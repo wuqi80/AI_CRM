@@ -18,6 +18,9 @@
         <if test="data.roleId != null">
             and g.role_id=#{data.roleId}
         </if>
+        <if test="data.deptId != null">
+            and a.dept_id=#{data.deptId}
+        </if>
     </select>
     <select id="getUserId" resultType="com.kakarote.ai_crm.entity.PO.ManagerUser">
         SELECT a.user_id, a.password, a.username,a.img, a.create_time, a.realname, a.num, a.mobile, a.email, a.sex, a.dept_id, a.post, a.status, a.parent_id

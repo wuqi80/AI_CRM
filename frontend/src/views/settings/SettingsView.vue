@@ -212,6 +212,258 @@
             </el-card>
           </div>
 
+          <!-- Team Management Tab -->
+          <div v-else-if="activeTab === 'team'">
+            <div class="flex gap-6" :class="{ 'flex-col': isMobile }" style="min-height: 500px">
+              <!-- Left: Department Tree -->
+              <div v-if="!isMobile" class="w-72 shrink-0 border-r border-gray-200 pr-4">
+                <div class="mb-3">
+                  <h4 class="font-medium text-base">组织架构</h4>
+                  <p class="text-xs text-gray-400 mt-1">查看和管理组织架构</p>
+                </div>
+                <el-button class="w-full mb-3" @click="handleAddDept(0)">
+                  <el-icon class="mr-1"><Plus /></el-icon>
+                  添加部门
+                </el-button>
+                <div v-if="loadingDeptTree" class="text-center py-8">
+                  <el-icon class="is-loading"><Loading /></el-icon>
+                </div>
+                <el-tree
+                  v-else
+                  ref="deptTreeRef"
+                  :data="deptTree"
+                  :props="{ label: 'deptName', children: 'children' }"
+                  node-key="deptId"
+                  highlight-current
+                  default-expand-all
+                  :expand-on-click-node="false"
+                  @node-click="handleDeptClick"
+                >
+                  <template #default="{ data }">
+                    <div class="flex items-center justify-between w-full pr-1">
+                      <span class="flex items-center gap-1.5 text-sm">
+                        <el-icon class="text-gray-400"><OfficeBuilding /></el-icon>
+                        {{ data.deptName }}
+                        <span class="text-xs text-gray-400">{{ data.userCount }}人</span>
+                      </span>
+                      <el-dropdown trigger="click" @command="(cmd: string) => handleDeptCommand(cmd, data)">
+                        <el-icon class="text-gray-400 cursor-pointer hover:text-primary-500" @click.stop><MoreFilled /></el-icon>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item command="edit">编辑</el-dropdown-item>
+                            <el-dropdown-item command="addChild">添加子部门</el-dropdown-item>
+                            <el-dropdown-item command="delete" divided>
+                              <span class="text-red-500">删除</span>
+                            </el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
+                    </div>
+                  </template>
+                </el-tree>
+              </div>
+
+              <!-- Mobile: Department selector -->
+              <div v-if="isMobile" class="flex items-center gap-2 mb-2">
+                <el-button @click="showDeptDrawer = true">
+                  <el-icon class="mr-1"><OfficeBuilding /></el-icon>
+                  {{ selectedDept ? selectedDept.deptName : '选择部门' }}
+                </el-button>
+                <el-button type="primary" size="small" @click="showAddMemberDialog = true" :disabled="!selectedDept">
+                  <el-icon class="mr-1"><Plus /></el-icon>
+                  添加成员
+                </el-button>
+              </div>
+
+              <!-- Right: Member List -->
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 class="font-medium text-base">
+                      {{ selectedDept ? selectedDept.deptName : '全部成员' }}
+                    </h4>
+                    <p class="text-xs text-gray-400 mt-1">管理组织内的成员和权限</p>
+                  </div>
+                  <el-button v-if="!isMobile" type="primary" @click="showAddMemberDialog = true" :disabled="!selectedDept">
+                    <el-icon class="mr-1"><Plus /></el-icon>
+                    添加成员
+                  </el-button>
+                </div>
+
+                <div v-if="loadingMembers" class="text-center py-8">
+                  <el-icon class="is-loading"><Loading /></el-icon>
+                </div>
+                <div v-else-if="memberList.length === 0" class="text-center py-16 text-gray-400">
+                  <el-icon :size="32" class="mb-2"><User /></el-icon>
+                  <p>{{ selectedDept ? '该部门暂无成员' : '请先选择一个部门' }}</p>
+                </div>
+                <div v-else class="space-y-3">
+                  <div
+                    v-for="member in memberList"
+                    :key="member.userId"
+                    class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div class="flex items-center gap-3 flex-1 min-w-0">
+                      <el-avatar :size="40" class="shrink-0" :class="getAvatarColor(member.realname)">
+                        {{ member.realname?.charAt(0) || '?' }}
+                      </el-avatar>
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <span class="font-medium">{{ member.realname || member.username }}</span>
+                          <el-tag
+                            :type="member.status === 1 ? 'success' : member.status === 0 ? 'danger' : 'info'"
+                            size="small"
+                          >
+                            {{ member.status === 1 ? '活跃' : member.status === 0 ? '禁用' : '未激活' }}
+                          </el-tag>
+                        </div>
+                        <div class="text-sm text-gray-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                          <span v-if="member.email" class="flex items-center gap-1">
+                            <el-icon :size="12"><Message /></el-icon>
+                            {{ member.email }}
+                          </span>
+                          <span v-if="member.mobile" class="flex items-center gap-1">
+                            <el-icon :size="12"><Phone /></el-icon>
+                            {{ member.mobile }}
+                          </span>
+                          <span v-if="selectedDept" class="flex items-center gap-1">
+                            <el-icon :size="12"><OfficeBuilding /></el-icon>
+                            {{ selectedDept.deptName }}
+                          </span>
+                          <span class="flex items-center gap-1">
+                            <el-icon :size="12"><Calendar /></el-icon>
+                            加入于 {{ formatDate(member.createTime) }}
+                          </span>
+                          <span v-if="member.post" class="flex items-center gap-1">
+                            <el-icon :size="12"><UserFilled /></el-icon>
+                            {{ member.post }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0 ml-2">
+                      <el-button text @click="handleEditMember(member)">
+                        <el-icon><Edit /></el-icon>
+                        编辑
+                      </el-button>
+                      <el-button text :type="member.status === 1 ? 'danger' : 'success'" @click="handleToggleStatus(member)">
+                        {{ member.status === 1 ? '禁用' : '启用' }}
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mobile: Department Drawer -->
+            <el-drawer
+              v-if="isMobile"
+              v-model="showDeptDrawer"
+              title="组织架构"
+              direction="ltr"
+              size="80%"
+            >
+              <el-button class="w-full mb-3" @click="handleAddDept(0)">
+                <el-icon class="mr-1"><Plus /></el-icon>
+                添加部门
+              </el-button>
+              <el-tree
+                :data="deptTree"
+                :props="{ label: 'deptName', children: 'children' }"
+                node-key="deptId"
+                highlight-current
+                default-expand-all
+                :expand-on-click-node="false"
+                @node-click="(data: any) => { handleDeptClick(data); showDeptDrawer = false }"
+              >
+                <template #default="{ data }">
+                  <div class="flex items-center justify-between w-full pr-1">
+                    <span class="flex items-center gap-1.5 text-sm">
+                      <el-icon class="text-gray-400"><OfficeBuilding /></el-icon>
+                      {{ data.deptName }}
+                      <span class="text-xs text-gray-400">{{ data.userCount }}人</span>
+                    </span>
+                    <el-dropdown trigger="click" @command="(cmd: string) => handleDeptCommand(cmd, data)">
+                      <el-icon class="text-gray-400 cursor-pointer hover:text-primary-500" @click.stop><MoreFilled /></el-icon>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="edit">编辑</el-dropdown-item>
+                          <el-dropdown-item command="addChild">添加子部门</el-dropdown-item>
+                          <el-dropdown-item command="delete" divided>
+                            <span class="text-red-500">删除</span>
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+              </el-tree>
+            </el-drawer>
+          </div>
+
+          <!-- Role Permission Tab -->
+          <div v-else-if="activeTab === 'role'">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="font-medium text-base">角色权限</h3>
+                <p class="text-xs text-gray-400 mt-1">管理不同角色的系统权限</p>
+              </div>
+              <el-button type="primary" @click="handleAddRole">
+                <el-icon class="mr-1"><Plus /></el-icon>
+                创建角色
+              </el-button>
+            </div>
+
+            <div v-if="loadingRoles" class="text-center py-8">
+              <el-icon class="is-loading"><Loading /></el-icon>
+            </div>
+
+            <div v-else-if="roleList.length === 0" class="text-center py-8 text-gray-400">
+              暂无角色，请创建
+            </div>
+
+            <div v-else class="space-y-4">
+              <el-card v-for="role in roleList" :key="role.roleId" shadow="hover" class="!border-gray-200">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center shrink-0">
+                    <el-icon :size="20" class="text-primary-500"><Key /></el-icon>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="font-medium text-base">{{ role.roleName }}</span>
+                        <p class="text-sm text-gray-500 mt-0.5">{{ role.description || '暂无描述' }}</p>
+                      </div>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <el-button text size="small" @click="handleEditRole(role)">
+                          <el-icon class="mr-0.5"><Edit /></el-icon> 编辑
+                        </el-button>
+                        <el-button text size="small" type="danger" @click="handleDeleteRole(role)">
+                          <el-icon><Delete /></el-icon>
+                        </el-button>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                      <div class="flex items-center gap-4">
+                        <span class="text-sm text-gray-500">用户数量</span>
+                        <el-tag size="small" round>{{ role.userCount }} 人</el-tag>
+                        <el-button size="small" link type="primary" @click="handleManageUsers(role)">
+                          <el-icon class="mr-0.5"><UserFilled /></el-icon> 管理用户
+                        </el-button>
+                      </div>
+                      <div>
+                        <span class="text-sm text-gray-500 mr-2">权限配置</span>
+                        <el-button size="small" @click="handleManagePermissions(role)">
+                          <el-icon class="mr-0.5"><Setting /></el-icon> 管理权限
+                        </el-button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </el-card>
+            </div>
+          </div>
+
           <!-- AI Agent Tab -->
           <div v-else-if="activeTab === 'agent'">
             <div class="flex items-center justify-between mb-4">
@@ -778,6 +1030,72 @@
       </template>
     </el-dialog>
 
+    <!-- Department Dialog -->
+    <el-dialog
+      v-model="showDeptDialog"
+      :title="editingDept ? '编辑部门' : '添加部门'"
+      :width="isMobile ? '95%' : '420px'"
+      :fullscreen="isMobile"
+    >
+      <el-form :model="deptForm" label-width="80px">
+        <el-form-item label="部门名称" required>
+          <el-input v-model="deptForm.deptName" placeholder="请输入部门名称" />
+        </el-form-item>
+        <el-form-item label="排序号">
+          <el-input-number v-model="deptForm.sortOrder" :min="0" :max="999" class="w-full" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showDeptDialog = false">取消</el-button>
+        <el-button type="primary" :loading="submittingDept" @click="handleSaveDept">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Member Dialog -->
+    <el-dialog
+      v-model="showAddMemberDialog"
+      :title="editingMember ? '编辑成员' : '添加成员'"
+      :width="isMobile ? '95%' : '500px'"
+      :fullscreen="isMobile"
+    >
+      <el-form :model="memberForm" label-width="80px">
+        <el-form-item v-if="!editingMember" label="用户名" required>
+          <el-input v-model="memberForm.username" placeholder="请输入用户名（用于登录）" />
+        </el-form-item>
+        <el-form-item label="姓名" required>
+          <el-input v-model="memberForm.realname" placeholder="请输入真实姓名" />
+        </el-form-item>
+        <el-form-item v-if="!editingMember" label="密码" required>
+          <el-input v-model="memberForm.password" type="password" show-password placeholder="请输入初始密码" />
+        </el-form-item>
+        <el-form-item label="手机号">
+          <el-input v-model="memberForm.mobile" placeholder="请输入手机号" />
+        </el-form-item>
+        <el-form-item label="邮箱">
+          <el-input v-model="memberForm.email" placeholder="请输入邮箱" />
+        </el-form-item>
+        <el-form-item label="部门">
+          <el-tree-select
+            v-model="memberForm.deptId"
+            :data="deptTree"
+            :props="{ label: 'deptName', value: 'deptId', children: 'children' }"
+            placeholder="请选择部门"
+            clearable
+            check-strictly
+            :render-after-expand="false"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="岗位">
+          <el-input v-model="memberForm.post" placeholder="请输入岗位" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddMemberDialog = false">取消</el-button>
+        <el-button type="primary" :loading="submittingMember" @click="handleSaveMember">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- Custom Field Dialog -->
     <el-dialog
       v-model="showFieldDialog"
@@ -843,18 +1161,179 @@
         <el-button type="primary" :loading="submitting" @click="handleSaveField">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- Role Create/Edit Dialog -->
+    <el-dialog
+      v-model="showRoleDialog"
+      :title="editingRole ? '编辑角色' : '创建角色'"
+      :width="isMobile ? '95%' : '460px'"
+      :fullscreen="isMobile"
+    >
+      <el-form :model="roleForm" label-width="80px">
+        <el-form-item label="角色名称" required>
+          <el-input v-model="roleForm.roleName" placeholder="请输入角色名称" />
+        </el-form-item>
+        <el-form-item label="角色描述">
+          <el-input v-model="roleForm.description" type="textarea" :rows="3" placeholder="请输入角色描述" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showRoleDialog = false">取消</el-button>
+        <el-button type="primary" :loading="savingRole" @click="handleSaveRole">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Permission Config Drawer -->
+    <el-drawer
+      v-model="showPermissionDrawer"
+      :title="'权限配置 - ' + (permissionRole?.roleName || '')"
+      :size="isMobile ? '100%' : '600px'"
+      direction="rtl"
+    >
+      <div v-if="loadingPermissions" class="text-center py-8">
+        <el-icon class="is-loading"><Loading /></el-icon>
+      </div>
+      <div v-else class="space-y-6">
+        <div v-for="moduleGroup in permissionList" :key="moduleGroup.module">
+          <h4 class="font-medium text-base mb-1">{{ moduleGroup.moduleName }}</h4>
+          <p class="text-xs text-gray-400 mb-3">配置用户在{{ moduleGroup.moduleName }}的操作权限和数据范围</p>
+          <div class="space-y-3">
+            <div
+              v-for="action in moduleGroup.actions"
+              :key="action.action"
+              class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+            >
+              <div class="flex items-center gap-3 flex-1">
+                <el-switch v-model="action.enabled" />
+                <div>
+                  <span class="font-medium text-sm">{{ action.actionName }}</span>
+                  <p class="text-xs text-gray-400 mt-0.5">允许{{ action.actionName }}{{ moduleGroup.moduleName === '商机模块' ? '商机' : '联系人' }}{{ action.action === 'change_stage' ? '' : '记录' }}</p>
+                </div>
+              </div>
+              <el-select
+                v-if="action.hasScopeOption"
+                v-model="action.dataScope"
+                :disabled="!action.enabled"
+                placeholder="数据范围"
+                size="small"
+                style="width: 160px"
+              >
+                <el-option
+                  v-for="opt in dataScopeOptions"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showPermissionDrawer = false">取消</el-button>
+        <el-button type="primary" :loading="savingPermissions" @click="handleSavePermissions">保存配置</el-button>
+      </template>
+    </el-drawer>
+
+    <!-- Manage Users Drawer -->
+    <el-drawer
+      v-model="showRoleUsersDrawer"
+      :title="'管理用户 - ' + (roleUsersRole?.roleName || '')"
+      :size="isMobile ? '100%' : '500px'"
+      direction="rtl"
+    >
+      <div class="mb-4">
+        <el-input
+          v-model="roleUserSearch"
+          placeholder="搜索用户..."
+          clearable
+          class="mb-3"
+        />
+        <el-button type="primary" class="w-full" @click="showAddRoleUserDialog = true">
+          <el-icon class="mr-1"><Plus /></el-icon>
+          添加用户
+        </el-button>
+      </div>
+
+      <p class="text-sm text-gray-500 mb-3">当前用户 ({{ filteredRoleUsers.length }})</p>
+
+      <div v-if="loadingRoleUsers" class="text-center py-8">
+        <el-icon class="is-loading"><Loading /></el-icon>
+      </div>
+      <div v-else-if="filteredRoleUsers.length === 0" class="text-center py-8 text-gray-400">
+        暂无用户
+      </div>
+      <div v-else class="space-y-2">
+        <div
+          v-for="user in filteredRoleUsers"
+          :key="user.userId"
+          class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+        >
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium" :class="getAvatarColor(user.realname || user.username)">
+              {{ (user.realname || user.username || '?').charAt(0) }}
+            </div>
+            <div>
+              <div class="font-medium text-sm">{{ user.realname || user.username }}</div>
+              <div class="text-xs text-gray-400">{{ user.email || '' }}</div>
+            </div>
+          </div>
+          <el-button text type="danger" size="small" @click="handleRemoveRoleUser(user)">
+            <el-icon><Delete /></el-icon>
+          </el-button>
+        </div>
+      </div>
+    </el-drawer>
+
+    <!-- Add User to Role Dialog -->
+    <el-dialog
+      v-model="showAddRoleUserDialog"
+      title="添加用户到角色"
+      :width="isMobile ? '95%' : '460px'"
+      :fullscreen="isMobile"
+      append-to-body
+    >
+      <el-input v-model="allUserSearch" placeholder="搜索用户..." clearable class="mb-3" />
+      <div class="max-h-64 overflow-auto space-y-1">
+        <div
+          v-for="user in availableUsersForRole"
+          :key="user.userId"
+          class="flex items-center justify-between p-2 hover:bg-gray-50 rounded cursor-pointer"
+          @click="toggleSelectUser(user.userId)"
+        >
+          <div class="flex items-center gap-2">
+            <el-checkbox :model-value="selectedUserIds.includes(String(user.userId))" @click.stop />
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium" :class="getAvatarColor(user.realname || user.username)">
+              {{ (user.realname || user.username || '?').charAt(0) }}
+            </div>
+            <span class="text-sm">{{ user.realname || user.username }}</span>
+          </div>
+          <span class="text-xs text-gray-400">{{ user.email || '' }}</span>
+        </div>
+        <div v-if="availableUsersForRole.length === 0" class="text-center py-4 text-gray-400 text-sm">
+          没有可添加的用户
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showAddRoleUserDialog = false">取消</el-button>
+        <el-button type="primary" :loading="addingRoleUsers" :disabled="selectedUserIds.length === 0" @click="handleConfirmAddRoleUsers">
+          确认添加 ({{ selectedUserIds.length }})
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useAgentStore } from '@/stores/agent'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   User, UserFilled, Key, MagicStick, Plus, Promotion, Edit, Delete, Loading, Grid,
-  Setting, Bell, Coin, Connection, Share, TrendCharts, Document, Tools, View, Hide, Box, Link, Reading
+  Setting, Bell, Coin, Connection, Share, TrendCharts, Document, Tools, View, Hide, Box, Link, Reading,
+  OfficeBuilding, MoreFilled, Message, Phone, Calendar
 } from '@element-plus/icons-vue'
 import type { AiAgent } from '@/types/common'
 import type { CustomField, EntityType, FieldType, FieldOption } from '@/types/customField'
@@ -867,9 +1346,13 @@ import {
   enableCustomField,
   disableCustomField
 } from '@/api/customField'
-import { getLoginUserDetail, updateProfile, changePassword } from '@/api/auth'
+import { getLoginUserDetail, updateProfile, changePassword, queryUserList, addUser, updateUserInfo } from '@/api/auth'
+import { queryDeptTree as fetchDeptTree, addDept, updateDept, deleteDept } from '@/api/dept'
+import type { DeptVO } from '@/types/dept'
 import { getAiConfig, updateAiConfig, testAiConnection, getMinioConsoleUrl, getMinioSsoUrl, getWeKnoraConfig, updateWeKnoraConfig, testWeKnoraConnection } from '@/api/systemConfig'
 import type { MinioConsoleConfig } from '@/types/systemConfig'
+import { queryRoleList, addRole, updateRole, deleteRole as deleteRoleApi, getRolePermissions, saveRolePermissions, addUsersToRole, removeUserFromRole } from '@/api/role'
+import type { RoleVO, RolePermissionVO, PermItem } from '@/types/role'
 
 const userStore = useUserStore()
 const agentStore = useAgentStore()
@@ -978,6 +1461,112 @@ const weknoraConfigForm = reactive<WeKnoraConfigUpdateBO & { updateTime?: string
   autoRagEnabled: true,
   updateTime: undefined
 })
+
+// Team management state
+const deptTreeRef = ref()
+const deptTree = ref<DeptVO[]>([])
+const selectedDept = ref<DeptVO | null>(null)
+const memberList = ref<any[]>([])
+const loadingDeptTree = ref(false)
+const loadingMembers = ref(false)
+const showDeptDrawer = ref(false)
+
+// Dept dialog
+const showDeptDialog = ref(false)
+const submittingDept = ref(false)
+const editingDept = ref<DeptVO | null>(null)
+const deptFormParentId = ref<number | string>(0)
+const deptForm = reactive({
+  deptName: '',
+  sortOrder: 0
+})
+
+// Member dialog
+const showAddMemberDialog = ref(false)
+const submittingMember = ref(false)
+const editingMember = ref<any>(null)
+const memberForm = reactive({
+  username: '',
+  realname: '',
+  password: '',
+  mobile: '',
+  email: '',
+  post: '',
+  deptId: null as number | string | null
+})
+
+// Role management state
+const roleList = ref<RoleVO[]>([])
+const loadingRoles = ref(false)
+const showRoleDialog = ref(false)
+const savingRole = ref(false)
+const editingRole = ref<RoleVO | null>(null)
+const roleForm = reactive({ roleName: '', description: '' })
+
+// Permission drawer state
+const showPermissionDrawer = ref(false)
+const permissionRole = ref<RoleVO | null>(null)
+const permissionList = ref<RolePermissionVO[]>([])
+const loadingPermissions = ref(false)
+const savingPermissions = ref(false)
+
+// Role users drawer state
+const showRoleUsersDrawer = ref(false)
+const roleUsersRole = ref<RoleVO | null>(null)
+const roleUsers = ref<any[]>([])
+const loadingRoleUsers = ref(false)
+const roleUserSearch = ref('')
+
+// Add user to role dialog state
+const showAddRoleUserDialog = ref(false)
+const allUsers = ref<any[]>([])
+const allUserSearch = ref('')
+const selectedUserIds = ref<string[]>([])
+const addingRoleUsers = ref(false)
+
+const dataScopeOptions = [
+  { value: 1, label: '本人' },
+  { value: 2, label: '本人及下属' },
+  { value: 3, label: '本部门' },
+  { value: 4, label: '本部门及下属部门' },
+  { value: 5, label: '全部' }
+]
+
+const filteredRoleUsers = computed(() => {
+  if (!roleUserSearch.value) return roleUsers.value
+  const s = roleUserSearch.value.toLowerCase()
+  return roleUsers.value.filter((u: any) =>
+    (u.realname || '').toLowerCase().includes(s) ||
+    (u.username || '').toLowerCase().includes(s) ||
+    (u.email || '').toLowerCase().includes(s)
+  )
+})
+
+const availableUsersForRole = computed(() => {
+  const existingIds = new Set(roleUsers.value.map((u: any) => String(u.userId)))
+  let users = allUsers.value.filter((u: any) => !existingIds.has(String(u.userId)))
+  if (allUserSearch.value) {
+    const s = allUserSearch.value.toLowerCase()
+    users = users.filter((u: any) =>
+      (u.realname || '').toLowerCase().includes(s) ||
+      (u.username || '').toLowerCase().includes(s)
+    )
+  }
+  return users
+})
+
+// Avatar color palette
+const avatarColors = ['bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-pink-500', 'bg-teal-500']
+function getAvatarColor(name: string): string {
+  if (!name) return avatarColors[0]
+  const index = name.charCodeAt(0) % avatarColors.length
+  return avatarColors[index]
+}
+
+function formatDate(date: string | Date | undefined): string {
+  if (!date) return ''
+  return new Date(date).toLocaleDateString('zh-CN')
+}
 
 // 预设的 AI 服务提供商
 const providerPresets: AiProviderPreset[] = [
@@ -1226,6 +1815,205 @@ function resetFieldForm() {
   })
 }
 
+// Team management methods
+async function loadDeptTree() {
+  loadingDeptTree.value = true
+  try {
+    deptTree.value = await fetchDeptTree()
+    // 默认选中第一个顶级部门
+    if (deptTree.value.length > 0 && !selectedDept.value) {
+      selectedDept.value = deptTree.value[0]
+      nextTick(() => {
+        deptTreeRef.value?.setCurrentKey(deptTree.value[0].deptId)
+      })
+      loadMembers()
+    }
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    loadingDeptTree.value = false
+  }
+}
+
+async function loadMembers() {
+  if (!selectedDept.value) {
+    memberList.value = []
+    return
+  }
+  loadingMembers.value = true
+  try {
+    const res = await queryUserList({ deptId: selectedDept.value.deptId, limit: 200 })
+    memberList.value = res?.list || res?.records || res || []
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    loadingMembers.value = false
+  }
+}
+
+function handleDeptClick(data: DeptVO) {
+  selectedDept.value = data
+  loadMembers()
+}
+
+function handleDeptCommand(command: string, data: DeptVO) {
+  if (command === 'edit') {
+    handleEditDept(data)
+  } else if (command === 'addChild') {
+    handleAddDept(data.deptId)
+  } else if (command === 'delete') {
+    handleDeleteDept(data)
+  }
+}
+
+function handleAddDept(parentId: string | number) {
+  editingDept.value = null
+  deptFormParentId.value = parentId
+  Object.assign(deptForm, { deptName: '', sortOrder: 0 })
+  showDeptDialog.value = true
+}
+
+function handleEditDept(dept: DeptVO) {
+  editingDept.value = dept
+  deptFormParentId.value = dept.parentId
+  Object.assign(deptForm, { deptName: dept.deptName, sortOrder: dept.sortOrder || 0 })
+  showDeptDialog.value = true
+}
+
+async function handleDeleteDept(dept: DeptVO) {
+  try {
+    await ElMessageBox.confirm(`确定要删除部门「${dept.deptName}」吗？`, '提示', { type: 'warning' })
+    await deleteDept(dept.deptId)
+    ElMessage.success('部门删除成功')
+    if (selectedDept.value?.deptId === dept.deptId) {
+      selectedDept.value = null
+      memberList.value = []
+    }
+    await loadDeptTree()
+  } catch {
+    // Cancelled or error
+  }
+}
+
+async function handleSaveDept() {
+  if (!deptForm.deptName.trim()) {
+    ElMessage.warning('请输入部门名称')
+    return
+  }
+  submittingDept.value = true
+  try {
+    if (editingDept.value) {
+      await updateDept({
+        deptId: editingDept.value.deptId,
+        deptName: deptForm.deptName,
+        parentId: deptFormParentId.value,
+        sortOrder: deptForm.sortOrder
+      })
+      ElMessage.success('部门更新成功')
+    } else {
+      await addDept({
+        deptName: deptForm.deptName,
+        parentId: deptFormParentId.value,
+        sortOrder: deptForm.sortOrder
+      })
+      ElMessage.success('部门添加成功')
+    }
+    showDeptDialog.value = false
+    await loadDeptTree()
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    submittingDept.value = false
+  }
+}
+
+function handleEditMember(member: any) {
+  editingMember.value = member
+  Object.assign(memberForm, {
+    username: member.username || '',
+    realname: member.realname || '',
+    password: '',
+    mobile: member.mobile || '',
+    email: member.email || '',
+    post: member.post || '',
+    deptId: member.deptId || null
+  })
+  showAddMemberDialog.value = true
+}
+
+async function handleToggleStatus(member: any) {
+  const newStatus = member.status === 1 ? 0 : 1
+  const action = newStatus === 0 ? '禁用' : '启用'
+  try {
+    await ElMessageBox.confirm(`确定要${action}成员「${member.realname || member.username}」吗？`, '提示', { type: 'warning' })
+    await updateUserInfo({ userId: member.userId, status: newStatus })
+    ElMessage.success(`成员已${action}`)
+    await loadMembers()
+  } catch {
+    // Cancelled or error
+  }
+}
+
+async function handleSaveMember() {
+  if (editingMember.value) {
+    if (!memberForm.realname.trim()) {
+      ElMessage.warning('请输入姓名')
+      return
+    }
+    submittingMember.value = true
+    try {
+      await updateUserInfo({
+        userId: editingMember.value.userId,
+        realname: memberForm.realname,
+        mobile: memberForm.mobile || undefined,
+        email: memberForm.email || undefined,
+        post: memberForm.post || undefined,
+        deptId: memberForm.deptId || undefined
+      })
+      ElMessage.success('成员更新成功')
+      showAddMemberDialog.value = false
+      editingMember.value = null
+      await loadMembers()
+      await loadDeptTree()
+    } catch {
+      // Error handled by interceptor
+    } finally {
+      submittingMember.value = false
+    }
+  } else {
+    if (!memberForm.username.trim() || !memberForm.realname.trim() || !memberForm.password.trim()) {
+      ElMessage.warning('请填写用户名、姓名和密码')
+      return
+    }
+    submittingMember.value = true
+    try {
+      await addUser({
+        username: memberForm.username,
+        password: memberForm.password,
+        realname: memberForm.realname,
+        mobile: memberForm.mobile || undefined,
+        email: memberForm.email || undefined,
+        deptId: memberForm.deptId || (selectedDept.value ? selectedDept.value.deptId : undefined),
+        post: memberForm.post || undefined
+      })
+      ElMessage.success('成员添加成功')
+      showAddMemberDialog.value = false
+      resetMemberForm()
+      await loadMembers()
+      await loadDeptTree()
+    } catch {
+      // Error handled by interceptor
+    } finally {
+      submittingMember.value = false
+    }
+  }
+}
+
+function resetMemberForm() {
+  editingMember.value = null
+  Object.assign(memberForm, { username: '', realname: '', password: '', mobile: '', email: '', post: '', deptId: selectedDept.value ? selectedDept.value.deptId : null })
+}
+
 // Agent methods
 function handleEditAgent(agent: AiAgent) {
   editingAgent.value = agent
@@ -1381,8 +2169,14 @@ function formatTime(time: string | undefined): string {
   return new Date(time).toLocaleString('zh-CN')
 }
 
-// 监听 tab 切换，懒加载 AI 配置
+// 监听 tab 切换，懒加载配置
 watch(activeTab, async (newTab) => {
+  if (newTab === 'team') {
+    await loadDeptTree()
+  }
+  if (newTab === 'role') {
+    await loadRoleList()
+  }
   if (newTab === 'api' && !aiConfigLoaded.value) {
     await loadAiConfig()
   }
@@ -1506,6 +2300,175 @@ async function handleSaveWeknoraConfig() {
     savingWeknoraConfig.value = false
   }
 }
+
+// ========== Role Management Methods ==========
+
+async function loadRoleList() {
+  loadingRoles.value = true
+  try {
+    roleList.value = await queryRoleList()
+  } catch {
+    // handled
+  } finally {
+    loadingRoles.value = false
+  }
+}
+
+function handleAddRole() {
+  editingRole.value = null
+  Object.assign(roleForm, { roleName: '', description: '' })
+  showRoleDialog.value = true
+}
+
+function handleEditRole(role: RoleVO) {
+  editingRole.value = role
+  Object.assign(roleForm, { roleName: role.roleName, description: role.description || '' })
+  showRoleDialog.value = true
+}
+
+async function handleSaveRole() {
+  if (!roleForm.roleName.trim()) {
+    ElMessage.warning('请输入角色名称')
+    return
+  }
+  savingRole.value = true
+  try {
+    if (editingRole.value) {
+      await updateRole({ roleId: editingRole.value.roleId, roleName: roleForm.roleName, description: roleForm.description })
+      ElMessage.success('角色更新成功')
+    } else {
+      await addRole({ roleName: roleForm.roleName, description: roleForm.description })
+      ElMessage.success('角色创建成功')
+    }
+    showRoleDialog.value = false
+    await loadRoleList()
+  } catch {
+    // handled
+  } finally {
+    savingRole.value = false
+  }
+}
+
+async function handleDeleteRole(role: RoleVO) {
+  try {
+    await ElMessageBox.confirm(`确定要删除角色「${role.roleName}」吗？该角色下的 ${role.userCount} 个用户将失去此角色。`, '提示', { type: 'warning' })
+    await deleteRoleApi(role.roleId)
+    ElMessage.success('角色删除成功')
+    await loadRoleList()
+  } catch {
+    // cancelled
+  }
+}
+
+// Permission methods
+async function handleManagePermissions(role: RoleVO) {
+  permissionRole.value = role
+  showPermissionDrawer.value = true
+  loadingPermissions.value = true
+  try {
+    permissionList.value = await getRolePermissions(role.roleId)
+  } catch {
+    // handled
+  } finally {
+    loadingPermissions.value = false
+  }
+}
+
+async function handleSavePermissions() {
+  if (!permissionRole.value) return
+  savingPermissions.value = true
+  const permissions: PermItem[] = []
+  for (const mod of permissionList.value) {
+    for (const act of mod.actions) {
+      if (act.enabled) {
+        permissions.push({
+          menuId: act.menuId,
+          dataScope: act.hasScopeOption ? act.dataScope : null
+        })
+      }
+    }
+  }
+  try {
+    await saveRolePermissions({ roleId: permissionRole.value.roleId, permissions })
+    ElMessage.success('权限配置保存成功')
+    showPermissionDrawer.value = false
+  } catch {
+    // handled
+  } finally {
+    savingPermissions.value = false
+  }
+}
+
+// Role users methods
+async function handleManageUsers(role: RoleVO) {
+  roleUsersRole.value = role
+  roleUserSearch.value = ''
+  showRoleUsersDrawer.value = true
+  await loadRoleUsers()
+}
+
+async function loadRoleUsers() {
+  if (!roleUsersRole.value) return
+  loadingRoleUsers.value = true
+  try {
+    const res = await queryUserList({ roleId: roleUsersRole.value.roleId, limit: 200 })
+    roleUsers.value = res?.list || res?.records || (Array.isArray(res) ? res : [])
+  } catch {
+    // handled
+  } finally {
+    loadingRoleUsers.value = false
+  }
+}
+
+async function handleRemoveRoleUser(user: any) {
+  if (!roleUsersRole.value) return
+  try {
+    await ElMessageBox.confirm(`确定要将「${user.realname || user.username}」从该角色中移除吗？`, '提示', { type: 'warning' })
+    await removeUserFromRole(String(user.userId), roleUsersRole.value.roleId)
+    ElMessage.success('用户已移除')
+    await loadRoleUsers()
+    await loadRoleList()
+  } catch {
+    // cancelled
+  }
+}
+
+function toggleSelectUser(userId: string | number) {
+  const id = String(userId)
+  const idx = selectedUserIds.value.indexOf(id)
+  if (idx >= 0) selectedUserIds.value.splice(idx, 1)
+  else selectedUserIds.value.push(id)
+}
+
+async function handleConfirmAddRoleUsers() {
+  if (!roleUsersRole.value || selectedUserIds.value.length === 0) return
+  addingRoleUsers.value = true
+  try {
+    await addUsersToRole(selectedUserIds.value, roleUsersRole.value.roleId)
+    ElMessage.success('用户添加成功')
+    showAddRoleUserDialog.value = false
+    selectedUserIds.value = []
+    await loadRoleUsers()
+    await loadRoleList()
+  } catch {
+    // handled
+  } finally {
+    addingRoleUsers.value = false
+  }
+}
+
+watch(showAddRoleUserDialog, async (val) => {
+  if (val) {
+    allUserSearch.value = ''
+    selectedUserIds.value = []
+    try {
+      const res = await queryUserList({ limit: 200 })
+      allUsers.value = res?.list || res?.records || (Array.isArray(res) ? res : [])
+    } catch {
+      // handled
+    }
+  }
+})
 </script>
 
 <style scoped>
@@ -1526,5 +2489,15 @@ async function handleSaveWeknoraConfig() {
 
 .settings-tabs :deep(.el-tabs__content) {
   display: none;
+}
+
+/* Department tree styles */
+:deep(.el-tree-node__content) {
+  height: 36px;
+  padding-right: 4px;
+}
+
+:deep(.el-tree-node.is-current > .el-tree-node__content) {
+  background-color: var(--el-color-primary-light-9);
 }
 </style>

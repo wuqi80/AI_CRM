@@ -48,8 +48,47 @@ export function changePassword(oldPassword: string, newPassword: string): Promis
 /**
  * Query user list
  */
-export function queryUserList(search?: string): Promise<any> {
-  return post('/managerUser/queryPageList', { page: 1, limit: 100, search })
+export function queryUserList(params?: { search?: string; deptId?: string | number; roleId?: string | number; page?: number; limit?: number }): Promise<any> {
+  return post('/managerUser/queryPageList', { page: 1, limit: 100, ...params })
+}
+
+/**
+ * Add user
+ */
+export function addUser(data: {
+  username: string
+  password: string
+  realname: string
+  mobile?: string
+  email?: string
+  deptId?: number | string
+  post?: string
+}): Promise<void> {
+  return post('/managerUser/addUser', data)
+}
+
+/**
+ * Update user info
+ */
+export function updateUserInfo(data: {
+  userId: number | string
+  realname?: string
+  mobile?: string
+  email?: string
+  deptId?: number | string
+  post?: string
+  sex?: number
+  status?: number
+  password?: string
+}): Promise<void> {
+  return post('/managerUser/updateUser', data)
+}
+
+/**
+ * Delete users
+ */
+export function deleteUsers(userIds: (number | string)[]): Promise<void> {
+  return post('/managerUser/deleteByIds', userIds)
 }
 
 /**

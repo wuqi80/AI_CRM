@@ -18,4 +18,7 @@ public class UserQueryBO extends PageEntity {
 
     @Schema(description = "角色ID")
     private Long roleId;
+
+    @Schema(description = "部门ID")
+    private Long deptId;
 }

@@ -112,6 +112,21 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
                 String passWord = bCryptPasswordEncoder.encode(updateBO.getPassword());
                 userEntity.setPassword(passWord);
             }
+            if (ObjectUtil.isNotNull(updateBO.getEmail())){
+                userEntity.setEmail(updateBO.getEmail());
+            }
+            if (ObjectUtil.isNotNull(updateBO.getDeptId())){
+                userEntity.setDeptId(updateBO.getDeptId());
+            }
+            if (ObjectUtil.isNotNull(updateBO.getPost())){
+                userEntity.setPost(updateBO.getPost());
+            }
+            if (ObjectUtil.isNotNull(updateBO.getSex())){
+                userEntity.setSex(updateBO.getSex());
+            }
+            if (ObjectUtil.isNotNull(updateBO.getStatus())){
+                userEntity.setStatus(updateBO.getStatus());
+            }
             updateById(userEntity);
         }
     }

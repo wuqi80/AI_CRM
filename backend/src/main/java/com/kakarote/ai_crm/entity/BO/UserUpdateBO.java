@@ -23,4 +23,19 @@ public class UserUpdateBO {
 
     @Schema(description = "密码")
     private String password;
+
+    @Schema(description = "邮箱")
+    private String email;
+
+    @Schema(description = "部门ID")
+    private Long deptId;
+
+    @Schema(description = "岗位")
+    private String post;
+
+    @Schema(description = "0 未选择 1 男 2 女")
+    private Integer sex;
+
+    @Schema(description = "状态,0禁用,1正常,2未激活")
+    private Integer status;
 }

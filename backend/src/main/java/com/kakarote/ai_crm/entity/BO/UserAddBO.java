@@ -23,4 +23,13 @@ public class UserAddBO {
 
     @Schema(description = "真实姓名")
     private String realname;
+
+    @Schema(description = "邮箱")
+    private String email;
+
+    @Schema(description = "部门ID")
+    private Long deptId;
+
+    @Schema(description = "岗位")
+    private String post;
 }

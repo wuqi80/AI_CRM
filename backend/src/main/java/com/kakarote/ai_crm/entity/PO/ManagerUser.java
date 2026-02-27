@@ -83,7 +83,7 @@ public class ManagerUser implements Serializable {
 	 * 部门
 	 */
 	@Schema(description = "部门")
-	private Integer deptId;
+	private Long deptId;
 	/**
 	 * 岗位
 	 */

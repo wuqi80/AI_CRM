@@ -50,4 +50,7 @@ public class ManageUserVO {
 
     @Schema(description = "上级名称")
     private String parentName;
+
+    @Schema(description = "部门名称")
+    private String deptName;
 }
