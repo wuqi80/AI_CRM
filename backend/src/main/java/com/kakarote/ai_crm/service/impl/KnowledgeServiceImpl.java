@@ -33,6 +33,7 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,6 +69,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     @Autowired
     private FileStorageService fileStorageService;
 
+    @Lazy
     @Autowired
     private DynamicChatClientProvider chatClientProvider;
 
