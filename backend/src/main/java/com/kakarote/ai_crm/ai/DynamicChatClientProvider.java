@@ -142,6 +142,15 @@ public class DynamicChatClientProvider {
     }
 
     /**
+     * 检查当前租户的 API Key 是否已配置
+     */
+    public boolean isApiKeyConfigured() {
+        Map<String, String> configs = loadAiConfigsFromDB();
+        String apiKey = configs.getOrDefault("ai_api_key", defaultApiKey);
+        return StrUtil.isNotBlank(apiKey);
+    }
+
+    /**
      * 移除指定租户的 ChatClient 缓存（配置变更后调用）
      */
     public void evictTenantChatClient(Long tenantId) {
