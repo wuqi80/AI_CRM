@@ -34,8 +34,8 @@
     </div>
 
     <!-- Content Area -->
-    <div class="flex-1 overflow-auto">
-      <div :class="activeTab === 'team' ? 'p-0' : 'p-4 md:p-6'">
+    <div class="flex-1 min-h-0" :class="activeTab === 'team' ? 'overflow-hidden' : 'overflow-auto'">
+      <div :class="activeTab === 'team' ? 'p-0 h-full min-h-0 flex flex-col' : 'p-4 md:p-6'">
           <!-- System Sub-tabs (v-show so it doesn't break v-if/v-else-if chain) -->
           <div v-show="isSystemTab" class="max-w-4xl mx-auto mb-6">
             <div class="flex gap-2 overflow-x-auto">
@@ -152,14 +152,13 @@
           </div>
 
           <!-- Team Management Tab -->
-          <div v-else-if="activeTab === 'team'">
+          <div v-else-if="activeTab === 'team'" class="h-full min-h-0">
             <div
-              class="flex h-full bg-slate-50/50 overflow-hidden"
+              class="flex h-full min-h-0 bg-slate-50/50 overflow-hidden"
               :class="{ 'flex-col': isMobile }"
-              style="min-height: 500px"
             >
               <!-- Left Sidebar: Department Tree -->
-              <div v-if="!isMobile" class="w-72 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+              <div v-if="!isMobile" class="w-72 shrink-0 bg-white border-r border-slate-200 flex flex-col min-h-0">
                 <div class="p-6 border-b border-slate-100 flex items-center justify-between">
                   <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <span class="material-symbols-outlined text-primary text-lg">account_tree</span>
@@ -173,7 +172,7 @@
                     <span class="material-symbols-outlined text-sm">add</span>
                   </button>
                 </div>
-                <div class="flex-1 overflow-y-auto p-4">
+                <div class="flex-1 min-h-0 overflow-y-auto p-4">
                   <div v-if="loadingDeptTree" class="text-center py-8">
                     <span class="material-symbols-outlined text-slate-300 animate-spin">progress_activity</span>
                   </div>
@@ -242,7 +241,7 @@
               </div>
 
               <!-- Right Content: Employee List -->
-              <div class="flex-1 overflow-y-auto" :class="isMobile ? 'p-4' : 'p-8'">
+              <div class="flex-1 min-h-0 overflow-y-auto" :class="isMobile ? 'p-4' : 'p-8'">
                 <div class="max-w-6xl mx-auto w-full space-y-6">
                   <!-- Header -->
                   <div class="flex items-center justify-between">
