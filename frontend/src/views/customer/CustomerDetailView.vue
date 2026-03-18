@@ -248,7 +248,7 @@
                 最近活动 - 智能跟进时间轴
               </h3>
               <div class="flex items-center gap-3">
-                <div class="flex bg-slate-100 p-1 rounded-lg">
+                <!-- <div class="flex bg-slate-100 p-1 rounded-lg">
                   <button class="px-3 py-1 text-xs font-bold rounded bg-white shadow-sm">全部</button>
                   <button class="px-3 py-1 text-xs font-medium text-slate-500">会议摘要</button>
                   <button class="px-3 py-1 text-xs font-medium text-slate-500">重要进展</button>
@@ -259,7 +259,7 @@
                 >
                   <span class="material-symbols-outlined text-sm">add</span>
                   添加跟进
-                </button>
+                </button> -->
               </div>
             </div>
 

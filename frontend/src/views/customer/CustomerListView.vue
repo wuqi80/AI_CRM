@@ -230,55 +230,102 @@
       </div>
 
       <!-- AI Insight Sidebar -->
-      <div v-if="!isMobile" class="w-80 shrink-0 space-y-4">
-        <div class="flex items-center gap-2 px-1 mb-2">
-          <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AI 智能洞察预警</h3>
-          <span class="size-2 rounded-full bg-primary animate-pulse"></span>
-        </div>
+      <div
+        v-if="!isMobile"
+        :class="[
+          'w-full xl:shrink-0 overflow-hidden transition-[width] duration-300 ease-out',
+          isAiSidebarExpanded ? 'xl:w-80' : 'xl:w-12'
+        ]"
+      >
+        <div
+          :class="[
+            'w-full xl:w-auto rounded-2xl xl:rounded-none p-1 xl:p-0 border border-transparent xl:border-none',
+            isAiSidebarExpanded ? 'bg-slate-50/50 xl:bg-transparent' : 'bg-transparent'
+          ]"
+        >
+          <div class="flex items-center justify-between px-1 mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <h3 v-if="isAiSidebarExpanded" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
+                AI 智能洞察预警
+              </h3>
+              <span v-if="isAiSidebarExpanded" class="size-2 rounded-full bg-primary animate-pulse"></span>
+            </div>
 
-        <!-- High Potential Warning -->
-        <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-primary/50 hover:shadow-md transition-all">
-          <div class="flex items-center gap-2 mb-2">
-            <span class="material-symbols-outlined text-primary text-xl">auto_awesome</span>
-            <h3 class="text-sm font-bold text-slate-900">高潜力客户预警</h3>
+            <button
+              type="button"
+              class="size-8 flex items-center justify-center rounded-lg hover:bg-slate-200/50 text-slate-400 hover:text-slate-600 transition-colors"
+              :title="isAiSidebarExpanded ? '收起面板' : '展开面板'"
+              @click="isAiSidebarExpanded = !isAiSidebarExpanded"
+            >
+              <span class="material-symbols-outlined text-xl">
+                {{ isAiSidebarExpanded ? 'last_page' : 'first_page' }}
+              </span>
+            </button>
           </div>
-          <p class="text-xs text-slate-500 leading-relaxed">发现 {{ negotiationCount }} 位客户近期成交概率显著提升，建议优先跟进。</p>
-          <div class="mt-3 flex items-center justify-between">
-            <span class="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded">{{ negotiationCount }} 位待处理</span>
-            <span class="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors text-sm">arrow_forward</span>
-          </div>
-        </div>
 
-        <!-- Auto Follow-up -->
-        <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all">
-          <div class="flex items-center gap-2 mb-2">
-            <span class="material-symbols-outlined text-indigo-600 text-xl">mark_email_unread</span>
-            <h3 class="text-sm font-bold text-slate-900">自动化跟进生成</h3>
-          </div>
-          <p class="text-xs text-slate-500 leading-relaxed">有 {{ overdueCount }} 个客户超过7天未跟进，建议尽快安排跟进计划。</p>
-          <div class="mt-3 flex items-center justify-between">
-            <span class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{{ overdueCount }} 个待跟进</span>
-            <span class="material-symbols-outlined text-slate-300 group-hover:text-indigo-600 transition-colors text-sm">arrow_forward</span>
-          </div>
-        </div>
+          <Transition
+            enter-active-class="transition-all duration-200 ease-out"
+            enter-from-class="opacity-0 -translate-y-1"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition-all duration-150 ease-in"
+            leave-from-class="opacity-100 translate-y-0"
+            leave-to-class="opacity-0 -translate-y-1"
+          >
+            <div v-if="isAiSidebarExpanded" class="space-y-4">
+              <!-- High Potential Warning -->
+              <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-primary/50 hover:shadow-md transition-all">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="material-symbols-outlined text-primary text-xl">auto_awesome</span>
+                  <h3 class="text-sm font-bold text-slate-900">高潜力客户预警</h3>
+                </div>
+                <p class="text-xs text-slate-500 leading-relaxed">发现 {{ negotiationCount }} 位客户近期成交概率显著提升，建议优先跟进。</p>
+                <div class="mt-3 flex items-center justify-between">
+                  <span class="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded">{{ negotiationCount }} 位待处理</span>
+                  <span class="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors text-sm">arrow_forward</span>
+                </div>
+              </div>
 
-        <!-- Forecast Update -->
-        <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-emerald-400 hover:shadow-md transition-all">
-          <div class="flex items-center gap-2 mb-2">
-            <span class="material-symbols-outlined text-emerald-600 text-xl">insights</span>
-            <h3 class="text-sm font-bold text-slate-900">成交预测更新</h3>
-          </div>
-          <p class="text-xs text-slate-500 leading-relaxed">当前成交转化率 {{ conversionRate }}%，共 {{ closedCount }} 个客户已成交。</p>
-          <div class="mt-3 flex items-center justify-between">
-            <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{{ conversionRate }}% 转化率</span>
-            <span class="material-symbols-outlined text-slate-300 group-hover:text-emerald-600 transition-colors text-sm">arrow_forward</span>
-          </div>
-        </div>
+              <!-- Auto Follow-up -->
+              <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="material-symbols-outlined text-indigo-600 text-xl">mark_email_unread</span>
+                  <h3 class="text-sm font-bold text-slate-900">自动化跟进生成</h3>
+                </div>
+                <p class="text-xs text-slate-500 leading-relaxed">有 {{ overdueCount }} 个客户超过7天未跟进，建议尽快安排跟进计划。</p>
+                <div class="mt-3 flex items-center justify-between">
+                  <span class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{{ overdueCount }} 个待跟进</span>
+                  <span class="material-symbols-outlined text-slate-300 group-hover:text-indigo-600 transition-colors text-sm">arrow_forward</span>
+                </div>
+              </div>
 
-        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
-          <p class="text-[10px] text-slate-400 leading-relaxed text-center italic">
-            AI 助手正在实时分析您的客户数据，预警信息将在此处即时更新。
-          </p>
+              <!-- Forecast Update -->
+              <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-emerald-400 hover:shadow-md transition-all">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="material-symbols-outlined text-emerald-600 text-xl">insights</span>
+                  <h3 class="text-sm font-bold text-slate-900">成交预测更新</h3>
+                </div>
+                <p class="text-xs text-slate-500 leading-relaxed">当前成交转化率 {{ conversionRate }}%，共 {{ closedCount }} 个客户已成交。</p>
+                <div class="mt-3 flex items-center justify-between">
+                  <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{{ conversionRate }}% 转化率</span>
+                  <span class="material-symbols-outlined text-slate-300 group-hover:text-emerald-600 transition-colors text-sm">arrow_forward</span>
+                </div>
+              </div>
+
+              <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <p class="text-[10px] text-slate-400 leading-relaxed text-center italic">
+                  AI 助手正在实时分析您的客户数据，预警信息将在此处即时更新。
+                </p>
+              </div>
+            </div>
+          </Transition>
+
+          <div v-if="!isAiSidebarExpanded" class="hidden xl:flex flex-col items-center gap-6 pt-4">
+            <span class="material-symbols-outlined text-primary/40 text-xl animate-pulse">auto_awesome</span>
+            <div class="h-20 w-px bg-slate-200"></div>
+            <span class="[writing-mode:vertical-rl] text-[10px] font-bold text-slate-400 tracking-widest">
+              <span class="[text-combine-upright:all]">AI</span> 智能洞察
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -710,7 +757,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
@@ -730,6 +777,28 @@ const router = useRouter()
 const route = useRoute()
 const customerStore = useCustomerStore()
 const { isMobile } = useResponsive()
+
+// UI only: AI sidebar expand/collapse (persisted)
+const AI_SIDEBAR_STORAGE_KEY = 'wk_ai_crm:customer_ai_sidebar_expanded:v1'
+const isAiSidebarExpanded = ref(true)
+
+function loadAiSidebarExpanded() {
+  try {
+    const raw = localStorage.getItem(AI_SIDEBAR_STORAGE_KEY)
+    if (raw === null) return
+    isAiSidebarExpanded.value = raw === '1'
+  } catch {
+    // ignore
+  }
+}
+
+watch(isAiSidebarExpanded, (val) => {
+  try {
+    localStorage.setItem(AI_SIDEBAR_STORAGE_KEY, val ? '1' : '0')
+  } catch {
+    // ignore
+  }
+})
 
 const showAddDialog = ref(false)
 const editingCustomer = ref<CustomerListVO | null>(null)
@@ -906,6 +975,7 @@ const overdueCount = computed(() => {
 })
 
 onMounted(async () => {
+  loadAiSidebarExpanded()
   try {
     const allFields = await getEnabledFieldsByEntity('customer')
     listCustomFields.value = allFields.filter(f => f.isShowInList)
