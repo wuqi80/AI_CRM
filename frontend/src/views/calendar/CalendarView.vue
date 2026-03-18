@@ -243,65 +243,104 @@
       </div>
     </div>
 
-    <!-- Event Detail Panel -->
-    <Transition name="slide-right">
-      <aside v-if="selectedEvent" class="w-[420px] bg-slate-50 flex flex-col shrink-0">
-        <div class="p-8 flex-1 overflow-y-auto">
-          <div class="flex items-center justify-between mb-8">
-            <div class="flex items-center gap-2">
-              <span class="size-2 rounded-full bg-primary animate-pulse"></span>
-              <span class="text-[10px] font-bold text-primary uppercase tracking-widest">日程详情</span>
-            </div>
-            <button @click="selectedEvent = null" class="size-8 flex items-center justify-center rounded-full hover:bg-white text-slate-400 transition-colors">
-              <span class="material-symbols-outlined">close</span>
+    <!-- Event Detail Drawer (Desktop) -->
+    <el-drawer
+      v-if="!isMobile"
+      v-model="showScheduleDetailDrawer"
+      direction="rtl"
+      :size="'400px'"
+      :with-header="false"
+      class="schedule-detail-drawer"
+    >
+      <div v-if="selectedEvent" class="h-full flex flex-col bg-white shadow-2xl">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-slate-100">
+          <span class="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">
+            日程详情
+          </span>
+          <div class="flex items-center gap-2">
+            <button
+              @click="handleDeleteSchedule"
+              class="size-9 flex items-center justify-center rounded-full hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+              type="button"
+              aria-label="删除日程"
+              title="删除日程"
+            >
+              <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
             </button>
-          </div>
-
-          <div class="bg-white rounded-[2rem] p-8 shadow-xl shadow-slate-200/40 border border-slate-100 mb-8">
-            <h2 class="text-xl font-bold text-slate-900 mb-2">{{ selectedEvent.title }}</h2>
-            <div class="flex items-center gap-4 text-sm text-slate-500 mb-6 flex-wrap">
-              <div class="flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm">schedule</span>
-                {{ formatDateTime(selectedEvent.startTime) }}
-                <template v-if="selectedEvent.endTime"> ~ {{ formatTime(selectedEvent.endTime) }}</template>
-              </div>
-              <div v-if="selectedEvent.location" class="flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm">location_on</span>
-                {{ selectedEvent.location }}
-              </div>
-              <div v-if="selectedEvent.typeName" class="flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm">label</span>
-                {{ selectedEvent.typeName }}
-              </div>
-            </div>
-
-            <div class="space-y-6">
-              <div v-if="selectedEvent.customerName">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">关联客户</p>
-                <span class="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-medium rounded-full border border-slate-100">{{ selectedEvent.customerName }}</span>
-              </div>
-              <div v-if="selectedEvent.contactName">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">联系人</p>
-                <span class="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-medium rounded-full border border-slate-100">{{ selectedEvent.contactName }}</span>
-              </div>
-              <div v-if="selectedEvent.description">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">描述</p>
-                <p class="text-sm text-slate-700 leading-relaxed">{{ selectedEvent.description }}</p>
-              </div>
-            </div>
+            <button
+              @click="selectedEvent = null"
+              class="size-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              type="button"
+              aria-label="关闭日程详情"
+              title="关闭"
+            >
+              <span class="material-symbols-outlined text-xl leading-none">close</span>
+            </button>
           </div>
         </div>
 
-        <div class="p-6 bg-white border-t border-slate-100 flex gap-3">
+        <!-- Content -->
+        <div class="flex-1 min-h-0 overflow-y-auto p-8">
+          <h2 class="text-2xl font-bold text-slate-900 leading-tight mb-2">{{ selectedEvent.title }}</h2>
+
+          <div class="flex items-center gap-4 text-sm text-slate-500 mb-8 flex-wrap">
+            <div class="flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">schedule</span>
+              {{ formatDateTime(selectedEvent.startTime) }}
+              <template v-if="selectedEvent.endTime"> ~ {{ formatTime(selectedEvent.endTime) }}</template>
+            </div>
+            <div v-if="selectedEvent.location" class="flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">location_on</span>
+              <span class="break-words">{{ selectedEvent.location }}</span>
+            </div>
+            <div v-if="selectedEvent.typeName" class="flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">label</span>
+              {{ selectedEvent.typeName }}
+            </div>
+          </div>
+
+          <div class="space-y-8">
+            <section v-if="selectedEvent.customerName">
+              <div class="flex items-center gap-2 mb-4">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">corporate_fare</span>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">关联客户</h3>
+              </div>
+              <div class="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 hover:bg-slate-50 transition-colors">
+                <div class="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                  {{ selectedEvent.customerName.charAt(0) }}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-bold text-slate-900 truncate">{{ selectedEvent.customerName }}</p>
+                  <p v-if="selectedEvent.contactName" class="text-[10px] text-slate-400 truncate">{{ selectedEvent.contactName }}</p>
+                </div>
+                <span class="material-symbols-outlined ml-auto text-slate-300">chevron_right</span>
+              </div>
+            </section>
+
+            <section v-if="selectedEvent.description">
+              <div class="flex items-center gap-2 mb-4">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">notes</span>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">备注说明</h3>
+              </div>
+              <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                <p class="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{{ selectedEvent.description }}</p>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-6 border-t border-slate-100 bg-white">
           <button
             @click="handleDeleteSchedule"
-            class="flex-1 py-3 border border-red-200 text-red-500 rounded-xl text-sm font-bold hover:bg-red-50 transition-all"
+            class="w-full py-3 bg-red-50 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-colors"
           >
             删除日程
           </button>
         </div>
-      </aside>
-    </Transition>
+      </div>
+    </el-drawer>
 
     <!-- Task Detail Panel -->
     <Transition name="slide-right">
@@ -532,10 +571,13 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useResponsive } from '@/composables/useResponsive'
 import { getMySchedules, addSchedule, deleteSchedule } from '@/api/schedule'
 import { getMyTasks, updateTaskStatus } from '@/api/task'
 import type { ScheduleVO, ScheduleAddBO } from '@/api/schedule'
 import type { Task } from '@/types/common'
+
+const { isMobile } = useResponsive()
 
 const lunarFormatter = new Intl.DateTimeFormat('zh-Hans-u-ca-chinese', {
   month: 'short',
@@ -553,6 +595,13 @@ function getLunarText(dateStr: string): string {
     return ''
   }
 }
+
+const showScheduleDetailDrawer = computed({
+  get: () => !!selectedEvent.value && !isMobile.value,
+  set: (val: boolean) => {
+    if (!val) selectedEvent.value = null
+  }
+})
 
 const viewMode = ref<'grid' | 'month' | 'list'>('grid')
 const selectedEvent = ref<ScheduleVO | null>(null)
@@ -796,6 +845,10 @@ const monthCells = computed(() => {
 .slide-right-leave-to {
   transform: translateX(100%);
   opacity: 0;
+}
+
+:deep(.schedule-detail-drawer .el-drawer__body) {
+  padding: 0 !important;
 }
 </style>
 
