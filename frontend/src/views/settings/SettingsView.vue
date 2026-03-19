@@ -281,15 +281,15 @@
                   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                     <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
                       <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">总员工数</p>
-                      <p class="text-2xl md:text-3xl font-black text-slate-900">{{ memberList.length }}</p>
+                      <p class="text-2xl md:text-3xl font-black text-slate-900">{{ deptMemberList.length }}</p>
                     </div>
                     <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
                       <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">活跃账号</p>
-                      <p class="text-2xl md:text-3xl font-black text-emerald-500">{{ memberList.filter(m => m.status === 1).length }}</p>
+                      <p class="text-2xl md:text-3xl font-black text-emerald-500">{{ deptMemberList.filter(m => m.status === 1).length }}</p>
                     </div>
                     <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
                       <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">待激活</p>
-                      <p class="text-2xl md:text-3xl font-black text-amber-500">{{ memberList.filter(m => m.status !== 1 && m.status !== 0).length }}</p>
+                      <p class="text-2xl md:text-3xl font-black text-amber-500">{{ deptMemberList.filter(m => m.status !== 1 && m.status !== 0).length }}</p>
                     </div>
                     <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
                       <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">部门数量</p>
@@ -302,7 +302,7 @@
                     <div v-if="loadingMembers" class="text-center py-16">
                       <span class="material-symbols-outlined text-slate-300 text-3xl animate-spin">progress_activity</span>
                     </div>
-                    <template v-else-if="memberList.length === 0">
+                    <template v-else-if="deptMemberList.length === 0">
                       <div class="text-center py-16 text-slate-400">
                         <span class="material-symbols-outlined text-3xl mb-2 opacity-50">group_off</span>
                         <p class="text-sm">{{ selectedDept ? '该部门暂无成员' : '请先选择一个部门' }}</p>
@@ -321,11 +321,11 @@
                           />
                         </div>
                         <select
-                          v-model.number="memberRoleId"
+                          v-model="memberRoleId"
                           class="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-600 outline-none focus:ring-2 focus:ring-primary/50"
                         >
                           <option :value="0">所有角色</option>
-                          <option v-for="r in allRoleOptions" :key="r.roleId" :value="Number(r.roleId)">
+                          <option v-for="r in allRoleOptions" :key="r.roleId" :value="String(r.roleId)">
                             {{ r.roleName }}
                           </option>
                         </select>
@@ -1830,24 +1830,22 @@ const minioConfig = reactive<MinioConsoleConfig>({
 const deptTreeRef = ref()
 const deptTree = ref<DeptVO[]>([])
 const selectedDept = ref<DeptVO | null>(null)
+const deptMemberList = ref<any[]>([])
 const memberList = ref<any[]>([])
 const loadingDeptTree = ref(false)
 const loadingMembers = ref(false)
 const showDeptDrawer = ref(false)
 const memberSearch = ref('')
-const memberRoleId = ref<number>(0)
+const memberRoleId = ref('0')
+let memberListRequestId = 0
 
 const filteredMembers = computed(() => {
   const list = memberList.value || []
   const s = memberSearch.value.trim().toLowerCase()
-  const roleId = Number(memberRoleId.value || 0)
   return list.filter((m: any) => {
-    const okSearch = !s || [m.realname, m.username, m.email, m.mobile]
+    return !s || [m.realname, m.username, m.email, m.mobile]
       .filter(Boolean)
       .some((v: string) => String(v).toLowerCase().includes(s))
-    const okRole = roleId === 0 || (Array.isArray(m.roleIds) && m.roleIds.map(String).includes(String(roleId))) ||
-      (Array.isArray(m.roles) && m.roles.map(String).includes(String(roleId)))
-    return okSearch && okRole
   })
 })
 
@@ -2284,17 +2282,37 @@ async function loadDeptTree() {
 
 async function loadMembers() {
   if (!selectedDept.value) {
+    deptMemberList.value = []
     memberList.value = []
     return
   }
+  const requestId = ++memberListRequestId
   loadingMembers.value = true
   try {
-    const res = await queryUserList({ deptId: selectedDept.value.deptId, limit: 200 })
-    memberList.value = res?.list || res?.records || res || []
+    const query = { deptId: selectedDept.value.deptId, limit: 200 }
+    const roleId = String(memberRoleId.value || '0')
+    const deptMembersPromise = queryUserList(query)
+    const roleMembersPromise = roleId === '0' ? null : queryUserList({ ...query, roleId })
+    const deptRes = await deptMembersPromise
+    if (memberListRequestId !== requestId) return
+    deptMemberList.value = deptRes?.list || deptRes?.records || deptRes || []
+    if (roleMembersPromise) {
+      const roleRes = await roleMembersPromise
+      if (memberListRequestId !== requestId) return
+      memberList.value = roleRes?.list || roleRes?.records || roleRes || []
+    } else {
+      memberList.value = deptMemberList.value
+    }
   } catch {
+    if (memberListRequestId === requestId) {
+      deptMemberList.value = []
+      memberList.value = []
+    }
     // Error handled by interceptor
   } finally {
-    loadingMembers.value = false
+    if (memberListRequestId === requestId) {
+      loadingMembers.value = false
+    }
   }
 }
 
@@ -2716,6 +2734,12 @@ watch(activeTab, async (newTab) => {
     await loadEnterpriseConfig()
   }
 }, { immediate: true })
+
+watch(memberRoleId, () => {
+  if (activeTab.value === 'team' && selectedDept.value) {
+    loadMembers()
+  }
+})
 
 // MinIO methods
 async function loadMinioConfig() {

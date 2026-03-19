@@ -648,7 +648,57 @@ const contactPageSize = ref(5)
 const contactLoading = ref(false)
 const customFields = ref<CustomField[]>([])
 
-const primaryContact = computed(() => contacts.value.find(c => c.isPrimary) || contacts.value[0] || null)
+function isPrimaryContact(contact?: Pick<Contact, 'isPrimary'> | null): boolean {
+  const value = contact?.isPrimary as boolean | number | string | undefined
+  return value === true || value === 1 || value === '1'
+}
+
+function normalizeContact(contact: Contact): Contact {
+  return {
+    ...contact,
+    contactId: String(contact.contactId),
+    customerId: String(contact.customerId),
+    isPrimary: isPrimaryContact(contact)
+  }
+}
+
+function syncCurrentContact(customerId: string) {
+  if (!currentContact.value) return
+
+  const matchedContact = contacts.value.find(contact => contact.contactId === currentContact.value?.contactId)
+  if (matchedContact) {
+    currentContact.value = matchedContact
+    return
+  }
+
+  if (currentContact.value.customerId === customerId) {
+    currentContact.value = null
+  }
+}
+
+async function refreshCustomerContext(customerId: string, options: { resetContacts?: boolean } = {}) {
+  await Promise.all([
+    customerStore.fetchCustomerDetail(customerId),
+    fetchContacts(customerId, options.resetContacts)
+  ])
+}
+
+function applyPrimaryContactLocally(contactId: string) {
+  const normalizedContactId = String(contactId)
+  contacts.value = contacts.value.map(contact => ({
+    ...contact,
+    isPrimary: contact.contactId === normalizedContactId
+  }))
+
+  if (currentContact.value) {
+    currentContact.value = {
+      ...currentContact.value,
+      isPrimary: currentContact.value.contactId === normalizedContactId
+    }
+  }
+}
+
+const primaryContact = computed(() => contacts.value.find(contact => isPrimaryContact(contact)) || contacts.value[0] || null)
 
 
 function formatDateForApi(date: Date = new Date()): string {
@@ -733,13 +783,14 @@ async function fetchContacts(customerId: string, reset = false) {
   contactLoading.value = true
   try {
     const result = await queryContactPageList({ customerId, page: contactPage.value, limit: contactPageSize.value })
-    contacts.value = result.list
+    contacts.value = result.list.map(contact => normalizeContact(contact))
     contactTotal.value = result.totalRow
   } catch (err) {
     console.error('Failed to fetch contacts:', err)
     contacts.value = []
     contactTotal.value = 0
   } finally {
+    syncCurrentContact(customerId)
     contactLoading.value = false
   }
 }
@@ -835,24 +886,34 @@ function handleEditContact(contact: Contact) {
   contactForm.email = contact.email || ''
   contactForm.wechat = contact.wechat || ''
   contactForm.notes = contact.notes || ''
-  contactForm.isPrimary = !!contact.isPrimary
+  contactForm.isPrimary = isPrimaryContact(contact)
   showAddContactDialog.value = true
 }
 
 async function handleDeleteContact(contactId: string) {
+  if (!customer.value) return
   try {
     await deleteContact(contactId)
-    if (customer.value) await fetchContacts(customer.value.customerId)
+    await refreshCustomerContext(customer.value.customerId)
     ElMessage.success('联系人已删除')
   } catch { /* Error handled */ }
 }
 
 async function handleSetPrimary(contactId: string) {
+  if (!customer.value) return
+  const customerId = customer.value.customerId
+  const previousContacts = contacts.value.map(contact => ({ ...contact }))
+  const previousCurrentContact = currentContact.value ? { ...currentContact.value } : null
+
+  applyPrimaryContactLocally(contactId)
   try {
     await setPrimaryContact(contactId)
-    if (customer.value) await fetchContacts(customer.value.customerId)
+    await refreshCustomerContext(customerId)
     ElMessage.success('已设为主联系人')
-  } catch { /* Error handled */ }
+  } catch {
+    contacts.value = previousContacts
+    currentContact.value = previousCurrentContact
+  }
 }
 
 function handleAddTask() {
@@ -919,7 +980,7 @@ async function handleSubmitContact() {
   }
   // 若勾选主联系人且已有主联系人，弹窗确认是否替换
   if (contactForm.isPrimary) {
-    const existingPrimary = contacts.value.find(c => c.isPrimary)
+    const existingPrimary = contacts.value.find(contact => isPrimaryContact(contact))
     if (existingPrimary && existingPrimary.contactId !== editingContact.value?.contactId) {
       try {
         await ElMessageBox.confirm(
@@ -951,7 +1012,7 @@ async function handleSubmitContact() {
       await addContact(submitData as any)
       ElMessage.success('联系人添加成功')
     }
-    await fetchContacts(contactForm.customerId, !editingContact.value)
+    await refreshCustomerContext(contactForm.customerId, { resetContacts: !editingContact.value })
     showAddContactDialog.value = false
     editingContact.value = null
     resetContactForm()

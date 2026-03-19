@@ -1,5 +1,7 @@
 package com.kakarote.ai_crm.entity.VO;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -59,6 +61,7 @@ public class ManageUserVO {
     private String deptName;
 
     @Schema(description = "角色ID列表")
+    @JsonSerialize(contentUsing = ToStringSerializer.class)
     private List<Long> roleIds;
 
     @Schema(description = "角色名称列表")
