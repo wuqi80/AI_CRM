@@ -139,6 +139,26 @@ html, body, #app {
   padding: 1rem 1.5rem !important;
 }
 
+/* Dialog variant: remove default paddings, let content control spacing */
+.wk-dialog--flush  {
+  padding: 0 !important;
+}
+
+.wk-dialog--flush .el-dialog__headerbtn {
+  top: 13px !important;
+  right: 4px !important;
+}
+
+.wk-dialog--flush .el-dialog__headerbtn .el-dialog__close {
+  font-weight: bold !important;
+  font-size: 1.25rem !important;
+  color: var(--el-text-color-primary);
+}
+
+.wk-dialog--flush .el-dialog__title {
+  font-weight: bold;
+}
+
 .el-button--primary {
   background-color: #137fec !important;
   border-color: #137fec !important;

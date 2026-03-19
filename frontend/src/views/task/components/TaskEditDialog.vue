@@ -128,8 +128,8 @@
               placeholder="搜索客户名称"
               :remote-method="searchCustomers"
               :loading="customerSearchLoading"
-              class="w-full"
-              size="default"
+              class="w-full "
+              size="large"
             >
               <el-option
                 v-for="item in customerOptions"
@@ -157,7 +157,7 @@
               :remote-method="searchUsers"
               :loading="userSearchLoading"
               class="w-full"
-              size="default"
+              size="large"
             >
               <el-option
                 v-for="item in userOptions"
@@ -275,5 +275,23 @@ const participants = computed({
 .el-overlay:has(.task-dialog) {
   overflow: hidden;
 }
+
+/* Unify form control radius in this dialog */
+.task-dialog input,
+.task-dialog select,
+.task-dialog textarea,
+.task-dialog .el-input__wrapper,
+.task-dialog .el-select__wrapper {
+  border-radius: 8px !important; /* align with rounded-lg */
+}
+
+/* Match el-select height to other form fields (e.g. 截止时间 / 任务类型) */
+.task-dialog .task-edit-form-select .el-input__wrapper,
+.task-dialog .task-edit-form-select .el-select__wrapper {
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+
 </style>
 
