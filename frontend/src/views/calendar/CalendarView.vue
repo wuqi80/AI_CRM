@@ -144,7 +144,7 @@
                         : 'border-slate-300 text-transparent'"
                       @click.stop="handleToggleTask(task)"
                     >
-                      <span class="material-symbols-outlined text-[8px] font-bold">check</span>
+                      <span class="material-symbols-outlined text-xs font-bold">check</span>
                     </div>
                     <span
                       @click="selectTask(task)"

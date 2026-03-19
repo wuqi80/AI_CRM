@@ -131,7 +131,7 @@
                     />
                     <div v-else class="size-16 rounded-lg bg-slate-100 border border-slate-200 flex flex-col items-center justify-center p-1 text-center">
                       <span class="material-symbols-outlined text-slate-400 text-sm">description</span>
-                      <span class="text-[8px] text-slate-500 truncate w-full">{{ attr.file.name }}</span>
+                      <span class="text-xs text-slate-500 truncate w-full">{{ attr.file.name }}</span>
                     </div>
                     <button
                       class="absolute -top-1.5 -right-1.5 size-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"

@@ -281,7 +281,7 @@
                 <button
                   v-for="action in quickActions"
                   :key="action.label"
-                  class="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
+                  class="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-sm font-bold text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
                   @click="sendQuickMessage(action.text)"
                 >
                   {{ action.label }}
@@ -346,7 +346,7 @@
                   </div>
                 </div>
               </div>
-              <p class="text-center text-[9px] text-slate-300 uppercase tracking-[0.4em]">内容由AI生成，请核查重要信息</p>
+              <p class="text-center text-xs text-slate-300 uppercase tracking-[0.4em]">内容由AI生成，请核查重要信息</p>
             </div>
           </div>
         </div>

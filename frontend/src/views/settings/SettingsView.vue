@@ -1838,11 +1838,11 @@
               <div class="grid grid-cols-2 gap-3">
                 <div class="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
                   <p class="text-lg font-black text-slate-900">-</p>
-                  <p class="text-[9px] font-bold text-slate-400 uppercase mt-1">跟进客户</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase mt-1">跟进客户</p>
                 </div>
                 <div class="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
                   <p class="text-lg font-black text-slate-900">-</p>
-                  <p class="text-[9px] font-bold text-slate-400 uppercase mt-1">活跃商机</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase mt-1">活跃商机</p>
                 </div>
               </div>
             </div>

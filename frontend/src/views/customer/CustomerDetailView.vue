@@ -367,7 +367,7 @@
                         <p class="text-xs text-slate-400 truncate max-w-[120px]">{{ contact.position || '联系人' }}</p>
                       </div>
                     </div>
-                    <span v-if="contact.isPrimary" class="px-1.5 py-0.5 bg-primary/10 text-primary text-[8px] font-black rounded uppercase">主要</span>
+                    <span v-if="contact.isPrimary" class="px-1.5 py-0.5 bg-primary/10 text-primary text-xs font-black rounded uppercase">主要</span>
                   </div>
                   <div class="flex items-center gap-3 text-xs text-slate-500">
                     <div v-if="contact.phone" class="flex items-center gap-1">
@@ -453,7 +453,7 @@
                   <div class="flex-1 min-w-0">
                     <p class="text-xs font-bold text-slate-900 truncate">{{ task.title }}</p>
                     <div class="flex items-center gap-2 mt-1">
-                      <span class="text-[9px] font-bold uppercase" :class="task.dueDate && isOverdue(task.dueDate) ? 'text-red-500' : 'text-slate-400'">
+                      <span class="text-xs font-bold uppercase" :class="task.dueDate && isOverdue(task.dueDate) ? 'text-red-500' : 'text-slate-400'">
                         {{ task.dueDate ? formatDate(task.dueDate) : '无截止日期' }}
                       </span>
                     </div>
