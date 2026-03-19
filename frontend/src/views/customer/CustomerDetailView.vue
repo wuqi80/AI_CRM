@@ -477,7 +477,7 @@
     </template>
 
     <!-- Add Tag Dialog -->
-    <el-dialog v-model="showAddTagDialog" title="添加标签" :width="isMobile ? '90%' : '400px'">
+    <el-dialog v-model="showAddTagDialog" title="添加标签" :width="isMobile ? '90%' : '400px'" class="wk-dialog--flush">
       <el-input v-model="newTagName" placeholder="请输入标签名称" />
       <template #footer>
         <el-button @click="showAddTagDialog = false">取消</el-button>

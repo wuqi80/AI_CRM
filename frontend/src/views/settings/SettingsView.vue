@@ -1225,6 +1225,7 @@
       :title="editingDept ? '编辑部门' : '添加部门'"
       :width="isMobile ? '95%' : '420px'"
       :fullscreen="isMobile"
+      class="wk-dialog--flush"
     >
       <el-form :model="deptForm" label-width="80px">
         <el-form-item label="部门名称" required>
@@ -1246,6 +1247,7 @@
       :title="editingMember ? '编辑员工' : '新增员工'"
       :width="isMobile ? '95%' : '650px'"
       :fullscreen="isMobile"
+      class="wk-dialog--flush"
     >
       <el-form :model="memberForm" label-position="top">
         <el-row :gutter="16">
@@ -1470,6 +1472,7 @@
       :title="editingRole ? '编辑角色' : '创建角色'"
       :width="isMobile ? '95%' : '460px'"
       :fullscreen="isMobile"
+      class="wk-dialog--flush"
     >
       <el-form :model="roleForm" label-width="80px">
         <el-form-item label="角色名称" required>
