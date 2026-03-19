@@ -61,13 +61,13 @@
                       <span class="material-symbols-outlined text-primary text-lg">auto_awesome</span>
                       <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">AI 智能录入</h3>
                     </div>
-                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">粘贴名片、邮件或简介</span>
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">粘贴名片、邮件或简介</span>
                   </div>
                   <div class="p-4 space-y-3">
                     <div class="relative">
                       <textarea
                         v-model="aiInputText"
-                        class="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-primary/50 outline-none resize-none transition-all"
+                        class="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none resize-none transition-all"
                         placeholder="在此粘贴客户描述、邮件内容，或直接粘贴 (Ctrl+V) 名片图片..."
                         @paste="handleAiPaste"
                       />
@@ -224,7 +224,7 @@
                   <div v-if="aiParseResult.score != null" class="bg-slate-900 rounded-2xl p-6 text-white relative overflow-hidden">
                     <div class="relative z-10">
                       <div class="flex items-center justify-between mb-4">
-                        <span class="text-[9px] font-bold text-primary uppercase tracking-widest">AI 潜力评分</span>
+                        <span class="text-xs font-bold text-primary uppercase tracking-widest">AI 潜力评分</span>
                         <span class="material-symbols-outlined text-primary text-lg">verified</span>
                       </div>
                       <div class="flex items-baseline gap-2 mb-1">
@@ -233,7 +233,7 @@
                       </div>
                       <p class="text-xs text-slate-400 mb-4">基于行业匹配度、需求迫切度及规模评估</p>
                       <div v-if="aiParseResult.tags?.length" class="flex flex-wrap gap-1.5">
-                        <span v-for="tag in aiParseResult.tags" :key="tag" class="px-2 py-0.5 bg-white/10 rounded-md text-[9px] font-bold uppercase tracking-wider">{{ tag }}</span>
+                        <span v-for="tag in aiParseResult.tags" :key="tag" class="px-2 py-0.5 bg-white/10 rounded-md text-xs font-bold uppercase tracking-wider">{{ tag }}</span>
                       </div>
                     </div>
                     <div class="absolute -right-8 -bottom-8 size-32 bg-primary/20 rounded-full blur-3xl"></div>

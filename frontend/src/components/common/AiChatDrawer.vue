@@ -272,7 +272,7 @@
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-1">
                       <span
-                        class="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tight"
+                        class="text-xs font-bold px-1.5 py-0.5 rounded uppercase tracking-tight"
                         :class="{
                           'bg-blue-50 text-blue-600': notif.type === 'info',
                           'bg-amber-50 text-amber-600': notif.type === 'warning',

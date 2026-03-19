@@ -98,7 +98,7 @@
                   </template>
                   <template v-else>
                     <span class="text-lg font-black text-primary leading-none">{{ getAiScore(task) }}</span>
-                    <span class="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">AI 评分</span>
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-tighter">AI 评分</span>
                   </template>
                 </div>
                 <div class="h-4 w-px bg-slate-100"></div>
