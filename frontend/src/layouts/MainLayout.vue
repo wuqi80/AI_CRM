@@ -3,11 +3,11 @@
     <!-- Desktop Sidebar -->
     <aside v-if="!isMobile" class="w-64 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-screen">
       <!-- Logo -->
-      <div class="p-6 flex items-center gap-3">
-        <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
+      <div class="p-6 flex items-center gap-3 ">
+        <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
           <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
         </div>
-        <div v-else class="size-10 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
+        <div v-else class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
           <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
         </div>
         <div class="min-w-0">
@@ -84,10 +84,10 @@
         <span class="material-symbols-outlined">menu</span>
       </button>
       <div class="flex items-center gap-2 min-w-0 flex-1 mx-2">
-        <div v-if="enterpriseStore.hasLogo" class="size-7 flex-shrink-0 rounded-lg overflow-hidden">
+        <div v-if="enterpriseStore.hasLogo" class="size-7 flex-shrink-0 rounded-lg overflow-hidden bg-transparent border border-slate-200">
           <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
         </div>
-        <div v-else class="size-7 flex-shrink-0 rounded-lg overflow-hidden">
+        <div v-else class="size-7 flex-shrink-0 rounded-lg overflow-hidden bg-transparent border border-slate-200">
           <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
         </div>
         <span class="text-sm font-bold text-slate-900 truncate">{{ enterpriseStore.displayName }}</span>
@@ -105,10 +105,10 @@
       <Transition name="drawer-panel">
         <aside v-if="isMobile && drawerVisible" class="fixed left-0 top-0 bottom-0 w-72 bg-white flex flex-col shadow-2xl z-[101]">
           <div class="p-6 flex items-center gap-3">
-            <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
+            <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
               <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
             </div>
-            <div v-else class="size-10 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
+            <div v-else class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
               <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
             </div>
             <div class="min-w-0">
