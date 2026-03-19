@@ -1198,6 +1198,7 @@
       :title="editingAgent ? '编辑智能体' : '添加智能体'"
       :width="isMobile ? '95%' : '500px'"
       :fullscreen="isMobile"
+      class="wk-dialog--flush"
     >
       <el-form :model="agentForm" label-width="80px">
         <el-form-item label="名称">
@@ -1361,6 +1362,7 @@
       :title="editingField ? '编辑自定义字段' : '添加自定义字段'"
       :width="isMobile ? '95%' : '550px'"
       :fullscreen="isMobile"
+      class="wk-dialog--flush"  
     >
       <el-form :model="fieldForm" label-width="100px">
         <el-form-item label="字段标签" required>
@@ -1696,6 +1698,7 @@
       :width="isMobile ? '95%' : '460px'"
       :fullscreen="isMobile"
       append-to-body
+      class="wk-dialog--flush"
     >
       <el-input v-model="allUserSearch" placeholder="搜索用户..." clearable class="mb-3" />
       <div class="max-h-64 overflow-auto space-y-1">
@@ -1785,12 +1788,12 @@
                 <p class="text-sm font-bold text-slate-700">{{ detailMember.deptName || '-' }}</p>
               </div>
               <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">登录账号</p>
-                <p class="text-sm font-bold text-slate-700">{{ detailMember.username }}</p>
-              </div>
-              <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 col-span-2">
                 <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">直属上级</p>
                 <p class="text-sm font-bold text-slate-700">{{ detailMember.parentName || '无' }}</p>
+              </div>
+              <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 col-span-2">
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">登录账号</p>
+                <p class="text-sm font-bold text-slate-700">{{ detailMember.username }}</p>
               </div>
             </div>
 

@@ -249,107 +249,12 @@
       </div>
     </div>
 
-    <!-- Event Detail Drawer (Desktop) -->
-    <el-drawer
+    <ScheduleDetailDrawer
       v-if="!isMobile"
       v-model="showScheduleDetailDrawer"
-      direction="rtl"
-      :size="'400px'"
-      :with-header="false"
-      :modal="false"
-      :lock-scroll="false"
-      modal-penetrable
-      class="schedule-detail-drawer"
-    >
-      <div v-if="selectedEvent" class="h-full flex flex-col bg-white shadow-2xl">
-        <!-- Header -->
-        <div class="flex items-center justify-between p-6 border-b border-slate-100">
-          <span class="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full uppercase tracking-widest">
-            日程详情
-          </span>
-          <div class="flex items-center gap-2">
-            <button
-              @click="handleDeleteSchedule"
-              class="size-9 flex items-center justify-center rounded-full hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-              type="button"
-              aria-label="删除日程"
-              title="删除日程"
-            >
-              <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
-            </button>
-            <button
-              @click="selectedEvent = null"
-              class="size-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-              type="button"
-              aria-label="关闭日程详情"
-              title="关闭"
-            >
-              <span class="material-symbols-outlined text-xl leading-none">close</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Content -->
-        <div class="flex-1 min-h-0 overflow-y-auto p-8">
-          <h2 class="text-2xl font-bold text-slate-900 leading-tight mb-2">{{ selectedEvent.title }}</h2>
-
-          <div class="flex items-center gap-4 text-sm text-slate-500 mb-8 flex-wrap">
-            <div class="flex items-center gap-1">
-              <span class="material-symbols-outlined text-sm">schedule</span>
-              {{ formatDateTime(selectedEvent.startTime) }}
-              <template v-if="selectedEvent.endTime"> ~ {{ formatTime(selectedEvent.endTime) }}</template>
-            </div>
-            <div v-if="selectedEvent.location" class="flex items-center gap-1">
-              <span class="material-symbols-outlined text-sm">location_on</span>
-              <span class="break-words">{{ selectedEvent.location }}</span>
-            </div>
-            <div v-if="selectedEvent.typeName" class="flex items-center gap-1">
-              <span class="material-symbols-outlined text-sm">label</span>
-              {{ selectedEvent.typeName }}
-            </div>
-          </div>
-
-          <div class="space-y-8">
-            <section v-if="selectedEvent.customerName">
-              <div class="flex items-center gap-2 mb-4">
-                <span class="material-symbols-outlined text-[18px] text-slate-400">corporate_fare</span>
-                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">关联客户</h3>
-              </div>
-              <div class="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 hover:bg-slate-50 transition-colors">
-                <div class="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-                  {{ selectedEvent.customerName.charAt(0) }}
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-bold text-slate-900 truncate">{{ selectedEvent.customerName }}</p>
-                  <p v-if="selectedEvent.contactName" class="text-xs text-slate-400 truncate">{{ selectedEvent.contactName }}</p>
-                </div>
-                <span class="material-symbols-outlined ml-auto text-slate-300">chevron_right</span>
-              </div>
-            </section>
-
-            <section v-if="selectedEvent.description">
-              <div class="flex items-center gap-2 mb-4">
-                <span class="material-symbols-outlined text-[18px] text-slate-400">notes</span>
-                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">备注说明</h3>
-              </div>
-              <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                <p class="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{{ selectedEvent.description }}</p>
-              </div>
-            </section>
-          </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="p-6 border-t border-slate-100 bg-white">
-          <button
-            @click="handleDeleteSchedule"
-            class="w-full py-3 bg-red-50 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-colors"
-          >
-            删除日程
-          </button>
-        </div>
-      </div>
-    </el-drawer>
+      :schedule="selectedEvent"
+      @deleted="loadSchedules"
+    />
 
     <TaskDetailDrawer
       v-model="showCalendarTaskDetail"
@@ -361,157 +266,24 @@
       @toggle-complete="handleToggleTask"
     />
 
-    <!-- Add Schedule Dialog -->
-    <el-dialog
+    <ScheduleFormDialog
       v-model="showAddDialog"
-      width="680px"
-      :show-close="false"
-      destroy-on-close
-      top="6vh"
-      class="!rounded-2xl !p-0 overflow-hidden schedule-dialog"
-    >
-      <template #header>
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-xl font-bold text-slate-900">新增日程</h2>
-            <p class="text-sm text-slate-500 mt-1">填写日程信息</p>
-          </div>
-          <button
-            @click="showAddDialog = false"
-            class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-          >
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-      </template>
-
-      <div class="space-y-6 bg-slate-50/50 p-6">
-        <!-- Form Fields -->
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <div>
-            <label class="text-xs font-bold text-slate-500 mb-1.5 block">日程标题 <span class="text-red-500">*</span></label>
-            <input
-              v-model="scheduleForm.title"
-              type="text"
-              placeholder="请输入日程标题"
-              class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2 outline-none transition-all"
-            />
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-xs font-bold text-slate-500 mb-1.5 block">开始日期 <span class="text-red-500">*</span></label>
-              <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-                <span class="material-symbols-outlined text-slate-400 text-sm">calendar_today</span>
-                <input
-                  v-model="scheduleForm.startDate"
-                  type="date"
-                  class="w-full text-sm text-slate-900 bg-transparent outline-none"
-                />
-              </div>
-            </div>
-            <div>
-              <label class="text-xs font-bold text-slate-500 mb-1.5 block">开始时间 <span class="text-red-500">*</span></label>
-              <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-                <span class="material-symbols-outlined text-slate-400 text-sm">schedule</span>
-                <input
-                  v-model="scheduleForm.startTime"
-                  type="time"
-                  class="w-full text-sm text-slate-900 bg-transparent outline-none"
-                />
-              </div>
-            </div>
-            <div>
-              <label class="text-xs font-bold text-slate-500 mb-1.5 block">结束日期</label>
-              <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-                <span class="material-symbols-outlined text-slate-400 text-sm">event</span>
-                <input
-                  v-model="scheduleForm.endDate"
-                  type="date"
-                  class="w-full text-sm text-slate-900 bg-transparent outline-none"
-                />
-              </div>
-            </div>
-            <div>
-              <label class="text-xs font-bold text-slate-500 mb-1.5 block">结束时间</label>
-              <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-                <span class="material-symbols-outlined text-slate-400 text-sm">update</span>
-                <input
-                  v-model="scheduleForm.endTime"
-                  type="time"
-                  class="w-full text-sm text-slate-900 bg-transparent outline-none"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-xs font-bold text-slate-500 mb-1.5 block">类型</label>
-              <select
-                v-model="scheduleForm.type"
-                class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2 outline-none transition-all"
-              >
-                <option value="meeting">会议</option>
-                <option value="call">电话</option>
-                <option value="visit">拜访</option>
-              </select>
-            </div>
-            <div>
-              <label class="text-xs font-bold text-slate-500 mb-1.5 block">地点</label>
-              <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-                <span class="material-symbols-outlined text-slate-400 text-sm">location_on</span>
-                <input
-                  v-model="scheduleForm.location"
-                  type="text"
-                  placeholder="请输入地点"
-                  class="w-full text-sm text-slate-900 bg-transparent outline-none"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label class="text-xs font-bold text-slate-500 mb-1.5 block">描述备注</label>
-            <textarea
-              v-model="scheduleForm.description"
-              placeholder="请输入日程备注信息..."
-              class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2 outline-none transition-all resize-none h-20"
-            />
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="flex gap-3">
-          <button
-            @click="showAddDialog = false"
-            class="flex-1 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
-          >
-            取消
-          </button>
-          <button
-            @click="handleSaveSchedule"
-            :disabled="!scheduleForm.title || !scheduleForm.startDate || !scheduleForm.startTime || saving"
-            class="flex-1 py-2.5 text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors shadow-sm"
-          >
-            {{ saving ? '保存中...' : '确认保存' }}
-          </button>
-        </div>
-      </template>
-    </el-dialog>
+      @created="loadSchedules"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
-import { getMySchedules, addSchedule, deleteSchedule } from '@/api/schedule'
+import { getMySchedules } from '@/api/schedule'
 import { getMyTasks, updateTaskStatus } from '@/api/task'
-import type { ScheduleVO, ScheduleAddBO } from '@/api/schedule'
+import type { ScheduleVO } from '@/api/schedule'
 import type { Task } from '@/types/common'
 import TaskDetailDrawer from '@/views/task/components/TaskDetailDrawer.vue'
+import ScheduleDetailDrawer from './components/ScheduleDetailDrawer.vue'
+import ScheduleFormDialog from './components/ScheduleFormDialog.vue'
 
 const { isMobile } = useResponsive()
 
@@ -551,8 +323,6 @@ const selectedEvent = ref<ScheduleVO | null>(null)
 const selectedTask = ref<Task | null>(null)
 const schedules = ref<ScheduleVO[]>([])
 const tasks = ref<Task[]>([])
-const loading = ref(false)
-const saving = ref(false)
 
 const viewModes = [
   { value: 'grid' as const, label: '周' },
@@ -600,9 +370,7 @@ async function loadTasks() {
 }
 
 onMounted(async () => {
-  loading.value = true
   await Promise.all([loadSchedules(), loadTasks()])
-  loading.value = false
 })
 
 // --- Helpers ---
@@ -618,12 +386,6 @@ function formatTime(dateStr: string): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 function getEventsForDate(dateStr: string): ScheduleVO[] {
@@ -662,74 +424,7 @@ function formatDueDate(dueDate: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
-// --- Add Schedule ---
-
 const showAddDialog = ref(false)
-
-const scheduleForm = reactive({
-  title: '',
-  startDate: '',
-  startTime: '',
-  endDate: '',
-  endTime: '',
-  type: 'meeting' as string,
-  location: '',
-  description: ''
-})
-
-async function handleSaveSchedule() {
-  if (!scheduleForm.title || !scheduleForm.startDate || !scheduleForm.startTime) return
-
-  saving.value = true
-  try {
-    const data: ScheduleAddBO = {
-      title: scheduleForm.title,
-      startTime: `${scheduleForm.startDate}T${scheduleForm.startTime}:00`,
-      type: scheduleForm.type,
-      location: scheduleForm.location || undefined,
-      description: scheduleForm.description || undefined,
-    }
-    if (scheduleForm.endDate && scheduleForm.endTime) {
-      data.endTime = `${scheduleForm.endDate}T${scheduleForm.endTime}:00`
-    }
-
-    await addSchedule(data)
-    showAddDialog.value = false
-    resetScheduleForm()
-    ElMessage.success('日程创建成功')
-    await loadSchedules()
-  } catch (e: any) {
-    ElMessage.error('创建日程失败: ' + (e.message || '未知错误'))
-  } finally {
-    saving.value = false
-  }
-}
-
-function resetScheduleForm() {
-  scheduleForm.title = ''
-  scheduleForm.startDate = ''
-  scheduleForm.startTime = ''
-  scheduleForm.endDate = ''
-  scheduleForm.endTime = ''
-  scheduleForm.type = 'meeting'
-  scheduleForm.location = ''
-  scheduleForm.description = ''
-}
-
-// --- Delete Schedule ---
-
-async function handleDeleteSchedule() {
-  if (!selectedEvent.value) return
-  try {
-    await ElMessageBox.confirm('确定删除该日程？', '提示', { type: 'warning' })
-    await deleteSchedule(selectedEvent.value.scheduleId)
-    selectedEvent.value = null
-    ElMessage.success('日程已删除')
-    await loadSchedules()
-  } catch {
-    // cancelled
-  }
-}
 
 // --- Week View ---
 
@@ -827,27 +522,3 @@ const listGroups = computed(() => {
     .sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime())
 })
 </script>
-
-<style scoped>
-.slide-right-enter-active,
-.slide-right-leave-active {
-  transition: all 0.3s ease;
-}
-.slide-right-enter-from,
-.slide-right-leave-to {
-  transform: translateX(100%);
-  opacity: 0;
-}
-
-:deep(.schedule-detail-drawer .el-drawer__body) {
-  padding: 0 !important;
-}
-</style>
-
-<style>
-.schedule-dialog .el-dialog__body {
-  max-height: 70vh;
-  overflow-y: auto;
-  padding: 0;
-}
-</style>
