@@ -65,12 +65,22 @@
           </el-form-item>
 
           <el-form-item label="验证码" prop="verificationCode">
-            <el-input
-              v-model="formData.verificationCode"
-              placeholder="请输入验证码"
-              size="large"
-              @keyup.enter="handleRegister"
-            />
+            <div class="flex w-full gap-3">
+              <el-input
+                v-model="formData.verificationCode"
+                placeholder="请输入验证码"
+                size="large"
+                @keyup.enter="handleRegister"
+              />
+              <button
+                type="button"
+                class="shrink-0 rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-700 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                :disabled="sendingCode || countdown > 0"
+                @click="handleSendCode"
+              >
+                {{ sendCodeText }}
+              </button>
+            </div>
           </el-form-item>
 
           <el-form-item class="mt-2">
@@ -92,18 +102,28 @@
       </div>
     </div>
   </div>
+
+  <SliderCaptchaDialog
+    v-model="showCaptchaDialog"
+    @verified="handleCaptchaVerified"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
-import { register } from '@/api/auth'
+import { register, sendEmailCode } from '@/api/auth'
+import SliderCaptchaDialog from '@/components/auth/SliderCaptchaDialog.vue'
 
 const router = useRouter()
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const sendingCode = ref(false)
+const showCaptchaDialog = ref(false)
+const countdown = ref(0)
+let countdownTimer: number | undefined
 
 const formData = reactive({
   companyName: '',
@@ -143,6 +163,12 @@ const rules: FormRules = {
   ]
 }
 
+const sendCodeText = computed(() => {
+  if (sendingCode.value) return '发送中...'
+  if (countdown.value > 0) return `${countdown.value}s 后重试`
+  return '发送验证码'
+})
+
 async function handleRegister() {
   if (!formRef.value) return
 
@@ -151,11 +177,11 @@ async function handleRegister() {
     loading.value = true
 
     await register({
-      companyName: formData.companyName,
-      realname: formData.realname || undefined,
-      email: formData.email,
+      companyName: formData.companyName.trim(),
+      realname: formData.realname.trim() || undefined,
+      email: formData.email.trim(),
       password: formData.password,
-      verificationCode: formData.verificationCode
+      verificationCode: formData.verificationCode.trim()
     })
 
     ElMessage.success('注册成功，请登录')
@@ -166,4 +192,50 @@ async function handleRegister() {
     loading.value = false
   }
 }
+
+async function handleSendCode() {
+  if (!formRef.value || sendingCode.value || countdown.value > 0) return
+
+  try {
+    await formRef.value.validateField('email')
+    showCaptchaDialog.value = true
+  } catch (_error) {
+    return
+  }
+}
+
+async function handleCaptchaVerified(captchaVerification: string) {
+  sendingCode.value = true
+  try {
+    await sendEmailCode({
+      email: formData.email.trim(),
+      type: 1,
+      captchaVerification
+    })
+    ElMessage.success('验证码已发送，请查收邮箱')
+    startCountdown()
+  } finally {
+    sendingCode.value = false
+  }
+}
+
+function startCountdown() {
+  countdown.value = 60
+  if (countdownTimer) {
+    window.clearInterval(countdownTimer)
+  }
+  countdownTimer = window.setInterval(() => {
+    countdown.value -= 1
+    if (countdown.value <= 0 && countdownTimer) {
+      window.clearInterval(countdownTimer)
+      countdownTimer = undefined
+    }
+  }, 1000)
+}
+
+onBeforeUnmount(() => {
+  if (countdownTimer) {
+    window.clearInterval(countdownTimer)
+  }
+})
 </script>

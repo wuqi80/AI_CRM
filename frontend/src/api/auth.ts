@@ -111,6 +111,46 @@ export function register(params: RegisterParams): Promise<string> {
   return post<string>('/auth/register', params)
 }
 
+export interface CaptchaData {
+  originalImageBase64: string
+  jigsawImageBase64: string
+  token: string
+  secretKey?: string
+  captchaType?: string
+}
+
+export interface CheckCaptchaParams {
+  token: string
+  pointX: number
+  pointY?: number
+  secretKey?: string
+  captchaType?: string
+}
+
+export interface CheckCaptchaResult {
+  captchaVerification: string
+}
+
+export interface SendEmailCodeParams {
+  email: string
+  type: number
+  captchaVerification: string
+}
+
+export function getCaptcha(): Promise<CaptchaData> {
+  return post<CaptchaData>('/cloud/getCaptcha', {
+    captchaType: 'blockPuzzle'
+  })
+}
+
+export function checkCaptcha(params: CheckCaptchaParams): Promise<CheckCaptchaResult> {
+  return post<CheckCaptchaResult>('/cloud/checkCaptcha', params)
+}
+
+export function sendEmailCode(params: SendEmailCodeParams): Promise<void> {
+  return post('/cloud/sendEmail', params)
+}
+
 /**
  * 获取当前用户权限树
  */

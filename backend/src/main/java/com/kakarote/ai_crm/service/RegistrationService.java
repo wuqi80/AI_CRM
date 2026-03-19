@@ -9,4 +9,13 @@ public interface RegistrationService {
      * @param registerBO 注册信息
      */
     void register(RegisterBO registerBO);
+
+
+    /**
+     * 发送邮件验证码
+     *
+     * @param email 邮件
+     * @param type  类型 1为注册 2为找回密码
+     */
+    public void sendEmail(String email, Integer type);
 }
