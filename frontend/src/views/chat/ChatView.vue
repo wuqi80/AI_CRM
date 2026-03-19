@@ -38,7 +38,7 @@
 
       <!-- Session List -->
       <div class="flex-1 overflow-y-auto px-3 space-y-1">
-        <p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">最近对话</p>
+        <p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">最近对话</p>
 
         <div v-if="chatStore.loading" class="flex justify-center py-8">
           <span class="material-symbols-outlined text-slate-300 animate-spin">progress_activity</span>
@@ -51,7 +51,7 @@
         <template v-else>
           <!-- Today -->
           <template v-if="groupedSessions.today.length > 0">
-            <p class="px-3 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">今天</p>
+            <p class="px-3 pt-3 pb-1 text-xs font-bold text-slate-400 uppercase tracking-widest">今天</p>
             <button
               v-for="session in groupedSessions.today"
               :key="session.sessionId"
@@ -65,7 +65,7 @@
                 class="text-sm font-semibold truncate block max-w-full"
                 :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId ? 'text-primary' : 'text-slate-700'"
               >{{ session.title || '新对话' }}</span>
-              <span class="text-[10px] text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
+              <span class="text-xs text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
               <span
                 class="absolute right-2 top-1/2 -translate-y-1/2 material-symbols-outlined text-sm text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                 @click.stop="handleDeleteSession(session.sessionId)"
@@ -75,7 +75,7 @@
 
           <!-- Yesterday -->
           <template v-if="groupedSessions.yesterday.length > 0">
-            <p class="px-3 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">昨天</p>
+            <p class="px-3 pt-3 pb-1 text-xs font-bold text-slate-400 uppercase tracking-widest">昨天</p>
             <button
               v-for="session in groupedSessions.yesterday"
               :key="session.sessionId"
@@ -89,7 +89,7 @@
                 class="text-sm font-semibold truncate block max-w-full"
                 :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId ? 'text-primary' : 'text-slate-700'"
               >{{ session.title || '新对话' }}</span>
-              <span class="text-[10px] text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
+              <span class="text-xs text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
               <span
                 class="absolute right-2 top-1/2 -translate-y-1/2 material-symbols-outlined text-sm text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                 @click.stop="handleDeleteSession(session.sessionId)"
@@ -99,7 +99,7 @@
 
           <!-- Earlier -->
           <template v-if="groupedSessions.earlier.length > 0">
-            <p class="px-3 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">更早</p>
+            <p class="px-3 pt-3 pb-1 text-xs font-bold text-slate-400 uppercase tracking-widest">更早</p>
             <button
               v-for="session in groupedSessions.earlier"
               :key="session.sessionId"
@@ -113,7 +113,7 @@
                 class="text-sm font-semibold truncate block max-w-full"
                 :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId ? 'text-primary' : 'text-slate-700'"
               >{{ session.title || '新对话' }}</span>
-              <span class="text-[10px] text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
+              <span class="text-xs text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
               <span
                 class="absolute right-2 top-1/2 -translate-y-1/2 material-symbols-outlined text-sm text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                 @click.stop="handleDeleteSession(session.sessionId)"
@@ -328,7 +328,7 @@
                   </div>
                 </div>
               </div>
-              <p class="text-center text-[9px] text-slate-300 uppercase font-bold tracking-[0.4em]">内容由AI生成，请核查重要信息</p>
+              <p class="text-center text-[9px] text-slate-300 uppercase tracking-[0.4em]">内容由AI生成，请核查重要信息</p>
             </div>
           </div>
         </div>
