@@ -72,10 +72,10 @@ public class DynamicChatClientProvider {
     private ObservationRegistry observationRegistry;
 
     // 默认配置（从 application.yml 读取，作为后备）
-    @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode/}")
+    @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode/v1}")
     private String defaultBaseUrl;
 
-    @Value("${spring.ai.openai.api-key:}")
+    @Value("${spring.ai.openai.api-key:${DASHSCOPE_API_KEY:${OPENAI_API_KEY:}}}")
     private String defaultApiKey;
 
     @Value("${spring.ai.openai.chat.options.model:qwen-max}")
@@ -119,11 +119,23 @@ public class DynamicChatClientProvider {
             // 从数据库加载 AI 配置（TenantLineInnerInterceptor 会自动按租户过滤）
             Map<String, String> configs = loadAiConfigsFromDB();
 
-            String apiUrl = configs.getOrDefault("ai_api_url", defaultBaseUrl);
-            String apiKey = configs.getOrDefault("ai_api_key", defaultApiKey);
-            String model = configs.getOrDefault("ai_model", defaultModel);
-            double temperature = parseDouble(configs.get("ai_temperature"), defaultTemperature);
-            int maxTokens = parseInt(configs.get("ai_max_tokens"), defaultMaxTokens);
+            boolean hasExplicitConfig = configs.containsKey("ai_provider");
+
+            String apiUrl = hasExplicitConfig
+                    ? configs.getOrDefault("ai_api_url", defaultBaseUrl)
+                    : defaultBaseUrl;
+            String apiKey = hasExplicitConfig
+                    ? configs.getOrDefault("ai_api_key", defaultApiKey)
+                    : defaultApiKey;
+            String model = hasExplicitConfig
+                    ? configs.getOrDefault("ai_model", defaultModel)
+                    : defaultModel;
+            double temperature = hasExplicitConfig
+                    ? parseDouble(configs.get("ai_temperature"), defaultTemperature)
+                    : defaultTemperature;
+            int maxTokens = hasExplicitConfig
+                    ? parseInt(configs.get("ai_max_tokens"), defaultMaxTokens)
+                    : defaultMaxTokens;
 
             if (StrUtil.isBlank(apiKey)) {
                 log.warn("AI API Key 未配置，ChatClient 将使用默认配置, tenantId={}", key);
@@ -146,7 +158,10 @@ public class DynamicChatClientProvider {
      */
     public boolean isApiKeyConfigured() {
         Map<String, String> configs = loadAiConfigsFromDB();
-        String apiKey = configs.getOrDefault("ai_api_key", defaultApiKey);
+        boolean hasExplicitConfig = configs.containsKey("ai_provider");
+        String apiKey = hasExplicitConfig
+                ? configs.getOrDefault("ai_api_key", defaultApiKey)
+                : defaultApiKey;
         return StrUtil.isNotBlank(apiKey);
     }
 

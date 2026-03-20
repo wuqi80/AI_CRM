@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
@@ -42,6 +43,7 @@ public class KnowledgeController {
 
     @PostMapping("/upload")
     @Operation(summary = "上传文件")
+    @RequirePermission("knowledge:upload")
     public Result<Long> upload(
             @Parameter(description = "文件") @RequestParam("file") MultipartFile file,
             @Parameter(description = "类型") @RequestParam(required = false) String type,
@@ -53,6 +55,7 @@ public class KnowledgeController {
 
     @PostMapping("/delete/{id}")
     @Operation(summary = "删除知识库文件")
+    @RequirePermission("knowledge:delete")
     public Result<String> delete(@PathVariable("id") Long id) {
         knowledgeService.deleteKnowledge(id);
         return Result.ok();
@@ -60,18 +63,21 @@ public class KnowledgeController {
 
     @PostMapping("/queryPageList")
     @Operation(summary = "分页查询知识库")
+    @RequirePermission("knowledge:view")
     public Result<BasePage<KnowledgeVO>> queryPageList(@RequestBody KnowledgeQueryBO queryBO) {
         return Result.ok(knowledgeService.queryPageList(queryBO));
     }
 
     @GetMapping("/detail/{id}")
     @Operation(summary = "获取知识库详情")
+    @RequirePermission("knowledge:view")
     public Result<KnowledgeVO> detail(@PathVariable("id") Long id) {
         return Result.ok(knowledgeService.getKnowledgeDetail(id));
     }
 
     @GetMapping("/download/{id}")
     @Operation(summary = "下载文件")
+    @RequirePermission("knowledge:download")
     public ResponseEntity<Resource> download(@PathVariable("id") Long id) {
         KnowledgeVO knowledge = knowledgeService.getKnowledgeDetail(id);
 
@@ -89,6 +95,7 @@ public class KnowledgeController {
 
     @GetMapping("/url/{id}")
     @Operation(summary = "获取文件访问URL")
+    @RequirePermission("knowledge:download")
     public Result<String> getFileUrl(@PathVariable("id") Long id) {
         KnowledgeVO knowledge = knowledgeService.getKnowledgeDetail(id);
         String url = fileStorageService.getUrl(knowledge.getFilePath());
@@ -97,6 +104,7 @@ public class KnowledgeController {
 
     @PostMapping("/reparse/{id}")
     @Operation(summary = "重新解析知识库文件")
+    @RequirePermission("knowledge:upload")
     public Result<String> reparse(@PathVariable("id") Long id) {
         knowledgeService.reparseKnowledge(id);
         return Result.ok();
@@ -104,6 +112,7 @@ public class KnowledgeController {
 
     @PostMapping("/addTag")
     @Operation(summary = "添加标签")
+    @RequirePermission("knowledge:upload")
     public Result<String> addTag(
             @Parameter(description = "知识库ID") @RequestParam Long knowledgeId,
             @Parameter(description = "标签名称") @RequestParam String tagName) {
@@ -113,12 +122,14 @@ public class KnowledgeController {
 
     @PostMapping("/{id}/ai-analyze")
     @Operation(summary = "AI分析文档内容")
+    @RequirePermission("knowledge:view")
     public Result<KnowledgeAiAnalyzeVO> aiAnalyze(@PathVariable("id") Long id) {
         return Result.ok(knowledgeService.aiAnalyzeDocument(id));
     }
 
     @PostMapping(value = "/{id}/ask", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "向AI提问文档内容（流式响应）")
+    @RequirePermission("knowledge:view")
     public Flux<ServerSentEvent<String>> askDocument(
             @PathVariable("id") Long id,
             @RequestBody KnowledgeAskBO askBO) {

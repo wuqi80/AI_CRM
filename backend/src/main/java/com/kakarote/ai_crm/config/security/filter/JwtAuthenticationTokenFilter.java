@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.config.security.filter;
 
 import cn.hutool.core.util.ObjectUtil;
+import com.kakarote.ai_crm.common.auth.DataPermissionHolder;
 import com.kakarote.ai_crm.config.security.service.TokenService;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
@@ -46,6 +47,7 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
         } finally {
             // 请求结束时清除租户上下文，防止线程复用导致数据泄露
+            DataPermissionHolder.clear();
             TenantContextHolder.clear();
         }
     }

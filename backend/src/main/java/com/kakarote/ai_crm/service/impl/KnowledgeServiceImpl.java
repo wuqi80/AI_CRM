@@ -17,6 +17,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
+import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
@@ -24,6 +25,7 @@ import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
+import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
@@ -65,10 +67,17 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     private KnowledgeTagMapper knowledgeTagMapper;
 
     @Autowired
+    private CustomerMapper customerMapper;
+
+    @Autowired
     private WeKnoraClient weKnoraClient;
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Lazy
+    @Autowired
+    private KnowledgeServiceImpl self;
 
     @Lazy
     @Autowired
@@ -79,6 +88,12 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long uploadFile(MultipartFile file, String type, Long customerId, String summary) {
+        if (customerId != null) {
+            Customer customer = customerMapper.selectById(customerId);
+            if (ObjectUtil.isNull(customer)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
+            }
+        }
         // Generate file path
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         String fileName = IdUtil.fastSimpleUUID() + "." + FileUtil.extName(file.getOriginalFilename());
@@ -110,7 +125,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
 
         // Async upload to WeKnora (only for supported file types)
         if (weKnoraClient.isEnabled() && weKnoraSupported) {
-            asyncUploadToWeKnora(knowledge.getKnowledgeId(), relativePath, file.getOriginalFilename(), UserUtil.getTenantId());
+            self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), relativePath, file.getOriginalFilename(), UserUtil.getTenantId());
         }
 
         return knowledge.getKnowledgeId();
@@ -148,11 +163,16 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             WeKnoraKnowledge result = weKnoraClient.uploadDocument(uploadFilePath, uniqueFilename, ctx.getKnowledgeBaseId(), ctx.getApiKey());
 
             // Update knowledge record
-            Knowledge knowledge = getById(knowledgeId);
-            if (knowledge != null && result != null) {
-                knowledge.setWeKnoraKnowledgeId(result.getId());
-                knowledge.setWeKnoraParseStatus(result.getParseStatus());
-                updateById(knowledge);
+            Knowledge knowledge = baseMapper.selectByIdIgnoreDataPermission(knowledgeId);
+            if (knowledge != null) {
+                if (result == null) {
+                    baseMapper.updateParseStatusIgnoreDataPermission(knowledgeId, "failed");
+                    log.error("WeKnora 上传未返回有效结果: knowledgeId={}", knowledgeId);
+                    return;
+                }
+                baseMapper.updateWeKnoraInfoIgnoreDataPermission(
+                    knowledgeId, result.getId(), result.getParseStatus()
+                );
                 log.info("WeKnora 上传成功: knowledgeId={}, weKnoraId={}, status={}",
                     knowledgeId, result.getId(), result.getParseStatus());
 
@@ -164,10 +184,9 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             }
         } catch (Exception e) {
             log.error("WeKnora 上传失败: knowledgeId={}, error={}", knowledgeId, e.getMessage(), e);
-            Knowledge knowledge = getById(knowledgeId);
+            Knowledge knowledge = baseMapper.selectByIdIgnoreDataPermission(knowledgeId);
             if (knowledge != null) {
-                knowledge.setWeKnoraParseStatus("failed");
-                updateById(knowledge);
+                baseMapper.updateParseStatusIgnoreDataPermission(knowledgeId, "failed");
             }
         } finally {
             if (tempFile != null && tempFile.exists()) {
@@ -253,11 +272,12 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                 log.debug("WeKnora 解析状态轮询: knowledgeId={}, attempt={}, status={}",
                     knowledgeId, i + 1, status);
 
-                if ("completed".equals(status) || "failed".equals(status)) {
-                    Knowledge knowledge = getById(knowledgeId);
+                if ("completed".equals(status) || "success".equals(status) || "failed".equals(status)) {
+                    Knowledge knowledge = baseMapper.selectByIdIgnoreDataPermission(knowledgeId);
                     if (knowledge != null) {
-                        knowledge.setWeKnoraParseStatus(status);
-                        updateById(knowledge);
+                        baseMapper.updateParseStatusIgnoreDataPermission(
+                            knowledgeId, "success".equals(status) ? "completed" : status
+                        );
                         log.info("WeKnora 解析完成: knowledgeId={}, status={}", knowledgeId, status);
                     }
                     return;
@@ -300,7 +320,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         updateById(knowledge);
 
         // 重新异步上传（含轮询）
-        asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), knowledge.getName(), UserUtil.getTenantId());
+self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), knowledge.getName(), UserUtil.getTenantId());
     }
 
     @Override

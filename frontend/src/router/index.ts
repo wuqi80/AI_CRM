@@ -113,7 +113,7 @@ router.beforeEach(async (to, _from, next) => {
   } else if (requiresAuth && token) {
     // 有 token 但可能没有用户信息，需要获取
     const userStore = useUserStore()
-    if (!userStore.userInfo) {
+    if (!userStore.userInfo || !userStore.permissionsLoaded) {
       try {
         await userStore.fetchUserInfo()
       } catch (e) {

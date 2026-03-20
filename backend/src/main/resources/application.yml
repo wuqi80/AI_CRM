@@ -25,9 +25,13 @@ spring:
       max-file-size: 100MB
       max-request-size: 100MB
   ai:
+    model:
+      audio:
+        speech: none
+        transcription: none
     openai:
-      api-key: ${OPENAI_API_KEY:}
-      base-url: ${OPENAI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/}
+      api-key: ${DASHSCOPE_API_KEY:${OPENAI_API_KEY:}}
+      base-url: ${OPENAI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
       chat:
         options:
           model: qwen-max
@@ -110,17 +114,23 @@ weknora:
   # 是否启用 WeKnora 集成（设为 false 可禁用，仅使用本地存储）
   enabled: true
   # WeKnora API 基础 URL
-  base-url: http://192.168.1.170/api/v1
+  base-url: http://39.97.38.69/api/v1
   # 全局 API Key（仅作 fallback，业务调用使用租户专属 API Key）
   api-key: sk-hNd0e76UZU7ep8a-B2lY-VgZ0AL4v9PwT0s1kdCD276Kq7NJ
   # 新租户初始化时自动创建的模型配置
   init-models:
+    chat:
+      name: qwen-max
+      source: remote
+      provider: aliyun
+      api-key: ${DASHSCOPE_API_KEY:}
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
     embedding:
       name: text-embedding-v3
-      source: aliyun
-      provider: openai
+      source: remote
+      provider: aliyun
       api-key: ${DASHSCOPE_API_KEY:}
-      base-url: https://dashscope.aliyuncs.com/compatible-mode/
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
       dimension: 1024
   # 搜索配置
   search:

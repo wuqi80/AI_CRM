@@ -71,6 +71,10 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long addFollowUp(FollowUpAddBO followUpAddBO) {
+        Customer customer = customerMapper.selectById(followUpAddBO.getCustomerId());
+        if (ObjectUtil.isNull(customer)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
+        }
         FollowUp followUp = BeanUtil.copyProperties(followUpAddBO, FollowUp.class);
         if (followUp.getFollowTime() == null) {
             followUp.setFollowTime(new Date());
@@ -78,7 +82,6 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         save(followUp);
 
         // Update customer's last contact time
-        Customer customer = customerMapper.selectById(followUpAddBO.getCustomerId());
         if (customer != null) {
             customer.setLastContactTime(new Date());
             if (followUpAddBO.getNextFollowTime() != null) {

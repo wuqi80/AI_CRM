@@ -28,15 +28,25 @@ public class WeKnoraConfig {
 
     @Data
     public static class InitModels {
+        private ChatModel chat = new ChatModel();
         private EmbeddingModel embedding = new EmbeddingModel();
+
+        @Data
+        public static class ChatModel {
+            private String name = "qwen-max";
+            private String source = "remote";
+            private String provider = "aliyun";
+            private String apiKey;
+            private String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+        }
 
         @Data
         public static class EmbeddingModel {
             private String name = "text-embedding-v3";
-            private String source = "aliyun";
-            private String provider = "openai";
+            private String source = "remote";
+            private String provider = "aliyun";
             private String apiKey;
-            private String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/";
+            private String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
             private int dimension = 1024;
         }
     }

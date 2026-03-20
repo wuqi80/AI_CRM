@@ -61,7 +61,7 @@
         ORDER BY c.create_time DESC
     </select>
 
-    <select id="getCustomerById" resultType="com.kakarote.ai_crm.entity.VO.CustomerListVO">
+    <select id="getCustomerById" resultType="com.kakarote.ai_crm.entity.VO.CustomerDetailVO">
         SELECT
             c.customer_id,
             c.company_name,
@@ -69,14 +69,18 @@
             c.stage,
             c.level,
             c.source,
+            c.address,
+            c.website,
             c.quotation,
             c.contract_amount,
             c.revenue,
             c.last_contact_time,
             c.next_follow_time,
+            c.remark,
             c.owner_id,
             u.realname AS owner_name,
-            c.create_time
+            c.create_time,
+            c.update_time
         FROM crm_customer c
         LEFT JOIN manager_user u ON c.owner_id = u.user_id
         WHERE c.customer_id = #{customerId} AND c.status = 1

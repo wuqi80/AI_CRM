@@ -62,8 +62,11 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     private FileStorageService fileStorageService;
 
     // 从 application.yml 读取默认值，确保与 DynamicChatClientProvider 一致
-    @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode/}")
+    @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode/v1}")
     private String defaultApiUrl;
+
+    @Value("${spring.ai.openai.api-key:${DASHSCOPE_API_KEY:${OPENAI_API_KEY:}}}")
+    private String defaultApiKey;
 
     @Value("${spring.ai.openai.chat.options.model:qwen-max}")
     private String defaultModel;
@@ -168,7 +171,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             // 未通过设置页面配置过，返回 application.yml 默认值（通义千问）
             vo.setProvider("dashscope");
             vo.setApiUrl(defaultApiUrl);
-            vo.setApiKey(maskApiKey(configs.get("ai_api_key")));
+            vo.setApiKey(maskApiKey(defaultApiKey));
             vo.setModel(defaultModel);
             vo.setTemperature(defaultTemperature);
             vo.setMaxTokens(defaultMaxTokens);

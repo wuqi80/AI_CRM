@@ -10,6 +10,7 @@ import com.kakarote.ai_crm.entity.BO.ContactAddBO;
 import com.kakarote.ai_crm.entity.BO.ContactQueryBO;
 import com.kakarote.ai_crm.entity.BO.ContactUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
+import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.ContactVO;
 import com.kakarote.ai_crm.mapper.ContactMapper;
 import com.kakarote.ai_crm.service.IContactService;
@@ -38,6 +39,10 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long addContact(ContactAddBO contactAddBO) {
+        Customer customer = customerService.getById(contactAddBO.getCustomerId());
+        if (ObjectUtil.isNull(customer)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
+        }
         Contact contact = BeanUtil.copyProperties(contactAddBO, Contact.class);
         contact.setStatus(1);
         if (contact.getIsPrimary() == null) {

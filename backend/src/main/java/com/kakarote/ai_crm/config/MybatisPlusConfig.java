@@ -2,9 +2,11 @@ package com.kakarote.ai_crm.config;
 
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.DataPermissionInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.pagination.dialects.PostgreDialect;
+import com.kakarote.ai_crm.config.auth.GlobalDataPermissionHandler;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
@@ -33,7 +35,7 @@ public class MybatisPlusConfig {
     );
 
     @Bean
-    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+    public MybatisPlusInterceptor mybatisPlusInterceptor(GlobalDataPermissionHandler dataPermissionHandler) {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
 
         // 租户拦截器（必须在分页拦截器之前）
@@ -61,6 +63,7 @@ public class MybatisPlusConfig {
             }
         });
         interceptor.addInnerInterceptor(tenantInterceptor);
+        interceptor.addInnerInterceptor(new DataPermissionInterceptor(dataPermissionHandler));
 
         // 分页拦截器
         PaginationInnerInterceptor innerInterceptor = new PaginationInnerInterceptor();

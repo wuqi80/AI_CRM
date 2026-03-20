@@ -139,7 +139,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             // 9. 初始化 WeKnora 租户（注册 + 创建模型 + 创建知识库）
             if (weKnoraClient.isEnabled()) {
                 try {
-//                    weKnoraClient.getOrCreateTenantContext(newTenantId);
+                    weKnoraClient.getOrCreateTenantContext(newTenantId);
                     log.info("WeKnora 租户初始化成功: tenantId={}", newTenantId);
                 } catch (Exception e) {
                     log.warn("WeKnora 租户初始化失败，将在首次使用时重试: tenantId={}, error={}", newTenantId, e.getMessage());

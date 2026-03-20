@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.CustomerListVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -22,7 +23,7 @@ public interface CustomerMapper extends BaseMapper<Customer> {
     /**
      * 查询客户详情
      */
-    CustomerListVO getCustomerById(@Param("customerId") Long customerId);
+    CustomerDetailVO getCustomerById(@Param("customerId") Long customerId);
 
     /**
      * 按阶段统计客户数量

@@ -10,6 +10,7 @@ import com.kakarote.ai_crm.entity.PO.CrmTenant;
 import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
 import com.kakarote.ai_crm.mapper.CrmTenantMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
@@ -45,11 +46,16 @@ public class WeKnoraClient {
     private final CrmTenantMapper crmTenantMapper;
     private final ConcurrentHashMap<Long, Object> tenantLocks = new ConcurrentHashMap<>();
 
+    @Autowired
     public WeKnoraClient(WeKnoraConfig config, CrmTenantMapper crmTenantMapper) {
+        this(config, crmTenantMapper, new RestTemplate(), new ObjectMapper());
+    }
+
+    WeKnoraClient(WeKnoraConfig config, CrmTenantMapper crmTenantMapper, RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.config = config;
         this.crmTenantMapper = crmTenantMapper;
-        this.restTemplate = new RestTemplate();
-        this.objectMapper = new ObjectMapper();
+        this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
     }
 
     public boolean isSupportedFileType(String filename) {
@@ -75,6 +81,19 @@ public class WeKnoraClient {
     public static class TenantWeKnoraContext {
         private final String apiKey;
         private final String knowledgeBaseId;
+    }
+
+    @Data
+    private static class RagModelContext {
+        private final String summaryModelId;
+        private final String embeddingModelId;
+    }
+
+    @Data
+    private static class TenantModelInfo {
+        private final String id;
+        private final String name;
+        private final String type;
     }
 
     /**
@@ -124,8 +143,13 @@ public class WeKnoraClient {
 
                 // Step 2: 创建 Embedding 模型 + 知识库（如果没有 KB ID）
                 if (StrUtil.isBlank(kbId)) {
-                    String embeddingModelId = createEmbeddingModel(apiKey);
-                    kbId = createKnowledgeBase(apiKey, "default", embeddingModelId);
+                    RagModelContext modelContext = ensureDefaultRagModels(apiKey);
+                    kbId = createKnowledgeBase(
+                            apiKey,
+                            "default",
+                            modelContext.getEmbeddingModelId(),
+                            modelContext.getSummaryModelId()
+                    );
 
                     LambdaUpdateWrapper<CrmTenant> update = new LambdaUpdateWrapper<>();
                     update.eq(CrmTenant::getTenantId, tenantId).set(CrmTenant::getWeKnoraKnowledgeBaseId, kbId);
@@ -147,6 +171,328 @@ public class WeKnoraClient {
      * POST /auth/register（无需认证）
      */
     private String registerWeKnoraTenant(String email, String password, String username) {
+        RuntimeException createTenantError = null;
+        if (StrUtil.isNotBlank(config.getApiKey())) {
+            try {
+                return createTenantWithGlobalApiKey(username);
+            } catch (RuntimeException e) {
+                createTenantError = e;
+                log.warn("WeKnora /tenants 创建租户失败，回退到认证接口: {}", e.getMessage());
+            }
+        }
+
+        try {
+            try {
+                return registerWeKnoraTenantLegacy(email, password, username);
+            } catch (RuntimeException legacyError) {
+                log.info("WeKnora /auth/register 未直接返回 api_key，继续通过登录接口获取: {}", legacyError.getMessage());
+                try {
+                    return loginAndGetTenantApiKey(email, password);
+                } catch (Exception loginAfterRegisterError) {
+                    log.info("WeKnora /auth/login 未能直接取回 api_key，继续补做 register+login: {}", loginAfterRegisterError.getMessage());
+                }
+            }
+
+            registerUser(email, password, username);
+            return loginAndGetTenantApiKey(email, password);
+        } catch (Exception e) {
+            log.error("WeKnora 租户注册异常: {}", e.getMessage(), e);
+            if (createTenantError != null) {
+                throw new RuntimeException(
+                        "WeKnora 租户注册失败: /tenants=" + createTenantError.getMessage()
+                                + "; /auth/register+/auth/login=" + e.getMessage(),
+                        e
+                );
+            }
+            throw new RuntimeException("WeKnora 租户注册失败: " + e.getMessage(), e);
+        }
+    }
+
+    private String createTenantWithGlobalApiKey(String tenantName) {
+        String url = config.getBaseUrl() + "/tenants";
+
+        HttpHeaders headers = createHeaders(config.getApiKey());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("name", tenantName);
+        body.put("description", "AI CRM tenant " + tenantName);
+        body.put("business", "crm");
+
+        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                String apiKey = extractApiKey(root);
+                if (StrUtil.isNotBlank(apiKey)) {
+                    return apiKey;
+                }
+                throw new RuntimeException("WeKnora /tenants 创建成功但未返回 api_key: " + response.getBody());
+            }
+            throw new RuntimeException("WeKnora /tenants 创建租户失败: " + response.getBody());
+        } catch (Exception e) {
+            throw new RuntimeException("WeKnora /tenants 创建租户失败: " + e.getMessage(), e);
+        }
+    }
+
+    private void registerUser(String email, String password, String username) throws IOException {
+        String url = config.getBaseUrl() + "/auth/register";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, String> body = Map.of("email", email, "password", password, "username", username);
+        HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                if (root.path("success").asBoolean(false)) {
+                    return;
+                }
+            }
+            throw new RuntimeException("WeKnora /auth/register 失败: " + response.getBody());
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            String responseBody = e.getResponseBodyAsString();
+            if (containsAlreadyExists(responseBody)) {
+                log.info("WeKnora 用户已存在，继续尝试登录获取租户 API Key: {}", email);
+                return;
+            }
+            throw new RuntimeException("WeKnora /auth/register 失败: " + responseBody, e);
+        }
+    }
+
+    private String loginAndGetTenantApiKey(String email, String password) throws IOException {
+        String url = config.getBaseUrl() + "/auth/login";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, String> body = Map.of("email", email, "password", password);
+        HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                throw new RuntimeException("WeKnora /auth/login 失败: " + response.getBody());
+            }
+
+            JsonNode root = objectMapper.readTree(response.getBody());
+            if (!root.path("success").asBoolean(false)) {
+                throw new RuntimeException("WeKnora /auth/login 失败: " + response.getBody());
+            }
+
+            String apiKey = extractApiKey(root);
+            if (StrUtil.isNotBlank(apiKey)) {
+                return apiKey;
+            }
+
+            String token = readText(root, "token");
+            if (StrUtil.isNotBlank(token)) {
+                apiKey = getCurrentTenantApiKey(token);
+                if (StrUtil.isNotBlank(apiKey)) {
+                    return apiKey;
+                }
+            }
+
+            throw new RuntimeException("WeKnora /auth/login 成功但未返回 tenant.api_key: " + response.getBody());
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            throw new RuntimeException("WeKnora /auth/login 失败: " + e.getResponseBodyAsString(), e);
+        }
+    }
+
+    private String getCurrentTenantApiKey(String token) throws IOException {
+        String url = config.getBaseUrl() + "/auth/me";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+
+        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, String.class);
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            JsonNode root = objectMapper.readTree(response.getBody());
+            return extractApiKey(root);
+        }
+        return null;
+    }
+
+    private boolean containsAlreadyExists(String responseBody) {
+        if (StrUtil.isBlank(responseBody)) {
+            return false;
+        }
+        String normalized = responseBody.toLowerCase(Locale.ROOT);
+        return normalized.contains("already exists") || normalized.contains("已存在");
+    }
+
+    private String extractApiKey(JsonNode root) {
+        return firstNonBlank(
+                readText(root, "data", "api_key"),
+                readText(root, "tenant", "api_key"),
+                readText(root, "data", "tenant", "api_key"),
+                readText(root, "api_key")
+        );
+    }
+
+    private String readText(JsonNode root, String... path) {
+        JsonNode node = root;
+        for (String name : path) {
+            if (node == null || node.isMissingNode() || node.isNull()) {
+                return null;
+            }
+            node = node.path(name);
+        }
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        String value = node.asText();
+        return StrUtil.isBlank(value) ? null : value;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private RagModelContext ensureDefaultRagModels(String tenantApiKey) {
+        List<TenantModelInfo> models = listModels(tenantApiKey);
+
+        String summaryModelId = firstNonBlank(
+                findModelId(models, "KnowledgeQA", config.getInitModels().getChat().getName()),
+                findFirstModelIdByType(models, "KnowledgeQA")
+        );
+        if (StrUtil.isBlank(summaryModelId)) {
+            summaryModelId = createKnowledgeQaModel(tenantApiKey);
+            log.info("WeKnora 默认 KnowledgeQA 模型创建成功: modelId={}", summaryModelId);
+        }
+
+        String embeddingModelId = firstNonBlank(
+                findModelId(models, "Embedding", config.getInitModels().getEmbedding().getName()),
+                findFirstModelIdByType(models, "Embedding")
+        );
+        if (StrUtil.isBlank(embeddingModelId)) {
+            embeddingModelId = createEmbeddingModel(tenantApiKey);
+        }
+
+        return new RagModelContext(summaryModelId, embeddingModelId);
+    }
+
+    private List<TenantModelInfo> listModels(String tenantApiKey) {
+        String url = config.getBaseUrl() + "/models";
+
+        HttpEntity<Void> requestEntity = new HttpEntity<>(createHeaders(tenantApiKey));
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, String.class);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                return Collections.emptyList();
+            }
+
+            JsonNode root = objectMapper.readTree(response.getBody());
+            JsonNode data = root.path("data");
+            if (!data.isArray()) {
+                return Collections.emptyList();
+            }
+
+            List<TenantModelInfo> models = new ArrayList<>();
+            for (JsonNode item : data) {
+                String id = readText(item, "id");
+                String name = readText(item, "name");
+                String type = readText(item, "type");
+                if (StrUtil.isNotBlank(id) && StrUtil.isNotBlank(type)) {
+                    models.add(new TenantModelInfo(id, name, type));
+                }
+            }
+            return models;
+        } catch (Exception e) {
+            log.warn("WeKnora 获取模型列表失败，将尝试直接创建默认模型: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private String findModelId(List<TenantModelInfo> models, String type, String modelName) {
+        if (StrUtil.isBlank(modelName)) {
+            return null;
+        }
+        return models.stream()
+                .filter(model -> type.equalsIgnoreCase(model.getType()))
+                .filter(model -> modelName.equalsIgnoreCase(model.getName()))
+                .map(TenantModelInfo::getId)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String findFirstModelIdByType(List<TenantModelInfo> models, String type) {
+        return models.stream()
+                .filter(model -> type.equalsIgnoreCase(model.getType()))
+                .map(TenantModelInfo::getId)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String createKnowledgeQaModel(String tenantApiKey) {
+        WeKnoraConfig.InitModels.ChatModel chatCfg = config.getInitModels().getChat();
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("api_key", resolveInitModelApiKey(chatCfg.getApiKey()));
+        parameters.put("base_url", chatCfg.getBaseUrl());
+        parameters.put("provider", chatCfg.getProvider());
+
+        return createModel(
+                tenantApiKey,
+                chatCfg.getName(),
+                "KnowledgeQA",
+                chatCfg.getSource(),
+                "AI CRM RAG chat model",
+                parameters
+        );
+    }
+
+    private String createModel(String tenantApiKey, String name, String type, String source,
+                               String description, Map<String, Object> parameters) {
+        String url = config.getBaseUrl() + "/models";
+
+        HttpHeaders headers = createHeaders(tenantApiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+        body.put("type", type);
+        body.put("source", source);
+        body.put("description", description);
+        body.put("parameters", parameters);
+
+        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                if (root.has("data") && root.get("data").has("id")) {
+                    return root.get("data").get("id").asText();
+                }
+                if (root.has("id")) {
+                    return root.get("id").asText();
+                }
+            }
+            throw new RuntimeException("WeKnora 创建模型失败: " + response.getBody());
+        } catch (Exception e) {
+            log.error("WeKnora 创建模型异常: type={}, name={}, error={}", type, name, e.getMessage(), e);
+            throw new RuntimeException("WeKnora 创建模型失败: " + e.getMessage(), e);
+        }
+    }
+
+    private String resolveInitModelApiKey(String configuredApiKey) {
+        return firstNonBlank(configuredApiKey, System.getenv("DASHSCOPE_API_KEY"));
+    }
+
+    private String registerWeKnoraTenantLegacy(String email, String password, String username) {
         String url = config.getBaseUrl() + "/auth/register";
 
         HttpHeaders headers = new HttpHeaders();
@@ -177,6 +523,30 @@ public class WeKnoraClient {
      * POST /models（需租户 X-API-Key）
      */
     private String createEmbeddingModel(String tenantApiKey) {
+        WeKnoraConfig.InitModels.EmbeddingModel embCfg = config.getInitModels().getEmbedding();
+
+        Map<String, Object> embeddingParams = new HashMap<>();
+        embeddingParams.put("dimension", embCfg.getDimension());
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("api_key", resolveInitModelApiKey(embCfg.getApiKey()));
+        parameters.put("base_url", embCfg.getBaseUrl());
+        parameters.put("provider", embCfg.getProvider());
+        parameters.put("embedding_parameters", embeddingParams);
+
+        String modelId = createModel(
+                tenantApiKey,
+                embCfg.getName(),
+                "Embedding",
+                embCfg.getSource(),
+                "AI CRM RAG embedding model",
+                parameters
+        );
+        log.info("WeKnora Embedding 模型创建成功: modelId={}", modelId);
+        return modelId;
+    }
+
+    private String createEmbeddingModelLegacy(String tenantApiKey) {
         String url = config.getBaseUrl() + "/models";
 
         HttpHeaders headers = createHeaders(tenantApiKey);
@@ -188,7 +558,7 @@ public class WeKnoraClient {
         embeddingParams.put("dimension", embCfg.getDimension());
 
         Map<String, Object> parameters = new HashMap<>();
-        parameters.put("api_key", embCfg.getApiKey());
+        parameters.put("api_key", resolveInitModelApiKey(embCfg.getApiKey()));
         parameters.put("base_url", embCfg.getBaseUrl());
         parameters.put("provider", embCfg.getProvider());
         parameters.put("embedding_parameters", embeddingParams);
@@ -228,7 +598,7 @@ public class WeKnoraClient {
      * 创建知识库，返回 KB ID
      * POST /knowledge-bases（需租户 X-API-Key）
      */
-    public String createKnowledgeBase(String tenantApiKey, String name, String embeddingModelId) {
+    public String createKnowledgeBase(String tenantApiKey, String name, String embeddingModelId, String summaryModelId) {
         String url = config.getBaseUrl() + "/knowledge-bases";
 
         HttpHeaders headers = createHeaders(tenantApiKey);
@@ -237,6 +607,9 @@ public class WeKnoraClient {
         Map<String, Object> body = new HashMap<>();
         body.put("name", name);
         body.put("embedding_model_id", embeddingModelId);
+        if (StrUtil.isNotBlank(summaryModelId)) {
+            body.put("summary_model_id", summaryModelId);
+        }
         body.put("type", "document");
 
         HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(body, headers);
@@ -431,7 +804,9 @@ public class WeKnoraClient {
 
     private HttpHeaders createHeaders(String apiKey) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-API-Key", apiKey);
+        if (StrUtil.isNotBlank(apiKey)) {
+            headers.set("X-API-Key", apiKey);
+        }
         return headers;
     }
 }

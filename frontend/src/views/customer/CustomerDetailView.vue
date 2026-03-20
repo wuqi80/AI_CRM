@@ -272,14 +272,14 @@
                   <button class="px-3 py-1 text-xs font-bold rounded bg-white shadow-sm">全部</button>
                   <button class="px-3 py-1 text-xs font-medium text-slate-500">会议摘要</button>
                   <button class="px-3 py-1 text-xs font-medium text-slate-500">重要进展</button>
-                </div>
+                </div> -->
                 <button
                   class="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
                   @click="handleOpenFollowUpDialog"
                 >
                   <span class="material-symbols-outlined text-sm">add</span>
                   添加跟进
-                </button> -->
+                </button>
               </div>
             </div>
 
@@ -961,6 +961,11 @@ async function handleSetPrimary(contactId: string) {
 
 function handleAddTask() {
   router.push('/task')
+}
+
+function handleOpenFollowUpDialog() {
+  followUpForm.followTime = formatDateForApi()
+  showAddFollowUpDialog.value = true
 }
 
 async function handleAddTag() {

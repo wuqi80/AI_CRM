@@ -198,6 +198,41 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 record.setTags(Collections.emptyList());
             }
         }
+        try {
+            List<Contact> contacts = contactMapper.selectList(
+                new LambdaQueryWrapper<Contact>()
+                    .in(Contact::getCustomerId, customerIds)
+                    .eq(Contact::getStatus, 1)
+                    .orderByDesc(Contact::getIsPrimary)
+                    .orderByAsc(Contact::getCreateTime)
+                    .orderByAsc(Contact::getContactId)
+            );
+            Map<Long, List<Contact>> contactMap = contacts.stream()
+                .collect(Collectors.groupingBy(Contact::getCustomerId));
+
+            for (CustomerListVO record : records) {
+                List<Contact> customerContacts = contactMap.getOrDefault(record.getCustomerId(), Collections.emptyList());
+                if (customerContacts.isEmpty()) {
+                    continue;
+                }
+
+                Contact fallbackContact = customerContacts.get(0);
+                if (StrUtil.isBlank(record.getPrimaryContactName())) {
+                    record.setPrimaryContactName(fallbackContact.getName());
+                }
+                if (StrUtil.isBlank(record.getPrimaryContactPhone())) {
+                    record.setPrimaryContactPhone(fallbackContact.getPhone());
+                }
+                if (StrUtil.isBlank(record.getPrimaryContactPosition())) {
+                    record.setPrimaryContactPosition(fallbackContact.getPosition());
+                }
+                if (record.getContactCount() == null || record.getContactCount() <= 0) {
+                    record.setContactCount(customerContacts.size());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("鎵归噺鍔犺浇鑱旂郴浜哄厬搴曚俊鎭け璐? {}", e.getMessage());
+        }
 
         // 2. 批量加载自定义字段（1-2条SQL代替N+1）
         try {
@@ -241,12 +276,11 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     @Override
     public CustomerDetailVO getCustomerDetail(Long customerId) {
-        CustomerListVO customer = baseMapper.getCustomerById(customerId);
-        if (ObjectUtil.isNull(customer)) {
+        CustomerDetailVO detail = baseMapper.getCustomerById(customerId);
+        if (ObjectUtil.isNull(detail)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
         }
 
-        CustomerDetailVO detail = BeanUtil.copyProperties(customer, CustomerDetailVO.class);
 
         // Get contacts - wrapped in try-catch to prevent failures from breaking the entire API
         try {
@@ -933,6 +967,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                             for (CustomerImportBO r : group) {
                                 insertContactFromImport(existing.getCustomerId(), r);
                             }
+                            syncContactCache(existing.getCustomerId());
                             updated++;
                         }
                         continue;
@@ -979,6 +1014,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                         firstContact = false;
                     }
                 }
+                syncContactCache(customer.getCustomerId());
                 imported++;
             } catch (Exception e) {
                 log.error("导入客户[{}]失败: {}", first.getCompanyName(), e.getMessage());
@@ -1066,8 +1102,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         Contact primary = contactMapper.selectOne(
             new LambdaQueryWrapper<Contact>()
                 .eq(Contact::getCustomerId, customerId)
-                .eq(Contact::getIsPrimary, 1)
                 .eq(Contact::getStatus, 1)
+                .orderByDesc(Contact::getIsPrimary)
+                .orderByAsc(Contact::getCreateTime)
+                .orderByAsc(Contact::getContactId)
                 .last("LIMIT 1")
         );
         Long count = contactMapper.selectCount(
