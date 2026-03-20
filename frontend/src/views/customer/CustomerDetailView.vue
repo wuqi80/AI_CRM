@@ -12,7 +12,7 @@
         <!-- Breadcrumb -->
         <div class="flex items-center gap-2 text-sm text-slate-500 mb-3">
           <button @click="router.push('/customer')" class="hover:text-primary flex items-center gap-1 transition-colors">
-            <span class="material-symbols-outlined text-sm">group</span>
+            <WkIcon name="customer" :size="14" />
             客户管理
           </button>
           <span class="material-symbols-outlined text-xs">chevron_right</span>

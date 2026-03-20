@@ -582,11 +582,17 @@ function updateTableHeight() {
   if (!tableCardEl) return
 
   const scrollContainer = tableCardEl.closest('main')
+  const pagePaddingBottom = pageRootRef.value
+    ? parseFloat(window.getComputedStyle(pageRootRef.value).paddingBottom || '0')
+    : 0
   const viewportBottom = scrollContainer instanceof HTMLElement
     ? scrollContainer.getBoundingClientRect().bottom
     : window.innerHeight
   const paginationHeight = paginationBarRef.value?.offsetHeight ?? 0
-  const availableHeight = Math.floor(viewportBottom - tableCardEl.getBoundingClientRect().top - paginationHeight)
+  const cardBorderHeight = tableCardEl.offsetHeight - tableCardEl.clientHeight
+  const availableHeight = Math.floor(
+    viewportBottom - tableCardEl.getBoundingClientRect().top - paginationHeight - pagePaddingBottom - cardBorderHeight
+  )
   const naturalHeight = getTableNaturalHeight()
 
   if (!naturalHeight) {
