@@ -63,22 +63,22 @@
               </div>
             </div>
             <div class="flex gap-2 shrink-0">
-              <button class="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors" @click="handleEdit">编辑资料</button>
-              <button class="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors" @click="handleAiFollowUp">
+              <button class="h-8 px-4 inline-flex items-center border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors" @click="handleEdit">编辑资料</button>
+              <button class="h-8 px-4 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors" @click="handleAiFollowUp">
                 <WkIcon name="ai" class="text-sm" />
                 AI 跟进
               </button>
-              <button class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-1.5 hover:bg-primary/90 transition-colors" @click="handleGenerateReport">
+              <button class="h-8 px-4 bg-primary text-white rounded-lg text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-1.5 hover:bg-primary/90 transition-colors" @click="handleGenerateReport">
                 <WkIcon name="ai" class="text-sm" />
                 生成 AI 分析报告
               </button>
               <button
-                class="size-12 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                class="size-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                 title="删除客户"
                 type="button"
                 @click="handleDeleteCustomerConfirm"
               >
-                <span class="material-symbols-outlined text-lg">delete</span>
+                <span class="material-symbols-outlined text-base">delete</span>
               </button>
             </div>
           </div>

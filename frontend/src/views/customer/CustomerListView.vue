@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col gap-6 px-6 py-6">
+  <div ref="pageRootRef" class="flex flex-col gap-6 px-6 py-6">
     <!-- Header -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -48,159 +48,168 @@
         <div
           ref="tableCardRef"
           class="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden"
-          :style="tableCardStyle"
           v-loading="customerStore.loading"
         >
-          <div class="flex-1 min-h-0 overflow-auto overscroll-none">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="bg-slate-50 border-b border-slate-200">
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky left-0 top-0 z-40 bg-slate-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">公司名称</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">客户级别</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">联系人</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">电话</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">行业</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">商机阶段</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">报价金额</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">最后跟进</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">负责人</th>
-                  <th v-for="field in listCustomFields" :key="field.fieldId" class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">
-                    {{ field.fieldLabel }}
-                  </th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-right sticky right-0 top-0 z-40 bg-slate-50 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]">操作</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100">
-                <tr
-                  v-for="customer in customerStore.customerList"
-                  :key="customer.customerId"
-                  class="hover:bg-blue-50 transition-colors group cursor-pointer"
-                  @click="handleRowClick(customer)"
-                >
-                  <!-- Company Name -->
-                  <td class="px-6 py-4 whitespace-nowrap sticky left-0 z-10 bg-white group-hover:bg-blue-50 transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                    <div class="flex items-center gap-3">
-                      <div class="size-8 rounded bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
-                        {{ customer.companyName?.charAt(0) || '?' }}
-                      </div>
-                      <span class="text-sm font-semibold text-slate-900 group-hover:text-primary truncate max-w-[200px] block transition-colors">{{ customer.companyName }}</span>
+          <div>
+            <el-table
+              :data="customerStore.customerList"
+              :height="tableHeight"
+              row-key="customerId"
+              table-layout="fixed"
+              class="wk-customer-table"
+              empty-text="暂无客户数据"
+              @row-click="handleCustomerRowClick"
+            >
+              <el-table-column label="公司名称" fixed="left" min-width="240">
+                <template #default="{ row }">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <div class="size-8 rounded bg-primary/10 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      {{ row.companyName?.charAt(0) || '?' }}
                     </div>
-                  </td>
+                    <span class="text-sm font-semibold text-slate-900 truncate block transition-colors">{{ row.companyName }}</span>
+                  </div>
+                </template>
+              </el-table-column>
 
-                  <!-- Level -->
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <span v-if="customer.level"
-                      class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
-                      :class="{
-                        'bg-emerald-50 text-emerald-600': customer.level === 'A',
-                        'bg-blue-50 text-blue-600': customer.level === 'B',
-                        'bg-slate-100 text-slate-500': customer.level === 'C'
-                      }"
-                    >{{ customer.level }}级</span>
-                    <span v-else class="text-slate-300">-</span>
-                  </td>
+              <el-table-column label="客户级别" width="110" align="center">
+                <template #default="{ row }">
+                  <span
+                    v-if="row.level"
+                    class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
+                    :class="{
+                      'bg-emerald-50 text-emerald-600': row.level === 'A',
+                      'bg-blue-50 text-blue-600': row.level === 'B',
+                      'bg-slate-100 text-slate-500': row.level === 'C'
+                    }"
+                  >{{ row.level }}级</span>
+                  <span v-else class="text-slate-300">-</span>
+                </template>
+              </el-table-column>
 
-                  <!-- Contact -->
-                  <td class="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
-                    <div v-if="customer.primaryContactName">
-                      <div>{{ customer.primaryContactName }}</div>
-                      <div v-if="customer.primaryContactPosition" class="text-xs text-slate-400">{{ customer.primaryContactPosition }}</div>
+              <el-table-column label="联系人" min-width="140">
+                <template #default="{ row }">
+                  <div v-if="row.primaryContactName" class="text-sm text-slate-600 whitespace-nowrap">
+                    <div>{{ row.primaryContactName }}</div>
+                    <div v-if="row.primaryContactPosition" class="text-xs text-slate-400">{{ row.primaryContactPosition }}</div>
+                  </div>
+                  <span v-else class="text-sm text-slate-300">-</span>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="电话" min-width="140">
+                <template #default="{ row }">
+                  <span class="text-sm text-slate-600 font-mono whitespace-nowrap">{{ row.primaryContactPhone || '-' }}</span>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="行业" min-width="120">
+                <template #default="{ row }">
+                  <span class="text-sm text-slate-600 whitespace-nowrap">{{ row.industry || '-' }}</span>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="商机阶段" min-width="130">
+                <template #default="{ row }">
+                  <span
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
+                    :class="getStageBadgeClass(row.stage)"
+                  >
+                    <span class="size-1.5 rounded-full mr-1.5" :class="getStageDotClass(row.stage)"></span>
+                    {{ getStageLabel(row.stage) }}
+                  </span>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="报价金额" min-width="130" align="right">
+                <template #default="{ row }">
+                  <span class="text-sm font-medium text-slate-900 whitespace-nowrap">{{ row.quotation ? formatMoney(row.quotation) : '-' }}</span>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="最后跟进" min-width="120">
+                <template #default="{ row }">
+                  <span class="text-sm text-slate-500 whitespace-nowrap">{{ formatRelativeTime(row.lastContactTime) }}</span>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="负责人" min-width="140">
+                <template #default="{ row }">
+                  <div class="flex items-center gap-2" data-row-action="true" @click.stop>
+                    <div class="size-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
+                      {{ row.ownerName?.charAt(0) || '?' }}
                     </div>
-                    <span v-else class="text-slate-300">-</span>
-                  </td>
-
-                  <!-- Phone -->
-                  <td class="px-6 py-4 text-sm text-slate-600 font-mono whitespace-nowrap">
-                    {{ customer.primaryContactPhone || '-' }}
-                  </td>
-
-                  <!-- Industry -->
-                  <td class="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
-                    {{ customer.industry || '-' }}
-                  </td>
-
-                  <!-- Stage Badge -->
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <span
-                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                      :class="getStageBadgeClass(customer.stage)"
-                    >
-                      <span class="size-1.5 rounded-full mr-1.5" :class="getStageDotClass(customer.stage)"></span>
-                      {{ getStageLabel(customer.stage) }}
-                    </span>
-                  </td>
-
-                  <!-- Quotation -->
-                  <td class="px-6 py-4 text-sm font-medium text-slate-900 whitespace-nowrap">
-                    {{ customer.quotation ? formatMoney(customer.quotation) : '-' }}
-                  </td>
-
-                  <!-- Last Contact -->
-                  <td class="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">
-                    {{ formatRelativeTime(customer.lastContactTime) }}
-                  </td>
-
-                  <!-- Owner -->
-                  <td class="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
-                    <div class="flex items-center gap-2" @click.stop>
-                      <div class="size-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
-                        {{ customer.ownerName?.charAt(0) || '?' }}
-                      </div>
-                      <el-popover trigger="click" :width="220" @show="loadUserList">
-                        <template #reference>
-                          <span class="cursor-pointer hover:text-primary transition-colors truncate max-w-[100px] inline-block align-middle">{{ customer.ownerName || '-' }}</span>
-                        </template>
-                        <div>
-                          <el-input v-model="ownerSearch" placeholder="搜索用户" size="small" clearable class="mb-2" />
-                          <div class="max-h-48 overflow-auto">
-                            <div
-                              v-for="u in filteredUserList"
-                              :key="u.userId"
-                              class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-100 transition-colors"
-                              :class="{ 'bg-primary/5': String(u.userId) === String(customer.ownerId) }"
-                              @click="handleTransfer(customer, u)"
-                            >
-                              <div class="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">{{ u.realname?.charAt(0) || '?' }}</div>
-                              <span class="text-sm truncate">{{ u.realname }}</span>
-                              <span v-if="String(u.userId) === String(customer.ownerId)" class="material-symbols-outlined ml-auto text-primary text-sm">check</span>
+                    <el-popover trigger="click" :width="220" @show="loadUserList">
+                      <template #reference>
+                        <span class="cursor-pointer hover:text-primary transition-colors truncate max-w-[100px] inline-block align-middle text-sm text-slate-600">
+                          {{ row.ownerName || '-' }}
+                        </span>
+                      </template>
+                      <div>
+                        <el-input v-model="ownerSearch" placeholder="搜索用户" size="small" clearable class="mb-2" />
+                        <div class="max-h-48 overflow-auto">
+                          <div
+                            v-for="u in filteredUserList"
+                            :key="u.userId"
+                            class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-100 transition-colors"
+                            :class="{ 'bg-primary/5': String(u.userId) === String(row.ownerId) }"
+                            @click="handleTransfer(row, u)"
+                          >
+                            <div class="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {{ u.realname?.charAt(0) || '?' }}
                             </div>
-                            <div v-if="filteredUserList.length === 0" class="text-center text-sm text-slate-400 py-3">无匹配用户</div>
+                            <span class="text-sm truncate">{{ u.realname }}</span>
+                            <span v-if="String(u.userId) === String(row.ownerId)" class="material-symbols-outlined ml-auto text-primary text-sm">check</span>
                           </div>
+                          <div v-if="filteredUserList.length === 0" class="text-center text-sm text-slate-400 py-3">无匹配用户</div>
                         </div>
-                      </el-popover>
-                    </div>
-                  </td>
+                      </div>
+                    </el-popover>
+                  </div>
+                </template>
+              </el-table-column>
 
-                  <!-- Custom Fields -->
-                  <td v-for="field in listCustomFields" :key="field.fieldId" class="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
-                    {{ customer.customFields?.[field.fieldName] ?? '-' }}
-                  </td>
+              <el-table-column
+                v-for="field in listCustomFields"
+                :key="field.fieldId"
+                :label="field.fieldLabel"
+                min-width="140"
+              >
+                <template #default="{ row }">
+                  <span class="text-sm text-slate-600 whitespace-nowrap">{{ row.customFields?.[field.fieldName] ?? '-' }}</span>
+                </template>
+              </el-table-column>
 
-                  <!-- Actions -->
-                  <td class="px-6 py-4 text-right whitespace-nowrap sticky right-0 z-10 bg-white group-hover:bg-blue-50 transition-colors shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]" @click.stop>
+              <el-table-column label="操作" fixed="right" width="132" align="right">
+                <template #default="{ row }">
+                  <div class="flex justify-end" data-row-action="true" @click.stop>
                     <button
                       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
-                      @click="handleAiFollowUp(customer)"
+                      @click="handleAiFollowUp(row)"
                     >
                       <WkIcon name="ai" class="text-sm" />
                       AI 跟进
                     </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                  </div>
+                </template>
+              </el-table-column>
 
-            <!-- Empty State -->
-            <div v-if="!customerStore.loading && customerStore.customerList.length === 0" class="text-center py-16">
-              <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-4">
-                <span class="material-symbols-outlined text-4xl">group</span>
-              </div>
-              <p class="text-slate-400 text-sm font-medium">暂无客户数据</p>
-            </div>
+              <template #empty>
+                <div class="text-center py-16">
+                  <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-4">
+                    <span class="material-symbols-outlined text-4xl">group</span>
+                  </div>
+                  <p class="text-slate-400 text-sm font-medium">暂无客户数据</p>
+                </div>
+              </template>
+            </el-table>
           </div>
 
           <!-- Pagination -->
-          <div v-if="customerStore.totalCount > 0" class="shrink-0 px-6 py-4 bg-slate-50/50 flex items-center justify-between border-t border-slate-200">
+          <div
+            v-if="customerStore.totalCount > 0"
+            ref="paginationBarRef"
+            class="shrink-0 px-6 py-4 bg-slate-50/50 flex items-center justify-between border-t border-slate-200"
+          >
             <span class="text-sm text-slate-500">
               共 {{ customerStore.totalCount }} 条客户数据
             </span>
@@ -496,22 +505,26 @@ const router = useRouter()
 const route = useRoute()
 const customerStore = useCustomerStore()
 const { isMobile } = useResponsive()
+const pageRootRef = ref<HTMLElement | null>(null)
 const tableCardRef = ref<HTMLElement | null>(null)
-const tableCardMaxHeight = ref<number | null>(null)
+const paginationBarRef = ref<HTMLElement | null>(null)
+const tableHeight = ref<number | undefined>(undefined)
+let layoutObserver: ResizeObserver | null = null
+let tableHeightRaf = 0
 
 // UI only: AI sidebar expand/collapse (persisted)
 const AI_SIDEBAR_STORAGE_KEY = 'wk_ai_crm:customer_ai_sidebar_expanded:v1'
-const isAiSidebarExpanded = ref(true)
-
-function loadAiSidebarExpanded() {
+function getInitialAiSidebarExpanded() {
   try {
     const raw = localStorage.getItem(AI_SIDEBAR_STORAGE_KEY)
-    if (raw === null) return
-    isAiSidebarExpanded.value = raw === '1'
+    if (raw === null) return true
+    return raw === '1'
   } catch {
-    // ignore
+    return true
   }
 }
+
+const isAiSidebarExpanded = ref(getInitialAiSidebarExpanded())
 
 watch(isAiSidebarExpanded, (val) => {
   try {
@@ -524,7 +537,6 @@ watch(isAiSidebarExpanded, (val) => {
 const showAddDialog = ref(false)
 const editingCustomer = ref<CustomerListVO | null>(null)
 const listCustomFields = ref<CustomField[]>([])
-const statistics = ref<any>(null)
 
 // Import/Export state
 const exporting = ref(false)
@@ -548,30 +560,54 @@ function handleUpsertSuccess(payload: { mode: 'create' | 'edit'; customerId?: st
 // AI Follow-up Drawer
 const showAiFollowUpDrawer = ref(false)
 const aiFollowUpCustomer = ref<CustomerListVO | null>(null)
+const ROW_INTERACTIVE_SELECTOR = '[data-row-action="true"], button, a, input, textarea, select, .el-input, .el-textarea, .el-button'
 
-const tableCardStyle = computed(() => {
-  if (!tableCardMaxHeight.value) return {}
-  return { maxHeight: `${tableCardMaxHeight.value}px` }
-})
+function getTableNaturalHeight() {
+  const tableRoot = tableCardRef.value?.querySelector('.wk-customer-table') as HTMLElement | null
+  if (!tableRoot) return undefined
 
-function updateTableCardMaxHeight() {
+  const headerHeight = tableRoot.querySelector('.el-table__header-wrapper')?.getBoundingClientRect().height ?? 0
+  const bodyHeight = tableRoot.querySelector('.el-table__body tbody')?.getBoundingClientRect().height
+    ?? tableRoot.querySelector('.el-table__body')?.getBoundingClientRect().height
+    ?? 0
+  const emptyHeight = tableRoot.querySelector('.el-table__empty-block')?.getBoundingClientRect().height ?? 0
+  const horizontalScrollbarHeight = tableRoot.querySelector('.el-scrollbar__bar.is-horizontal')?.getBoundingClientRect().height ?? 0
+  const naturalHeight = headerHeight + Math.max(bodyHeight, emptyHeight) + horizontalScrollbarHeight
+
+  return naturalHeight > 0 ? Math.ceil(naturalHeight) : undefined
+}
+
+function updateTableHeight() {
   const tableCardEl = tableCardRef.value
   if (!tableCardEl) return
 
-  const cardRect = tableCardEl.getBoundingClientRect()
   const scrollContainer = tableCardEl.closest('main')
   const viewportBottom = scrollContainer instanceof HTMLElement
     ? scrollContainer.getBoundingClientRect().bottom
     : window.innerHeight
-  const nextHeight = Math.floor(viewportBottom - cardRect.top - 24)
+  const paginationHeight = paginationBarRef.value?.offsetHeight ?? 0
+  const availableHeight = Math.floor(viewportBottom - tableCardEl.getBoundingClientRect().top - paginationHeight)
+  const naturalHeight = getTableNaturalHeight()
 
-  if (nextHeight > 0) {
-    tableCardMaxHeight.value = nextHeight
+  if (!naturalHeight) {
+    tableHeight.value = undefined
+    return
   }
+
+  if (availableHeight <= 0) {
+    tableHeight.value = naturalHeight
+    return
+  }
+
+  tableHeight.value = Math.min(naturalHeight, availableHeight)
 }
 
-function handleTableViewportResize() {
-  updateTableCardMaxHeight()
+function queueTableHeightUpdate() {
+  if (tableHeightRaf) cancelAnimationFrame(tableHeightRaf)
+  tableHeightRaf = window.requestAnimationFrame(() => {
+    tableHeightRaf = 0
+    updateTableHeight()
+  })
 }
 
 function handleAiFollowUp(customer: CustomerListVO) {
@@ -639,29 +675,33 @@ const overdueCount = computed(() => {
   }).length
 })
 
-onMounted(async () => {
-  loadAiSidebarExpanded()
-  await nextTick()
-  updateTableCardMaxHeight()
-  window.addEventListener('resize', handleTableViewportResize)
-
+async function loadListCustomFields() {
   try {
     const allFields = await getEnabledFieldsByEntity('customer')
     listCustomFields.value = allFields.filter(f => f.isShowInList)
   } catch {
     // Error handled by interceptor
   }
+}
 
-  try {
-    await customerStore.fetchStatistics()
-    statistics.value = customerStore.statistics
-  } catch {
-    // Statistics loading failed
-  }
+onMounted(async () => {
+  queueTableHeightUpdate()
+  window.addEventListener('resize', queueTableHeightUpdate, { passive: true })
 
-  await customerStore.fetchCustomerList(true)
+  layoutObserver = new ResizeObserver(() => {
+    queueTableHeightUpdate()
+  })
+
+  if (pageRootRef.value) layoutObserver.observe(pageRootRef.value)
+  if (tableCardRef.value) layoutObserver.observe(tableCardRef.value)
+
+  await Promise.all([
+    loadListCustomFields(),
+    customerStore.fetchCustomerList(true)
+  ])
+
   await nextTick()
-  updateTableCardMaxHeight()
+  queueTableHeightUpdate()
 
   if (route.query.action === 'create') {
     showAddDialog.value = true
@@ -670,8 +710,15 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleTableViewportResize)
+  window.removeEventListener('resize', queueTableHeightUpdate)
+  if (layoutObserver) layoutObserver.disconnect()
+  if (tableHeightRaf) cancelAnimationFrame(tableHeightRaf)
   if (searchTimer) clearTimeout(searchTimer)
+})
+
+watch(() => [customerStore.totalCount, customerStore.customerList.length], async () => {
+  await nextTick()
+  queueTableHeightUpdate()
 })
 
 const offCustomerListRefresh = appEvents.on(APP_EVENT.CUSTOMER_LIST_REFRESH, () => {
@@ -698,6 +745,12 @@ function handlePageChange(page: number) {
   if (customerStore.queryParams.page === page) return
   customerStore.queryParams.page = page
   customerStore.fetchCustomerList(false)
+}
+
+function handleCustomerRowClick(row: CustomerListVO, _column: unknown, event: Event) {
+  const target = event.target
+  if (target instanceof HTMLElement && target.closest(ROW_INTERACTIVE_SELECTOR)) return
+  handleRowClick(row)
 }
 
 function handleRowClick(row: CustomerListVO) {
@@ -878,7 +931,6 @@ async function handleImportConfirm() {
     importResult.value = await confirmCustomerImport(importPreview.value.rows)
     importStep.value = 3
     await customerStore.fetchCustomerList(true)
-    try { await customerStore.fetchStatistics(); statistics.value = customerStore.statistics } catch { /* ignore */ }
   } catch {
     // Error handled by interceptor
   } finally {
@@ -895,3 +947,43 @@ function resetImport() {
   importUploadRef.value?.clearFiles()
 }
 </script>
+
+<style scoped>
+.wk-customer-table :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.wk-customer-table :deep(.el-table__border-left-patch),
+.wk-customer-table :deep(.el-table__fixed-right-patch) {
+  background: #f8fafc;
+}
+
+.wk-customer-table :deep(th.el-table__cell) {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 16px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.wk-customer-table :deep(td.el-table__cell) {
+  padding: 16px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.wk-customer-table :deep(.el-table__row) {
+  cursor: pointer;
+}
+
+.wk-customer-table :deep(.el-table__body tr:hover > td.el-table__cell),
+.wk-customer-table :deep(.el-table__body tr.hover-row > td.el-table__cell) {
+  background: #eff6ff;
+}
+
+.wk-customer-table :deep(.el-table__empty-block) {
+  min-height: 220px;
+}
+</style>
