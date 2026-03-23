@@ -77,7 +77,7 @@ public class AuthController {
         // Authenticate
         Authentication authentication;
         try {
-            authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginUserBO.getUsername(), loginUserBO.getPassword()));
+            authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginUserBO.getUsername().trim(), loginUserBO.getPassword().trim()));
         } catch (DisabledException e) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DISABLED);
         } catch (BadCredentialsException e) {
