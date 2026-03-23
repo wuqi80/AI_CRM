@@ -142,6 +142,67 @@ html, body, #app {
   box-shadow: 0 0 0 2px rgba(19, 127, 236, 0.3) inset !important;
 }
 
+/* el-input type="textarea" 使用 .el-textarea__inner，与单行 input 的 0.5rem 圆角对齐 */
+.el-textarea__inner {
+  border-radius: 0.5rem !important;
+}
+
+/* 带 prepend/append 时：全局圆角用了 !important，会盖掉 EP 分组规则，接缝处需重新压平 */
+.el-input-group.el-input-group--prepend > .el-input__wrapper {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+
+.el-input-group .el-input-group__prepend {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.el-input-group.el-input-group--append > .el-input__wrapper {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.el-input-group .el-input-group__append {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+
+/*
+ * el-input-number：± 盖在 wrapper 上，全周 inset 与按钮外侧 border 会叠成双边框。
+ * 用根节点单层外描边包一整块；wrapper 去掉 inset，保留 EP 按钮上的内侧分割线。
+ */
+.el-input-number {
+  border-radius: var(--el-border-radius-base);
+  box-shadow: 0 0 0 1px #e2e8f0;
+}
+
+.el-input-number:hover:not(:has(.el-input__wrapper.is-focus)) {
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+.el-input-number:has(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(19, 127, 236, 0.3);
+}
+
+.el-input-number.is-disabled {
+  box-shadow: 0 0 0 1px var(--el-disabled-border-color);
+}
+
+.el-input-number.is-disabled:hover {
+  box-shadow: 0 0 0 1px var(--el-disabled-border-color);
+}
+
+.el-input-number .el-input__wrapper {
+  border-radius: var(--el-border-radius-base) !important;
+  box-shadow: none !important;
+}
+
+.el-input-number .el-input__wrapper:hover,
+.el-input-number .el-input__wrapper.is-focus {
+  box-shadow: none !important;
+}
+
 /* 与 el-input 一致：选择框默认圆角更小，统一为 0.5rem（含 el-select / el-tree-select） */
 .el-select__wrapper {
   border-radius: 0.5rem !important;
