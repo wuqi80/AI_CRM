@@ -142,6 +142,11 @@ html, body, #app {
   box-shadow: 0 0 0 2px rgba(19, 127, 236, 0.3) inset !important;
 }
 
+/* 与 el-input 一致：选择框默认圆角更小，统一为 0.5rem（含 el-select / el-tree-select） */
+.el-select__wrapper {
+  border-radius: 0.5rem !important;
+}
+
 .el-dialog {
   border-radius: 1rem !important;
 }

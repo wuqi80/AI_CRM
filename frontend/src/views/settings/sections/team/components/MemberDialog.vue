@@ -4,7 +4,7 @@
     :title="editingMember ? '编辑员工' : '新增员工'"
     :width="isMobile ? '95%' : '650px'"
     :fullscreen="isMobile"
-    class="wk-dialog--flush"
+    class="wk-dialog--flush wk-member-dialog"
   >
     <el-form :model="memberForm" label-position="top">
       <el-row :gutter="16">
@@ -87,7 +87,7 @@
         <label class="text-sm font-bold text-slate-900">系统角色权限</label>
         <span class="text-xs text-primary">已选择 {{ memberForm.roleIds.length }} 个角色</span>
       </div>
-      <div class="border border-slate-200 rounded-xl p-4 max-h-48 overflow-y-auto bg-slate-50/50">
+      <div class="wk-member-dialog__role-scroll border border-slate-200 rounded-xl p-4 max-h-48 overflow-y-auto bg-slate-50/50">
         <el-checkbox-group v-model="memberForm.roleIds">
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
             <el-checkbox
@@ -148,3 +148,31 @@ const dialogVisible = computed({
   set: (value: boolean) => emit('update:visible', value)
 })
 </script>
+
+<style>
+/* 类名挂在 Teleport 后的 .el-dialog 上，用双类限定作用域；flex + 仅 body 滚动，避免滚动链带动整块弹窗晃动 */
+.el-dialog.wk-member-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  margin-top: 5vh !important;
+  overscroll-behavior: none;
+}
+
+.el-dialog.wk-member-dialog.is-fullscreen {
+  max-height: none;
+  height: 100%;
+  margin: 0 !important;
+}
+
+.el-dialog.wk-member-dialog .el-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.el-dialog.wk-member-dialog .wk-member-dialog__role-scroll {
+  overscroll-behavior: contain;
+}
+</style>
