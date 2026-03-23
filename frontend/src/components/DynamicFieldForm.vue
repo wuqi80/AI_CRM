@@ -1,188 +1,100 @@
 <template>
   <div v-if="fields.length > 0" class="dynamic-field-form">
-    <!-- Native mode: renders fields matching the plain HTML style of basic info -->
-    <template v-if="nativeStyle">
-      <div
-        v-for="field in fields"
-        :key="field.fieldId"
-        :class="field.fieldType === 'textarea' ? 'md:col-span-2' : ''"
-        class="space-y-1.5"
+    <div
+      v-for="field in fields"
+      :key="field.fieldId"
+      :class="field.fieldType === 'textarea' ? 'md:col-span-2' : ''"
+      class="space-y-1.5"
+    >
+      <label class="text-xs font-bold text-slate-500 uppercase ml-1">
+        {{ field.fieldLabel }}
+        <span v-if="field.isRequired" class="text-red-400">*</span>
+      </label>
+
+      <el-input
+        v-if="field.fieldType === 'text'"
+        v-model="localValues[field.fieldName]"
+        :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
+        size="large"
+        class="w-full wk-crm-el-field-input"
+        @input="emitChange"
+      />
+      <el-input
+        v-else-if="field.fieldType === 'textarea'"
+        v-model="localValues[field.fieldName]"
+        type="textarea"
+        :rows="3"
+        resize="none"
+        :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
+        class="w-full wk-crm-el-field-input"
+        @input="emitChange"
+      />
+      <el-input
+        v-else-if="field.fieldType === 'number'"
+        v-model="localValues[field.fieldName]"
+        type="number"
+        :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
+        size="large"
+        class="w-full wk-crm-el-field-input"
+        @input="emitChange"
+      />
+      <el-date-picker
+        v-else-if="field.fieldType === 'date'"
+        v-model="localValues[field.fieldName]"
+        type="date"
+        value-format="YYYY-MM-DD"
+        :placeholder="field.placeholder || '选择日期'"
+        size="large"
+        class="w-full wk-crm-el-field-date"
+        @change="emitChange"
+      />
+      <el-date-picker
+        v-else-if="field.fieldType === 'datetime'"
+        v-model="localValues[field.fieldName]"
+        type="datetime"
+        value-format="YYYY-MM-DD HH:mm:ss"
+        :placeholder="field.placeholder || '选择日期时间'"
+        size="large"
+        class="w-full wk-crm-el-field-date"
+        @change="emitChange"
+      />
+      <el-select
+        v-else-if="field.fieldType === 'select'"
+        v-model="localValues[field.fieldName]"
+        :placeholder="field.placeholder || '请选择'"
+        size="large"
+        class="w-full wk-crm-el-field-select"
+        clearable
+        @change="emitChange"
       >
-        <label class="text-xs font-bold text-slate-500 uppercase ml-1">
-          {{ field.fieldLabel }}
-          <span v-if="field.isRequired" class="text-red-400">*</span>
-        </label>
-
-        <!-- Text -->
-        <input
-          v-if="field.fieldType === 'text'"
-          v-model="localValues[field.fieldName]"
-          :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
-          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
-          @input="emitChange"
+        <el-option
+          v-for="opt in field.options"
+          :key="opt.value"
+          :label="opt.label"
+          :value="opt.value"
         />
-
-        <!-- Textarea -->
-        <textarea
-          v-else-if="field.fieldType === 'textarea'"
-          v-model="localValues[field.fieldName]"
-          :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
-          rows="3"
-          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all resize-none"
-          @input="emitChange"
+      </el-select>
+      <el-select
+        v-else-if="field.fieldType === 'multiselect'"
+        v-model="localValues[field.fieldName]"
+        :placeholder="field.placeholder || '请选择'"
+        size="large"
+        class="w-full wk-crm-el-field-select"
+        multiple
+        clearable
+        @change="emitChange"
+      >
+        <el-option
+          v-for="opt in field.options"
+          :key="opt.value"
+          :label="opt.label"
+          :value="opt.value"
         />
-
-        <!-- Number -->
-        <input
-          v-else-if="field.fieldType === 'number'"
-          v-model="localValues[field.fieldName]"
-          type="number"
-          :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
-          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
-          @input="emitChange"
-        />
-
-        <!-- Date / DateTime -->
-        <input
-          v-else-if="field.fieldType === 'date'"
-          v-model="localValues[field.fieldName]"
-          type="date"
-          :placeholder="field.placeholder || '选择日期'"
-          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
-          @input="emitChange"
-        />
-
-        <input
-          v-else-if="field.fieldType === 'datetime'"
-          v-model="localValues[field.fieldName]"
-          type="datetime-local"
-          :placeholder="field.placeholder || '选择日期时间'"
-          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
-          @input="emitChange"
-        />
-
-        <!-- Select -->
-        <select
-          v-else-if="field.fieldType === 'select'"
-          v-model="localValues[field.fieldName]"
-          class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
-          @change="emitChange"
-        >
-          <option value="" disabled>{{ field.placeholder || '请选择' }}</option>
-          <option v-for="opt in field.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-        </select>
-
-        <!-- MultiSelect (fallback to el-select for multi) -->
-        <el-select
-          v-else-if="field.fieldType === 'multiselect'"
-          v-model="localValues[field.fieldName]"
-          :placeholder="field.placeholder || '请选择'"
-          class="w-full"
-          multiple
-          clearable
-          @change="emitChange"
-        >
-          <el-option
-            v-for="opt in field.options"
-            :key="opt.value"
-            :label="opt.label"
-            :value="opt.value"
-          />
-        </el-select>
-
-        <!-- Checkbox/Switch -->
-        <div v-else-if="field.fieldType === 'checkbox'" class="pt-1">
-          <el-switch v-model="localValues[field.fieldName]" @change="emitChange" />
-        </div>
+      </el-select>
+      <div v-else-if="field.fieldType === 'checkbox'" class="pt-1">
+        <el-switch v-model="localValues[field.fieldName]" @change="emitChange" />
       </div>
-    </template>
-
-    <!-- Legacy mode: el-form-item + el-divider -->
-    <template v-else>
-      <el-divider v-if="showDivider" content-position="left">{{ title }}</el-divider>
-      <el-form-item
-        v-for="field in fields"
-        :key="field.fieldId"
-        :label="field.fieldLabel"
-        :required="field.isRequired"
-      >
-        <el-input
-          v-if="field.fieldType === 'text'"
-          v-model="localValues[field.fieldName]"
-          :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
-          @change="emitChange"
-        />
-        <el-input
-          v-else-if="field.fieldType === 'textarea'"
-          v-model="localValues[field.fieldName]"
-          type="textarea"
-          :rows="3"
-          :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
-          @change="emitChange"
-        />
-        <el-input-number
-          v-else-if="field.fieldType === 'number'"
-          v-model="localValues[field.fieldName]"
-          :placeholder="field.placeholder"
-          class="w-full"
-          @change="emitChange"
-        />
-        <el-date-picker
-          v-else-if="field.fieldType === 'date'"
-          v-model="localValues[field.fieldName]"
-          type="date"
-          value-format="YYYY-MM-DD"
-          :placeholder="field.placeholder || '选择日期'"
-          class="w-full"
-          @change="emitChange"
-        />
-        <el-date-picker
-          v-else-if="field.fieldType === 'datetime'"
-          v-model="localValues[field.fieldName]"
-          type="datetime"
-          value-format="YYYY-MM-DD HH:mm:ss"
-          :placeholder="field.placeholder || '选择日期时间'"
-          class="w-full"
-          @change="emitChange"
-        />
-        <el-select
-          v-else-if="field.fieldType === 'select'"
-          v-model="localValues[field.fieldName]"
-          :placeholder="field.placeholder || '请选择'"
-          class="w-full"
-          clearable
-          @change="emitChange"
-        >
-          <el-option
-            v-for="opt in field.options"
-            :key="opt.value"
-            :label="opt.label"
-            :value="opt.value"
-          />
-        </el-select>
-        <el-select
-          v-else-if="field.fieldType === 'multiselect'"
-          v-model="localValues[field.fieldName]"
-          :placeholder="field.placeholder || '请选择'"
-          class="w-full"
-          multiple
-          clearable
-          @change="emitChange"
-        >
-          <el-option
-            v-for="opt in field.options"
-            :key="opt.value"
-            :label="opt.label"
-            :value="opt.value"
-          />
-        </el-select>
-        <el-switch
-          v-else-if="field.fieldType === 'checkbox'"
-          v-model="localValues[field.fieldName]"
-          @change="emitChange"
-        />
-      </el-form-item>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -191,17 +103,13 @@ import { ref, watch, onMounted } from 'vue'
 import type { CustomField, EntityType } from '@/types/customField'
 import { getEnabledFieldsByEntity } from '@/api/customField'
 
+// 与新建任务一致：父级需带 wk-crm-el-field-scope 才应用 wk-crm-el-field-skin.css
+
 const props = withDefaults(defineProps<{
   entityType: EntityType
   modelValue?: Record<string, any>
-  showDivider?: boolean
-  title?: string
-  nativeStyle?: boolean
 }>(), {
-  modelValue: () => ({}),
-  showDivider: true,
-  title: '扩展信息',
-  nativeStyle: false
+  modelValue: () => ({})
 })
 
 const emit = defineEmits<{

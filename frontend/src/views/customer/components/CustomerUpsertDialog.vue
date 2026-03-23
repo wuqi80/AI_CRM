@@ -14,7 +14,7 @@
 
         <!-- Modal Container -->
         <div :class="[
-          'relative w-full bg-slate-50 shadow-2xl overflow-hidden flex flex-col',
+          'relative w-full bg-slate-50 shadow-2xl overflow-hidden flex flex-col wk-crm-el-field-scope',
           isMobile ? 'max-w-full max-h-full rounded-none inset-0' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
         ]">
           <!-- Header -->
@@ -65,9 +65,12 @@
                   </div>
                   <div class="p-4 space-y-3">
                     <div class="relative">
-                      <textarea
+                      <el-input
                         v-model="aiInputText"
-                        class="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none resize-none transition-all"
+                        type="textarea"
+                        :rows="4"
+                        resize="none"
+                        class="wk-crm-el-field-input wk-crm-el-field-ai w-full"
                         placeholder="在此粘贴客户描述、邮件内容，或直接粘贴 (Ctrl+V) 名片图片..."
                         @paste="handleAiPaste"
                       />
@@ -133,52 +136,46 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <div class="md:col-span-2 space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">公司名称 <span class="text-red-400">*</span></label>
-                      <input
+                      <el-input
                         v-model="formData.companyName"
                         placeholder="请输入公司全称"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
                       />
                     </div>
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">所属行业</label>
-                      <input
+                      <el-input
                         v-model="formData.industry"
                         placeholder="例如：互联网 / 科技"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
                       />
                     </div>
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">客户级别</label>
-                      <select
-                        v-model="formData.level"
-                        class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
-                      >
-                        <option value="A">A级客户</option>
-                        <option value="B">B级客户</option>
-                        <option value="C">C级客户</option>
-                      </select>
+                      <el-select v-model="formData.level" class="w-full wk-crm-el-field-select" size="large">
+                        <el-option label="A级客户" value="A" />
+                        <el-option label="B级客户" value="B" />
+                        <el-option label="C级客户" value="C" />
+                      </el-select>
                     </div>
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">商机阶段</label>
-                      <select
-                        v-model="formData.stage"
-                        class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
-                      >
-                        <option value="lead">线索</option>
-                        <option value="qualified">资格审查</option>
-                        <option value="proposal">方案报价</option>
-                        <option value="negotiation">谈判中</option>
-                        <option value="closed">已成交</option>
-                        <option value="lost">已流失</option>
-                      </select>
+                      <el-select v-model="formData.stage" class="w-full wk-crm-el-field-select" size="large">
+                        <el-option label="线索" value="lead" />
+                        <el-option label="资格审查" value="qualified" />
+                        <el-option label="方案报价" value="proposal" />
+                        <el-option label="谈判中" value="negotiation" />
+                        <el-option label="已成交" value="closed" />
+                        <el-option label="已流失" value="lost" />
+                      </el-select>
                     </div>
 
                     <DynamicFieldForm
                       ref="dynamicFieldFormRef"
                       entity-type="customer"
                       v-model="customFieldValues"
-                      :show-divider="false"
-                      native-style
                     />
                   </div>
                 </section>
@@ -192,26 +189,29 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">主要联系人</label>
-                      <input
+                      <el-input
                         v-model="formData.contactName"
                         placeholder="请输入联系人姓名"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
                       />
                     </div>
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">手机号码</label>
-                      <input
+                      <el-input
                         v-model="formData.contactPhone"
                         placeholder="请输入联系电话"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
                       />
                     </div>
                     <div class="space-y-1.5 md:col-span-2">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">电子邮箱</label>
-                      <input
+                      <el-input
                         v-model="formData.contactEmail"
                         placeholder="请输入邮箱地址"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
                       />
                     </div>
                   </div>
