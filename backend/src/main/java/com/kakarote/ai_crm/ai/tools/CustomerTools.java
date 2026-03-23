@@ -3,6 +3,9 @@ package com.kakarote.ai_crm.ai.tools;
 import cn.hutool.core.util.StrUtil;
 import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.ai.state.PendingCustomerCreationStore;
+import com.kakarote.ai_crm.ai.tools.support.AiCustomerMatcher;
+import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
+import com.kakarote.ai_crm.ai.tools.support.AiToolPermissionSupport;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.CustomerAddBO;
 import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
@@ -34,7 +37,14 @@ public class CustomerTools {
     @Autowired
     private PendingCustomerCreationStore pendingCustomerCreationStore;
 
+    @Autowired
+    private AiCustomerMatcher aiCustomerMatcher;
+
+    @Autowired
+    private AiToolPermissionSupport permissionSupport;
+
     @Tool(description = "创建新客户档案。系统会先检查是否已存在同名客户；如果存在，不会直接创建，而是进入待确认状态。只有用户明确确认后，才能再调用 confirmPendingCustomerCreation 完成创建。")
+    @AiToolPermission(value = "customer:create", action = "创建客户")
     public String createCustomer(
             @ToolParam(description = "公司名称，必填") String companyName,
             @ToolParam(description = "行业，如互联网、金融、制造业等", required = false) String industry,
@@ -93,6 +103,7 @@ public class CustomerTools {
     }
 
     @Tool(description = "确认创建重复客户。只有在 createCustomer 检测到同名客户后，且用户明确表示“确认创建”“继续创建”“仍然创建”时才调用。会基于当前会话中暂存的草稿真正创建客户。")
+    @AiToolPermission(value = "customer:create", action = "确认创建客户")
     public String confirmPendingCustomerCreation() {
         Long sessionId = AiContextHolder.getCurrentSessionId();
         if (sessionId == null) {
@@ -116,6 +127,7 @@ public class CustomerTools {
     }
 
     @Tool(description = "取消待确认的重复客户创建。只有在 createCustomer 检测到同名客户后，且用户明确表示“不创建”“取消”“算了”时才调用。")
+    @AiToolPermission(value = "customer:create", action = "取消创建客户")
     public String cancelPendingCustomerCreation() {
         Long sessionId = AiContextHolder.getCurrentSessionId();
         if (sessionId == null) {
@@ -131,6 +143,7 @@ public class CustomerTools {
     }
 
     @Tool(description = "查询客户列表。当用户查看、搜索、筛选客户时调用此工具。")
+    @AiToolPermission(value = "customer:view", action = "查看客户")
     public String queryCustomers(
             @ToolParam(description = "搜索关键词，可搜索公司名称", required = false) String keyword,
             @ToolParam(description = "客户级别筛选：A/B/C", required = false) String level,
@@ -178,6 +191,7 @@ public class CustomerTools {
     }
 
     @Tool(description = "修改客户信息。当用户要修改、编辑、更新已有客户的信息时调用。包括公司名称、行业、阶段、等级、地址、网站、金额等。")
+    @AiToolPermission(value = "customer:edit", action = "编辑客户")
     public String updateCustomer(
             @ToolParam(description = "客户ID，数字类型，必填") String customerIdStr,
             @ToolParam(description = "公司名称", required = false) String companyName,
@@ -220,6 +234,10 @@ public class CustomerTools {
             }
             String normalizedStage = normalizeOptionalText(stage);
             if (normalizedStage != null) {
+                String denied = permissionSupport.denyMessage("customer:change_stage", "变更客户阶段");
+                if (denied != null) {
+                    return denied;
+                }
                 bo.setStage(normalizedStage);
             }
             String normalizedLevel = normalizeOptionalText(level);
@@ -293,6 +311,7 @@ public class CustomerTools {
     }
 
     @Tool(description = "获取客户详细信息。当用户询问某个客户的具体信息、联系人、跟进记录时调用。可以使用客户ID或公司名称查询。")
+    @AiToolPermission(value = "customer:view", action = "查看客户详情")
     public String getCustomerDetail(
             @ToolParam(description = "客户标识，可以是客户ID（数字）或公司名称（文本）。优先使用客户ID") String customerIdentifier) {
 
@@ -303,10 +322,19 @@ public class CustomerTools {
             }
 
             Long customerId;
+            String matchedCompanyName = normalizedIdentifier;
             try {
                 customerId = Long.parseLong(normalizedIdentifier);
             } catch (NumberFormatException e) {
-                customerId = findCustomerIdByName(normalizedIdentifier);
+                AiCustomerMatcher.CustomerMatchResult matchResult = aiCustomerMatcher.match(normalizedIdentifier);
+                if (matchResult.isAmbiguous()) {
+                    return "获取客户详情失败: 客户名称「" + normalizedIdentifier + "」无法唯一匹配，可能是：" + matchResult.formatCandidateNames() + "。请提供更完整的客户名称。";
+                }
+                if (!matchResult.isMatched()) {
+                    return "获取客户详情失败: 未找到名为「" + normalizedIdentifier + "」的客户";
+                }
+                customerId = matchResult.getCustomer().getCustomerId();
+                matchedCompanyName = matchResult.getCustomer().getCompanyName();
             }
 
             if (customerId == null) {

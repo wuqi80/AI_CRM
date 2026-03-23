@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.ai.tools;
 
 import com.kakarote.ai_crm.ai.context.AiContextHolder;
+import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
@@ -32,6 +33,7 @@ public class KnowledgeTools {
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
     @Tool(description = "查看知识库文件列表。当用户查询文档、资料、知识库、会议记录、合同等时调用。")
+    @AiToolPermission(value = "knowledge:view", action = "查看知识库")
     public String getKnowledgeBase(
             @ToolParam(description = "搜索关键词，可搜索文件名或内容", required = false) String keyword,
             @ToolParam(description = "文件类型：meeting(会议记录)/email(邮件)/recording(录音)/document(文档)/proposal(方案)/contract(合同)", required = false) String type,
@@ -88,6 +90,7 @@ public class KnowledgeTools {
     }
 
     @Tool(description = "获取知识库文件详情。当用户想查看某个文件的具体内容时调用。")
+    @AiToolPermission(value = "knowledge:view", action = "查看知识库详情")
     public String getKnowledgeDetail(
             @ToolParam(description = "知识库文件ID，数字类型") String knowledgeIdStr) {
 
@@ -132,6 +135,7 @@ public class KnowledgeTools {
     }
 
     @Tool(description = "在知识库中语义搜索相关文档内容。当用户询问文档具体内容、查找特定信息、需要基于文档内容回答问题时调用。这是一个智能搜索工具，能理解问题语义并返回最相关的文档片段。")
+    @AiToolPermission(value = "knowledge:view", action = "搜索知识库内容")
     public String searchKnowledgeContent(
             @ToolParam(description = "搜索关键词或问题，例如：'合同付款条款'、'客户需求分析'、'会议讨论的技术方案'") String query) {
 
