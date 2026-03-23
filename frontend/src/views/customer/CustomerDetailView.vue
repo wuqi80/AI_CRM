@@ -208,6 +208,10 @@
                   <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">创建时间</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatDate(customer.createTime) }}</p>
                 </div>
+                <div v-for="field in customFields" :key="field.fieldId">
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{{ field.fieldLabel }}</p>
+                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatCustomFieldValue(field, customer.customFields?.[field.fieldName]) }}</p>
+                </div>
                 <div>
                   <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户背景</p>
                   <p class="text-sm text-slate-600 leading-relaxed px-2 py-1 -ml-2">{{ customer.description || '暂无描述' }}</p>
@@ -242,21 +246,6 @@
               </div>
             </section>
 
-            <!-- Custom Fields -->
-            <section v-if="customFields.length > 0" class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-              <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <span :class="sectionIconBoxClass" :style="getSectionIconStyle('customFields')">
-                  <span :class="sectionMaterialIconClass">tune</span>
-                </span>
-                扩展信息
-              </h3>
-              <div class="space-y-5">
-                <div v-for="field in customFields" :key="field.fieldId">
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{{ field.fieldLabel }}</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatCustomFieldValue(field, customer.customFields?.[field.fieldName]) }}</p>
-                </div>
-              </div>
-            </section>
           </div>
 
           <!-- Center Column: Follow-ups Timeline (col-span-6) -->
@@ -266,7 +255,7 @@
                 <span :class="sectionIconBoxClass" :style="getSectionIconStyle('recentActivity')">
                   <span :class="sectionMaterialIconClass">history</span>
                 </span>
-                最近活动 - 智能跟进时间轴
+                最近活动 - AI时间轴
               </h3>
               <div class="flex items-center gap-3">
                 <!-- <div class="flex bg-slate-100 p-1 rounded-lg">
@@ -680,7 +669,6 @@ const sectionIconBgColors = {
   customerStage: '#0052CC',
   basicInfo: '#5243AA',
   tags: '#DE350B',
-  customFields: '#00875A',
   recentActivity: '#FF991F',
   relatedBusiness: '#00A3BF',
   relatedContacts: '#DE350B',
