@@ -146,8 +146,17 @@
 
                 <!-- User Message -->
                 <div v-else class="flex gap-3 flex-row-reverse">
-                  <div class="size-8 rounded-lg bg-slate-100 shrink-0 border border-slate-200 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-slate-400 text-base">person</span>
+                  <div class="size-8 rounded-lg bg-slate-100 shrink-0 border border-slate-200 flex items-center justify-center overflow-hidden">
+                    <img
+                      v-if="showUserAvatarImage"
+                      :src="userStore.avatar"
+                      class="h-full w-full object-cover"
+                      alt="user avatar"
+                      @error="userAvatarLoadFailed = true"
+                    />
+                    <span v-else class="text-xs font-bold text-slate-600">
+                      {{ userAvatarFallback }}
+                    </span>
                   </div>
                   <div class="space-y-2 min-w-0 max-w-[80%]">
                     <div class="bg-primary text-white rounded-2xl rounded-tr-none p-3 shadow-sm shadow-primary/10 text-sm leading-relaxed">
@@ -294,7 +303,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useChatDrawer } from '@/composables/useChatDrawer'
 import { useChatStore } from '@/stores/chat'
@@ -318,9 +327,12 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
 const currentTab = ref<'chat' | 'notifications'>('chat')
+const userAvatarLoadFailed = ref(false)
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024
 const MAX_FILE_COUNT = 5
+const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
+const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
 
 const quickActions = [
   { label: '分析客户意向', text: '帮我分析客户意向' },
@@ -383,6 +395,13 @@ watch(
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
       }
     })
+  }
+)
+
+watch(
+  () => userStore.avatar,
+  () => {
+    userAvatarLoadFailed.value = false
   }
 )
 

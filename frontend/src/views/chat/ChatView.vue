@@ -237,7 +237,16 @@
                 <!-- User Message -->
                 <div v-else class="flex gap-4 md:gap-5 flex-row-reverse">
                   <div class="size-9 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-slate-400">person</span>
+                    <img
+                      v-if="showUserAvatarImage"
+                      :src="userStore.avatar"
+                      class="h-full w-full object-cover"
+                      alt="user avatar"
+                      @error="userAvatarLoadFailed = true"
+                    />
+                    <span v-else class="text-sm font-bold text-slate-600">
+                      {{ userAvatarFallback }}
+                    </span>
                   </div>
                   <div class="space-y-3 min-w-0" :class="isMobile ? 'max-w-[85%]' : 'max-w-[70%]'">
                     <div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-lg shadow-primary/10 text-sm leading-relaxed">
@@ -489,6 +498,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
 const currentView = ref<'chat' | 'notifications'>('chat')
+const userAvatarLoadFailed = ref(false)
 const aiConfig = ref<AiConfig | null>(null)
 const aiConfigLoaded = ref(false)
 const isApiKeyModalOpen = ref(false)
@@ -576,6 +586,8 @@ const quickActions = [
 ]
 
 const hasAiApiKeyConfigured = computed(() => hasApiKeyConfigured(aiConfig.value))
+const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
+const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
 
 onMounted(async () => {
   await Promise.all([
@@ -605,6 +617,13 @@ watch(
   },
   () => {
     nextTick(scrollToBottom)
+  }
+)
+
+watch(
+  () => userStore.avatar,
+  () => {
+    userAvatarLoadFailed.value = false
   }
 )
 
