@@ -62,7 +62,7 @@
                   class="p-3 rounded-xl border border-primary/20 bg-primary/5 shadow-sm hover:shadow-md hover:bg-primary/10 transition-all cursor-pointer"
                 >
                   <p class="text-xs font-bold text-primary mb-1 truncate">{{ event.title }}</p>
-                  <p class="text-xs text-slate-500 truncate">{{ formatTime(event.startTime) }} • {{ event.customerName || '' }}</p>
+                  <p class="text-xs text-slate-500 truncate">{{ formatTime(event.startTime) }} • {{ event.customerName || event.participantNames || '' }}</p>
                 </div>
                 <!-- Tasks -->
                 <div

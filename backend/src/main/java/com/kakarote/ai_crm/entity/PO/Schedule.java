@@ -47,6 +47,9 @@ public class Schedule implements Serializable {
     @Schema(description = "地点")
     private String location;
 
+    @Schema(description = "参与人员工ID（逗号分隔）")
+    private String participantUserIds;
+
     @TableField(fill = FieldFill.INSERT)
     @Schema(description = "创建人ID")
     private Long createUserId;

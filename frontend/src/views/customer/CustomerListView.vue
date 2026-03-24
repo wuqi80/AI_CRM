@@ -19,6 +19,80 @@
             @input="debouncedSearch"
           />
         </div>
+        <el-popover
+          v-model:visible="showAiSearchPopover"
+          trigger="click"
+          placement="bottom-end"
+          :width="420"
+          popper-class="wk-ai-search-popover"
+        >
+          <template #reference>
+            <button
+              class="h-10 px-4 bg-white border border-primary/30 text-primary rounded-xl text-sm font-bold hover:bg-primary/5 transition-all shadow-sm flex items-center gap-2"
+              type="button"
+            >
+              <WkIcon name="ai" class="text-sm" />
+              AI 搜索
+            </button>
+          </template>
+
+          <div class="space-y-4">
+            <div class="space-y-2">
+              <p class="text-sm font-bold text-slate-900">AI 搜索场景示例</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="example in AI_SEARCH_EXAMPLES"
+                  :key="example"
+                  type="button"
+                  class="px-3 py-1.5 rounded-full bg-slate-50 text-slate-600 text-xs font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                  @click="applyAiSearchExample(example)"
+                >
+                  {{ example }}
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">场景描述</label>
+              <textarea
+                v-model="aiSearchInput"
+                rows="3"
+                placeholder="例如：30 天未跟进的制造业客户"
+                class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
+                @keydown.enter.exact.prevent="handleAiSearch"
+              />
+              <p class="text-xs text-slate-500 leading-5">{{ aiSearchStatusText }}</p>
+            </div>
+
+            <div class="flex items-center justify-between gap-3">
+              <button
+                v-if="hasAiSearchState"
+                class="text-xs font-medium text-slate-500 hover:text-red-500 transition-colors"
+                type="button"
+                @click="clearAiSearch"
+              >
+                清空 AI 条件
+              </button>
+              <div class="flex items-center gap-2 ml-auto">
+                <button
+                  class="px-3 py-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
+                  type="button"
+                  @click="showAiSearchPopover = false"
+                >
+                  取消
+                </button>
+                <button
+                  class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  :disabled="!aiSearchInput.trim() || aiSearchLoading"
+                  type="button"
+                  @click="handleAiSearch"
+                >
+                  {{ aiSearchLoading ? '解析中...' : 'AI 搜索' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </el-popover>
         <!-- Import/Export - desktop only -->
         <div v-if="!isMobile" class="flex items-center gap-1.5 border-r border-slate-200 pr-3 mr-1">
           <button class="h-10 px-4 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2" @click="showImportDialog = true">
@@ -39,6 +113,38 @@
           <span v-if="!isMobile">新增客户</span>
         </button>
       </div>
+    </div>
+
+    <div v-if="hasAiSearchState" class="bg-white border border-primary/10 rounded-2xl px-4 py-3 shadow-sm">
+      <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold">
+            <WkIcon name="ai" class="text-[12px]" />
+            AI 筛选
+          </span>
+          <el-tag
+            v-for="chip in aiSearchState?.displayChips || []"
+            :key="chip.key"
+            closable
+            size="small"
+            class="wk-ai-chip"
+            @close="handleRemoveAiChip(chip.key)"
+          >
+            {{ chip.label }}
+          </el-tag>
+        </div>
+
+        <button
+          class="text-xs font-medium text-slate-500 hover:text-red-500 transition-colors self-start"
+          type="button"
+          @click="clearAiSearch"
+        >
+          清空
+        </button>
+      </div>
+      <p v-if="aiSearchState?.explanation" class="mt-2 text-xs text-slate-500 leading-5">
+        {{ aiSearchState.explanation }}
+      </p>
     </div>
 
     <!-- Main Content: Table + AI Sidebar -->
@@ -281,10 +387,17 @@ import { useRouter, useRoute } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { CustomerListVO, CustomerImportResult } from '@/types/customer'
+import type {
+  CustomerAiSearchParseVO,
+  CustomerAiSearchQuery,
+  CustomerExportBO,
+  CustomerListVO,
+  CustomerImportResult,
+  CustomerQueryBO
+} from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { getEnabledFieldsByEntity } from '@/api/customField'
-import { transferCustomer, exportCustomers } from '@/api/customer'
+import { aiParseCustomerSearch, transferCustomer, exportCustomers } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import CustomerImportDialog from '@/views/customer/components/CustomerImportDialog.vue'
@@ -310,6 +423,178 @@ const listCustomFields = ref<CustomField[]>([])
 // Import/Export state
 const exporting = ref(false)
 const showImportDialog = ref(false)
+const AI_SEARCH_EXAMPLES = [
+  '报价大于 50 万的高价值客户',
+  '30 天未跟进的制造业客户',
+  '最近一周新增的客户',
+  '活跃阶段的 A 级客户'
+]
+const showAiSearchPopover = ref(false)
+const aiSearchInput = ref('')
+const aiSearchLoading = ref(false)
+const aiSearchState = ref<CustomerAiSearchParseVO | null>(null)
+
+const hasAiSearchState = computed(() => {
+  return Boolean(aiSearchState.value?.displayChips.length || aiSearchState.value?.explanation)
+})
+
+const aiSearchStatusText = computed(() => {
+  if (aiSearchLoading.value) return '正在解析自然语言并生成筛选条件...'
+  if (aiSearchState.value?.fallbackKeywordSearch) return '本次已回退为关键词搜索'
+  if (aiSearchState.value?.explanation) return aiSearchState.value.explanation
+  return '支持“30天未跟进的制造业客户”这类自然语言描述'
+})
+
+function normalizeCustomerQuery(query: CustomerAiSearchQuery): Partial<CustomerQueryBO> {
+  const normalized: Partial<CustomerQueryBO> = {}
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '') continue
+    if (Array.isArray(value) && value.length === 0) continue
+    normalized[key as keyof CustomerQueryBO] = value as never
+  }
+  return normalized
+}
+
+function buildExportPayload(): CustomerExportBO {
+  return {
+    ...customerStore.queryParams
+  }
+}
+
+async function applyAiSearchResult(result: CustomerAiSearchParseVO) {
+  aiSearchState.value = result
+  aiSearchInput.value = result.normalizedQuery || result.originalQuery || aiSearchInput.value
+  const normalizedQuery = normalizeCustomerQuery(result.parsedQuery || {})
+  customerStore.replaceQueryParams(normalizedQuery)
+  await customerStore.fetchCustomerList(true)
+  showAiSearchPopover.value = false
+}
+
+async function handleAiSearch() {
+  const query = aiSearchInput.value.trim()
+  if (!query || aiSearchLoading.value) return
+  aiSearchLoading.value = true
+  try {
+    const result = await aiParseCustomerSearch({ query })
+    await applyAiSearchResult(result)
+  } finally {
+    aiSearchLoading.value = false
+  }
+}
+
+function applyAiSearchExample(example: string) {
+  aiSearchInput.value = example
+  void handleAiSearch()
+}
+
+function syncAiKeywordChip(keyword: string) {
+  if (!aiSearchState.value) return
+  const chips = aiSearchState.value.displayChips.filter(chip => chip.key !== 'keyword')
+  const parsedQuery = { ...aiSearchState.value.parsedQuery }
+
+  if (keyword) {
+    parsedQuery.keyword = keyword
+    chips.unshift({ key: 'keyword', label: `关键词: ${keyword}` })
+  } else {
+    delete parsedQuery.keyword
+  }
+
+  aiSearchState.value = {
+    ...aiSearchState.value,
+    parsedQuery,
+    displayChips: chips
+  }
+}
+
+async function clearAiSearch() {
+  aiSearchState.value = null
+  aiSearchInput.value = ''
+  customerStore.resetQueryParams()
+  await customerStore.fetchCustomerList(true)
+}
+
+function clearAiQueryField(query: CustomerAiSearchQuery, key: string) {
+  switch (key) {
+    case 'keyword':
+      delete query.keyword
+      break
+    case 'industry':
+      delete query.industry
+      break
+    case 'level':
+      delete query.level
+      break
+    case 'stage':
+      delete query.stage
+      delete query.stages
+      break
+    case 'stages':
+      delete query.stages
+      delete query.stage
+      break
+    case 'tag':
+      delete query.tag
+      break
+    case 'source':
+      delete query.source
+      break
+    case 'quotation':
+      delete query.quotationMin
+      delete query.quotationMax
+      break
+    case 'contractAmount':
+      delete query.contractAmountMin
+      delete query.contractAmountMax
+      break
+    case 'revenue':
+      delete query.revenueMin
+      delete query.revenueMax
+      break
+    case 'lastContact':
+      delete query.lastContactStart
+      delete query.lastContactEnd
+      delete query.includeNoLastContact
+      break
+    case 'nextFollow':
+      delete query.nextFollowStart
+      delete query.nextFollowEnd
+      break
+    case 'createTime':
+      delete query.createTimeStart
+      delete query.createTimeEnd
+      break
+    case 'contactCount':
+      delete query.contactCountMin
+      delete query.contactCountMax
+      break
+    case 'sort':
+      delete query.sortBy
+      delete query.sortOrder
+      break
+  }
+}
+
+async function handleRemoveAiChip(key: string) {
+  if (!aiSearchState.value) return
+
+  const parsedQuery: CustomerAiSearchQuery = { ...aiSearchState.value.parsedQuery }
+  clearAiQueryField(parsedQuery, key)
+
+  const displayChips = aiSearchState.value.displayChips.filter(chip => chip.key !== key)
+  aiSearchState.value = {
+    ...aiSearchState.value,
+    parsedQuery,
+    displayChips
+  }
+
+  if (displayChips.length === 0) {
+    await clearAiSearch()
+    return
+  }
+
+  customerStore.replaceQueryParams(normalizeCustomerQuery(parsedQuery))
+  await customerStore.fetchCustomerList(true)
+}
 
 function handleUpsertSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
   // keep original behavior: refresh list after submit
@@ -498,6 +783,7 @@ onBeforeUnmount(() => {
 })
 
 function handleSearch() {
+  syncAiKeywordChip((customerStore.queryParams.keyword || '').trim())
   customerStore.queryParams.page = 1
   customerStore.fetchCustomerList(true)
 }
@@ -607,11 +893,7 @@ async function handleTransfer(customer: CustomerListVO, user: any) {
 async function handleExport() {
   exporting.value = true
   try {
-    const blob = await exportCustomers({
-      keyword: customerStore.queryParams.keyword || undefined,
-      stage: customerStore.queryParams.stage || undefined,
-      level: customerStore.queryParams.level || undefined
-    })
+    const blob = await exportCustomers(buildExportPayload())
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -671,5 +953,16 @@ async function handleImportSuccess(_result: CustomerImportResult) {
 
 .wk-customer-table :deep(.el-table__empty-block) {
   min-height: 220px;
+}
+
+.wk-ai-chip :deep(.el-tag__content) {
+  color: #137fec;
+}
+
+:deep(.wk-ai-search-popover) {
+  border-radius: 20px;
+  border: 1px solid #dbeafe;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
+  padding: 16px;
 }
 </style>

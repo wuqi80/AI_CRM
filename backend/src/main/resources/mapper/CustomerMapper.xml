@@ -56,9 +56,116 @@
             AND c.source = #{query.source}
         </if>
         <if test="query.tag != null and query.tag != ''">
-            AND EXISTS (SELECT 1 FROM crm_customer_tag t WHERE t.customer_id = c.customer_id AND t.tag_name = #{query.tag})
+            AND EXISTS (
+                SELECT 1
+                FROM crm_customer_tag t
+                WHERE t.customer_id = c.customer_id
+                  AND t.tag_name = #{query.tag}
+            )
         </if>
-        ORDER BY c.create_time DESC
+        <if test="query.quotationMin != null">
+            AND c.quotation <![CDATA[>=]]> #{query.quotationMin}
+        </if>
+        <if test="query.quotationMax != null">
+            AND c.quotation <![CDATA[<=]]> #{query.quotationMax}
+        </if>
+        <if test="query.contractAmountMin != null">
+            AND c.contract_amount <![CDATA[>=]]> #{query.contractAmountMin}
+        </if>
+        <if test="query.contractAmountMax != null">
+            AND c.contract_amount <![CDATA[<=]]> #{query.contractAmountMax}
+        </if>
+        <if test="query.revenueMin != null">
+            AND c.revenue <![CDATA[>=]]> #{query.revenueMin}
+        </if>
+        <if test="query.revenueMax != null">
+            AND c.revenue <![CDATA[<=]]> #{query.revenueMax}
+        </if>
+        <if test="query.lastContactStart != null">
+            AND c.last_contact_time <![CDATA[>=]]> #{query.lastContactStart}
+        </if>
+        <if test="query.lastContactEnd != null">
+            <choose>
+                <when test="query.includeNoLastContact != null and query.includeNoLastContact">
+                    AND (c.last_contact_time <![CDATA[<=]]> #{query.lastContactEnd} OR c.last_contact_time IS NULL)
+                </when>
+                <otherwise>
+                    AND c.last_contact_time <![CDATA[<=]]> #{query.lastContactEnd}
+                </otherwise>
+            </choose>
+        </if>
+        <if test="query.nextFollowStart != null">
+            AND c.next_follow_time <![CDATA[>=]]> #{query.nextFollowStart}
+        </if>
+        <if test="query.nextFollowEnd != null">
+            AND c.next_follow_time <![CDATA[<=]]> #{query.nextFollowEnd}
+        </if>
+        <if test="query.createTimeStart != null">
+            AND c.create_time <![CDATA[>=]]> #{query.createTimeStart}
+        </if>
+        <if test="query.createTimeEnd != null">
+            AND c.create_time <![CDATA[<=]]> #{query.createTimeEnd}
+        </if>
+        <if test="query.contactCountMin != null">
+            AND c.contact_count <![CDATA[>=]]> #{query.contactCountMin}
+        </if>
+        <if test="query.contactCountMax != null">
+            AND c.contact_count <![CDATA[<=]]> #{query.contactCountMax}
+        </if>
+
+        <choose>
+            <when test="query.sortBy == 'quotation'">
+                ORDER BY c.quotation
+                <choose>
+                    <when test="query.sortOrder == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'contractAmount'">
+                ORDER BY c.contract_amount
+                <choose>
+                    <when test="query.sortOrder == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'revenue'">
+                ORDER BY c.revenue
+                <choose>
+                    <when test="query.sortOrder == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'lastContactTime'">
+                ORDER BY c.last_contact_time
+                <choose>
+                    <when test="query.sortOrder == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'nextFollowTime'">
+                ORDER BY c.next_follow_time
+                <choose>
+                    <when test="query.sortOrder == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'contactCount'">
+                ORDER BY c.contact_count
+                <choose>
+                    <when test="query.sortOrder == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <otherwise>
+                ORDER BY c.create_time DESC
+            </otherwise>
+        </choose>
     </select>
 
     <select id="getCustomerById" resultType="com.kakarote.ai_crm.entity.VO.CustomerDetailVO">

@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.poi.excel.ExcelReader;
@@ -40,7 +41,11 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -108,6 +113,65 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         1. 无法从输入中提取的字段请留空字符串或空数组
         2. tags 请生成3-5个关键词标签
         3. score 请根据信息丰富度和客户质量给出合理评分
+        """;
+
+    private static final DateTimeFormatter AI_SEARCH_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final Pattern DAYS_WITHOUT_CONTACT_PATTERN = Pattern.compile("(\\d{1,3})\\s*天(?:未跟进|未联系|未互动)");
+    private static final Pattern RECENT_NEW_CUSTOMERS_PATTERN = Pattern.compile("(?:最近|近)(\\d{1,3})\\s*天新增");
+    private static final Pattern LEVEL_PATTERN = Pattern.compile("([ABC])\\s*(?:类|级)?客户", Pattern.CASE_INSENSITIVE);
+    private static final List<String> COMMON_INDUSTRIES = List.of(
+        "制造业", "互联网", "金融", "教育", "医疗", "零售", "物流", "房地产", "SaaS", "政府", "能源"
+    );
+    private static final List<String> ACTIVE_STAGE_CODES = List.of("qualified", "proposal", "negotiation");
+    private static final String AI_CUSTOMER_SEARCH_PARSE_PROMPT = """
+        你是 CRM 客户列表的 AI 搜索解析器。你的任务是把自然语言搜索语句，转换为结构化的客户筛选条件。
+        当前时间：%s
+        用户输入：%s
+
+        只允许输出以下字段，不要输出未定义字段：
+        {
+          "parsedQuery": {
+            "keyword": "无法映射到结构化字段时使用的关键词",
+            "stage": "lead/qualified/proposal/negotiation/closed/lost 之一",
+            "stages": ["lead/qualified/proposal/negotiation/closed/lost"],
+            "level": "A/B/C",
+            "industry": "行业名称",
+            "tag": "标签名称",
+            "source": "客户来源",
+            "quotationMin": 0,
+            "quotationMax": 0,
+            "contractAmountMin": 0,
+            "contractAmountMax": 0,
+            "revenueMin": 0,
+            "revenueMax": 0,
+            "lastContactStart": "yyyy-MM-dd HH:mm:ss",
+            "lastContactEnd": "yyyy-MM-dd HH:mm:ss",
+            "includeNoLastContact": true,
+            "nextFollowStart": "yyyy-MM-dd HH:mm:ss",
+            "nextFollowEnd": "yyyy-MM-dd HH:mm:ss",
+            "createTimeStart": "yyyy-MM-dd HH:mm:ss",
+            "createTimeEnd": "yyyy-MM-dd HH:mm:ss",
+            "contactCountMin": 0,
+            "contactCountMax": 0,
+            "sortBy": "createTime/quotation/contractAmount/revenue/lastContactTime/nextFollowTime/contactCount",
+            "sortOrder": "asc/desc"
+          },
+          "explanation": "一句话说明解析依据",
+          "confidence": 0.0
+        }
+
+        解析规则：
+        1. 能结构化就结构化，不能结构化的词放到 keyword。
+        2. 所有时间必须输出绝对时间，不允许输出“最近30天”“上周”这种相对表达。
+        3. “高价值客户”默认表示 quotationMin = 500000，建议 sortBy=quotation, sortOrder=desc。
+        4. “活跃客户”默认表示 stages=["qualified","proposal","negotiation"]。
+        5. “30天未跟进”这类表达，转成 lastContactEnd，并将 includeNoLastContact 设为 true。
+        6. “最近一周新增客户”转成 createTimeStart，并建议按 createTime 倒序。
+        7. 阶段若用户说的是中文，请映射成英文 code。
+        8. level 只能是 A/B/C；sortOrder 只能是 asc/desc。
+        9. 未提及的字段留空，不要猜测。
+
+        只返回 JSON，不要返回解释性文字，不要使用 Markdown 代码块。
         """;
 
     @Override
@@ -423,22 +487,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     @Override
     public void exportCustomers(CustomerExportBO exportBO, HttpServletResponse response) {
         // 1. 查询客户列表
-        LambdaQueryWrapper<Customer> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Customer::getStatus, 1);
-        if (exportBO.getCustomerIds() != null && !exportBO.getCustomerIds().isEmpty()) {
-            wrapper.in(Customer::getCustomerId, exportBO.getCustomerIds());
-        } else {
-            if (StrUtil.isNotEmpty(exportBO.getKeyword())) {
-                wrapper.like(Customer::getCompanyName, exportBO.getKeyword());
-            }
-            if (StrUtil.isNotEmpty(exportBO.getStage())) {
-                wrapper.eq(Customer::getStage, exportBO.getStage());
-            }
-            if (StrUtil.isNotEmpty(exportBO.getLevel())) {
-                wrapper.eq(Customer::getLevel, exportBO.getLevel());
-            }
-        }
-        wrapper.orderByDesc(Customer::getCreateTime);
+        LambdaQueryWrapper<Customer> wrapper = buildExportCustomerWrapper(exportBO);
         List<Customer> customers = list(wrapper);
 
         if (customers.isEmpty()) {
@@ -544,6 +593,140 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             log.error("导出客户Excel失败", e);
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "导出失败: " + e.getMessage());
         }
+    }
+
+    private LambdaQueryWrapper<Customer> buildExportCustomerWrapper(CustomerExportBO exportBO) {
+        LambdaQueryWrapper<Customer> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Customer::getStatus, 1);
+
+        if (exportBO.getCustomerIds() != null && !exportBO.getCustomerIds().isEmpty()) {
+            wrapper.in(Customer::getCustomerId, exportBO.getCustomerIds());
+            wrapper.orderByDesc(Customer::getCreateTime);
+            return wrapper;
+        }
+
+        if (StrUtil.isNotEmpty(exportBO.getKeyword())) {
+            wrapper.and(w -> w.like(Customer::getCompanyName, exportBO.getKeyword())
+                .or()
+                .like(Customer::getPrimaryContactName, exportBO.getKeyword())
+                .or()
+                .like(Customer::getPrimaryContactPhone, exportBO.getKeyword())
+                .or()
+                .like(Customer::getTagNames, exportBO.getKeyword()));
+        }
+        if (StrUtil.isNotEmpty(exportBO.getStage())) {
+            wrapper.eq(Customer::getStage, exportBO.getStage());
+        }
+        if (exportBO.getStages() != null && !exportBO.getStages().isEmpty()) {
+            wrapper.in(Customer::getStage, exportBO.getStages());
+        }
+        if (StrUtil.isNotEmpty(exportBO.getLevel())) {
+            wrapper.eq(Customer::getLevel, exportBO.getLevel());
+        }
+        if (exportBO.getOwnerId() != null) {
+            wrapper.eq(Customer::getOwnerId, exportBO.getOwnerId());
+        }
+        if (StrUtil.isNotEmpty(exportBO.getIndustry())) {
+            wrapper.eq(Customer::getIndustry, exportBO.getIndustry());
+        }
+        if (StrUtil.isNotEmpty(exportBO.getSource())) {
+            wrapper.eq(Customer::getSource, exportBO.getSource());
+        }
+        if (StrUtil.isNotEmpty(exportBO.getTag())) {
+            List<Long> tagCustomerIds = customerTagMapper.selectList(
+                    new LambdaQueryWrapper<CustomerTag>()
+                        .eq(CustomerTag::getTagName, exportBO.getTag()))
+                .stream()
+                .map(CustomerTag::getCustomerId)
+                .distinct()
+                .toList();
+            if (tagCustomerIds.isEmpty()) {
+                wrapper.eq(Customer::getCustomerId, -1L);
+            } else {
+                wrapper.in(Customer::getCustomerId, tagCustomerIds);
+            }
+        }
+        if (exportBO.getQuotationMin() != null) {
+            wrapper.ge(Customer::getQuotation, exportBO.getQuotationMin());
+        }
+        if (exportBO.getQuotationMax() != null) {
+            wrapper.le(Customer::getQuotation, exportBO.getQuotationMax());
+        }
+        if (exportBO.getContractAmountMin() != null) {
+            wrapper.ge(Customer::getContractAmount, exportBO.getContractAmountMin());
+        }
+        if (exportBO.getContractAmountMax() != null) {
+            wrapper.le(Customer::getContractAmount, exportBO.getContractAmountMax());
+        }
+        if (exportBO.getRevenueMin() != null) {
+            wrapper.ge(Customer::getRevenue, exportBO.getRevenueMin());
+        }
+        if (exportBO.getRevenueMax() != null) {
+            wrapper.le(Customer::getRevenue, exportBO.getRevenueMax());
+        }
+        if (exportBO.getLastContactStart() != null) {
+            wrapper.ge(Customer::getLastContactTime, exportBO.getLastContactStart());
+        }
+        if (exportBO.getLastContactEnd() != null) {
+            if (Boolean.TRUE.equals(exportBO.getIncludeNoLastContact())) {
+                wrapper.and(w -> w.le(Customer::getLastContactTime, exportBO.getLastContactEnd())
+                    .or()
+                    .isNull(Customer::getLastContactTime));
+            } else {
+                wrapper.le(Customer::getLastContactTime, exportBO.getLastContactEnd());
+            }
+        }
+        if (exportBO.getNextFollowStart() != null) {
+            wrapper.ge(Customer::getNextFollowTime, exportBO.getNextFollowStart());
+        }
+        if (exportBO.getNextFollowEnd() != null) {
+            wrapper.le(Customer::getNextFollowTime, exportBO.getNextFollowEnd());
+        }
+        if (exportBO.getCreateTimeStart() != null) {
+            wrapper.ge(Customer::getCreateTime, exportBO.getCreateTimeStart());
+        }
+        if (exportBO.getCreateTimeEnd() != null) {
+            wrapper.le(Customer::getCreateTime, exportBO.getCreateTimeEnd());
+        }
+        if (exportBO.getContactCountMin() != null) {
+            wrapper.ge(Customer::getContactCount, exportBO.getContactCountMin());
+        }
+        if (exportBO.getContactCountMax() != null) {
+            wrapper.le(Customer::getContactCount, exportBO.getContactCountMax());
+        }
+
+        applyExportSort(wrapper, exportBO.getSortBy(), exportBO.getSortOrder());
+        return wrapper;
+    }
+
+    private void applyExportSort(LambdaQueryWrapper<Customer> wrapper, String sortBy, String sortOrder) {
+        boolean asc = "asc".equalsIgnoreCase(sortOrder);
+        if (StrUtil.isBlank(sortBy) || "createTime".equals(sortBy)) {
+            if (asc) {
+                wrapper.orderByAsc(Customer::getCreateTime);
+            } else {
+                wrapper.orderByDesc(Customer::getCreateTime);
+            }
+            return;
+        }
+
+        switch (sortBy) {
+            case "quotation" -> wrapper.orderBy(true, asc, Customer::getQuotation);
+            case "contractAmount" -> wrapper.orderBy(true, asc, Customer::getContractAmount);
+            case "revenue" -> wrapper.orderBy(true, asc, Customer::getRevenue);
+            case "lastContactTime" -> wrapper.orderBy(true, asc, Customer::getLastContactTime);
+            case "nextFollowTime" -> wrapper.orderBy(true, asc, Customer::getNextFollowTime);
+            case "contactCount" -> wrapper.orderBy(true, asc, Customer::getContactCount);
+            default -> {
+                if (asc) {
+                    wrapper.orderByAsc(Customer::getCreateTime);
+                } else {
+                    wrapper.orderByDesc(Customer::getCreateTime);
+                }
+                return;
+            }
+        }
+        wrapper.orderByDesc(Customer::getCreateTime);
     }
 
     private List<Object> buildExportRow(Customer c, Contact contact, List<CustomFieldVO> customFields, Map<String, Object> cfValues) {
@@ -1192,6 +1375,35 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
     }
 
+    @Override
+    public CustomerAiSearchParseVO aiParseSearch(CustomerAiSearchParseBO parseBO) {
+        String normalizedQuery = StrUtil.trim(parseBO.getQuery());
+        if (StrUtil.isBlank(normalizedQuery)) {
+            return buildFallbackSearchResult("");
+        }
+
+        String now = LocalDateTime.now().format(AI_SEARCH_TIME_FORMATTER);
+        String prompt = String.format(AI_CUSTOMER_SEARCH_PARSE_PROMPT, now, normalizedQuery);
+
+        try {
+            String response = chatClientProvider.getChatClient()
+                .prompt()
+                .user(prompt)
+                .call()
+                .content();
+
+            log.info("AI 客户搜索解析原始响应: {}", response);
+            return parseCustomerAiSearchResponse(response, normalizedQuery);
+        } catch (Exception e) {
+            log.error("AI 客户搜索解析失败", e);
+            CustomerAiSearchQueryVO heuristicQuery = buildHeuristicSearchQuery(normalizedQuery);
+            if (!isSearchQueryEmpty(heuristicQuery)) {
+                return buildSearchResult(normalizedQuery, heuristicQuery, "已使用内置规则解析搜索条件", 0.65, false);
+            }
+            return buildFallbackSearchResult(normalizedQuery);
+        }
+    }
+
     private CustomerAiParseVO parseCustomerAiResponse(String response) {
         try {
             // Strip markdown code block markers if present
@@ -1228,6 +1440,472 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             log.warn("AI 客户录入响应 JSON 解析失败: {}", e.getMessage());
             return buildFallbackCustomerResult();
         }
+    }
+
+    private CustomerAiSearchParseVO parseCustomerAiSearchResponse(String response, String normalizedQuery) {
+        try {
+            String json = response.trim();
+            if (json.startsWith("```")) {
+                json = json.replaceFirst("```(?:json)?\\s*", "");
+                json = json.replaceFirst("\\s*```$", "");
+            }
+
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode queryNode = root.has("parsedQuery") ? root.get("parsedQuery") : root;
+            CustomerAiSearchQueryVO query = toCustomerAiSearchQuery(queryNode);
+            enrichSearchQueryWithHeuristics(query, normalizedQuery);
+
+            if (isSearchQueryEmpty(query)) {
+                return buildFallbackSearchResult(normalizedQuery);
+            }
+
+            String explanation = getJsonText(root, "explanation");
+            if (StrUtil.isBlank(explanation)) {
+                explanation = "已将自然语言搜索解析为结构化筛选条件";
+            }
+            Double confidence = parseJsonConfidence(root.get("confidence"));
+            return buildSearchResult(normalizedQuery, query, explanation, confidence, false);
+        } catch (Exception e) {
+            log.warn("AI 客户搜索响应 JSON 解析失败: {}", e.getMessage());
+            CustomerAiSearchQueryVO heuristicQuery = buildHeuristicSearchQuery(normalizedQuery);
+            if (!isSearchQueryEmpty(heuristicQuery)) {
+                return buildSearchResult(normalizedQuery, heuristicQuery, "已使用内置规则解析搜索条件", 0.65, false);
+            }
+            return buildFallbackSearchResult(normalizedQuery);
+        }
+    }
+
+    private CustomerAiSearchQueryVO toCustomerAiSearchQuery(JsonNode queryNode) {
+        CustomerAiSearchQueryVO query = new CustomerAiSearchQueryVO();
+        if (queryNode == null || queryNode.isNull()) {
+            return query;
+        }
+
+        query.setKeyword(normalizeOptionalText(getJsonText(queryNode, "keyword")));
+
+        String stage = normalizeStageCode(getJsonText(queryNode, "stage"));
+        query.setStage(stage);
+
+        List<String> stages = getJsonStringList(queryNode, "stages").stream()
+            .map(this::normalizeStageCode)
+            .filter(StrUtil::isNotBlank)
+            .distinct()
+            .toList();
+        if (!stages.isEmpty()) {
+            query.setStages(stages);
+            if (stages.size() == 1 && StrUtil.isBlank(query.getStage())) {
+                query.setStage(stages.get(0));
+            }
+        }
+
+        String level = normalizeOptionalText(getJsonText(queryNode, "level"));
+        if (StrUtil.isNotBlank(level)) {
+            level = level.toUpperCase(Locale.ROOT);
+            if (VALID_LEVELS.contains(level)) {
+                query.setLevel(level);
+            }
+        }
+
+        query.setIndustry(normalizeOptionalText(getJsonText(queryNode, "industry")));
+        query.setTag(normalizeOptionalText(getJsonText(queryNode, "tag")));
+        query.setSource(normalizeOptionalText(getJsonText(queryNode, "source")));
+        query.setQuotationMin(parseJsonBigDecimal(queryNode.get("quotationMin")));
+        query.setQuotationMax(parseJsonBigDecimal(queryNode.get("quotationMax")));
+        query.setContractAmountMin(parseJsonBigDecimal(queryNode.get("contractAmountMin")));
+        query.setContractAmountMax(parseJsonBigDecimal(queryNode.get("contractAmountMax")));
+        query.setRevenueMin(parseJsonBigDecimal(queryNode.get("revenueMin")));
+        query.setRevenueMax(parseJsonBigDecimal(queryNode.get("revenueMax")));
+        query.setLastContactStart(parseJsonDate(queryNode.get("lastContactStart")));
+        query.setLastContactEnd(parseJsonDate(queryNode.get("lastContactEnd")));
+        query.setIncludeNoLastContact(parseJsonBoolean(queryNode.get("includeNoLastContact")));
+        query.setNextFollowStart(parseJsonDate(queryNode.get("nextFollowStart")));
+        query.setNextFollowEnd(parseJsonDate(queryNode.get("nextFollowEnd")));
+        query.setCreateTimeStart(parseJsonDate(queryNode.get("createTimeStart")));
+        query.setCreateTimeEnd(parseJsonDate(queryNode.get("createTimeEnd")));
+        query.setContactCountMin(parseJsonInteger(queryNode.get("contactCountMin")));
+        query.setContactCountMax(parseJsonInteger(queryNode.get("contactCountMax")));
+        query.setSortBy(normalizeSortBy(getJsonText(queryNode, "sortBy")));
+        query.setSortOrder(normalizeSortOrder(getJsonText(queryNode, "sortOrder")));
+        return query;
+    }
+
+    private CustomerAiSearchParseVO buildSearchResult(String originalQuery,
+                                                      CustomerAiSearchQueryVO query,
+                                                      String explanation,
+                                                      Double confidence,
+                                                      boolean fallbackKeywordSearch) {
+        CustomerAiSearchParseVO vo = new CustomerAiSearchParseVO();
+        vo.setOriginalQuery(originalQuery);
+        vo.setNormalizedQuery(originalQuery);
+        vo.setParsedQuery(query);
+        vo.setDisplayChips(buildSearchChips(query));
+        vo.setExplanation(explanation);
+        vo.setConfidence(confidence != null ? confidence : 0.8);
+        vo.setFallbackKeywordSearch(fallbackKeywordSearch);
+        return vo;
+    }
+
+    private CustomerAiSearchParseVO buildFallbackSearchResult(String normalizedQuery) {
+        CustomerAiSearchQueryVO query = new CustomerAiSearchQueryVO();
+        query.setKeyword(normalizedQuery);
+        return buildSearchResult(
+            normalizedQuery,
+            query,
+            StrUtil.isBlank(normalizedQuery) ? "未识别到有效搜索内容" : "已回退为关键词搜索",
+            StrUtil.isBlank(normalizedQuery) ? 0.0 : 0.35,
+            true
+        );
+    }
+
+    private CustomerAiSearchQueryVO buildHeuristicSearchQuery(String normalizedQuery) {
+        CustomerAiSearchQueryVO query = new CustomerAiSearchQueryVO();
+        enrichSearchQueryWithHeuristics(query, normalizedQuery);
+        return query;
+    }
+
+    private void enrichSearchQueryWithHeuristics(CustomerAiSearchQueryVO query, String normalizedQuery) {
+        if (query == null || StrUtil.isBlank(normalizedQuery)) {
+            return;
+        }
+
+        if (StrUtil.isBlank(query.getIndustry())) {
+            for (String industry : COMMON_INDUSTRIES) {
+                if (normalizedQuery.contains(industry)) {
+                    query.setIndustry(industry);
+                    break;
+                }
+            }
+        }
+
+        if (query.getQuotationMin() == null && normalizedQuery.contains("高价值")) {
+            query.setQuotationMin(BigDecimal.valueOf(500_000));
+            if (StrUtil.isBlank(query.getSortBy())) {
+                query.setSortBy("quotation");
+            }
+            if (StrUtil.isBlank(query.getSortOrder())) {
+                query.setSortOrder("desc");
+            }
+        }
+
+        if ((query.getStages() == null || query.getStages().isEmpty())
+            && StrUtil.isBlank(query.getStage())
+            && normalizedQuery.contains("活跃")) {
+            query.setStages(new ArrayList<>(ACTIVE_STAGE_CODES));
+        }
+
+        if (query.getLastContactEnd() == null) {
+            Matcher daysMatcher = DAYS_WITHOUT_CONTACT_PATTERN.matcher(normalizedQuery);
+            if (daysMatcher.find()) {
+                int days = Integer.parseInt(daysMatcher.group(1));
+                query.setLastContactEnd(DateUtil.offsetDay(new Date(), -days));
+                query.setIncludeNoLastContact(Boolean.TRUE);
+                if (StrUtil.isBlank(query.getSortBy())) {
+                    query.setSortBy("lastContactTime");
+                }
+                if (StrUtil.isBlank(query.getSortOrder())) {
+                    query.setSortOrder("asc");
+                }
+            }
+        }
+
+        if (query.getCreateTimeStart() == null) {
+            Matcher recentNewMatcher = RECENT_NEW_CUSTOMERS_PATTERN.matcher(normalizedQuery);
+            if (recentNewMatcher.find()) {
+                int days = Integer.parseInt(recentNewMatcher.group(1));
+                query.setCreateTimeStart(DateUtil.offsetDay(new Date(), -days));
+                query.setSortBy("createTime");
+                query.setSortOrder("desc");
+            } else if (normalizedQuery.contains("最近一周新增") || normalizedQuery.contains("近一周新增")) {
+                query.setCreateTimeStart(DateUtil.offsetDay(new Date(), -7));
+                query.setSortBy("createTime");
+                query.setSortOrder("desc");
+            }
+        }
+
+        if (StrUtil.isBlank(query.getLevel())) {
+            Matcher levelMatcher = LEVEL_PATTERN.matcher(normalizedQuery);
+            if (levelMatcher.find()) {
+                String level = levelMatcher.group(1).toUpperCase(Locale.ROOT);
+                if (VALID_LEVELS.contains(level)) {
+                    query.setLevel(level);
+                }
+            }
+        }
+    }
+
+    private boolean isSearchQueryEmpty(CustomerAiSearchQueryVO query) {
+        if (query == null) {
+            return true;
+        }
+        return StrUtil.isBlank(query.getKeyword())
+            && StrUtil.isBlank(query.getStage())
+            && (query.getStages() == null || query.getStages().isEmpty())
+            && StrUtil.isBlank(query.getLevel())
+            && StrUtil.isBlank(query.getIndustry())
+            && StrUtil.isBlank(query.getTag())
+            && StrUtil.isBlank(query.getSource())
+            && query.getQuotationMin() == null
+            && query.getQuotationMax() == null
+            && query.getContractAmountMin() == null
+            && query.getContractAmountMax() == null
+            && query.getRevenueMin() == null
+            && query.getRevenueMax() == null
+            && query.getLastContactStart() == null
+            && query.getLastContactEnd() == null
+            && !Boolean.TRUE.equals(query.getIncludeNoLastContact())
+            && query.getNextFollowStart() == null
+            && query.getNextFollowEnd() == null
+            && query.getCreateTimeStart() == null
+            && query.getCreateTimeEnd() == null
+            && query.getContactCountMin() == null
+            && query.getContactCountMax() == null;
+    }
+
+    private List<CustomerAiSearchDisplayChipVO> buildSearchChips(CustomerAiSearchQueryVO query) {
+        List<CustomerAiSearchDisplayChipVO> chips = new ArrayList<>();
+        if (query == null) {
+            return chips;
+        }
+
+        if (StrUtil.isNotBlank(query.getKeyword())) {
+            chips.add(new CustomerAiSearchDisplayChipVO("keyword", "关键词: " + query.getKeyword()));
+        }
+        if (StrUtil.isNotBlank(query.getIndustry())) {
+            chips.add(new CustomerAiSearchDisplayChipVO("industry", "行业: " + query.getIndustry()));
+        }
+        if (StrUtil.isNotBlank(query.getLevel())) {
+            chips.add(new CustomerAiSearchDisplayChipVO("level", "级别: " + query.getLevel()));
+        }
+        if (StrUtil.isNotBlank(query.getStage())) {
+            chips.add(new CustomerAiSearchDisplayChipVO("stage", "阶段: " + getStageLabel(query.getStage())));
+        } else if (query.getStages() != null && !query.getStages().isEmpty()) {
+            String labels = query.getStages().stream().map(this::getStageLabel).collect(Collectors.joining(" / "));
+            chips.add(new CustomerAiSearchDisplayChipVO("stages", "阶段: " + labels));
+        }
+        if (StrUtil.isNotBlank(query.getTag())) {
+            chips.add(new CustomerAiSearchDisplayChipVO("tag", "标签: " + query.getTag()));
+        }
+        if (StrUtil.isNotBlank(query.getSource())) {
+            chips.add(new CustomerAiSearchDisplayChipVO("source", "来源: " + query.getSource()));
+        }
+        if (query.getQuotationMin() != null || query.getQuotationMax() != null) {
+            chips.add(new CustomerAiSearchDisplayChipVO("quotation", buildAmountRangeLabel("报价", query.getQuotationMin(), query.getQuotationMax())));
+        }
+        if (query.getContractAmountMin() != null || query.getContractAmountMax() != null) {
+            chips.add(new CustomerAiSearchDisplayChipVO("contractAmount", buildAmountRangeLabel("合同", query.getContractAmountMin(), query.getContractAmountMax())));
+        }
+        if (query.getRevenueMin() != null || query.getRevenueMax() != null) {
+            chips.add(new CustomerAiSearchDisplayChipVO("revenue", buildAmountRangeLabel("回款", query.getRevenueMin(), query.getRevenueMax())));
+        }
+        if (query.getLastContactStart() != null || query.getLastContactEnd() != null || Boolean.TRUE.equals(query.getIncludeNoLastContact())) {
+            chips.add(new CustomerAiSearchDisplayChipVO("lastContact", buildDateRangeLabel("最后跟进", query.getLastContactStart(), query.getLastContactEnd(), Boolean.TRUE.equals(query.getIncludeNoLastContact()))));
+        }
+        if (query.getNextFollowStart() != null || query.getNextFollowEnd() != null) {
+            chips.add(new CustomerAiSearchDisplayChipVO("nextFollow", buildDateRangeLabel("下次跟进", query.getNextFollowStart(), query.getNextFollowEnd(), false)));
+        }
+        if (query.getCreateTimeStart() != null || query.getCreateTimeEnd() != null) {
+            chips.add(new CustomerAiSearchDisplayChipVO("createTime", buildDateRangeLabel("创建时间", query.getCreateTimeStart(), query.getCreateTimeEnd(), false)));
+        }
+        if (query.getContactCountMin() != null || query.getContactCountMax() != null) {
+            String label = "联系人";
+            if (query.getContactCountMin() != null && query.getContactCountMax() != null) {
+                label += ": " + query.getContactCountMin() + "-" + query.getContactCountMax();
+            } else if (query.getContactCountMin() != null) {
+                label += ">=" + query.getContactCountMin();
+            } else {
+                label += "<=" + query.getContactCountMax();
+            }
+            chips.add(new CustomerAiSearchDisplayChipVO("contactCount", label));
+        }
+        if (StrUtil.isNotBlank(query.getSortBy())) {
+            chips.add(new CustomerAiSearchDisplayChipVO("sort", buildSortLabel(query.getSortBy(), query.getSortOrder())));
+        }
+        return chips;
+    }
+
+    private String getStageLabel(String stage) {
+        if (StrUtil.isBlank(stage)) {
+            return "未知";
+        }
+        return STAGE_LABEL_MAP.getOrDefault(stage, stage);
+    }
+
+    private String buildAmountRangeLabel(String prefix, BigDecimal min, BigDecimal max) {
+        if (min != null && max != null) {
+            return prefix + ": " + formatCompactAmount(min) + " - " + formatCompactAmount(max);
+        }
+        if (min != null) {
+            return prefix + ">=" + formatCompactAmount(min);
+        }
+        return prefix + "<=" + formatCompactAmount(max);
+    }
+
+    private String buildDateRangeLabel(String prefix, Date start, Date end, boolean includeNoValue) {
+        List<String> parts = new ArrayList<>();
+        if (start != null) {
+            parts.add("从 " + DateUtil.formatDateTime(start));
+        }
+        if (end != null) {
+            parts.add("到 " + DateUtil.formatDateTime(end));
+        }
+        if (parts.isEmpty() && includeNoValue) {
+            return prefix + ": 包含未跟进";
+        }
+        if (includeNoValue) {
+            parts.add("包含未跟进");
+        }
+        return prefix + ": " + String.join(" ", parts);
+    }
+
+    private String buildSortLabel(String sortBy, String sortOrder) {
+        String label = switch (sortBy) {
+            case "quotation" -> "报价";
+            case "contractAmount" -> "合同金额";
+            case "revenue" -> "回款";
+            case "lastContactTime" -> "最后跟进";
+            case "nextFollowTime" -> "下次跟进";
+            case "contactCount" -> "联系人数量";
+            default -> "创建时间";
+        };
+        return "排序: 按" + label + ("asc".equalsIgnoreCase(sortOrder) ? "升序" : "降序");
+    }
+
+    private String formatCompactAmount(BigDecimal amount) {
+        if (amount == null) {
+            return "";
+        }
+        BigDecimal tenThousand = BigDecimal.valueOf(10_000);
+        if (amount.abs().compareTo(tenThousand) >= 0) {
+            BigDecimal wan = amount.divide(tenThousand, 1, java.math.RoundingMode.HALF_UP).stripTrailingZeros();
+            return wan.toPlainString() + "万";
+        }
+        return amount.stripTrailingZeros().toPlainString();
+    }
+
+    private BigDecimal parseJsonBigDecimal(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        String text = StrUtil.trim(node.asText());
+        if (StrUtil.isBlank(text)) {
+            return null;
+        }
+        try {
+            return new BigDecimal(text.replace(",", ""));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Integer parseJsonInteger(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        String text = StrUtil.trim(node.asText());
+        if (StrUtil.isBlank(text)) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(text);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Boolean parseJsonBoolean(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        String text = StrUtil.trim(node.asText());
+        if (StrUtil.isBlank(text)) {
+            return null;
+        }
+        return Boolean.parseBoolean(text);
+    }
+
+    private Date parseJsonDate(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        String text = StrUtil.trim(node.asText());
+        if (StrUtil.isBlank(text)) {
+            return null;
+        }
+        try {
+            return DateUtil.parse(text);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Double parseJsonConfidence(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        String text = StrUtil.trim(node.asText());
+        if (StrUtil.isBlank(text)) {
+            return null;
+        }
+        try {
+            double value = Double.parseDouble(text);
+            if (value > 1) {
+                value = value / 100D;
+            }
+            return Math.max(0D, Math.min(1D, value));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private String normalizeStageCode(String stage) {
+        String normalized = normalizeOptionalText(stage);
+        if (normalized == null) {
+            return null;
+        }
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        if (STAGE_LABEL_MAP.containsKey(lower)) {
+            return lower;
+        }
+        return LABEL_STAGE_MAP.getOrDefault(normalized, null);
+    }
+
+    private String normalizeSortBy(String sortBy) {
+        String normalized = normalizeOptionalText(sortBy);
+        if (normalized == null) {
+            return null;
+        }
+        return switch (normalized) {
+            case "createTime", "create_time", "创建时间", "新增时间" -> "createTime";
+            case "quotation", "报价", "报价金额" -> "quotation";
+            case "contractAmount", "contract_amount", "合同金额" -> "contractAmount";
+            case "revenue", "回款", "回款金额" -> "revenue";
+            case "lastContactTime", "last_contact_time", "最后联系", "最后跟进" -> "lastContactTime";
+            case "nextFollowTime", "next_follow_time", "下次跟进" -> "nextFollowTime";
+            case "contactCount", "contact_count", "联系人数", "联系人数量" -> "contactCount";
+            default -> null;
+        };
+    }
+
+    private String normalizeSortOrder(String sortOrder) {
+        String normalized = normalizeOptionalText(sortOrder);
+        if (normalized == null) {
+            return null;
+        }
+        if ("asc".equalsIgnoreCase(normalized) || "升序".equals(normalized)) {
+            return "asc";
+        }
+        if ("desc".equalsIgnoreCase(normalized) || "降序".equals(normalized)) {
+            return "desc";
+        }
+        return null;
+    }
+
+    private String normalizeOptionalText(String value) {
+        String normalized = StrUtil.trim(value);
+        if (StrUtil.isBlank(normalized) || "null".equalsIgnoreCase(normalized)) {
+            return null;
+        }
+        return normalized;
     }
 
     private String getJsonText(JsonNode root, String field) {

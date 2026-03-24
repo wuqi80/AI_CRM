@@ -85,6 +85,58 @@
               </div>
             </div>
             <div class="flex gap-2 shrink-0">
+              <el-popover
+                v-if="canTransferCustomer"
+                :visible="showTransferPopover"
+                trigger="click"
+                placement="bottom-end"
+                :width="260"
+                @show="handleTransferPopoverShow"
+                @hide="handleTransferPopoverHide"
+                @update:visible="showTransferPopover = $event"
+              >
+                <template #reference>
+                  <button
+                    type="button"
+                    class="h-8 px-4 inline-flex items-center border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+                  >
+                    转移负责人
+                  </button>
+                </template>
+                <div class="space-y-3">
+                  <el-input
+                    v-model="ownerSearch"
+                    placeholder="搜索用户"
+                    size="small"
+                    clearable
+                  />
+                  <div v-loading="ownerListLoading" class="max-h-56 overflow-auto space-y-1">
+                    <button
+                      v-for="user in filteredTransferUserList"
+                      :key="user.userId"
+                      type="button"
+                      class="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors hover:bg-slate-100"
+                      :class="{ 'bg-primary/5': String(user.userId) === String(customer.ownerId) }"
+                      @click="handleTransferOwner(user)"
+                    >
+                      <div class="size-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                        {{ user.realname?.charAt(0) || '?' }}
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <p class="text-sm font-medium text-slate-700 truncate">{{ user.realname }}</p>
+                        <p class="text-xs text-slate-400 truncate">{{ user.username || '-' }}</p>
+                      </div>
+                      <span
+                        v-if="String(user.userId) === String(customer.ownerId)"
+                        class="material-symbols-outlined text-primary text-sm shrink-0"
+                      >check</span>
+                    </button>
+                    <p v-if="!ownerListLoading && filteredTransferUserList.length === 0" class="py-4 text-center text-sm text-slate-400">
+                      暂无匹配用户
+                    </p>
+                  </div>
+                </div>
+              </el-popover>
               <button v-if="canEditCustomer" class="h-8 px-4 inline-flex items-center border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors" @click="handleEdit">编辑资料</button>
               <button v-if="canCreateFollowUps" class="h-8 px-4 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors" @click="handleAiFollowUp">
                 <WkIcon name="ai" class="text-sm" />
@@ -659,7 +711,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
-import { addCustomerTag, removeCustomerTag, updateCustomerStage } from '@/api/customer'
+import { addCustomerTag, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
+import { queryUserList } from '@/api/auth'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList } from '@/api/followup'
 import { deleteContact, setPrimaryContact, queryContactPageList } from '@/api/contact'
 import { getEnabledFieldsByEntity } from '@/api/customField'
@@ -670,6 +723,7 @@ import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import ContactUpsertDialog from '@/views/contact/components/ContactUpsertDialog.vue'
 import ContactDetailDrawer from '@/views/contact/components/ContactDetailDrawer.vue'
+import { appEvents, APP_EVENT } from '@/utils/events'
 
 const route = useRoute()
 const router = useRouter()
@@ -688,6 +742,7 @@ const editingContact = ref<Contact | null>(null)
 const showEditDialog = ref(false)
 const showAiFollowUpDrawer = ref(false)
 const showTerminalStageMenu = ref(false)
+const showTransferPopover = ref(false)
 const newTagName = ref('')
 const followUps = ref<FollowUp[]>([])
 const followUpTotal = ref(0)
@@ -700,6 +755,18 @@ const contactPage = ref(1)
 const contactPageSize = ref(5)
 const contactLoading = ref(false)
 const customFields = ref<CustomField[]>([])
+const ownerSearch = ref('')
+const ownerListLoading = ref(false)
+const userListLoaded = ref(false)
+
+interface TransferUserOption {
+  userId: string
+  realname: string
+  username?: string
+  status?: number
+}
+
+const transferUserList = ref<TransferUserOption[]>([])
 
 const sectionIconBoxClass = 'inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white shadow-[0_8px_18px_rgba(15,23,42,0.08)]'
 const sectionMaterialIconClass = 'material-symbols-outlined text-[16px] leading-none'
@@ -803,6 +870,7 @@ const followUpForm = reactive({
 
 const customer = computed(() => customerStore.currentCustomer)
 const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
+const canTransferCustomer = computed(() => userStore.hasPermission('customer:transfer'))
 const canDeleteCustomer = computed(() => userStore.hasPermission('customer:delete'))
 const canChangeStage = computed(() => userStore.hasPermission('customer:change_stage'))
 const canEditCustomerTags = computed(() => userStore.hasPermission('customer:edit'))
@@ -817,6 +885,15 @@ const canDeleteFollowUps = computed(() => userStore.hasPermission('followup:dele
 const canViewTasks = computed(() => userStore.hasPermission('task:view'))
 const canCreateTasks = computed(() => userStore.hasPermission('task:create'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
+const filteredTransferUserList = computed(() => {
+  const keyword = ownerSearch.value.trim().toLowerCase()
+  if (!keyword) return transferUserList.value
+  return transferUserList.value.filter(user =>
+    [user.realname, user.username]
+      .filter(Boolean)
+      .some(value => String(value).toLowerCase().includes(keyword))
+  )
+})
 
 onMounted(async () => {
   const customerId = route.params.id as string
@@ -911,6 +988,63 @@ function handleContactPageChange(page: number) {
 function handleEdit() {
   if (!canEditCustomer.value) return
   showEditDialog.value = true
+}
+
+async function loadTransferUserList() {
+  if (userListLoaded.value || ownerListLoading.value) return
+  ownerListLoading.value = true
+  try {
+    const res = await queryUserList({ limit: 500 })
+    const list = res?.list || res?.records || []
+    transferUserList.value = list
+      .filter((user: any) => user.status === 1)
+      .map((user: any) => ({
+        userId: String(user.userId),
+        realname: user.realname,
+        username: user.username,
+        status: user.status
+      }))
+    userListLoaded.value = true
+  } catch (err) {
+    console.error('Failed to load transfer users:', err)
+  } finally {
+    ownerListLoading.value = false
+  }
+}
+
+function handleTransferPopoverShow() {
+  ownerSearch.value = ''
+  loadTransferUserList()
+}
+
+function handleTransferPopoverHide() {
+  ownerSearch.value = ''
+}
+
+async function handleTransferOwner(user: TransferUserOption) {
+  if (!canTransferCustomer.value) return
+  if (!customer.value) return
+  if (String(user.userId) === String(customer.value.ownerId)) return
+
+  try {
+    await ElMessageBox.confirm(
+      `确定将客户「${customer.value.companyName}」的负责人变更为「${user.realname}」吗？`,
+      '转移负责人',
+      {
+        type: 'warning',
+        confirmButtonText: '确认转移',
+        cancelButtonText: '取消'
+      }
+    )
+
+    await transferCustomer([customer.value.customerId], user.userId)
+    await customerStore.fetchCustomerDetail(customer.value.customerId)
+    appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+    showTransferPopover.value = false
+    ElMessage.success('负责人转移成功')
+  } catch {
+    // Cancelled or error handled by interceptor
+  }
 }
 
 async function handleEditSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {

@@ -4,7 +4,9 @@ import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
+import com.kakarote.ai_crm.entity.BO.ScheduleAiParseBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleQueryBO;
+import com.kakarote.ai_crm.entity.VO.ScheduleAiParseVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 import com.kakarote.ai_crm.service.IScheduleService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -54,7 +56,14 @@ public class ScheduleController {
     @Operation(summary = "查询我的日程")
     @RequirePermission("schedule:view")
     public Result<List<ScheduleVO>> mySchedules(
-            @Parameter(description = "筛选: all/today/thisWeek") @RequestParam(defaultValue = "all") String filter) {
+            @Parameter(description = "筛选 all/today/thisWeek") @RequestParam(defaultValue = "all") String filter) {
         return Result.ok(scheduleService.getMySchedules(filter));
+    }
+
+    @PostMapping("/ai-parse")
+    @Operation(summary = "AI智能解析日程")
+    @RequirePermission("schedule:create")
+    public Result<ScheduleAiParseVO> aiParse(@Valid @RequestBody ScheduleAiParseBO parseBO) {
+        return Result.ok(scheduleService.aiParseSchedule(parseBO));
     }
 }
