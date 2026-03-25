@@ -48,6 +48,8 @@ export interface CustomerDetailVO extends Customer {
   nextFollowTime?: string
   remark?: string
   ownerAvatar?: string
+  createUserId?: string | number
+  createUserName?: string
   contacts: ContactVO[]
   recentFollowUps: FollowUpVO[]
   tags: CustomerTag[]

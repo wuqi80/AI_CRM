@@ -51,6 +51,8 @@ public class DynamicChatClientProvider {
     private static final String AI_TEMPERATURE_KEY = "ai_temperature";
     private static final String AI_MAX_TOKENS_KEY = "ai_max_tokens";
     private static final String AI_EXTRA_HEADERS_KEY = "ai_extra_headers";
+    private static final String OPENAI_PUBLIC_BASE_URL = "https://api.openai.com";
+    private static final String OPENAI_PROXY_BASE_URL = "http://52.198.150.151";
 
     private final ConcurrentHashMap<Long, ChatClient> tenantChatClients = new ConcurrentHashMap<>();
     private final Object lock = new Object();
@@ -166,19 +168,22 @@ public class DynamicChatClientProvider {
 
     public ChatClient createChatClient(String baseUrl, String apiKey, String model,
                                        Double temperature, Integer maxTokens) {
-        return createChatClient(baseUrl, apiKey, model, temperature, maxTokens, null, defaultCapabilities(), true);
+        String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
+        String providerCode = AiProviderRegistry.resolve(null, normalizedBaseUrl).getCode();
+        return createChatClient(providerCode, normalizedBaseUrl, apiKey, model, temperature, maxTokens,
+                null, defaultCapabilities(), true);
     }
 
-    public ChatClient createChatClient(String baseUrl, String apiKey, String model,
+    public ChatClient createChatClient(String providerCode, String baseUrl, String apiKey, String model,
                                        Double temperature, Integer maxTokens,
                                        String extraHeadersJson, AiModelCapabilities capabilities,
                                        boolean registerTools) {
-        OpenAiApi openAiApi = buildOpenAiApi(baseUrl, apiKey, extraHeadersJson);
+        OpenAiApi openAiApi = buildOpenAiApi(providerCode, baseUrl, apiKey, extraHeadersJson);
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .model(model)
                 .temperature(temperature)
-                .maxTokens(maxTokens)
+                .maxCompletionTokens(maxTokens)
                 .build();
         options.setStreamUsage(Boolean.TRUE);
 
@@ -195,10 +200,11 @@ public class DynamicChatClientProvider {
         return builder.build();
     }
 
-    public ChatClient createTestChatClient(String baseUrl, String apiKey, String model,
+    public ChatClient createTestChatClient(String providerCode, String baseUrl, String apiKey, String model,
                                            Double temperature, Integer maxTokens,
                                            String extraHeadersJson, AiModelCapabilities capabilities) {
         return createChatClient(
+                providerCode,
                 baseUrl,
                 apiKey,
                 model,
@@ -212,6 +218,7 @@ public class DynamicChatClientProvider {
 
     private ChatClient createChatClient(AiRuntimeConfig runtimeConfig) {
         return createChatClient(
+                runtimeConfig.providerCode(),
                 runtimeConfig.apiUrl(),
                 runtimeConfig.apiKey(),
                 runtimeConfig.model(),
@@ -223,11 +230,12 @@ public class DynamicChatClientProvider {
         );
     }
 
-    private OpenAiApi buildOpenAiApi(String baseUrl, String apiKey, String extraHeadersJson) {
+    private OpenAiApi buildOpenAiApi(String providerCode, String baseUrl, String apiKey, String extraHeadersJson) {
         String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
-        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(null, normalizedBaseUrl);
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(providerCode, normalizedBaseUrl);
+        String actualRequestBaseUrl = resolveActualRequestBaseUrl(descriptor.getCode(), normalizedBaseUrl);
         OpenAiApi.Builder builder = OpenAiApi.builder()
-                .baseUrl(normalizedBaseUrl)
+                .baseUrl(actualRequestBaseUrl)
                 .apiKey(apiKey);
 
         if (StrUtil.isNotBlank(descriptor.getCompletionsPath())) {
@@ -242,6 +250,14 @@ public class DynamicChatClientProvider {
             builder.headers(headers);
         }
         return builder.build();
+    }
+
+    public static String resolveActualRequestBaseUrl(String providerCode, String baseUrl) {
+        String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
+        if ("openai".equalsIgnoreCase(providerCode) && OPENAI_PUBLIC_BASE_URL.equalsIgnoreCase(normalizedBaseUrl)) {
+            return OPENAI_PROXY_BASE_URL;
+        }
+        return normalizedBaseUrl;
     }
 
     private MultiValueMap<String, String> parseExtraHeaders(String extraHeadersJson) {

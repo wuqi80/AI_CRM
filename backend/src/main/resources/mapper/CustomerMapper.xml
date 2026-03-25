@@ -186,10 +186,13 @@
             c.remark,
             c.owner_id,
             u.realname AS owner_name,
+            c.create_user_id,
+            cu.realname AS create_user_name,
             c.create_time,
             c.update_time
         FROM crm_customer c
         LEFT JOIN manager_user u ON c.owner_id = u.user_id
+        LEFT JOIN manager_user cu ON c.create_user_id = cu.user_id
         WHERE c.customer_id = #{customerId} AND c.status = 1
     </select>
 

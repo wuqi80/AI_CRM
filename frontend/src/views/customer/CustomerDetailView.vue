@@ -353,7 +353,7 @@
                 </div>
                 <div>
                   <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">创建人</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.ownerName || '-' }}</p>
+                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.createUserName || customer.createUserId || '-' }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">创建时间</p>

@@ -243,6 +243,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             AiModelCapabilities capabilities = validateAiConfig(descriptor, configBO);
 
             ChatClient testClient = chatClientProvider.createTestChatClient(
+                    descriptor.getCode(),
                     normalizedApiUrl,
                     configBO.getApiKey().trim(),
                     configBO.getModel().trim(),
