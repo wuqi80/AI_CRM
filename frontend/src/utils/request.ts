@@ -2,6 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Result } from '@/types/api'
 import router from '@/router'
+import { markRequestErrorHandled } from '@/utils/requestError'
 
 const TOKEN_KEY = 'Manager-Token'
 
@@ -39,7 +40,7 @@ function handleNotLogin(message?: string): Promise<never> {
       isRedirecting = false
     })
   }
-  return Promise.reject(new Error(message || '认证失败'))
+  return Promise.reject(markRequestErrorHandled(new Error(message || '认证失败')))
 }
 
 function handleNoPermission(message?: string): Promise<never> {
@@ -52,7 +53,7 @@ function handleNoPermission(message?: string): Promise<never> {
       isPermissionAlertVisible = false
     })
   }
-  return Promise.reject(new Error(message || '无权操作'))
+  return Promise.reject(markRequestErrorHandled(new Error(message || '无权操作')))
 }
 
 service.interceptors.request.use(
@@ -89,7 +90,7 @@ service.interceptors.response.use(
     }
 
     ElMessage.error(res.msg || '请求失败')
-    return Promise.reject(new Error(res.msg || '请求失败'))
+    return Promise.reject(markRequestErrorHandled(new Error(res.msg || '请求失败')))
   },
   (error) => {
     console.error('Response error:', error)
@@ -112,6 +113,7 @@ service.interceptors.response.use(
 
     const message = responseData?.msg || error.message || '网络错误'
     ElMessage.error(message)
+    markRequestErrorHandled(error)
     return Promise.reject(error)
   }
 )

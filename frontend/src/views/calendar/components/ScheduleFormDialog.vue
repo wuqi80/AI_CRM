@@ -492,7 +492,6 @@ async function handleAiParse() {
     }
   } catch (error) {
     console.error('AI 解析日程失败', error)
-    ElMessage.error('智能解析失败，请手动补充信息')
   } finally {
     aiParsing.value = false
   }
@@ -533,8 +532,8 @@ async function handleSaveSchedule() {
     ElMessage.success('日程创建成功')
     emit('created')
     visible.value = false
-  } catch (error: any) {
-    ElMessage.error('创建日程失败: ' + (error?.message || '未知错误'))
+  } catch (error) {
+    console.error('Create schedule failed:', error)
   } finally {
     saving.value = false
   }

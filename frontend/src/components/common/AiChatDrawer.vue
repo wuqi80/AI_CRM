@@ -332,6 +332,7 @@ import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { renderMarkdown } from '@/utils/markdown'
+import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
 
 const router = useRouter()
@@ -474,7 +475,9 @@ async function handleSend() {
       attachmentVOs = results.map(r => r.vo)
     } catch (e) {
       console.error('文件上传失败:', e)
-      ElMessage.error('文件上传失败，请重试')
+      if (!isRequestErrorHandled(e)) {
+        ElMessage.error('文件上传失败，请重试')
+      }
       isUploading.value = false
       return
     }

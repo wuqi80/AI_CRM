@@ -549,6 +549,7 @@ import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { getAiConfig, updateAiConfig } from '@/api/systemConfig'
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
 import { renderMarkdown } from '@/utils/markdown'
+import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
 import type { AiConfig, AiConfigUpdateBO, AiMode } from '@/types/systemConfig'
 
@@ -892,7 +893,9 @@ async function handleSend() {
       attachmentVOs = results.map(r => r.vo)
     } catch (e) {
       console.error('文件上传失败:', e)
-      ElMessage.error('文件上传失败，请重试')
+      if (!isRequestErrorHandled(e)) {
+        ElMessage.error('文件上传失败，请重试')
+      }
       isUploading.value = false
       return
     }

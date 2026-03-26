@@ -244,6 +244,7 @@ import { useCustomerStore } from '@/stores/customer'
 import { aiParseCustomer } from '@/api/customer'
 import type { CustomerAiParseVO } from '@/api/customer'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import { isRequestErrorHandled } from '@/utils/requestError'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 import AiSmartEntrySection from '@/components/crm/AiSmartEntrySection.vue'
 import AiParseInsightSidebar from '@/components/crm/AiParseInsightSidebar.vue'
@@ -422,8 +423,12 @@ async function handleAiExtract() {
     if (result.contactEmail) formData.contactEmail = result.contactEmail
 
     ElMessage.success('AI 提取完成，信息已自动填充')
-  } catch (err: any) {
-    ElMessage.error('AI 解析失败: ' + (err.message || '未知错误'))
+  } catch (error: unknown) {
+    console.error('AI parse customer failed:', error)
+    if (!isRequestErrorHandled(error)) {
+      const message = error instanceof Error ? error.message : '未知错误'
+      ElMessage.error('AI 解析失败: ' + message)
+    }
   } finally {
     aiParsing.value = false
   }

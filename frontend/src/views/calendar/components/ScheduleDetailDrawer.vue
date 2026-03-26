@@ -194,7 +194,7 @@ async function handleDeleteSchedule() {
     visible.value = false
   } catch (error: any) {
     if (error !== 'cancel' && error !== 'close') {
-      ElMessage.error('删除日程失败')
+      console.error('Delete schedule failed:', error)
     }
   } finally {
     deleting.value = false

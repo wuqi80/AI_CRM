@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { changePassword, getLoginUserDetail, updateProfile } from '@/api/auth'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import { isRequestErrorHandled } from '@/utils/requestError'
 
 export function useAccountSettings() {
   const userStore = useUserStore()
@@ -89,8 +90,11 @@ export function useAccountSettings() {
       profileForm.img = presigned.objectKey
       avatarPreviewUrl.value = presigned.accessUrl
       ElMessage.success('头像上传成功，点击保存资料后生效')
-    } catch {
-      ElMessage.error('头像上传失败')
+    } catch (error) {
+      console.error('Avatar upload failed:', error)
+      if (!isRequestErrorHandled(error)) {
+        ElMessage.error('头像上传失败')
+      }
     } finally {
       avatarUploading.value = false
       if (avatarInputRef.value) {

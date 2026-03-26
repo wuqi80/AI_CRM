@@ -169,6 +169,7 @@ import { addContact, updateContact } from '@/api/contact'
 import { aiParseCustomer } from '@/api/customer'
 import type { CustomerAiParseVO } from '@/api/customer'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import { isRequestErrorHandled } from '@/utils/requestError'
 import type { Contact } from '@/types/customer'
 import AiSmartEntrySection from '@/components/crm/AiSmartEntrySection.vue'
 
@@ -275,8 +276,12 @@ async function handleAiExtract() {
     if (result.remark) formData.notes = result.remark
 
     ElMessage.success('AI 提取完成，信息已自动填充')
-  } catch (err: any) {
-    ElMessage.error('AI 解析失败: ' + (err.message || '未知错误'))
+  } catch (error: unknown) {
+    console.error('AI parse contact failed:', error)
+    if (!isRequestErrorHandled(error)) {
+      const message = error instanceof Error ? error.message : '未知错误'
+      ElMessage.error('AI 解析失败: ' + message)
+    }
   } finally {
     aiParsing.value = false
   }

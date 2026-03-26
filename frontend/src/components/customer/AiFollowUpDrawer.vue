@@ -563,8 +563,7 @@ async function handleSubmitText() {
 
     applyParsedResult(result, content)
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : '未知错误'
-    ElMessage.error(`AI 解析失败: ${message}`)
+    console.error('AI parse follow-up failed:', err)
   } finally {
     isProcessing.value = false
   }
@@ -599,8 +598,7 @@ async function handleConfirmSave() {
     emit('saved')
     emit('update:modelValue', false)
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : '未知错误'
-    ElMessage.error(`保存失败: ${message}`)
+    console.error('Save follow-up failed:', err)
   } finally {
     saving.value = false
   }
