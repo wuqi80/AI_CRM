@@ -28,6 +28,7 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref<LocalMessage[]>([])
   const isStreaming = ref(false)
   const loading = ref(false)
+  const sessionsLoading = ref(false)
   const ragEnabled = ref(loadRagEnabled())
 
   // Getters
@@ -37,11 +38,11 @@ export const useChatStore = defineStore('chat', () => {
 
   // Actions
   async function fetchSessions() {
-    loading.value = true
+    sessionsLoading.value = true
     try {
       sessions.value = await getSessionList()
     } finally {
-      loading.value = false
+      sessionsLoading.value = false
     }
   }
 
@@ -222,6 +223,7 @@ export const useChatStore = defineStore('chat', () => {
     messages,
     isStreaming,
     loading,
+    sessionsLoading,
     ragEnabled,
     // Getters
     currentSession,

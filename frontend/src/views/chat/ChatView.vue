@@ -40,7 +40,7 @@
       <div class="flex-1 overflow-y-auto px-3 space-y-1">
         <p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">最近对话</p>
 
-        <div v-if="chatStore.loading" class="flex justify-center py-8">
+        <div v-if="chatStore.sessionsLoading && chatStore.sessions.length === 0" class="flex justify-center py-8">
           <span class="material-symbols-outlined text-slate-300 animate-spin">progress_activity</span>
         </div>
 
