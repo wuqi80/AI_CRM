@@ -62,10 +62,10 @@ export function addKnowledgeTag(knowledgeId: string, tagName: string): Promise<v
 }
 
 /**
- * Get knowledge file presigned URL
+ * Get knowledge preview content
  */
-export function getKnowledgeFileUrl(id: string): Promise<string> {
-  return get(`/knowledge/url/${id}`)
+export function getKnowledgePreview(id: string): Promise<Blob> {
+  return get(`/knowledge/preview/${id}`, { responseType: 'blob' })
 }
 
 /**
@@ -151,12 +151,11 @@ export async function askKnowledgeQuestion(
 }
 
 function parseSSEEvent(event: string): string | null {
-  const lines = event.split('\n')
+  const lines = event.split(/\r?\n/)
   const dataLines: string[] = []
   for (const line of lines) {
-    const trimmed = line.trim()
-    if (trimmed.startsWith('data:')) {
-      const content = trimmed.slice(5)
+    if (line.startsWith('data:')) {
+      const content = line.slice(5)
       dataLines.push(content.startsWith(' ') ? content.slice(1) : content)
     }
   }

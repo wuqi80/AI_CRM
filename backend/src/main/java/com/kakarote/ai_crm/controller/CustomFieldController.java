@@ -5,8 +5,10 @@ import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.CustomFieldAddBO;
 import com.kakarote.ai_crm.entity.BO.CustomFieldUpdateBO;
 import com.kakarote.ai_crm.entity.BO.FieldSortBO;
+import com.kakarote.ai_crm.entity.BO.FieldSortUpdateBO;
 import com.kakarote.ai_crm.entity.VO.CustomFieldVO;
 import com.kakarote.ai_crm.service.ICustomFieldService;
+import com.kakarote.ai_crm.service.ICustomFieldSortService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +25,9 @@ public class CustomFieldController {
 
     @Autowired
     private ICustomFieldService customFieldService;
+
+    @Autowired
+    private ICustomFieldSortService customFieldSortService;
 
     @PostMapping("/add")
     @Operation(summary = "Add custom field")
@@ -86,6 +91,27 @@ public class CustomFieldController {
     @RequirePermission("customField:edit")
     public Result<String> sort(@RequestBody List<FieldSortBO> sortList) {
         customFieldService.updateSortOrder(sortList);
+        return Result.ok();
+    }
+
+    @GetMapping("/user-columns/{entityType}")
+    @Operation(summary = "获取当前用户的列表列配置（已排序、过滤隐藏）")
+    public Result<List<CustomFieldVO>> getUserColumns(
+            @Parameter(description = "实体类型") @PathVariable("entityType") String entityType) {
+        return Result.ok(customFieldSortService.getUserFieldConfig(entityType));
+    }
+
+    @GetMapping("/user-columns-all/{entityType}")
+    @Operation(summary = "获取当前用户的全部字段配置（含隐藏标记，用于设置界面）")
+    public Result<List<CustomFieldVO>> getUserColumnsAll(
+            @Parameter(description = "实体类型") @PathVariable("entityType") String entityType) {
+        return Result.ok(customFieldSortService.getUserAllFieldConfig(entityType));
+    }
+
+    @PostMapping("/user-sort")
+    @Operation(summary = "保存用户的字段排序和显隐配置")
+    public Result<String> saveUserSort(@Valid @RequestBody FieldSortUpdateBO bo) {
+        customFieldSortService.saveUserFieldConfig(bo);
         return Result.ok();
     }
 }

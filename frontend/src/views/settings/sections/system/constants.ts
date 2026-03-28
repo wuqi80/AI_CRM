@@ -39,6 +39,18 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     supportsVision: false
   },
   {
+    label: 'DeepSeek',
+    value: 'deepseek',
+    description: 'DeepSeek 提供与 OpenAI 兼容的接口，推荐使用 deepseek-chat。',
+    baseUrl: 'https://api.deepseek.com',
+    models: ['deepseek-chat', 'deepseek-reasoner'],
+    modelHint: '填写 DeepSeek 模型名称，例如 deepseek-chat。',
+    extraHeadersHint: '',
+    supportsStream: true,
+    supportsToolCall: true,
+    supportsVision: false
+  },
+  {
     label: '火山方舟 / 豆包',
     value: 'ark',
     description: '通常填写模型 ID 或 Endpoint ID。',

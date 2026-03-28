@@ -13,6 +13,10 @@ import com.kakarote.ai_crm.entity.PO.Contact;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.ContactVO;
 import com.kakarote.ai_crm.mapper.ContactMapper;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import com.kakarote.ai_crm.service.IContactService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -111,10 +115,11 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
             .list();
         List<ContactVO> voList = BeanUtil.copyToList(contacts, ContactVO.class);
 
-        // 获取每个联系人的自定义字段
+        // 批量获取联系人的自定义字段（避免N+1）
+        List<Long> contactIds = voList.stream().map(ContactVO::getContactId).toList();
+        Map<Long, Map<String, Object>> cfMap = customFieldService.getBatchCustomFieldValues("contact", contactIds);
         for (ContactVO vo : voList) {
-            Map<String, Object> customFields = customFieldService.getCustomFieldValues("contact", vo.getContactId());
-            vo.setCustomFields(customFields);
+            vo.setCustomFields(cfMap.getOrDefault(vo.getContactId(), Collections.emptyMap()));
         }
 
         return voList;

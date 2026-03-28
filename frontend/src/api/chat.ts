@@ -131,14 +131,13 @@ export async function sendMessageStream(
  * These should be joined with newlines according to SSE spec
  */
 function parseSSEEvent(event: string): string | null {
-  const lines = event.split('\n')
+  const lines = event.split(/\r?\n/)
   const dataLines: string[] = []
 
   for (const line of lines) {
-    const trimmed = line.trim()
-    if (trimmed.startsWith('data:')) {
-      const content = trimmed.slice(5)
-      // Handle "data: " (with space) vs "data:" (without space)
+    if (line.startsWith('data:')) {
+      const content = line.slice(5)
+      // Per SSE spec, strip at most one leading space after "data:"
       dataLines.push(content.startsWith(' ') ? content.slice(1) : content)
     }
   }

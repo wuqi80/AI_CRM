@@ -396,7 +396,7 @@ import type {
   CustomerQueryBO
 } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
-import { getEnabledFieldsByEntity } from '@/api/customField'
+import { getUserColumns } from '@/api/customField'
 import { aiParseCustomerSearch, transferCustomer, exportCustomers } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
@@ -730,8 +730,7 @@ const overdueCount = computed(() => {
 
 async function loadListCustomFields() {
   try {
-    const allFields = await getEnabledFieldsByEntity('customer')
-    listCustomFields.value = allFields.filter(f => f.isShowInList)
+    listCustomFields.value = await getUserColumns('customer')
   } catch {
     // Error handled by interceptor
   }

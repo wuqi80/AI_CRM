@@ -29,9 +29,10 @@ public class MybatisPlusConfig {
      * 不需要租户隔离的表（全局共享数据）
      */
     private static final Set<String> IGNORE_TENANT_TABLES = Set.of(
-            "manager_menu",       // 菜单定义全局共享
-            "manager_role_menu",  // 跟随 role 隔离，role 已按租户隔离
-            "crm_tenant"          // 租户主表本身不做隔离
+            "manager_menu",            // 菜单定义全局共享
+            "manager_role_menu",       // 跟随 role 隔离，role 已按租户隔离
+            "crm_tenant",              // 租户主表本身不做隔离
+            "crm_custom_field_pool"    // 字段池全局共享，跨租户复用物理列
     );
 
     @Bean

@@ -2,6 +2,7 @@ export type AiProvider =
   | 'openai'
   | 'dashscope'
   | 'moonshot'
+  | 'deepseek'
   | 'ark'
   | 'hunyuan'
   | 'minimax'

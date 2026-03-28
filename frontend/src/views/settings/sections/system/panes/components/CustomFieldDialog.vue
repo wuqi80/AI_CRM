@@ -10,10 +10,6 @@
       <el-form-item label="字段标签" required>
         <el-input v-model="fieldForm.fieldLabel" placeholder="显示名称，如：合同类型" class="w-full wk-crm-el-field-input" size="large" />
       </el-form-item>
-      <el-form-item v-if="!editingField" label="字段标识" required>
-        <el-input v-model="fieldForm.fieldName" placeholder="英文标识，如：contractType" class="w-full wk-crm-el-field-input" size="large" />
-        <div class="text-xs text-slate-400 mt-1">只能包含字母、数字、下划线，以字母开头</div>
-      </el-form-item>
       <el-form-item v-if="!editingField" label="字段类型" required>
         <el-select
           v-model="fieldForm.fieldType"
@@ -128,7 +124,6 @@ const props = defineProps<{
   editingField: CustomField | null
   fieldForm: {
     fieldLabel: string
-    fieldName: string
     fieldType: FieldType
     placeholder: string
     defaultValue: any

@@ -459,7 +459,7 @@ function inferCapabilities(provider: AiProvider | undefined, model: string | und
     if (['gpt-5', '4o', '4.1', 'vision', 'omni', '3.5-plus', '1-8', '4.6v', '4.5v', '4v', 'vl'].some((keyword) => normalizedModel.includes(keyword))) {
       supportsVision = true
     }
-    if (normalizedProvider === 'openai' || normalizedProvider === 'dashscope' || normalizedProvider === 'ark' || normalizedProvider === 'minimax' || normalizedProvider === 'zhipu' || normalizedProvider === 'custom') {
+    if (normalizedProvider === 'openai' || normalizedProvider === 'dashscope' || normalizedProvider === 'deepseek' || normalizedProvider === 'ark' || normalizedProvider === 'minimax' || normalizedProvider === 'zhipu' || normalizedProvider === 'custom') {
       supportsToolCall = true
     }
   }

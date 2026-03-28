@@ -79,6 +79,23 @@ public final class AiProviderRegistry {
                 .build());
 
         register(AiProviderDescriptor.builder()
+                .code("deepseek")
+                .displayName("DeepSeek")
+                .description("DeepSeek 提供与 OpenAI 兼容的接口，推荐使用 deepseek-chat。")
+                .baseUrl("https://api.deepseek.com")
+                .completionsPath("/chat/completions")
+                .embeddingsPath(null)
+                .recommendedModels(List.of("deepseek-chat", "deepseek-reasoner"))
+                .modelHint("填写 DeepSeek 模型名称，例如 deepseek-chat。")
+                .extraHeadersHint("")
+                .defaultCapabilities(defaultCapabilities())
+                .apiUrlKeywords(List.of("api.deepseek.com", "deepseek.com"))
+                .toolCallEnabledKeywords(List.of())
+                .toolCallDisabledKeywords(List.of())
+                .visionEnabledKeywords(List.of())
+                .build());
+
+        register(AiProviderDescriptor.builder()
                 .code("ark")
                 .displayName("火山方舟 / 豆包")
                 .description("火山方舟兼容 OpenAI 协议，通常可填写模型 ID 或 Endpoint ID。")

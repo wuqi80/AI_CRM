@@ -16,10 +16,14 @@ import com.kakarote.ai_crm.entity.BO.FieldValidation;
 import com.kakarote.ai_crm.entity.PO.CustomField;
 import com.kakarote.ai_crm.entity.VO.CustomFieldVO;
 import com.kakarote.ai_crm.mapper.CustomFieldMapper;
+import com.kakarote.ai_crm.entity.PO.CustomFieldPool;
+import com.kakarote.ai_crm.service.ICustomFieldPoolService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
+import com.kakarote.ai_crm.service.ICustomFieldSortService;
 import com.kakarote.ai_crm.service.IDynamicSchemaService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,19 +41,12 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
     @Autowired
     private IDynamicSchemaService dynamicSchemaService;
 
-    /**
-     * 字段类型 -> PostgreSQL列类型映射
-     */
-    private static final Map<String, String> TYPE_MAPPING = Map.of(
-            "text", "VARCHAR(500)",
-            "textarea", "TEXT",
-            "number", "DECIMAL(15,2)",
-            "date", "DATE",
-            "datetime", "TIMESTAMP",
-            "select", "VARCHAR(100)",
-            "multiselect", "TEXT",
-            "checkbox", "BOOLEAN"
-    );
+    @Autowired
+    private ICustomFieldPoolService customFieldPoolService;
+
+    @Lazy
+    @Autowired
+    private ICustomFieldSortService customFieldSortService;
 
     /**
      * 单个实体最大自定义字段数
@@ -71,35 +68,18 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "自定义字段数量已达上限(" + MAX_FIELDS_PER_ENTITY + "个)");
         }
 
-        // 3. 检查字段标识是否已存在
-        Long existCount = count(new LambdaQueryWrapper<CustomField>()
-                .eq(CustomField::getEntityType, bo.getEntityType())
-                .eq(CustomField::getFieldName, bo.getFieldName()));
-        if (existCount > 0) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "字段标识已存在: " + bo.getFieldName());
-        }
+        // 3. 从字段池获取槽位（自动复用或新建物理列）
+        CustomFieldPool poolEntry = customFieldPoolService.acquireSlot(bo.getEntityType(), bo.getFieldType());
+        String columnName = poolEntry.getColumnName();
 
-        // 4. 生成列名（camelCase -> snake_case，加 cf_ 前缀）
-        String columnName = "cf_" + toSnakeCase(bo.getFieldName());
-
-        // 5. 获取列类型
-        String columnType = TYPE_MAPPING.get(bo.getFieldType());
-        if (columnType == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的字段类型: " + bo.getFieldType());
-        }
-
-        // 6. 执行 ALTER TABLE
-        String tableName = dynamicSchemaService.getTableName(bo.getEntityType());
-        dynamicSchemaService.addColumn(tableName, columnName, columnType, bo.getFieldLabel());
-
-        // 7. 保存元数据
+        // 4. 保存元数据（fieldName = columnName，不再由用户提供）
         CustomField field = new CustomField();
         field.setEntityType(bo.getEntityType());
-        field.setFieldName(bo.getFieldName());
+        field.setFieldName(columnName);
         field.setFieldLabel(bo.getFieldLabel());
         field.setFieldType(bo.getFieldType());
         field.setColumnName(columnName);
-        field.setColumnType(columnType);
+        field.setColumnType(poolEntry.getColumnType());
         field.setDefaultValue(bo.getDefaultValue());
         field.setPlaceholder(bo.getPlaceholder());
         field.setIsRequired(Boolean.TRUE.equals(bo.getIsRequired()) ? 1 : 0);
@@ -184,12 +164,11 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "字段不存在");
         }
 
-        // 执行 DROP COLUMN
-        String tableName = dynamicSchemaService.getTableName(field.getEntityType());
-        dynamicSchemaService.dropColumn(tableName, field.getColumnName());
-
-        // 删除元数据
+        // 仅删除元数据，物理列保留在字段池中供其他租户或未来复用
         removeById(fieldId);
+
+        // 清理该字段的所有用户排序记录
+        customFieldSortService.removeByFieldId(fieldId);
     }
 
     @Override
@@ -373,25 +352,4 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }).collect(Collectors.toList());
     }
 
-    /**
-     * 将 camelCase 转换为 snake_case
-     */
-    private String toSnakeCase(String camelCase) {
-        if (StrUtil.isEmpty(camelCase)) {
-            return camelCase;
-        }
-        StringBuilder result = new StringBuilder();
-        for (int i = 0; i < camelCase.length(); i++) {
-            char ch = camelCase.charAt(i);
-            if (Character.isUpperCase(ch)) {
-                if (i > 0) {
-                    result.append('_');
-                }
-                result.append(Character.toLowerCase(ch));
-            } else {
-                result.append(ch);
-            }
-        }
-        return result.toString();
-    }
 }

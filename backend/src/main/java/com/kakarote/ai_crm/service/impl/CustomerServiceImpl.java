@@ -68,6 +68,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private ICustomFieldService customFieldService;
 
     @Autowired
+    private com.kakarote.ai_crm.service.IDynamicSchemaService dynamicSchemaService;
+
+    @Autowired
     private CustomerTeamMapper customerTeamMapper;
 
     @Autowired
@@ -244,17 +247,47 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     @Override
     public BasePage<CustomerListVO> queryPageList(CustomerQueryBO queryBO) {
-        BasePage<CustomerListVO> page = queryBO.parse();
-        baseMapper.queryPageList(page, queryBO);
+        // 1. 获取启用的自定义字段，构建动态列列表
+        List<CustomFieldVO> enabledFields = customFieldService.getEnabledFieldsByEntity("customer");
+        List<String> cfColumns = enabledFields.stream()
+                .map(CustomFieldVO::getColumnName)
+                .filter(col -> dynamicSchemaService.columnExists("crm_customer", col))
+                .toList();
+        Map<String, String> colToFieldName = enabledFields.stream()
+                .filter(f -> cfColumns.contains(f.getColumnName()))
+                .collect(Collectors.toMap(CustomFieldVO::getColumnName, CustomFieldVO::getFieldName));
 
-        List<CustomerListVO> records = page.getRecords();
-        if (records == null || records.isEmpty()) {
-            return page;
+        // 2. 单次查询：标准字段 + 自定义字段列一起查出
+        BasePage<Map<String, Object>> rawPage = queryBO.parse();
+        baseMapper.queryPageListWithCf(rawPage, queryBO, cfColumns);
+
+        List<Map<String, Object>> rawRecords = rawPage.getRecords();
+        if (rawRecords == null || rawRecords.isEmpty()) {
+            BasePage<CustomerListVO> emptyPage = new BasePage<>(rawPage.getCurrent(), rawPage.getSize());
+            emptyPage.setTotal(rawPage.getTotal());
+            emptyPage.setRecords(Collections.emptyList());
+            return emptyPage;
         }
+
+        // 3. Map → CustomerListVO 转换，同时提取自定义字段
+        List<CustomerListVO> records = rawRecords.stream()
+                .map(row -> {
+                    CustomerListVO vo = mapToCustomerListVO(row);
+                    Map<String, Object> customFields = new HashMap<>();
+                    for (String col : cfColumns) {
+                        Object val = row.get(col);
+                        if (val != null) {
+                            customFields.put(colToFieldName.get(col), val);
+                        }
+                    }
+                    vo.setCustomFields(customFields);
+                    return vo;
+                })
+                .collect(Collectors.toList());
 
         List<Long> customerIds = records.stream().map(CustomerListVO::getCustomerId).toList();
 
-        // 1. tagNames -> tags 列表
+        // 4. tagNames -> tags 列表
         for (CustomerListVO record : records) {
             if (StrUtil.isNotEmpty(record.getTagNames())) {
                 record.setTags(Arrays.asList(record.getTagNames().split(",")));
@@ -262,6 +295,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 record.setTags(Collections.emptyList());
             }
         }
+
+        // 5. 联系人 fallback
         try {
             List<Contact> contacts = contactMapper.selectList(
                 new LambdaQueryWrapper<Contact>()
@@ -295,20 +330,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 }
             }
         } catch (Exception e) {
-            log.warn("鎵归噺鍔犺浇鑱旂郴浜哄厬搴曚俊鎭け璐? {}", e.getMessage());
+            log.warn("批量加载联系人兜底信息失败: {}", e.getMessage());
         }
 
-        // 2. 批量加载自定义字段（1-2条SQL代替N+1）
-        try {
-            Map<Long, Map<String, Object>> cfMap = customFieldService.getBatchCustomFieldValues("customer", customerIds);
-            for (CustomerListVO record : records) {
-                record.setCustomFields(cfMap.getOrDefault(record.getCustomerId(), Collections.emptyMap()));
-            }
-        } catch (Exception e) {
-            log.warn("批量加载自定义字段失败: {}", e.getMessage());
-        }
-
-        // 3. 批量加载团队成员姓名
+        // 6. 批量加载团队成员姓名
         try {
             List<CustomerTeam> teamList = customerTeamMapper.selectList(
                 new LambdaQueryWrapper<CustomerTeam>()
@@ -335,7 +360,68 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             log.warn("批量加载团队成员失败: {}", e.getMessage());
         }
 
-        return page;
+        // 7. 组装分页结果
+        BasePage<CustomerListVO> resultPage = new BasePage<>(rawPage.getCurrent(), rawPage.getSize());
+        resultPage.setTotal(rawPage.getTotal());
+        resultPage.setRecords(records);
+        return resultPage;
+    }
+
+    /**
+     * 将 Map 行数据映射为 CustomerListVO（标准字段）
+     */
+    private CustomerListVO mapToCustomerListVO(Map<String, Object> row) {
+        CustomerListVO vo = new CustomerListVO();
+        vo.setCustomerId(toLong(row.get("customer_id")));
+        vo.setCompanyName(toStr(row.get("company_name")));
+        vo.setIndustry(toStr(row.get("industry")));
+        vo.setStage(toStr(row.get("stage")));
+        vo.setLevel(toStr(row.get("level")));
+        vo.setSource(toStr(row.get("source")));
+        vo.setQuotation(toBigDecimal(row.get("quotation")));
+        vo.setContractAmount(toBigDecimal(row.get("contract_amount")));
+        vo.setRevenue(toBigDecimal(row.get("revenue")));
+        vo.setLastContactTime(toDate(row.get("last_contact_time")));
+        vo.setNextFollowTime(toDate(row.get("next_follow_time")));
+        vo.setOwnerId(toLong(row.get("owner_id")));
+        vo.setOwnerName(toStr(row.get("owner_name")));
+        vo.setCreateTime(toDate(row.get("create_time")));
+        vo.setPrimaryContactName(toStr(row.get("primary_contact_name")));
+        vo.setPrimaryContactPhone(toStr(row.get("primary_contact_phone")));
+        vo.setPrimaryContactPosition(toStr(row.get("primary_contact_position")));
+        vo.setContactCount(toInt(row.get("contact_count")));
+        vo.setTagNames(toStr(row.get("tag_names")));
+        return vo;
+    }
+
+    private Long toLong(Object val) {
+        if (val == null) return null;
+        if (val instanceof Number n) return n.longValue();
+        try { return Long.valueOf(val.toString()); } catch (NumberFormatException e) { return null; }
+    }
+
+    private String toStr(Object val) {
+        return val != null ? val.toString() : null;
+    }
+
+    private BigDecimal toBigDecimal(Object val) {
+        if (val == null) return null;
+        if (val instanceof BigDecimal bd) return bd;
+        if (val instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        try { return new BigDecimal(val.toString()); } catch (NumberFormatException e) { return null; }
+    }
+
+    private Date toDate(Object val) {
+        if (val == null) return null;
+        if (val instanceof Date d) return d;
+        if (val instanceof java.sql.Timestamp ts) return new Date(ts.getTime());
+        return null;
+    }
+
+    private Integer toInt(Object val) {
+        if (val == null) return null;
+        if (val instanceof Number n) return n.intValue();
+        try { return Integer.valueOf(val.toString()); } catch (NumberFormatException e) { return null; }
     }
 
     @Override

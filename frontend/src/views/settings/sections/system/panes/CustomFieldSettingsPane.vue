@@ -34,8 +34,7 @@
               <el-tag v-if="field.isRequired" size="small" type="danger" class="ml-2">必填</el-tag>
             </div>
             <div class="text-sm text-slate-500 mt-1">
-              <span>标识: {{ field.fieldName }}</span>
-              <el-tag size="small" class="ml-2">{{ getFieldTypeLabel(field.fieldType) }}</el-tag>
+              <el-tag size="small">{{ getFieldTypeLabel(field.fieldType) }}</el-tag>
               <span v-if="field.options && field.options.length > 0" class="ml-2">
                 选项: {{ field.options.map((item) => item.label).join(', ') }}
               </span>
@@ -97,7 +96,6 @@ const submitting = ref(false)
 
 const fieldForm = reactive({
   fieldLabel: '',
-  fieldName: '',
   fieldType: 'text' as FieldType,
   placeholder: '',
   defaultValue: '',
@@ -130,7 +128,6 @@ function resetFieldForm() {
   editingField.value = null
   Object.assign(fieldForm, {
     fieldLabel: '',
-    fieldName: '',
     fieldType: 'text',
     placeholder: '',
     defaultValue: '',
@@ -151,7 +148,6 @@ function handleEditField(field: CustomField) {
   editingField.value = field
   Object.assign(fieldForm, {
     fieldLabel: field.fieldLabel,
-    fieldName: field.fieldName,
     fieldType: field.fieldType,
     placeholder: field.placeholder || '',
     defaultValue: field.defaultValue || '',
@@ -181,14 +177,6 @@ async function handleSaveField() {
     ElMessage.warning('请输入字段标签')
     return
   }
-  if (!editingField.value && !fieldForm.fieldName.trim()) {
-    ElMessage.warning('请输入字段标识')
-    return
-  }
-  if (!editingField.value && !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(fieldForm.fieldName)) {
-    ElMessage.warning('字段标识只能包含字母数字下划线，且以字母开头')
-    return
-  }
 
   if (['select', 'multiselect'].includes(fieldForm.fieldType)) {
     const validOptions = fieldForm.options.filter((option) => option.value.trim() && option.label.trim())
@@ -216,7 +204,6 @@ async function handleSaveField() {
     } else {
       await addCustomField({
         entityType: activeEntityType.value,
-        fieldName: fieldForm.fieldName,
         fieldLabel: fieldForm.fieldLabel,
         fieldType: fieldForm.fieldType,
         placeholder: fieldForm.placeholder || undefined,
@@ -253,7 +240,7 @@ async function handleToggleFieldStatus(field: CustomField, enabled: boolean) {
 
 async function confirmDeleteField(field: CustomField) {
   try {
-    await ElMessageBox.confirm('删除字段将同时删除数据库列，确定继续吗？', '提示', {
+    await ElMessageBox.confirm('删除字段后该字段数据将不再展示，确定继续吗？', '提示', {
       type: 'warning',
       confirmButtonText: '删除',
       cancelButtonText: '取消'
