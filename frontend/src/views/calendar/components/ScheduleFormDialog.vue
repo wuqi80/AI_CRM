@@ -190,7 +190,6 @@
               :value="item.value"
             />
           </el-select>
-          <p class="mt-2 text-xs text-slate-400">参与人会关联到系统员工账号，不再保存为自由文本。</p>
           <p v-if="participantAiWarning" class="mt-1 text-xs font-medium text-amber-600">
             AI 识别到但未匹配到系统员工：{{ participantAiWarning }}
           </p>
