@@ -260,30 +260,51 @@
       </div>
     </div>
 
-    <!-- Task Detail Side Panel (Desktop) -->
-    <transition name="slide-right">
-      <aside
-        v-if="selectedTask && !isMobile"
-        class="w-[400px] bg-white border-l border-slate-200 shadow-2xl z-20 flex flex-col shrink-0"
-      >
-        <div class="p-8 flex-1 overflow-y-auto">
-          <div class="flex items-center justify-between mb-8">
-            <span class="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">
-              任务详情
-            </span>
+    <!-- Task Detail Drawer (Desktop) -->
+    <el-drawer
+      v-if="!isMobile"
+      v-model="showTaskDetailDrawer"
+      direction="rtl"
+      :size="'400px'"
+      :with-header="false"
+      :modal="false"
+      class="task-detail-drawer"
+    >
+      <div v-if="selectedTask" class="h-full flex flex-col bg-white shadow-2xl">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-slate-100">
+          <span class="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">
+            任务详情
+          </span>
+          <div class="flex items-center gap-2">
+            <button
+              @click="handleEdit(selectedTask)"
+              class="size-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-primary transition-colors"
+              type="button"
+              aria-label="编辑任务"
+              title="编辑任务"
+            >
+              <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
+            </button>
             <button
               @click="selectedTask = null"
-              class="size-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+              class="size-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              type="button"
+              aria-label="关闭任务详情"
+              title="关闭"
             >
-              <span class="material-symbols-outlined">close</span>
+              <span class="material-symbols-outlined text-xl leading-none">close</span>
             </button>
           </div>
+        </div>
 
+        <!-- Content -->
+        <div class="flex-1 min-h-0 overflow-y-auto p-8">
           <!-- Title -->
-          <h2 class="text-xl font-bold text-slate-900 mb-6 line-clamp-2">{{ selectedTask.title }}</h2>
+          <h2 class="text-2xl font-bold text-slate-900 mb-2 line-clamp-2">{{ selectedTask.title }}</h2>
 
           <!-- Info Grid -->
-          <div class="grid grid-cols-2 gap-4 mb-8">
+          <div class="grid grid-cols-2 gap-4 my-8">
             <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">截止时间</p>
               <p :class="['text-xs font-bold', isOverdue(selectedTask) ? 'text-red-500' : 'text-slate-700']">
@@ -321,7 +342,7 @@
                 <div class="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
                   {{ selectedTask.customerName.charAt(0) }}
                 </div>
-                <div>
+                <div class="flex-1 min-w-0">
                   <p class="text-sm font-bold text-slate-900 truncate">{{ selectedTask.customerName }}</p>
                   <p class="text-[10px] text-slate-400">点击查看客户详情</p>
                 </div>
@@ -332,7 +353,7 @@
             <!-- Description -->
             <section v-if="selectedTask.description">
               <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">任务描述</h3>
-              <div class="p-4 bg-slate-50 rounded-xl">
+              <div class="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
                 <p class="text-sm text-slate-600 leading-relaxed">{{ selectedTask.description }}</p>
               </div>
             </section>
@@ -352,14 +373,7 @@
 
         <!-- Bottom Actions -->
         <div class="p-6 border-t border-slate-100 space-y-4">
-          <div class="flex gap-3">
-            <button
-              @click="handleEdit(selectedTask)"
-              class="flex-1 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
-            >
-              <span class="material-symbols-outlined text-lg">edit</span>
-              编辑任务
-            </button>
+          <div class="flex gap-3 items-stretch">
             <button
               v-if="selectedTask.status !== 'COMPLETED'"
               @click="handleToggleComplete(selectedTask)"
@@ -376,17 +390,19 @@
               <span class="material-symbols-outlined text-lg">undo</span>
               重新打开
             </button>
+            <button
+              @click="handleDelete(selectedTask)"
+              class="size-12 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+              type="button"
+              aria-label="删除任务"
+              title="删除任务"
+            >
+              <span class="material-symbols-outlined">delete</span>
+            </button>
           </div>
-          <button
-            @click="handleDelete(selectedTask)"
-            class="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-slate-400 hover:text-red-500 transition-colors"
-          >
-            <span class="material-symbols-outlined text-sm">delete</span>
-            删除此任务
-          </button>
         </div>
-      </aside>
-    </transition>
+      </div>
+    </el-drawer>
 
     <!-- Task Detail Dialog (Mobile) -->
     <el-dialog v-model="showDetailDialog" title="任务详情" width="95%" fullscreen>
@@ -770,6 +786,13 @@ const visiblePages = computed(() => {
   return pages
 })
 
+const showTaskDetailDrawer = computed({
+  get: () => !!selectedTask.value && !isMobile.value,
+  set: (val: boolean) => {
+    if (!val) selectedTask.value = null
+  }
+})
+
 onMounted(() => {
   taskStore.fetchTaskList(true)
 })
@@ -986,6 +1009,10 @@ function getRelativeTime(dateStr: string): string {
 .slide-right-leave-to {
   transform: translateX(100%);
   opacity: 0;
+}
+
+:deep(.task-detail-drawer .el-drawer__body) {
+  padding: 0 !important;
 }
 </style>
 
