@@ -1621,110 +1621,127 @@
     <el-drawer
       v-model="showMemberDetailDrawer"
       direction="rtl"
-      :size="isMobile ? '100%' : '380px'"
+      :size="isMobile ? '100%' : '400px'"
       :with-header="false"
+      class="employee-detail-drawer"
     >
-      <div v-if="detailMember" class="h-full flex flex-col">
+      <div v-if="detailMember" class="h-full flex flex-col bg-white shadow-2xl">
         <!-- Header -->
-        <div class="flex items-center justify-between p-4 pb-0">
+        <div class="flex items-center justify-between p-6 border-b border-slate-100">
           <h3 class="text-lg font-bold text-slate-900">员工详情</h3>
-          <button @click="showMemberDetailDrawer = false" class="size-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all">
-            <span class="material-symbols-outlined text-xl">close</span>
+          <button
+            @click="showMemberDetailDrawer = false"
+            class="size-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            aria-label="关闭员工详情"
+            type="button"
+          >
+            <span class="material-symbols-outlined text-xl leading-none">close</span>
           </button>
         </div>
 
         <!-- Content -->
-        <div class="flex-1 overflow-y-auto p-6 pt-4">
+        <div class="flex-1 overflow-y-auto">
           <!-- Avatar + Name + Position -->
-          <div class="text-center mb-6">
+          <div class="p-8 text-center space-y-4">
             <div class="relative inline-block">
-              <div class="size-20 rounded-full mx-auto flex items-center justify-center text-white text-2xl font-bold shadow-lg" :class="getAvatarColor(detailMember.realname)">
+              <div
+                class="size-24 rounded-2xl mx-auto flex items-center justify-center text-white text-3xl font-bold shadow-xl ring-4 ring-white"
+                :class="getAvatarColor(detailMember.realname)"
+              >
                 {{ (detailMember.realname || detailMember.username || '?').charAt(0) }}
               </div>
-              <span
-                class="absolute bottom-0.5 right-0.5 size-4 rounded-full border-2 border-white"
-                :class="detailMember.status === 1 ? 'bg-emerald-400' : 'bg-slate-300'"
-              ></span>
+              <div
+                class="absolute -bottom-2 -right-2 size-6 rounded-full border-2 border-white"
+                :class="detailMember.status === 1 ? 'bg-emerald-500' : 'bg-slate-400'"
+              />
             </div>
-            <h2 class="text-xl font-bold text-slate-900 mt-3">{{ detailMember.realname || detailMember.username }}</h2>
-            <p class="text-sm text-primary font-medium mt-1">{{ detailMember.post || '员工' }}</p>
+            <div>
+              <h2 class="text-xl font-bold text-slate-900">
+                {{ detailMember.realname || detailMember.username }}
+              </h2>
+              <p class="text-primary font-bold text-sm uppercase tracking-widest mt-1">
+                {{ detailMember.post || '员工' }}
+              </p>
+            </div>
           </div>
 
           <!-- Info Cards -->
-          <div class="grid grid-cols-2 gap-3 mb-6">
-            <div class="bg-slate-50 rounded-xl p-3">
-              <p class="text-[10px] text-slate-400 mb-1">所属部门</p>
-              <p class="text-sm font-semibold text-slate-900">{{ detailMember.deptName || '-' }}</p>
+          <div class="px-8 space-y-6">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">所属部门</p>
+                <p class="text-sm font-bold text-slate-700">{{ detailMember.deptName || '-' }}</p>
+              </div>
+              <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">登录账号</p>
+                <p class="text-sm font-bold text-slate-700">@{{ detailMember.username }}</p>
+              </div>
+              <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 col-span-2">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">直属上级</p>
+                <p class="text-sm font-bold text-slate-700">{{ detailMember.parentName || '无' }}</p>
+              </div>
             </div>
-            <div class="bg-slate-50 rounded-xl p-3">
-              <p class="text-[10px] text-slate-400 mb-1">登录账号</p>
-              <p class="text-sm font-semibold text-slate-900">@{{ detailMember.username }}</p>
-            </div>
-            <div class="bg-slate-50 rounded-xl p-3 col-span-2">
-              <p class="text-[10px] text-slate-400 mb-1">直属上级</p>
-              <p class="text-sm font-semibold text-slate-900">{{ detailMember.parentName || '无' }}</p>
-            </div>
-          </div>
 
-          <!-- Roles -->
-          <div class="mb-6">
-            <h4 class="text-sm font-bold text-slate-900 mb-2">系统角色</h4>
-            <div class="flex flex-wrap gap-2">
-              <span
-                v-for="rn in (detailMember.roleNames || [])"
-                :key="rn"
-                class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold inline-flex items-center gap-1.5"
-              >
-                <span class="size-1.5 rounded-full bg-blue-400"></span>
-                {{ rn }}
-              </span>
-              <span v-if="!detailMember.roleNames?.length" class="text-sm text-slate-400">未分配角色</span>
-            </div>
-          </div>
-
-          <!-- Contact Info -->
-          <div class="mb-6">
-            <h4 class="text-sm font-bold text-slate-900 mb-3">联系信息</h4>
+            <!-- Roles -->
             <div class="space-y-3">
-              <div class="flex items-center gap-3">
-                <div class="size-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                  <span class="material-symbols-outlined text-blue-500 text-base">mail</span>
+              <h4 class="text-xs font-bold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">系统角色</h4>
+              <div class="flex flex-wrap gap-2">
+                <div
+                  v-for="rn in (detailMember.roleNames || [])"
+                  :key="rn"
+                  class="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm"
+                >
+                  <div class="size-1.5 rounded-full bg-primary"></div>
+                  <span class="text-xs font-bold text-slate-700">
+                    {{ rn }}
+                  </span>
                 </div>
-                <div>
-                  <p class="text-[10px] text-slate-400">电子邮箱</p>
-                  <p class="text-sm text-slate-700">{{ detailMember.email || '-' }}</p>
+                <span v-if="!detailMember.roleNames?.length" class="text-sm text-slate-400">未分配角色</span>
+              </div>
+            </div>
+
+            <!-- Contact Info -->
+            <div class="space-y-4">
+              <h4 class="text-xs font-bold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">联系信息</h4>
+              <div class="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors">
+                <div class="size-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-xl leading-none">mail</span>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-[10px] font-bold text-slate-400 uppercase">电子邮箱</p>
+                  <p class="text-sm font-medium text-slate-700 break-words">{{ detailMember.email || '-' }}</p>
                 </div>
               </div>
-              <div class="flex items-center gap-3">
-                <div class="size-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
-                  <span class="material-symbols-outlined text-green-500 text-base">phone</span>
+              <div class="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors">
+                <div class="size-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-xl leading-none">call</span>
                 </div>
-                <div>
-                  <p class="text-[10px] text-slate-400">手机号码</p>
-                  <p class="text-sm text-slate-700">{{ detailMember.mobile || '-' }}</p>
+                <div class="min-w-0">
+                  <p class="text-[10px] font-bold text-slate-400 uppercase">手机号码</p>
+                  <p class="text-sm font-medium text-slate-700 break-words">{{ detailMember.mobile || '-' }}</p>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- Work Summary -->
-          <div class="mb-6">
-            <h4 class="text-sm font-bold text-slate-900 mb-2">工作摘要</h4>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="bg-blue-50 rounded-xl p-4 text-center">
-                <p class="text-2xl font-black text-blue-600">-</p>
-                <p class="text-[10px] text-blue-400 mt-1 font-medium">跟进客户</p>
-              </div>
-              <div class="bg-emerald-50 rounded-xl p-4 text-center">
-                <p class="text-2xl font-black text-emerald-600">-</p>
-                <p class="text-[10px] text-emerald-400 mt-1 font-medium">活跃商机</p>
+            <!-- Work Summary -->
+            <div class="space-y-4 pb-8">
+              <h4 class="text-xs font-bold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">工作摘要</h4>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p class="text-lg font-black text-slate-900">-</p>
+                  <p class="text-[9px] font-bold text-slate-400 uppercase mt-1">跟进客户</p>
+                </div>
+                <div class="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p class="text-lg font-black text-slate-900">-</p>
+                  <p class="text-[9px] font-bold text-slate-400 uppercase mt-1">活跃商机</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Action Buttons -->
-        <div class="p-4 pt-0 flex gap-3">
+        <div class="p-6 border-t border-slate-100 flex gap-3">
           <el-button class="flex-1" type="primary" size="large" @click="showMemberDetailDrawer = false; handleEditMember(detailMember)">
             <span class="material-symbols-outlined text-base mr-1">edit</span>
             编辑资料
@@ -3147,5 +3164,10 @@ watch(showAddRoleUserDialog, async (val) => {
 
 :deep(.el-tree-node.is-current > .el-tree-node__content) {
   background-color: var(--el-color-primary-light-9);
+}
+
+/* Employee detail drawer: remove default body padding */
+:deep(.employee-detail-drawer .el-drawer__body) {
+  padding: 0 !important;
 }
 </style>
