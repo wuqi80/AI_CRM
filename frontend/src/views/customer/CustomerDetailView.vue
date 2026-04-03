@@ -403,13 +403,14 @@
                   <button class="px-3 py-1 text-xs font-medium text-slate-500">会议摘要</button>
                   <button class="px-3 py-1 text-xs font-medium text-slate-500">重要进展</button>
                 </div> -->
-                <!-- <button
+                <button
+                  v-if="canCreateFollowUps"
                   class="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
                   @click="handleOpenFollowUpDialog"
                 >
                   <span class="material-symbols-outlined text-sm">add</span>
                   添加跟进
-                </button> -->
+                </button>
               </div>
             </div>
 
@@ -454,6 +455,14 @@
                       </div>
                       <div class="flex items-center gap-3">
                         <span class="text-xs text-slate-400 uppercase font-bold">{{ formatDateTime(item.followTime || item.createTime) }}</span>
+                        <button
+                          v-if="canEditFollowUps"
+                          type="button"
+                          class="text-slate-300 hover:text-primary transition-colors"
+                          @click="handleEditFollowUp(item)"
+                        >
+                          <span class="material-symbols-outlined text-sm">edit</span>
+                        </button>
                         <button
                           v-if="canDeleteFollowUps"
                           type="button"
@@ -709,7 +718,7 @@
     </el-dialog>
 
     <!-- Add Follow-up Dialog -->
-    <el-dialog v-model="showAddFollowUpDialog" title="添加跟进记录" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
+    <el-dialog v-model="showAddFollowUpDialog" :title="isEditingFollowUp ? '编辑跟进记录' : '添加跟进记录'" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
       <el-form :model="followUpForm" label-width="80px">
         <el-form-item label="跟进类型">
           <el-select v-model="followUpForm.type" class="w-full">
@@ -726,10 +735,20 @@
         <el-form-item label="跟进内容">
           <el-input v-model="followUpForm.content" type="textarea" :rows="4" placeholder="请输入跟进内容" />
         </el-form-item>
+        <el-form-item label="下次联系">
+          <el-date-picker
+            v-model="followUpForm.nextFollowTime"
+            type="datetime"
+            class="w-full"
+            placeholder="选择下次联系时间"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            clearable
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAddFollowUpDialog = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmitFollowUp">添加</el-button>
+        <el-button type="primary" :loading="submitting" @click="handleSubmitFollowUp">{{ isEditingFollowUp ? '保存' : '添加' }}</el-button>
       </template>
     </el-dialog>
 
@@ -768,7 +787,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useUserStore } from '@/stores/user'
@@ -994,8 +1013,6 @@ const canViewTasks = computed(() => userStore.hasPermission('task:view'))
 const canCreateTasks = computed(() => userStore.hasPermission('task:create'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
 const isEditingFollowUp = computed(() => !!editingFollowUpId.value)
-const followUpDialogTitle = computed(() => isEditingFollowUp.value ? '编辑跟进记录' : '添加跟进记录')
-const followUpDialogSubmitText = computed(() => isEditingFollowUp.value ? '保存' : '添加')
 const filteredTransferUserList = computed(() => {
   const keyword = ownerSearch.value.trim().toLowerCase()
   if (!keyword) return transferUserList.value
@@ -1004,6 +1021,12 @@ const filteredTransferUserList = computed(() => {
       .filter(Boolean)
       .some(value => String(value).toLowerCase().includes(keyword))
   )
+})
+
+watch(showAddFollowUpDialog, (visible) => {
+  if (!visible) {
+    resetFollowUpForm(route.params.id as string || customer.value?.customerId || '')
+  }
 })
 
 onMounted(async () => {
@@ -1213,8 +1236,27 @@ function handleAiFollowUp() {
   showAiFollowUpDrawer.value = true
 }
 
-function handleAiFollowUpSaved() {
-  if (customer.value && canViewFollowUps.value) fetchFollowUps(customer.value.customerId, true)
+async function handleAiFollowUpSaved() {
+  if (!customer.value) return
+  await refreshFollowUpContext(customer.value.customerId, { resetFollowUps: true })
+}
+
+function handleOpenFollowUpDialog() {
+  if (!canCreateFollowUps.value) return
+  if (!customer.value) return
+  resetFollowUpForm(customer.value.customerId)
+  showAddFollowUpDialog.value = true
+}
+
+function handleEditFollowUp(followUp: FollowUp) {
+  if (!canEditFollowUps.value) return
+  editingFollowUpId.value = String(followUp.followUpId)
+  followUpForm.customerId = String(followUp.customerId)
+  followUpForm.type = normalizeFollowUpType(followUp.type)
+  followUpForm.content = followUp.content || ''
+  followUpForm.followTime = normalizeDateTimeValue(followUp.followTime)
+  followUpForm.nextFollowTime = normalizeDateTimeValue(followUp.nextFollowTime)
+  showAddFollowUpDialog.value = true
 }
 
 function handleGenerateReport() {
@@ -1331,7 +1373,7 @@ async function handleRemoveTag(tag: CustomerTag) {
 }
 
 async function handleSubmitFollowUp() {
-  if (!canCreateFollowUps.value) return
+  if (isEditingFollowUp.value ? !canEditFollowUps.value : !canCreateFollowUps.value) return
   if (!followUpForm.content.trim()) {
     ElMessage.warning('请输入跟进内容')
     return
@@ -1342,12 +1384,27 @@ async function handleSubmitFollowUp() {
   }
   submitting.value = true
   try {
-    await addFollowUp({ customerId: followUpForm.customerId, type: followUpForm.type, content: followUpForm.content, followTime: followUpForm.followTime } as any)
-    await fetchFollowUps(followUpForm.customerId, true)
+    const payload = {
+      type: followUpForm.type,
+      content: followUpForm.content.trim(),
+      followTime: followUpForm.followTime,
+      nextFollowTime: followUpForm.nextFollowTime || undefined
+    }
+    if (isEditingFollowUp.value) {
+      await updateFollowUp({
+        followUpId: editingFollowUpId.value,
+        ...payload
+      } as FollowUpUpdateBO)
+    } else {
+      await addFollowUp({
+        customerId: followUpForm.customerId,
+        ...payload
+      } as FollowUpAddBO)
+    }
+    const successMessage = isEditingFollowUp.value ? '跟进记录已更新' : '跟进记录添加成功'
+    await refreshFollowUpContext(followUpForm.customerId, { resetFollowUps: !isEditingFollowUp.value })
     showAddFollowUpDialog.value = false
-    followUpForm.content = ''
-    followUpForm.followTime = formatDateForApi()
-    ElMessage.success('跟进记录添加成功')
+    ElMessage.success(successMessage)
   } catch { /* Error handled */ } finally {
     submitting.value = false
   }
@@ -1371,8 +1428,11 @@ async function confirmDeleteFollowUp(followUpId: string) {
 async function handleDeleteFollowUp(followUpId: string) {
   if (!canDeleteFollowUps.value) return
   try {
+    if (followUps.value.length === 1 && followUpPage.value > 1) {
+      followUpPage.value -= 1
+    }
     await deleteFollowUp(followUpId)
-    if (customer.value) await fetchFollowUps(customer.value.customerId)
+    if (customer.value) await refreshFollowUpContext(customer.value.customerId)
     ElMessage.success('跟进记录已删除')
   } catch { /* Error handled */ }
 }

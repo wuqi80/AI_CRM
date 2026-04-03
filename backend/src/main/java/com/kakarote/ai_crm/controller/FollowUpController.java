@@ -6,6 +6,7 @@ import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
+import com.kakarote.ai_crm.entity.BO.FollowUpUpdateBO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.service.IFollowUpService;
@@ -35,6 +36,14 @@ public class FollowUpController {
     public Result<Long> add(@Valid @RequestBody FollowUpAddBO followUpAddBO) {
         Long followUpId = followUpService.addFollowUp(followUpAddBO);
         return Result.ok(followUpId);
+    }
+
+    @PostMapping("/update")
+    @Operation(summary = "更新跟进记录")
+    @RequirePermission("followup:edit")
+    public Result<String> update(@Valid @RequestBody FollowUpUpdateBO followUpUpdateBO) {
+        followUpService.updateFollowUp(followUpUpdateBO);
+        return Result.ok();
     }
 
     @PostMapping("/queryPageList")

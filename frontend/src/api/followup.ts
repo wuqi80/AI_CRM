@@ -1,5 +1,5 @@
 import { post } from '@/utils/request'
-import type { FollowUp, FollowUpAddBO, FollowUpQueryBO } from '@/types/customer'
+import type { FollowUp, FollowUpAddBO, FollowUpQueryBO, FollowUpUpdateBO } from '@/types/customer'
 import type { PageResult } from '@/types/api'
 
 /**
@@ -7,6 +7,13 @@ import type { PageResult } from '@/types/api'
  */
 export function addFollowUp(data: FollowUpAddBO): Promise<string> {
   return post('/followup/add', data)
+}
+
+/**
+ * Update follow-up record
+ */
+export function updateFollowUp(data: FollowUpUpdateBO): Promise<void> {
+  return post('/followup/update', data)
 }
 
 /**

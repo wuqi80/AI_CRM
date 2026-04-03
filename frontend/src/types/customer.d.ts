@@ -265,6 +265,15 @@ export interface FollowUpAddBO {
   nextFollowTime?: string
 }
 
+export interface FollowUpUpdateBO {
+  followUpId: string
+  type: string
+  content: string
+  followTime: string
+  contactId?: string
+  nextFollowTime?: string
+}
+
 export interface FollowUpQueryBO {
   customerId?: string
   contactId?: string

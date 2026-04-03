@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,6 +14,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
+import com.kakarote.ai_crm.entity.BO.FollowUpUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.FollowUp;
 import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
@@ -91,23 +93,34 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             followUp.setFollowTime(new Date());
         }
         save(followUp);
-
-        customer.setLastContactTime(new Date());
-        if (followUpAddBO.getNextFollowTime() != null) {
-            customer.setNextFollowTime(followUpAddBO.getNextFollowTime());
-        }
-        customerMapper.updateById(customer);
+        syncCustomerFollowUpSummary(followUp.getCustomerId());
 
         return followUp.getFollowUpId();
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateFollowUp(FollowUpUpdateBO followUpUpdateBO) {
+        FollowUp followUp = getById(followUpUpdateBO.getFollowUpId());
+        if (ObjectUtil.isNull(followUp)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "跟进记录不存在");
+        }
+
+        BeanUtil.copyProperties(followUpUpdateBO, followUp, "followUpId", "customerId", "createUserId", "createTime", "tenantId");
+        updateById(followUp);
+        syncCustomerFollowUpSummary(followUp.getCustomerId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteFollowUp(Long followUpId) {
         FollowUp followUp = getById(followUpId);
         if (ObjectUtil.isNull(followUp)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "跟进记录不存在");
         }
+        Long customerId = followUp.getCustomerId();
         removeById(followUpId);
+        syncCustomerFollowUpSummary(customerId);
     }
 
     @Override
@@ -242,5 +255,25 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         } catch (DateTimeParseException ignored) {
             return null;
         }
+    }
+
+    private void syncCustomerFollowUpSummary(Long customerId) {
+        if (customerId == null) {
+            return;
+        }
+
+        FollowUp latestFollowUp = lambdaQuery()
+            .eq(FollowUp::getCustomerId, customerId)
+            .orderByDesc(FollowUp::getFollowTime)
+            .orderByDesc(FollowUp::getCreateTime)
+            .orderByDesc(FollowUp::getFollowUpId)
+            .last("LIMIT 1")
+            .one();
+
+        LambdaUpdateWrapper<Customer> updateWrapper = new LambdaUpdateWrapper<Customer>()
+            .eq(Customer::getCustomerId, customerId)
+            .set(Customer::getLastContactTime, latestFollowUp != null ? latestFollowUp.getFollowTime() : null)
+            .set(Customer::getNextFollowTime, latestFollowUp != null ? latestFollowUp.getNextFollowTime() : null);
+        customerMapper.update(null, updateWrapper);
     }
 }
