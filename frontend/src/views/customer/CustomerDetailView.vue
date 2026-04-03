@@ -43,8 +43,6 @@
                   >{{ customer.level }}级客户</span>
                 </div>
                 <div class="flex items-center gap-4 text-sm flex-wrap">
-                  <p class="text-slate-500">{{ customer.level ? customer.level + '级' : '普通' }}客户 · {{ customer.industry || '未分类' }}</p>
-                  <div class="h-3 w-px bg-slate-200 hidden sm:block"></div>
                   <div class="flex items-center gap-4">
                     <div class="flex items-center gap-1">
                       <span class="text-slate-400">联系人:</span>
@@ -777,11 +775,11 @@ import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
-import { addFollowUp, deleteFollowUp, queryFollowUpPageList } from '@/api/followup'
+import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } from '@/api/followup'
 import { deleteContact, setPrimaryContact, queryContactPageList } from '@/api/contact'
 import { getEnabledFieldsByEntity } from '@/api/customField'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { CustomerTag, FollowUp, Contact } from '@/types/customer'
+import type { Contact, CustomerTag, FollowUp, FollowUpAddBO, FollowUpType, FollowUpUpdateBO } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { formatCustomFieldValue as formatCustomFieldDisplayValue } from '@/utils/customFieldDisplay'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
@@ -804,6 +802,7 @@ const showAddContactDialog = ref(false)
 const showContactDetail = ref(false)
 const currentContact = ref<Contact | null>(null)
 const editingContact = ref<Contact | null>(null)
+const editingFollowUpId = ref('')
 const contactAiImagePickerToken = ref(0)
 const showEditDialog = ref(false)
 const showAiFollowUpDrawer = ref(false)
@@ -900,6 +899,14 @@ async function refreshCustomerContext(customerId: string, options: { resetContac
   await Promise.all(tasks)
 }
 
+async function refreshFollowUpContext(customerId: string, options: { resetFollowUps?: boolean } = {}) {
+  const tasks: Promise<any>[] = [customerStore.fetchCustomerDetail(customerId)]
+  if (canViewFollowUps.value) {
+    tasks.push(fetchFollowUps(customerId, options.resetFollowUps))
+  }
+  await Promise.all(tasks)
+}
+
 function applyPrimaryContactLocally(contactId: string) {
   const normalizedContactId = String(contactId)
   contacts.value = contacts.value.map(contact => ({
@@ -928,12 +935,45 @@ function formatDateForApi(date: Date = new Date()): string {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
-const followUpForm = reactive({
+interface FollowUpFormState {
+  customerId: string
+  type: FollowUpType
+  content: string
+  followTime: string
+  nextFollowTime: string
+}
+
+const FOLLOW_UP_TYPES = new Set<FollowUpType>(['call', 'meeting', 'email', 'visit', 'other'])
+
+function normalizeFollowUpType(type?: string): FollowUpType {
+  return type && FOLLOW_UP_TYPES.has(type as FollowUpType) ? type as FollowUpType : 'call'
+}
+
+function normalizeDateTimeValue(value?: string): string {
+  if (!value) return ''
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+    return value
+  }
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : formatDateForApi(parsed)
+}
+
+const followUpForm = reactive<FollowUpFormState>({
   customerId: '',
   type: 'call',
   content: '',
-  followTime: formatDateForApi()
+  followTime: formatDateForApi(),
+  nextFollowTime: ''
 })
+
+function resetFollowUpForm(customerId = customer.value?.customerId || '') {
+  editingFollowUpId.value = ''
+  followUpForm.customerId = customerId
+  followUpForm.type = 'call'
+  followUpForm.content = ''
+  followUpForm.followTime = formatDateForApi()
+  followUpForm.nextFollowTime = ''
+}
 
 const customer = computed(() => customerStore.currentCustomer)
 const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
@@ -948,10 +988,14 @@ const canDeleteContacts = computed(() => userStore.hasPermission('contact:delete
 const canSetPrimaryContacts = computed(() => userStore.hasPermission('contact:set_primary'))
 const canViewFollowUps = computed(() => userStore.hasPermission('followup:view'))
 const canCreateFollowUps = computed(() => userStore.hasPermission('followup:create'))
+const canEditFollowUps = computed(() => userStore.hasPermission('followup:edit'))
 const canDeleteFollowUps = computed(() => userStore.hasPermission('followup:delete'))
 const canViewTasks = computed(() => userStore.hasPermission('task:view'))
 const canCreateTasks = computed(() => userStore.hasPermission('task:create'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
+const isEditingFollowUp = computed(() => !!editingFollowUpId.value)
+const followUpDialogTitle = computed(() => isEditingFollowUp.value ? '编辑跟进记录' : '添加跟进记录')
+const followUpDialogSubmitText = computed(() => isEditingFollowUp.value ? '保存' : '添加')
 const filteredTransferUserList = computed(() => {
   const keyword = ownerSearch.value.trim().toLowerCase()
   if (!keyword) return transferUserList.value
@@ -966,7 +1010,7 @@ onMounted(async () => {
   const customerId = route.params.id as string
   if (customerId) {
     loading.value = true
-    followUpForm.customerId = customerId
+    resetFollowUpForm(customerId)
 
     const fetchTasks: Promise<any>[] = [
       customerStore.fetchCustomerDetail(customerId).catch(err => {
