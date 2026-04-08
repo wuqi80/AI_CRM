@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.kakarote.ai_crm.entity.BO.TaskQueryBO;
@@ -7,6 +8,7 @@ import com.kakarote.ai_crm.entity.PO.Task;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.Date;
 import java.util.List;
@@ -39,4 +41,12 @@ public interface TaskMapper extends BaseMapper<Task> {
                                      @Param("filter") String filter,
                                      @Param("today") Date today,
                                      @Param("weekEnd") Date weekEnd);
+
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("SELECT * FROM crm_task WHERE task_id = #{taskId}")
+    Task selectByIdIgnoreDataPermission(@Param("taskId") Long taskId);
+
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("SELECT * FROM crm_task WHERE customer_id = #{customerId}")
+    List<Task> selectByCustomerIdIgnoreDataPermission(@Param("customerId") Long customerId);
 }

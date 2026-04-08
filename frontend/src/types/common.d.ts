@@ -39,6 +39,7 @@ export interface TaskUpdateBO extends TaskAddBO {
 }
 
 export interface TaskQueryBO {
+  taskId?: string
   keyword?: string
   status?: TaskStatus
   priority?: TaskPriority
@@ -91,6 +92,31 @@ export interface KnowledgeAiAnalyzeVO {
     name: string
     type: string
   }>
+}
+
+export interface KnowledgeAiSearchVO {
+  keyword: string
+  answer: string
+  tookMs: number
+  matchPercent: number
+  totalHits: number
+  references: Array<{
+    knowledgeId: string
+    name: string
+    type: string
+    customerName?: string
+    summary?: string
+    excerpt?: string
+    matchPercent: number
+    fileSize?: number
+    createTime?: string
+  }>
+}
+
+export interface KnowledgeAiSearchBO {
+  keyword: string
+  type?: KnowledgeType
+  limit?: number
 }
 
 // AI Agent types

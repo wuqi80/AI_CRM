@@ -19,6 +19,7 @@ import com.kakarote.ai_crm.entity.VO.ScheduleAiParseVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleParticipantUserVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 import com.kakarote.ai_crm.mapper.ScheduleMapper;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.IScheduleService;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.utils.UserUtil;
@@ -53,6 +54,9 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
 
     @Autowired
     private ManageUserService manageUserService;
+
+    @Autowired
+    private IGlobalSearchIndexService globalSearchIndexService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -94,6 +98,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         }
 
         save(schedule);
+        globalSearchIndexService.refreshScheduleIndex(schedule.getScheduleId());
         return schedule.getScheduleId();
     }
 
@@ -104,6 +109,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "日程不存在");
         }
         removeById(scheduleId);
+        globalSearchIndexService.deleteByEntity("schedule", scheduleId);
     }
 
     @Override
@@ -119,6 +125,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
 
     @Override
     public BasePage<ScheduleVO> queryPageList(ScheduleQueryBO queryBO) {
+        queryBO.setCurrentUserId(UserUtil.getUserId());
         BasePage<ScheduleVO> page = queryBO.parse();
         baseMapper.queryPageList(page, queryBO);
         enrichSchedules(page.getList());

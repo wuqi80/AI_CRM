@@ -25,6 +25,7 @@ import com.kakarote.ai_crm.service.DataPermissionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.ICustomerService;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
@@ -92,6 +93,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     @Autowired
     private DataPermissionService dataPermissionService;
+
+    @Autowired
+    private IGlobalSearchIndexService globalSearchIndexService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -223,6 +227,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
 
         refreshCustomerSearchText(customer.getCustomerId());
+        globalSearchIndexService.refreshCustomerIndex(customer.getCustomerId());
 
         return customer.getCustomerId();
     }
@@ -243,6 +248,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
 
         refreshCustomerSearchText(customer.getCustomerId());
+        globalSearchIndexService.refreshCustomerIndex(customer.getCustomerId());
+        globalSearchIndexService.refreshCustomerRelatedIndexes(customer.getCustomerId());
     }
 
     @Override
@@ -257,6 +264,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         contactMapper.delete(new LambdaQueryWrapper<Contact>().eq(Contact::getCustomerId, customerId));
         // Delete related tags
         customerTagMapper.delete(new LambdaQueryWrapper<CustomerTag>().eq(CustomerTag::getCustomerId, customerId));
+        globalSearchIndexService.deleteByEntity("customer", customerId);
+        globalSearchIndexService.deleteContactIndexesByCustomerId(customerId);
+        globalSearchIndexService.refreshCustomerRelatedIndexes(customerId);
     }
 
     @Override
@@ -543,6 +553,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
         customer.setStage(stage);
         updateById(customer);
+        globalSearchIndexService.refreshCustomerIndex(customerId);
     }
 
     @Override
@@ -586,6 +597,12 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             .in(Customer::getCustomerId, transferBO.getCustomerIds())
             .set(Customer::getOwnerId, transferBO.getNewOwnerId())
             .update();
+        if (transferBO.getCustomerIds() != null) {
+            transferBO.getCustomerIds().forEach(customerId -> {
+                globalSearchIndexService.refreshCustomerIndex(customerId);
+                globalSearchIndexService.refreshCustomerRelatedIndexes(customerId);
+            });
+        }
     }
 
     // ==================== 阶段/级别标签映射 ====================
@@ -1469,6 +1486,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             .set(Customer::getContactCount, count.intValue())
             .update();
         refreshCustomerSearchText(customerId);
+        globalSearchIndexService.refreshCustomerIndex(customerId);
     }
 
     /**
@@ -1486,6 +1504,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             .set(Customer::getTagNames, tagNames)
             .update();
         refreshCustomerSearchText(customerId);
+        globalSearchIndexService.refreshCustomerIndex(customerId);
     }
 
     // ==================== AI 智能录入 ====================

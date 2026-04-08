@@ -1,6 +1,12 @@
 import { post, get, upload, download, getToken, getApiBaseUrl } from '@/utils/request'
 import type { PageResult } from '@/types/api'
-import type { Knowledge, KnowledgeQueryBO, KnowledgeAiAnalyzeVO } from '@/types/common'
+import type {
+  Knowledge,
+  KnowledgeQueryBO,
+  KnowledgeAiAnalyzeVO,
+  KnowledgeAiSearchBO,
+  KnowledgeAiSearchVO
+} from '@/types/common'
 
 /**
  * Upload file to knowledge base
@@ -73,6 +79,13 @@ export function getKnowledgeFileBlob(id: string): Promise<Blob> {
  */
 export function aiAnalyzeKnowledge(id: string): Promise<KnowledgeAiAnalyzeVO> {
   return post(`/knowledge/${id}/ai-analyze`)
+}
+
+/**
+ * AI search across knowledge base and return summarized answer with references
+ */
+export function aiSearchKnowledge(query: KnowledgeAiSearchBO): Promise<KnowledgeAiSearchVO> {
+  return post('/knowledge/ai-search', query)
 }
 
 /**

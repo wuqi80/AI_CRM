@@ -20,6 +20,7 @@ import com.kakarote.ai_crm.entity.PO.Task;
 import com.kakarote.ai_crm.entity.VO.TaskAiParseVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
 import com.kakarote.ai_crm.mapper.TaskMapper;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +42,9 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
     @Autowired
     @Lazy
     private DynamicChatClientProvider chatClientProvider;
+
+    @Autowired
+    private IGlobalSearchIndexService globalSearchIndexService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -81,6 +85,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             task.setGeneratedByAi(0);
         }
         save(task);
+        globalSearchIndexService.refreshTaskIndex(task.getTaskId());
         return task.getTaskId();
     }
 
@@ -92,6 +97,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         }
         BeanUtil.copyProperties(taskUpdateBO, task, "taskId", "createUserId", "createTime");
         updateById(task);
+        globalSearchIndexService.refreshTaskIndex(task.getTaskId());
     }
 
     @Override
@@ -101,6 +107,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "任务不存在");
         }
         removeById(taskId);
+        globalSearchIndexService.deleteByEntity("task", taskId);
     }
 
     @Override
@@ -122,6 +129,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             task.setCompletedTime(new Date());
         }
         updateById(task);
+        globalSearchIndexService.refreshTaskIndex(taskId);
     }
 
     @Override

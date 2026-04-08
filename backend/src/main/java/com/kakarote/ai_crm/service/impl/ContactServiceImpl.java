@@ -13,17 +13,15 @@ import com.kakarote.ai_crm.entity.PO.Contact;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.ContactVO;
 import com.kakarote.ai_crm.mapper.ContactMapper;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import com.kakarote.ai_crm.service.IContactService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +37,9 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
     @Autowired
     @Lazy
     private CustomerServiceImpl customerService;
+
+    @Autowired
+    private IGlobalSearchIndexService globalSearchIndexService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -67,6 +68,7 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         }
         // 同步客户冗余字段
         customerService.syncContactCache(contact.getCustomerId());
+        globalSearchIndexService.refreshContactIndex(contact.getContactId());
         return contact.getContactId();
     }
 
@@ -77,6 +79,7 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         if (ObjectUtil.isNull(contact)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "联系人不存在");
         }
+        Long oldCustomerId = contact.getCustomerId();
         BeanUtil.copyProperties(contactUpdateBO, contact, "contactId", "createUserId", "createTime", "customFields");
         updateById(contact);
 
@@ -94,7 +97,11 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
             customFieldService.updateCustomFieldValues("contact", contactUpdateBO.getContactId(), contactUpdateBO.getCustomFields());
         }
         // 同步客户冗余字段
+        if (oldCustomerId != null && !oldCustomerId.equals(contact.getCustomerId())) {
+            customerService.syncContactCache(oldCustomerId);
+        }
         customerService.syncContactCache(contact.getCustomerId());
+        globalSearchIndexService.refreshContactIndex(contact.getContactId());
     }
 
     @Override
@@ -107,6 +114,7 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         removeById(contactId);
         // 同步客户冗余字段
         customerService.syncContactCache(customerId);
+        globalSearchIndexService.deleteByEntity("contact", contactId);
     }
 
     @Override
@@ -148,6 +156,7 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         updateById(contact);
         // 同步客户冗余字段
         customerService.syncContactCache(contact.getCustomerId());
+        globalSearchIndexService.refreshContactIndex(contactId);
     }
 
     @Override

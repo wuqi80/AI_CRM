@@ -9,6 +9,7 @@ import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.CustomerListVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,10 @@ public interface CustomerMapper extends BaseMapper<Customer> {
 
     @InterceptorIgnore(tenantLine = "true", dataPermission = "true")
     Long queryPageListCount(@Param("query") CustomerQueryBO query);
+
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("SELECT * FROM crm_customer WHERE customer_id = #{customerId}")
+    Customer selectByIdIgnoreDataPermission(@Param("customerId") Long customerId);
 
     /**
      * 查询客户详情

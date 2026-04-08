@@ -293,10 +293,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
-import { getMySchedules } from '@/api/schedule'
+import { getMySchedules, queryScheduleList } from '@/api/schedule'
 import { getMyTasks, updateTaskStatus, aiParseTask, deleteTask, updateTask } from '@/api/task'
 import { queryCustomerList } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
@@ -308,6 +309,8 @@ import ScheduleDetailDrawer from './components/ScheduleDetailDrawer.vue'
 import ScheduleFormDialog from './components/ScheduleFormDialog.vue'
 
 const { isMobile } = useResponsive()
+const route = useRoute()
+const router = useRouter()
 
 const lunarFormatter = new Intl.DateTimeFormat('zh-Hans-u-ca-chinese', {
   month: 'short',
@@ -414,7 +417,44 @@ async function loadTasks() {
 
 onMounted(async () => {
   await Promise.all([loadSchedules(), loadTasks()])
+
+  if (typeof route.query.openScheduleId === 'string') {
+    await openScheduleFromRouteQuery(route.query.openScheduleId)
+  }
 })
+
+watch(
+  () => route.query.openScheduleId,
+  (scheduleId) => {
+    if (typeof scheduleId === 'string') {
+      void openScheduleFromRouteQuery(scheduleId)
+    }
+  }
+)
+
+async function openScheduleFromRouteQuery(scheduleId: string) {
+  try {
+    const currentSchedule = schedules.value.find(item => item.scheduleId === scheduleId)
+    if (currentSchedule) {
+      selectedTask.value = null
+      selectedEvent.value = currentSchedule
+      return
+    }
+
+    const result = await queryScheduleList({ scheduleId, page: 1, limit: 1 })
+    const schedule = result.list?.[0]
+    if (schedule) {
+      selectedTask.value = null
+      selectedEvent.value = schedule
+    }
+  } catch (error) {
+    console.error('Load schedule from route failed:', error)
+  } finally {
+    const nextQuery = { ...route.query }
+    delete nextQuery.openScheduleId
+    await router.replace({ path: route.path, query: nextQuery })
+  }
+}
 
 // --- Helpers ---
 

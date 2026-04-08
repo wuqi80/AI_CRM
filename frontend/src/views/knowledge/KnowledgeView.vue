@@ -132,7 +132,7 @@
                 :key="'hot-' + tag"
                 type="button"
                 class="rounded-full bg-slate-50 px-4 py-1.5 text-xs text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-700"
-                @click="queryParams.keyword = tag"
+                @click="handleHotSearch(tag)"
               >
                 {{ tag }}
               </button>
@@ -162,6 +162,16 @@
       <!-- Content Grid -->
       <div class="min-h-0 flex-1 overflow-y-auto p-6 md:p-8">
         <div class="mx-auto max-w-7xl">
+          <KnowledgeSearchResultPanel
+            v-if="showAiSearchResult"
+            :loading="aiSearchLoading"
+            :keyword="queryParams.keyword || ''"
+            :result="aiSearchResult"
+            @back="resetAiSearchView"
+            @open="openDetailById"
+          />
+
+          <template v-else>
           <!-- Section Header -->
           <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div class="flex flex-wrap items-center gap-3">
@@ -482,6 +492,7 @@
               </button>
             </div>
           </div>
+          </template>
         </div>
       </div>
     </div>
@@ -636,14 +647,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useResponsive } from '@/composables/useResponsive'
-import { queryKnowledgeList, uploadKnowledge, deleteKnowledge, downloadKnowledge, reparseKnowledge } from '@/api/knowledge'
+import {
+  queryKnowledgeList,
+  uploadKnowledge,
+  deleteKnowledge,
+  downloadKnowledge,
+  reparseKnowledge,
+  aiSearchKnowledge
+} from '@/api/knowledge'
 import { ElMessage, ElMessageBox, UploadInstance, UploadRequestOptions } from 'element-plus'
-import type { Knowledge, KnowledgeQueryBO, KnowledgeType } from '@/types/common'
+import type { Knowledge, KnowledgeQueryBO, KnowledgeType, KnowledgeAiSearchVO } from '@/types/common'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
+import KnowledgeSearchResultPanel from '@/components/knowledge/KnowledgeSearchResultPanel.vue'
 
 const { isMobile } = useResponsive()
+const route = useRoute()
+const router = useRouter()
 /** 桌面侧栏折叠，仅 UI */
 const sidebarCollapsed = ref(false)
 const hotSearchTags = ['产品知识库', '销售话术', '售后服务', '入职培训', '客户FAQ']
@@ -657,6 +679,8 @@ const showDetailModal = ref(false)
 const selectedKnowledgeId = ref('')
 const knowledgeList = ref<Knowledge[]>([])
 const totalCount = ref(0)
+const aiSearchLoading = ref(false)
+const aiSearchResult = ref<KnowledgeAiSearchVO | null>(null)
 const uploadingFile = ref<File | null>(null)
 const uploadRef = ref<UploadInstance>()
 const selectedCategory = ref('all')
@@ -684,6 +708,7 @@ const uploadForm = reactive({
 })
 
 const totalPages = computed(() => Math.ceil(totalCount.value / (queryParams.limit || 12)))
+const showAiSearchResult = computed(() => aiSearchLoading.value || aiSearchResult.value !== null)
 
 const visiblePages = computed(() => {
   const total = totalPages.value
@@ -696,10 +721,23 @@ const visiblePages = computed(() => {
   return pages
 })
 
-onMounted(() => {
+onMounted(async () => {
   void uploadRef.value
-  fetchList()
+  await fetchList()
+
+  if (typeof route.query.openKnowledgeId === 'string') {
+    await openKnowledgeFromRouteQuery(route.query.openKnowledgeId)
+  }
 })
+
+watch(
+  () => route.query.openKnowledgeId,
+  (knowledgeId) => {
+    if (typeof knowledgeId === 'string') {
+      void openKnowledgeFromRouteQuery(knowledgeId)
+    }
+  }
+)
 
 async function fetchList() {
   loading.value = true
@@ -712,15 +750,42 @@ async function fetchList() {
   }
 }
 
-function handleSearch() {
+async function handleSearch() {
+  const keyword = queryParams.keyword?.trim()
   queryParams.page = 1
-  fetchList()
+
+  if (!keyword) {
+    aiSearchResult.value = null
+    fetchList()
+    return
+  }
+
+  aiSearchLoading.value = true
+  aiSearchResult.value = null
+  try {
+    aiSearchResult.value = await aiSearchKnowledge({
+      keyword,
+      type: queryParams.type,
+      limit: 5
+    })
+  } finally {
+    aiSearchLoading.value = false
+  }
+}
+
+function handleHotSearch(keyword: string) {
+  queryParams.keyword = keyword
+  void handleSearch()
 }
 
 function handleCategoryFilter(categoryId: string) {
   selectedCategory.value = categoryId
   queryParams.type = categoryId === 'all' ? undefined : categoryId as KnowledgeType
   queryParams.page = 1
+  if (showAiSearchResult.value && queryParams.keyword?.trim()) {
+    void handleSearch()
+    return
+  }
   fetchList()
 }
 
@@ -756,7 +821,11 @@ async function handleConfirmUpload() {
     uploadingFile.value = null
     uploadForm.type = 'document'
     uploadForm.summary = ''
-    fetchList()
+    if (showAiSearchResult.value && queryParams.keyword?.trim()) {
+      await handleSearch()
+    } else {
+      fetchList()
+    }
   } finally {
     uploading.value = false
   }
@@ -765,6 +834,22 @@ async function handleConfirmUpload() {
 function openDetail(item: Knowledge) {
   selectedKnowledgeId.value = item.knowledgeId
   showDetailModal.value = true
+}
+
+function openDetailById(knowledgeId: string | number) {
+  selectedKnowledgeId.value = String(knowledgeId)
+  showDetailModal.value = true
+}
+
+async function openKnowledgeFromRouteQuery(knowledgeId: string) {
+  try {
+    selectedKnowledgeId.value = knowledgeId
+    showDetailModal.value = true
+  } finally {
+    const nextQuery = { ...route.query }
+    delete nextQuery.openKnowledgeId
+    await router.replace({ path: route.path, query: nextQuery })
+  }
 }
 
 async function handleDownload(item: Knowledge) {
@@ -779,7 +864,11 @@ async function handleReparse(item: Knowledge) {
   try {
     await reparseKnowledge(item.knowledgeId)
     ElMessage.success('已提交重新解析')
-    fetchList()
+    if (showAiSearchResult.value && queryParams.keyword?.trim()) {
+      await handleSearch()
+    } else {
+      fetchList()
+    }
   } catch {
     // error handled by axios interceptor
   }
@@ -790,10 +879,20 @@ async function handleDelete(item: Knowledge) {
     await ElMessageBox.confirm(`确定要删除「${item.name}」吗？`, '提示', { type: 'warning' })
     await deleteKnowledge(item.knowledgeId)
     ElMessage.success('删除成功')
-    fetchList()
+    if (showAiSearchResult.value && queryParams.keyword?.trim()) {
+      await handleSearch()
+    } else {
+      fetchList()
+    }
   } catch {
     // Cancelled
   }
+}
+
+function resetAiSearchView() {
+  aiSearchLoading.value = false
+  aiSearchResult.value = null
+  fetchList()
 }
 
 function setViewMode(mode: 'card' | 'list') {

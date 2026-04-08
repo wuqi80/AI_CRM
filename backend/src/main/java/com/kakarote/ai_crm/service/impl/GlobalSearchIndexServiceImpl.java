@@ -1,0 +1,706 @@
+package com.kakarote.ai_crm.service.impl;
+
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.common.auth.DataPermissionContext;
+import com.kakarote.ai_crm.common.enums.CustomerStageEnum;
+import com.kakarote.ai_crm.entity.BO.GlobalSearchQueryBO;
+import com.kakarote.ai_crm.entity.PO.Contact;
+import com.kakarote.ai_crm.entity.PO.ContactTag;
+import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.PO.CustomerTag;
+import com.kakarote.ai_crm.entity.PO.GlobalSearchIndex;
+import com.kakarote.ai_crm.entity.PO.Knowledge;
+import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
+import com.kakarote.ai_crm.entity.PO.ManagerUser;
+import com.kakarote.ai_crm.entity.PO.Schedule;
+import com.kakarote.ai_crm.entity.PO.Task;
+import com.kakarote.ai_crm.entity.VO.CustomFieldVO;
+import com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO;
+import com.kakarote.ai_crm.mapper.ContactMapper;
+import com.kakarote.ai_crm.mapper.ContactTagMapper;
+import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.CustomerTagMapper;
+import com.kakarote.ai_crm.mapper.GlobalSearchIndexMapper;
+import com.kakarote.ai_crm.mapper.KnowledgeMapper;
+import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
+import com.kakarote.ai_crm.mapper.ManageUserMapper;
+import com.kakarote.ai_crm.mapper.ScheduleMapper;
+import com.kakarote.ai_crm.mapper.TaskMapper;
+import com.kakarote.ai_crm.service.DataPermissionService;
+import com.kakarote.ai_crm.service.ICustomFieldService;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
+import com.kakarote.ai_crm.service.PermissionService;
+import com.kakarote.ai_crm.utils.UserUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexMapper, GlobalSearchIndex>
+        implements IGlobalSearchIndexService {
+
+    private static final String ENTITY_CUSTOMER = "customer";
+    private static final String ENTITY_CONTACT = "contact";
+    private static final String ENTITY_TASK = "task";
+    private static final String ENTITY_SCHEDULE = "schedule";
+    private static final String ENTITY_KNOWLEDGE = "knowledge";
+
+    private static final Set<String> SEARCHABLE_CUSTOM_FIELD_TYPES = Set.of("text", "textarea", "select", "multiselect");
+    private static final int SUMMARY_LIMIT = 180;
+    private static final int KNOWLEDGE_CONTENT_SEARCH_LIMIT = 10000;
+
+    @Autowired
+    private CustomerMapper customerMapper;
+
+    @Autowired
+    private CustomerTagMapper customerTagMapper;
+
+    @Autowired
+    private ContactMapper contactMapper;
+
+    @Autowired
+    private ContactTagMapper contactTagMapper;
+
+    @Autowired
+    private TaskMapper taskMapper;
+
+    @Autowired
+    private ScheduleMapper scheduleMapper;
+
+    @Autowired
+    private KnowledgeMapper knowledgeMapper;
+
+    @Autowired
+    private KnowledgeTagMapper knowledgeTagMapper;
+
+    @Autowired
+    private ManageUserMapper manageUserMapper;
+
+    @Autowired
+    private ICustomFieldService customFieldService;
+
+    @Autowired
+    private PermissionService permissionService;
+
+    @Autowired
+    private DataPermissionService dataPermissionService;
+
+    @Override
+    public BasePage<GlobalSearchResultVO> queryPageList(GlobalSearchQueryBO queryBO) {
+        queryBO.setTenantId(UserUtil.getTenantId());
+        queryBO.setCurrentUserId(UserUtil.getUserId());
+        queryBO.setKeyword(normalizeSearchText(queryBO.getKeyword()));
+        applyPermissionScope(queryBO);
+
+        if (!hasAnyEnabledModule(queryBO) || isDisabledRequestedEntity(queryBO)) {
+            BasePage<GlobalSearchResultVO> emptyPage = new BasePage<>(queryBO.getPage(), queryBO.getLimit());
+            emptyPage.setTotal(0);
+            emptyPage.setRecords(Collections.emptyList());
+            return emptyPage;
+        }
+
+        BasePage<GlobalSearchResultVO> page = queryBO.parse();
+        page.setSearchCount(false);
+        page.setOptimizeCountSql(false);
+        page.setOptimizeJoinOfCountSql(false);
+
+        Long total = baseMapper.queryPageCount(queryBO);
+        page.setTotal(total == null ? 0L : total);
+        if (page.getTotal() <= 0) {
+            page.setRecords(Collections.emptyList());
+            return page;
+        }
+
+        baseMapper.queryPageList(page, queryBO);
+        return page;
+    }
+
+    @Override
+    public void refreshCustomerIndex(Long customerId) {
+        if (customerId == null) {
+            return;
+        }
+
+        Customer customer = customerMapper.selectByIdIgnoreDataPermission(customerId);
+        if (customer == null || !Objects.equals(customer.getStatus(), 1)) {
+            deleteByEntity(ENTITY_CUSTOMER, customerId);
+            return;
+        }
+
+        Map<Long, String> userNameMap = getUserDisplayNames(collectUserIds(customer.getOwnerId()));
+        List<String> tags = customerTagMapper.getTagsByCustomerId(customerId);
+
+        GlobalSearchIndex index = new GlobalSearchIndex();
+        index.setTenantId(customer.getTenantId());
+        index.setEntityType(ENTITY_CUSTOMER);
+        index.setEntityId(customer.getCustomerId());
+        index.setTitle(customer.getCompanyName());
+        index.setSubtitle(buildSubtitle("客户", firstNonBlank(customer.getIndustry(), getStageLabel(customer.getStage()))));
+        index.setSummary(truncateSummary(firstNonBlank(customer.getRemark(), customer.getPrimaryContactName())));
+        index.setCustomerId(customer.getCustomerId());
+        index.setCustomerName(customer.getCompanyName());
+        index.setOwnerUserId(customer.getOwnerId());
+        index.setRoutePath("/customer/" + customer.getCustomerId());
+        index.setSortTime(firstNonNull(customer.getUpdateTime(), customer.getCreateTime()));
+        index.setSearchText(normalizeSearchText(joinFragments(
+                customer.getSearchText(),
+                customer.getCompanyName(),
+                customer.getIndustry(),
+                getStageLabel(customer.getStage()),
+                getLevelLabel(customer.getLevel()),
+                customer.getSource(),
+                customer.getAddress(),
+                customer.getWebsite(),
+                customer.getPrimaryContactName(),
+                customer.getPrimaryContactPhone(),
+                customer.getPrimaryContactPosition(),
+                userNameMap.get(customer.getOwnerId()),
+                tags,
+                customer.getRemark()
+        )));
+        baseMapper.upsert(fillSearchFallback(index));
+    }
+
+    @Override
+    public void refreshCustomerRelatedIndexes(Long customerId) {
+        if (customerId == null) {
+            return;
+        }
+
+        contactMapper.selectByCustomerIdIgnoreDataPermission(customerId)
+                .forEach(contact -> refreshContactIndex(contact.getContactId()));
+        taskMapper.selectByCustomerIdIgnoreDataPermission(customerId)
+                .forEach(task -> refreshTaskIndex(task.getTaskId()));
+        scheduleMapper.selectByCustomerIdIgnoreDataPermission(customerId)
+                .forEach(schedule -> refreshScheduleIndex(schedule.getScheduleId()));
+        knowledgeMapper.selectByCustomerIdIgnoreDataPermission(customerId)
+                .forEach(knowledge -> refreshKnowledgeIndex(knowledge.getKnowledgeId()));
+    }
+
+    @Override
+    public void refreshContactIndex(Long contactId) {
+        if (contactId == null) {
+            return;
+        }
+
+        Contact contact = contactMapper.selectByIdIgnoreDataPermission(contactId);
+        if (contact == null || !Objects.equals(contact.getStatus(), 1)) {
+            deleteByEntity(ENTITY_CONTACT, contactId);
+            return;
+        }
+
+        Customer customer = customerMapper.selectByIdIgnoreDataPermission(contact.getCustomerId());
+        Map<String, Object> customFields = customFieldService.getCustomFieldValues(ENTITY_CONTACT, contactId);
+        List<String> tags = contactTagMapper.getTagsByContactId(contactId);
+
+        GlobalSearchIndex index = new GlobalSearchIndex();
+        index.setTenantId(contact.getTenantId());
+        index.setEntityType(ENTITY_CONTACT);
+        index.setEntityId(contact.getContactId());
+        index.setTitle(contact.getName());
+        index.setSubtitle(buildSubtitle("联系人", customer != null ? customer.getCompanyName() : null));
+        index.setSummary(truncateSummary(firstNonBlank(contact.getPosition(), contact.getPhone(), contact.getEmail(), contact.getNotes())));
+        index.setCustomerId(contact.getCustomerId());
+        index.setCustomerName(customer != null ? customer.getCompanyName() : null);
+        index.setCustomerOwnerId(customer != null ? customer.getOwnerId() : null);
+        index.setRoutePath(contact.getCustomerId() == null
+                ? "/customer"
+                : "/customer/" + contact.getCustomerId() + "?openContactId=" + contact.getContactId());
+        index.setSortTime(firstNonNull(contact.getUpdateTime(), contact.getLastContactTime(), contact.getCreateTime()));
+        index.setSearchText(normalizeSearchText(joinFragments(
+                contact.getName(),
+                contact.getPosition(),
+                contact.getPhone(),
+                contact.getEmail(),
+                contact.getWechat(),
+                customer != null ? customer.getCompanyName() : null,
+                tags,
+                extractSearchableCustomFieldText(ENTITY_CONTACT, customFields),
+                contact.getNotes()
+        )));
+        baseMapper.upsert(fillSearchFallback(index));
+    }
+
+    @Override
+    public void refreshTaskIndex(Long taskId) {
+        if (taskId == null) {
+            return;
+        }
+
+        Task task = taskMapper.selectByIdIgnoreDataPermission(taskId);
+        if (task == null) {
+            deleteByEntity(ENTITY_TASK, taskId);
+            return;
+        }
+
+        Customer customer = customerMapper.selectByIdIgnoreDataPermission(task.getCustomerId());
+        Map<Long, String> userNameMap = getUserDisplayNames(collectUserIds(task.getAssignedTo(), task.getCreateUserId()));
+
+        GlobalSearchIndex index = new GlobalSearchIndex();
+        index.setTenantId(task.getTenantId());
+        index.setEntityType(ENTITY_TASK);
+        index.setEntityId(task.getTaskId());
+        index.setTitle(task.getTitle());
+        index.setSubtitle(buildSubtitle("任务", customer != null ? customer.getCompanyName() : null));
+        index.setSummary(truncateSummary(firstNonBlank(task.getDescription(), task.getParticipantNames(), task.getTaskType())));
+        index.setCustomerId(task.getCustomerId());
+        index.setCustomerName(customer != null ? customer.getCompanyName() : null);
+        index.setCustomerOwnerId(customer != null ? customer.getOwnerId() : null);
+        index.setAssignedUserId(task.getAssignedTo());
+        index.setRoutePath("/task?openTaskId=" + task.getTaskId());
+        index.setSortTime(firstNonNull(task.getDueDate(), task.getUpdateTime(), task.getCreateTime()));
+        index.setSearchText(normalizeSearchText(joinFragments(
+                task.getTitle(),
+                task.getDescription(),
+                task.getTaskType(),
+                task.getParticipantNames(),
+                getTaskPriorityLabel(task.getPriority()),
+                getTaskStatusLabel(task.getStatus()),
+                customer != null ? customer.getCompanyName() : null,
+                userNameMap.get(task.getAssignedTo()),
+                userNameMap.get(task.getCreateUserId())
+        )));
+        baseMapper.upsert(fillSearchFallback(index));
+    }
+
+    @Override
+    public void refreshScheduleIndex(Long scheduleId) {
+        if (scheduleId == null) {
+            return;
+        }
+
+        Schedule schedule = scheduleMapper.selectByIdIgnoreDataPermission(scheduleId);
+        if (schedule == null) {
+            deleteByEntity(ENTITY_SCHEDULE, scheduleId);
+            return;
+        }
+
+        Customer customer = customerMapper.selectByIdIgnoreDataPermission(schedule.getCustomerId());
+        Contact contact = schedule.getContactId() == null
+                ? null
+                : contactMapper.selectByIdIgnoreDataPermission(schedule.getContactId());
+
+        Set<Long> participantIds = parseParticipantUserIds(schedule.getParticipantUserIds());
+        participantIds.add(schedule.getCreateUserId());
+        Map<Long, String> userNameMap = getUserDisplayNames(participantIds);
+        String participantNames = parseParticipantUserIds(schedule.getParticipantUserIds()).stream()
+                .map(userNameMap::get)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.joining(", "));
+
+        GlobalSearchIndex index = new GlobalSearchIndex();
+        index.setTenantId(schedule.getTenantId());
+        index.setEntityType(ENTITY_SCHEDULE);
+        index.setEntityId(schedule.getScheduleId());
+        index.setTitle(schedule.getTitle());
+        index.setSubtitle(buildSubtitle("日程", customer != null ? customer.getCompanyName() : getScheduleTypeLabel(schedule.getType())));
+        index.setSummary(truncateSummary(firstNonBlank(schedule.getLocation(), schedule.getDescription(), participantNames)));
+        index.setCustomerId(schedule.getCustomerId());
+        index.setCustomerName(customer != null ? customer.getCompanyName() : null);
+        index.setCustomerOwnerId(customer != null ? customer.getOwnerId() : null);
+        index.setCreateUserId(schedule.getCreateUserId());
+        index.setParticipantUserIds(schedule.getParticipantUserIds());
+        index.setRoutePath("/calendar?openScheduleId=" + schedule.getScheduleId());
+        index.setSortTime(firstNonNull(schedule.getStartTime(), schedule.getUpdateTime(), schedule.getCreateTime()));
+        index.setSearchText(normalizeSearchText(joinFragments(
+                schedule.getTitle(),
+                schedule.getDescription(),
+                schedule.getLocation(),
+                getScheduleTypeLabel(schedule.getType()),
+                customer != null ? customer.getCompanyName() : null,
+                contact != null ? contact.getName() : null,
+                participantNames,
+                userNameMap.get(schedule.getCreateUserId())
+        )));
+        baseMapper.upsert(fillSearchFallback(index));
+    }
+
+    @Override
+    public void refreshKnowledgeIndex(Long knowledgeId) {
+        if (knowledgeId == null) {
+            return;
+        }
+
+        Knowledge knowledge = knowledgeMapper.selectByIdIgnoreDataPermission(knowledgeId);
+        if (knowledge == null || Objects.equals(knowledge.getStatus(), 2)) {
+            deleteByEntity(ENTITY_KNOWLEDGE, knowledgeId);
+            return;
+        }
+
+        Customer customer = customerMapper.selectByIdIgnoreDataPermission(knowledge.getCustomerId());
+        Map<Long, String> userNameMap = getUserDisplayNames(collectUserIds(knowledge.getUploadUserId()));
+        List<String> tags = knowledgeTagMapper.getTagsByKnowledgeId(knowledgeId);
+
+        GlobalSearchIndex index = new GlobalSearchIndex();
+        index.setTenantId(knowledge.getTenantId());
+        index.setEntityType(ENTITY_KNOWLEDGE);
+        index.setEntityId(knowledge.getKnowledgeId());
+        index.setTitle(knowledge.getName());
+        index.setSubtitle(buildSubtitle("知识库", customer != null ? customer.getCompanyName() : getKnowledgeTypeLabel(knowledge.getType())));
+        index.setSummary(truncateSummary(firstNonBlank(knowledge.getSummary(), knowledge.getContentText())));
+        index.setCustomerId(knowledge.getCustomerId());
+        index.setCustomerName(customer != null ? customer.getCompanyName() : null);
+        index.setCustomerOwnerId(customer != null ? customer.getOwnerId() : null);
+        index.setUploadUserId(knowledge.getUploadUserId());
+        index.setRoutePath("/knowledge?openKnowledgeId=" + knowledge.getKnowledgeId());
+        index.setSortTime(firstNonNull(knowledge.getUpdateTime(), knowledge.getCreateTime()));
+        index.setSearchText(normalizeSearchText(joinFragments(
+                knowledge.getName(),
+                getKnowledgeTypeLabel(knowledge.getType()),
+                customer != null ? customer.getCompanyName() : null,
+                userNameMap.get(knowledge.getUploadUserId()),
+                tags,
+                knowledge.getSummary(),
+                truncateText(knowledge.getContentText(), KNOWLEDGE_CONTENT_SEARCH_LIMIT)
+        )));
+        baseMapper.upsert(fillSearchFallback(index));
+    }
+
+    @Override
+    public void deleteByEntity(String entityType, Long entityId) {
+        if (StrUtil.isBlank(entityType) || entityId == null || UserUtil.getTenantId() == null) {
+            return;
+        }
+        baseMapper.deleteByEntity(UserUtil.getTenantId(), entityType, entityId);
+    }
+
+    @Override
+    public void deleteContactIndexesByCustomerId(Long customerId) {
+        if (customerId == null || UserUtil.getTenantId() == null) {
+            return;
+        }
+        baseMapper.deleteByCustomerIdAndEntityType(UserUtil.getTenantId(), customerId, ENTITY_CONTACT);
+    }
+
+    private void applyPermissionScope(GlobalSearchQueryBO queryBO) {
+        applyScopedModule(queryBO, ENTITY_CUSTOMER, "customer:view");
+        applyScopedModule(queryBO, ENTITY_CONTACT, "contact:view");
+        applyScopedModule(queryBO, ENTITY_TASK, "task:view");
+        applyScheduleScope(queryBO);
+        applyScopedModule(queryBO, ENTITY_KNOWLEDGE, "knowledge:view");
+    }
+
+    private void applyScopedModule(GlobalSearchQueryBO queryBO, String module, String permission) {
+        boolean enabled = permissionService.hasPermission(permission);
+        DataPermissionContext context = enabled ? dataPermissionService.createContext(module) : DataPermissionContext.none();
+        boolean allData = enabled && context.isAllData();
+        List<Long> userIds = enabled && context.getUserIds() != null ? context.getUserIds() : Collections.emptyList();
+
+        switch (module) {
+            case ENTITY_CUSTOMER -> {
+                queryBO.setCustomerEnabled(enabled);
+                queryBO.setCustomerAllData(allData);
+                queryBO.setCustomerUserIds(userIds);
+            }
+            case ENTITY_CONTACT -> {
+                queryBO.setContactEnabled(enabled);
+                queryBO.setContactAllData(allData);
+                queryBO.setContactUserIds(userIds);
+            }
+            case ENTITY_TASK -> {
+                queryBO.setTaskEnabled(enabled);
+                queryBO.setTaskAllData(allData);
+                queryBO.setTaskUserIds(userIds);
+            }
+            case ENTITY_KNOWLEDGE -> {
+                queryBO.setKnowledgeEnabled(enabled);
+                queryBO.setKnowledgeAllData(allData);
+                queryBO.setKnowledgeUserIds(userIds);
+            }
+            default -> {
+            }
+        }
+    }
+
+    private void applyScheduleScope(GlobalSearchQueryBO queryBO) {
+        queryBO.setScheduleEnabled(permissionService.hasPermission("schedule:view"));
+    }
+
+    private boolean hasAnyEnabledModule(GlobalSearchQueryBO queryBO) {
+        return Boolean.TRUE.equals(queryBO.getCustomerEnabled())
+                || Boolean.TRUE.equals(queryBO.getContactEnabled())
+                || Boolean.TRUE.equals(queryBO.getTaskEnabled())
+                || Boolean.TRUE.equals(queryBO.getScheduleEnabled())
+                || Boolean.TRUE.equals(queryBO.getKnowledgeEnabled());
+    }
+
+    private boolean isDisabledRequestedEntity(GlobalSearchQueryBO queryBO) {
+        if (StrUtil.isBlank(queryBO.getEntityType())) {
+            return false;
+        }
+        return switch (queryBO.getEntityType()) {
+            case ENTITY_CUSTOMER -> !Boolean.TRUE.equals(queryBO.getCustomerEnabled());
+            case ENTITY_CONTACT -> !Boolean.TRUE.equals(queryBO.getContactEnabled());
+            case ENTITY_TASK -> !Boolean.TRUE.equals(queryBO.getTaskEnabled());
+            case ENTITY_SCHEDULE -> !Boolean.TRUE.equals(queryBO.getScheduleEnabled());
+            case ENTITY_KNOWLEDGE -> !Boolean.TRUE.equals(queryBO.getKnowledgeEnabled());
+            default -> true;
+        };
+    }
+
+    private Map<Long, String> getUserDisplayNames(Collection<Long> userIds) {
+        Set<Long> ids = userIds == null
+                ? Collections.emptySet()
+                : userIds.stream().filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new));
+        if (ids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return manageUserMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(
+                        ManagerUser::getUserId,
+                        this::getUserDisplayName,
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
+    }
+
+    private Set<Long> collectUserIds(Long... userIds) {
+        Set<Long> result = new LinkedHashSet<>();
+        if (userIds == null) {
+            return result;
+        }
+        for (Long userId : userIds) {
+            if (userId != null) {
+                result.add(userId);
+            }
+        }
+        return result;
+    }
+
+    private String getUserDisplayName(ManagerUser user) {
+        if (user == null) {
+            return null;
+        }
+        return firstNonBlank(user.getRealname(), user.getUsername());
+    }
+
+    private String extractSearchableCustomFieldText(String entityType, Map<String, Object> customFields) {
+        if (customFields == null || customFields.isEmpty()) {
+            return null;
+        }
+
+        Set<String> searchableFieldNames = customFieldService.getEnabledFieldsByEntity(entityType).stream()
+                .filter(field -> Boolean.TRUE.equals(field.getIsSearchable()))
+                .filter(field -> SEARCHABLE_CUSTOM_FIELD_TYPES.contains(StrUtil.blankToDefault(field.getFieldType(), "").toLowerCase(Locale.ROOT)))
+                .map(CustomFieldVO::getFieldName)
+                .collect(Collectors.toSet());
+
+        if (searchableFieldNames.isEmpty()) {
+            return null;
+        }
+
+        List<String> fragments = new ArrayList<>();
+        for (Map.Entry<String, Object> entry : customFields.entrySet()) {
+            if (!searchableFieldNames.contains(entry.getKey())) {
+                continue;
+            }
+            appendFragment(fragments, entry.getValue());
+        }
+        return joinFragments(fragments);
+    }
+
+    private Set<Long> parseParticipantUserIds(String participantUserIds) {
+        if (StrUtil.isBlank(participantUserIds)) {
+            return new LinkedHashSet<>();
+        }
+
+        Set<Long> result = new LinkedHashSet<>();
+        for (String part : participantUserIds.split(",")) {
+            String value = StrUtil.trim(part);
+            if (StrUtil.isBlank(value)) {
+                continue;
+            }
+            try {
+                result.add(Long.parseLong(value));
+            } catch (NumberFormatException exception) {
+                log.warn("Ignore invalid participant_user_ids value: {}", value);
+            }
+        }
+        return result;
+    }
+
+    private GlobalSearchIndex fillSearchFallback(GlobalSearchIndex index) {
+        index.setSearchText(firstNonBlank(index.getSearchText(), normalizeSearchText(joinFragments(index.getTitle(), index.getSubtitle(), index.getSummary()))));
+        index.setSortTime(firstNonNull(index.getSortTime(), new Date()));
+        return index;
+    }
+
+    private String buildSubtitle(String entityLabel, String context) {
+        return StrUtil.isBlank(context) ? entityLabel : entityLabel + " • " + context;
+    }
+
+    private String getStageLabel(String stage) {
+        return CustomerStageEnum.getNameByCode(stage);
+    }
+
+    private String getLevelLabel(String level) {
+        if (StrUtil.isBlank(level)) {
+            return null;
+        }
+        return switch (level.toUpperCase(Locale.ROOT)) {
+            case "A" -> "A级客户";
+            case "B" -> "B级客户";
+            case "C" -> "C级客户";
+            default -> level;
+        };
+    }
+
+    private String getTaskPriorityLabel(String priority) {
+        if (StrUtil.isBlank(priority)) {
+            return null;
+        }
+        return switch (priority.toLowerCase(Locale.ROOT)) {
+            case "high" -> "高优先级";
+            case "medium" -> "中优先级";
+            case "low" -> "低优先级";
+            default -> priority;
+        };
+    }
+
+    private String getTaskStatusLabel(String status) {
+        if (StrUtil.isBlank(status)) {
+            return null;
+        }
+        return switch (status.toLowerCase(Locale.ROOT)) {
+            case "pending" -> "待处理";
+            case "in_progress" -> "进行中";
+            case "completed" -> "已完成";
+            case "cancelled" -> "已取消";
+            default -> status;
+        };
+    }
+
+    private String getScheduleTypeLabel(String type) {
+        if (StrUtil.isBlank(type)) {
+            return null;
+        }
+        return switch (type.toLowerCase(Locale.ROOT)) {
+            case "meeting" -> "会议";
+            case "call" -> "电话";
+            case "visit" -> "拜访";
+            case "other" -> "其他";
+            default -> type;
+        };
+    }
+
+    private String getKnowledgeTypeLabel(String type) {
+        if (StrUtil.isBlank(type)) {
+            return null;
+        }
+        return switch (type.toLowerCase(Locale.ROOT)) {
+            case "meeting" -> "会议记录";
+            case "email" -> "邮件";
+            case "recording" -> "录音";
+            case "document" -> "文档";
+            case "proposal" -> "方案";
+            case "contract" -> "合同";
+            default -> type;
+        };
+    }
+
+    private String joinFragments(Object... values) {
+        List<String> fragments = new ArrayList<>();
+        if (values != null) {
+            for (Object value : values) {
+                appendFragment(fragments, value);
+            }
+        }
+        return String.join(" ", fragments);
+    }
+
+    private void appendFragment(List<String> fragments, Object value) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof Collection<?> collection) {
+            collection.forEach(item -> appendFragment(fragments, item));
+            return;
+        }
+        if (value instanceof Map<?, ?> map) {
+            map.values().forEach(item -> appendFragment(fragments, item));
+            return;
+        }
+
+        String text = StrUtil.trim(String.valueOf(value));
+        if (StrUtil.isBlank(text) || "null".equalsIgnoreCase(text)) {
+            return;
+        }
+        fragments.add(text);
+    }
+
+    private String normalizeSearchText(String text) {
+        if (StrUtil.isBlank(text)) {
+            return null;
+        }
+        String normalized = text.toLowerCase(Locale.ROOT)
+                .replace('，', ' ')
+                .replace('。', ' ')
+                .replace('；', ' ')
+                .replace('：', ' ')
+                .replace('、', ' ')
+                .replace('（', ' ')
+                .replace('）', ' ')
+                .replace('【', ' ')
+                .replace('】', ' ');
+        normalized = normalized.replaceAll("[\\s\\p{Punct}]+", " ").trim();
+        return StrUtil.emptyToNull(normalized);
+    }
+
+    private String truncateSummary(String text) {
+        String normalized = StrUtil.trim(text);
+        if (StrUtil.isBlank(normalized)) {
+            return null;
+        }
+        return truncateText(normalized, SUMMARY_LIMIT);
+    }
+
+    private String truncateText(String text, int maxLength) {
+        if (StrUtil.isBlank(text) || maxLength <= 0 || text.length() <= maxLength) {
+            return text;
+        }
+        return text.substring(0, maxLength);
+    }
+
+    @SafeVarargs
+    private final <T> T firstNonNull(T... values) {
+        if (values == null) {
+            return null;
+        }
+        for (T value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value)) {
+                return StrUtil.trim(value);
+            }
+        }
+        return null;
+    }
+}

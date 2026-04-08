@@ -292,7 +292,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useTaskStore } from '@/stores/task'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -304,6 +305,8 @@ import TaskDetailDrawer from './components/TaskDetailDrawer.vue'
 import TaskEditDialog from './components/TaskEditDialog.vue'
 
 const taskStore = useTaskStore()
+const route = useRoute()
+const router = useRouter()
 const { isMobile } = useResponsive()
 
 const currentStatus = ref('all')
@@ -416,13 +419,61 @@ const showTaskDetail = computed({
 })
 
 onMounted(() => {
-  taskStore.fetchTaskList(true)
+  void initializeTaskList()
 })
+
+watch(
+  () => route.query.openTaskId,
+  (openTaskId, previousTaskId) => {
+    if (typeof openTaskId !== 'string' || !openTaskId || openTaskId === previousTaskId) return
+    void openTaskFromRouteQuery(openTaskId)
+  }
+)
+
+async function initializeTaskList() {
+  await taskStore.fetchTaskList(true)
+  const openTaskId = typeof route.query.openTaskId === 'string' ? route.query.openTaskId : ''
+  if (openTaskId) {
+    await openTaskFromRouteQuery(openTaskId)
+  }
+}
+
+async function openTaskFromRouteQuery(taskId: string) {
+  const previousQuery = { ...taskStore.queryParams }
+
+  Object.assign(taskStore.queryParams, {
+    ...previousQuery,
+    taskId,
+    page: 1,
+    limit: 1
+  })
+  await taskStore.fetchTaskList(false)
+
+  const matchedTask = taskStore.taskList.find(task => task.taskId === taskId) || null
+  if (matchedTask) {
+    selectedTask.value = matchedTask
+  }
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.openTaskId
+  await router.replace({ path: route.path, query: nextQuery })
+
+  Object.assign(taskStore.queryParams, {
+    ...previousQuery,
+    taskId: undefined
+  })
+  await taskStore.fetchTaskList(false)
+
+  if (matchedTask) {
+    selectedTask.value = taskStore.taskList.find(task => task.taskId === taskId) || matchedTask
+  }
+}
 
 
 
 function handleStatusFilter(status: string) {
   currentStatus.value = status
+  taskStore.queryParams.taskId = undefined
   taskStore.queryParams.status = status === 'all' ? undefined : status as TaskStatus
   taskStore.queryParams.page = 1
   taskStore.fetchTaskList(false)
@@ -430,6 +481,7 @@ function handleStatusFilter(status: string) {
 
 function handlePageChange(page: number) {
   if (taskStore.queryParams.page === page) return
+  taskStore.queryParams.taskId = undefined
   taskStore.queryParams.page = page
   taskStore.fetchTaskList(false)
 }

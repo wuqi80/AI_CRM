@@ -16,21 +16,26 @@ import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
+import com.kakarote.ai_crm.entity.BO.KnowledgeAiSearchBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
+import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
+import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.tika.Tika;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -46,12 +51,18 @@ import reactor.core.publisher.Flux;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 知识库服务实现
@@ -59,6 +70,11 @@ import java.util.List;
 @Slf4j
 @Service
 public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge> implements IKnowledgeService {
+
+    private static final int MAX_SEARCHABLE_CONTENT_LENGTH = 20_000;
+    private static final int DEFAULT_AI_SEARCH_LIMIT = 5;
+    private static final int MAX_AI_SEARCH_LIMIT = 8;
+    private static final int MAX_AI_SEARCH_CONTEXT_LENGTH = 1_200;
 
     @Value("${file.upload-path:./uploads}")
     private String uploadPath;
@@ -83,7 +99,11 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     @Autowired
     private DynamicChatClientProvider chatClientProvider;
 
+    @Autowired
+    private IGlobalSearchIndexService globalSearchIndexService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Tika tika = new Tika();
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -111,6 +131,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         knowledge.setFileSize(file.getSize());
         knowledge.setMimeType(file.getContentType());
         knowledge.setSummary(summary);
+        knowledge.setContentText(extractSearchableContent(file));
         knowledge.setUploadUserId(UserUtil.getUserId());
 
         // 检查文件类型是否被 WeKnora 支持
@@ -128,6 +149,8 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         if (weKnoraClient.isEnabled() && weKnoraSupported) {
             self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), relativePath, file.getOriginalFilename(), UserUtil.getTenantId());
         }
+
+        globalSearchIndexService.refreshKnowledgeIndex(knowledge.getKnowledgeId());
 
         return knowledge.getKnowledgeId();
     }
@@ -229,6 +252,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         knowledgeTagMapper.delete(
             new LambdaQueryWrapper<KnowledgeTag>().eq(KnowledgeTag::getKnowledgeId, knowledgeId)
         );
+        globalSearchIndexService.deleteByEntity("knowledge", knowledgeId);
     }
 
     @Override
@@ -250,6 +274,35 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     /**
      * 轮询 WeKnora 解析状态，直到完成或失败
      */
+    @Override
+    public KnowledgeAiSearchVO aiSearch(KnowledgeAiSearchBO searchBO) {
+        long startAt = System.currentTimeMillis();
+        String keyword = searchBO != null ? StrUtil.trim(searchBO.getKeyword()) : null;
+        if (StrUtil.isBlank(keyword)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "搜索内容不能为空");
+        }
+
+        String type = searchBO != null ? StrUtil.trim(searchBO.getType()) : null;
+        int limit = DEFAULT_AI_SEARCH_LIMIT;
+        if (searchBO != null && searchBO.getLimit() != null && searchBO.getLimit() > 0) {
+            limit = Math.min(searchBO.getLimit(), MAX_AI_SEARCH_LIMIT);
+        }
+
+        List<KnowledgeAiSearchVO.ReferenceItem> references = buildSemanticReferences(keyword, type, limit);
+        if (references.isEmpty()) {
+            references = buildLocalReferences(keyword, type, limit);
+        }
+
+        KnowledgeAiSearchVO result = new KnowledgeAiSearchVO();
+        result.setKeyword(keyword);
+        result.setReferences(references);
+        result.setTotalHits(references.size());
+        result.setMatchPercent(calculateOverallMatchPercent(references));
+        result.setAnswer(buildAiSearchAnswer(keyword, references));
+        result.setTookMs(System.currentTimeMillis() - startAt);
+        return result;
+    }
+
     private void pollWeKnoraParseStatus(Long knowledgeId, String weKnoraKnowledgeId, String tenantApiKey) {
         int maxAttempts = 60;
         long intervalMs = 20000; // 20秒
@@ -318,7 +371,9 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         // 重置状态
         knowledge.setWeKnoraParseStatus("pending");
         knowledge.setWeKnoraKnowledgeId(null);
+        knowledge.setContentText(extractSearchableContent(knowledge.getFilePath(), knowledge.getMimeType(), knowledge.getName()));
         updateById(knowledge);
+        globalSearchIndexService.refreshKnowledgeIndex(knowledgeId);
 
         // 重新异步上传（含轮询）
 self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), knowledge.getName(), UserUtil.getTenantId());
@@ -345,6 +400,7 @@ self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), k
         tag.setKnowledgeId(knowledgeId);
         tag.setTagName(tagName);
         knowledgeTagMapper.insert(tag);
+        globalSearchIndexService.refreshKnowledgeIndex(knowledgeId);
     }
 
     // ==================== AI 文档分析 ====================
@@ -530,5 +586,372 @@ self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), k
                     log.error("文档问答错误: {}", error.getMessage(), error);
                     AiContextHolder.clear();
                 });
+    }
+
+    private List<KnowledgeAiSearchVO.ReferenceItem> buildSemanticReferences(String keyword, String type, int limit) {
+        if (!weKnoraClient.isEnabled()) {
+            return List.of();
+        }
+
+        Long tenantId = UserUtil.getTenantId();
+        if (tenantId == null) {
+            return List.of();
+        }
+
+        try {
+            WeKnoraClient.TenantWeKnoraContext ctx = weKnoraClient.getOrCreateTenantContext(tenantId);
+            List<WeKnoraChunk> chunks = weKnoraClient.searchKnowledge(keyword, ctx.getKnowledgeBaseId(), ctx.getApiKey());
+            if (chunks.isEmpty()) {
+                return List.of();
+            }
+
+            Set<String> weKnoraIds = new LinkedHashSet<>();
+            for (WeKnoraChunk chunk : chunks) {
+                if (StrUtil.isNotBlank(chunk.getKnowledgeId())) {
+                    weKnoraIds.add(chunk.getKnowledgeId());
+                }
+            }
+            if (weKnoraIds.isEmpty()) {
+                return List.of();
+            }
+
+            LambdaQueryWrapper<Knowledge> wrapper = new LambdaQueryWrapper<Knowledge>()
+                .in(Knowledge::getWeKnoraKnowledgeId, weKnoraIds)
+                .ne(Knowledge::getStatus, 2);
+            if (StrUtil.isNotBlank(type)) {
+                wrapper.eq(Knowledge::getType, type);
+            }
+
+            List<Knowledge> localKnowledges = list(wrapper);
+            if (localKnowledges.isEmpty()) {
+                return List.of();
+            }
+
+            Map<String, Knowledge> knowledgeByWeKnoraId = new LinkedHashMap<>();
+            for (Knowledge knowledge : localKnowledges) {
+                if (StrUtil.isNotBlank(knowledge.getWeKnoraKnowledgeId())) {
+                    knowledgeByWeKnoraId.put(knowledge.getWeKnoraKnowledgeId(), knowledge);
+                }
+            }
+
+            Map<Long, String> customerNameMap = loadCustomerNameMap(localKnowledges);
+            LinkedHashMap<Long, KnowledgeAiSearchVO.ReferenceItem> deduped = new LinkedHashMap<>();
+            for (WeKnoraChunk chunk : chunks) {
+                Knowledge knowledge = knowledgeByWeKnoraId.get(chunk.getKnowledgeId());
+                if (knowledge == null) {
+                    continue;
+                }
+
+                KnowledgeAiSearchVO.ReferenceItem item = deduped.computeIfAbsent(
+                    knowledge.getKnowledgeId(),
+                    ignored -> toReferenceItem(knowledge, customerNameMap.get(knowledge.getCustomerId()))
+                );
+                item.setMatchPercent(Math.max(item.getMatchPercent(), toMatchPercent(chunk.getScore())));
+                if (StrUtil.isBlank(item.getExcerpt())) {
+                    item.setExcerpt(extractSnippet(chunk.getContent(), keyword));
+                }
+            }
+
+            return deduped.values().stream()
+                .sorted(Comparator.comparingInt(KnowledgeAiSearchVO.ReferenceItem::getMatchPercent).reversed()
+                    .thenComparing(KnowledgeAiSearchVO.ReferenceItem::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(limit)
+                .toList();
+        } catch (Exception e) {
+            log.warn("知识库语义检索失败，回退到本地内容搜索: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<KnowledgeAiSearchVO.ReferenceItem> buildLocalReferences(String keyword, String type, int limit) {
+        KnowledgeQueryBO queryBO = new KnowledgeQueryBO();
+        queryBO.setKeyword(keyword);
+        queryBO.setType(type);
+        queryBO.setPage(1);
+        queryBO.setLimit(limit);
+
+        BasePage<KnowledgeVO> page = queryPageList(queryBO);
+        List<KnowledgeAiSearchVO.ReferenceItem> references = new ArrayList<>();
+        for (KnowledgeVO knowledge : page.getList()) {
+            KnowledgeAiSearchVO.ReferenceItem item = new KnowledgeAiSearchVO.ReferenceItem();
+            item.setKnowledgeId(knowledge.getKnowledgeId());
+            item.setName(knowledge.getName());
+            item.setType(knowledge.getType());
+            item.setCustomerName(knowledge.getCustomerName());
+            item.setSummary(knowledge.getSummary());
+            item.setExcerpt(extractSnippet(knowledge.getContentText(), keyword));
+            item.setMatchPercent(calculateLocalMatchPercent(keyword, knowledge));
+            item.setFileSize(knowledge.getFileSize());
+            item.setCreateTime(knowledge.getCreateTime());
+            references.add(item);
+        }
+        return references;
+    }
+
+    private String buildAiSearchAnswer(String keyword, List<KnowledgeAiSearchVO.ReferenceItem> references) {
+        if (references.isEmpty()) {
+            return "### 未找到相关内容\n\n当前知识库里还没有与“" + keyword + "”直接相关的资料，可以换个关键词再试试。";
+        }
+
+        String fallback = buildFallbackAiAnswer(keyword, references);
+        if (!chatClientProvider.isApiKeyConfigured()) {
+            return fallback;
+        }
+
+        StringBuilder contextBuilder = new StringBuilder();
+        for (int i = 0; i < references.size(); i++) {
+            KnowledgeAiSearchVO.ReferenceItem item = references.get(i);
+            contextBuilder.append("资料").append(i + 1).append("：").append(item.getName()).append("\n");
+            if (StrUtil.isNotBlank(item.getSummary())) {
+                contextBuilder.append("摘要：").append(item.getSummary()).append("\n");
+            }
+            if (StrUtil.isNotBlank(item.getExcerpt())) {
+                contextBuilder.append("命中片段：").append(item.getExcerpt()).append("\n");
+            }
+            contextBuilder.append("\n");
+        }
+
+        String prompt = """
+            你是企业知识库搜索助手。请基于以下检索到的资料，用中文输出一段简洁、专业、可直接展示给业务用户的答案。
+
+            要求：
+            1. 只基于提供的资料回答，不要编造。
+            2. 输出使用 Markdown。
+            3. 先给结论，再分点列出关键依据。
+            4. 如果资料不足以得出确定结论，要明确说明信息不足。
+            5. 不要输出“根据资料1/资料2”这类生硬措辞，改成自然表达。
+
+            用户问题：
+            %s
+
+            检索资料：
+            %s
+            """.formatted(keyword, contextBuilder);
+
+        try {
+            String answer = chatClientProvider.getChatClient()
+                .prompt()
+                .user(prompt)
+                .call()
+                .content();
+            return StrUtil.isNotBlank(answer) ? answer.trim() : fallback;
+        } catch (Exception e) {
+            log.warn("生成知识库 AI 检索答案失败，使用兜底摘要: {}", e.getMessage());
+            return fallback;
+        }
+    }
+
+    private String buildFallbackAiAnswer(String keyword, List<KnowledgeAiSearchVO.ReferenceItem> references) {
+        StringBuilder answer = new StringBuilder();
+        answer.append("### “").append(keyword).append("”相关知识解答\n\n");
+        KnowledgeAiSearchVO.ReferenceItem top = references.getFirst();
+        if (StrUtil.isNotBlank(top.getSummary())) {
+            answer.append(top.getSummary()).append("\n\n");
+        } else if (StrUtil.isNotBlank(top.getExcerpt())) {
+            answer.append(top.getExcerpt()).append("\n\n");
+        } else {
+            answer.append("已找到与该主题相关的知识资料，建议优先查看下方参考文档。\n\n");
+        }
+
+        answer.append("#### 关键信息\n");
+        for (KnowledgeAiSearchVO.ReferenceItem item : references.stream().limit(3).toList()) {
+            answer.append("- **").append(item.getName()).append("**");
+            if (StrUtil.isNotBlank(item.getExcerpt())) {
+                answer.append("：").append(item.getExcerpt());
+            } else if (StrUtil.isNotBlank(item.getSummary())) {
+                answer.append("：").append(item.getSummary());
+            }
+            answer.append("\n");
+        }
+        return answer.toString().trim();
+    }
+
+    private Map<Long, String> loadCustomerNameMap(List<Knowledge> knowledges) {
+        Set<Long> customerIds = new LinkedHashSet<>();
+        for (Knowledge knowledge : knowledges) {
+            if (knowledge.getCustomerId() != null) {
+                customerIds.add(knowledge.getCustomerId());
+            }
+        }
+        if (customerIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Customer> customers = customerMapper.selectBatchIds(customerIds);
+        Map<Long, String> customerNameMap = new LinkedHashMap<>();
+        for (Customer customer : customers) {
+            customerNameMap.put(customer.getCustomerId(), customer.getCompanyName());
+        }
+        return customerNameMap;
+    }
+
+    private KnowledgeAiSearchVO.ReferenceItem toReferenceItem(Knowledge knowledge, String customerName) {
+        KnowledgeAiSearchVO.ReferenceItem item = new KnowledgeAiSearchVO.ReferenceItem();
+        item.setKnowledgeId(knowledge.getKnowledgeId());
+        item.setName(knowledge.getName());
+        item.setType(knowledge.getType());
+        item.setCustomerName(customerName);
+        item.setSummary(knowledge.getSummary());
+        item.setExcerpt(extractSnippet(knowledge.getContentText(), null));
+        item.setMatchPercent(0);
+        item.setFileSize(knowledge.getFileSize());
+        item.setCreateTime(knowledge.getCreateTime());
+        return item;
+    }
+
+    private int calculateOverallMatchPercent(List<KnowledgeAiSearchVO.ReferenceItem> references) {
+        if (references.isEmpty()) {
+            return 0;
+        }
+        return references.stream()
+            .map(KnowledgeAiSearchVO.ReferenceItem::getMatchPercent)
+            .max(Integer::compareTo)
+            .orElse(0);
+    }
+
+    private int calculateLocalMatchPercent(String keyword, KnowledgeVO knowledge) {
+        int score = 55;
+        if (StrUtil.containsIgnoreCase(StrUtil.blankToDefault(knowledge.getName(), ""), keyword)) {
+            score += 20;
+        }
+        if (StrUtil.containsIgnoreCase(StrUtil.blankToDefault(knowledge.getSummary(), ""), keyword)) {
+            score += 12;
+        }
+        if (StrUtil.containsIgnoreCase(StrUtil.blankToDefault(knowledge.getContentText(), ""), keyword)) {
+            score += 18;
+        }
+        return Math.min(score, 98);
+    }
+
+    private int toMatchPercent(Double score) {
+        if (score == null) {
+            return 86;
+        }
+        if (score <= 1) {
+            return Math.max(1, Math.min(99, (int) Math.round(score * 100)));
+        }
+        return Math.max(1, Math.min(99, (int) Math.round(score)));
+    }
+
+    private String extractSnippet(String content, String keyword) {
+        String normalized = normalizeSearchableContent(content);
+        if (StrUtil.isBlank(normalized)) {
+            return "";
+        }
+        if (keyword != null) {
+            int index = normalized.toLowerCase().indexOf(keyword.toLowerCase());
+            if (index >= 0) {
+                int start = Math.max(0, index - 60);
+                int end = Math.min(normalized.length(), index + keyword.length() + 120);
+                String snippet = normalized.substring(start, end).trim();
+                if (start > 0) {
+                    snippet = "..." + snippet;
+                }
+                if (end < normalized.length()) {
+                    snippet = snippet + "...";
+                }
+                return snippet;
+            }
+        }
+        return normalized.length() > MAX_AI_SEARCH_CONTEXT_LENGTH
+            ? normalized.substring(0, MAX_AI_SEARCH_CONTEXT_LENGTH) + "..."
+            : normalized;
+    }
+
+    private String extractSearchableContent(MultipartFile file) {
+        if (file == null) {
+            return null;
+        }
+        try (InputStream inputStream = file.getInputStream()) {
+            return extractSearchableContent(inputStream, file.getContentType(), file.getOriginalFilename());
+        } catch (Exception e) {
+            log.warn("提取知识库文件正文失败: {}", file.getOriginalFilename(), e);
+            return null;
+        }
+    }
+
+    private String extractSearchableContent(String filePath, String mimeType, String fileName) {
+        if (StrUtil.isBlank(filePath)) {
+            return null;
+        }
+        try (InputStream inputStream = fileStorageService.getFileStream(filePath)) {
+            return extractSearchableContent(inputStream, mimeType, fileName);
+        } catch (Exception e) {
+            log.warn("提取知识库文件正文失败: {}", fileName, e);
+            return null;
+        }
+    }
+
+    private String extractSearchableContent(InputStream inputStream, String mimeType, String fileName) throws Exception {
+        if (inputStream == null) {
+            return null;
+        }
+
+        String text;
+        if (isPlainTextFile(mimeType, fileName)) {
+            byte[] bytes = inputStream.readNBytes(MAX_SEARCHABLE_CONTENT_LENGTH * 3);
+            text = new String(bytes, StandardCharsets.UTF_8);
+        } else if (isDocumentFile(mimeType, fileName)) {
+            text = tika.parseToString(inputStream);
+        } else {
+            return null;
+        }
+
+        return normalizeSearchableContent(text);
+    }
+
+    private String normalizeSearchableContent(String text) {
+        if (StrUtil.isBlank(text)) {
+            return null;
+        }
+        String normalized = text.replaceAll("\\s+", " ").trim();
+        if (normalized.length() > MAX_SEARCHABLE_CONTENT_LENGTH) {
+            normalized = normalized.substring(0, MAX_SEARCHABLE_CONTENT_LENGTH);
+        }
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private boolean isPlainTextFile(String mimeType, String fileName) {
+        if (mimeType != null && (mimeType.startsWith("text/") || "application/json".equals(mimeType))) {
+            return true;
+        }
+        if (fileName == null) {
+            return false;
+        }
+        String lower = fileName.toLowerCase();
+        return lower.endsWith(".txt")
+            || lower.endsWith(".md")
+            || lower.endsWith(".markdown")
+            || lower.endsWith(".csv")
+            || lower.endsWith(".json")
+            || lower.endsWith(".xml")
+            || lower.endsWith(".yaml")
+            || lower.endsWith(".yml")
+            || lower.endsWith(".log");
+    }
+
+    private boolean isDocumentFile(String mimeType, String fileName) {
+        if (mimeType != null) {
+            if ("application/pdf".equals(mimeType)
+                || "application/msword".equals(mimeType)
+                || "application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(mimeType)
+                || "application/vnd.ms-excel".equals(mimeType)
+                || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".equals(mimeType)
+                || "application/vnd.ms-powerpoint".equals(mimeType)
+                || "application/vnd.openxmlformats-officedocument.presentationml.presentation".equals(mimeType)) {
+                return true;
+            }
+        }
+        if (fileName == null) {
+            return false;
+        }
+        String lower = fileName.toLowerCase();
+        return lower.endsWith(".pdf")
+            || lower.endsWith(".doc")
+            || lower.endsWith(".docx")
+            || lower.endsWith(".xls")
+            || lower.endsWith(".xlsx")
+            || lower.endsWith(".ppt")
+            || lower.endsWith(".pptx");
     }
 }

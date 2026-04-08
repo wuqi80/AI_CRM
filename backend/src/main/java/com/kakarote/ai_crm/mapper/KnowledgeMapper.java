@@ -11,6 +11,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.util.List;
+
 /**
  * 知识库Mapper
  */
@@ -30,6 +32,10 @@ public interface KnowledgeMapper extends BaseMapper<Knowledge> {
     @InterceptorIgnore(dataPermission = "true")
     @Select("SELECT * FROM crm_knowledge WHERE knowledge_id = #{knowledgeId}")
     Knowledge selectByIdIgnoreDataPermission(@Param("knowledgeId") Long knowledgeId);
+
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("SELECT * FROM crm_knowledge WHERE customer_id = #{customerId}")
+    List<Knowledge> selectByCustomerIdIgnoreDataPermission(@Param("customerId") Long customerId);
 
     @InterceptorIgnore(dataPermission = "true")
     @Update("""

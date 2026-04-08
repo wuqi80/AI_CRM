@@ -795,7 +795,7 @@ import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } from '@/api/followup'
-import { deleteContact, setPrimaryContact, queryContactPageList } from '@/api/contact'
+import { deleteContact, queryContactPageList, queryContactsByCustomer, setPrimaryContact } from '@/api/contact'
 import { getEnabledFieldsByEntity } from '@/api/customField'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Contact, CustomerTag, FollowUp, FollowUpAddBO, FollowUpType, FollowUpUpdateBO } from '@/types/customer'
@@ -908,6 +908,30 @@ function syncCurrentContact(customerId: string) {
   if (currentContact.value.customerId === customerId) {
     currentContact.value = null
   }
+}
+
+async function maybeOpenContactFromQuery(customerId: string) {
+  const openContactId = typeof route.query.openContactId === 'string' ? route.query.openContactId : ''
+  if (!openContactId || !canViewContacts.value) return
+
+  let matchedContact = contacts.value.find(contact => contact.contactId === openContactId)
+  if (!matchedContact) {
+    try {
+      const allContacts = await queryContactsByCustomer(customerId)
+      matchedContact = allContacts.map(contact => normalizeContact(contact)).find(contact => contact.contactId === openContactId)
+    } catch (error) {
+      console.error('Failed to load contact by route query:', error)
+    }
+  }
+
+  if (!matchedContact) return
+
+  currentContact.value = matchedContact
+  showContactDetail.value = true
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.openContactId
+  await router.replace({ path: route.path, query: nextQuery })
 }
 
 async function refreshCustomerContext(customerId: string, options: { resetContacts?: boolean } = {}) {
@@ -1110,6 +1134,7 @@ async function fetchContacts(customerId: string, reset = false) {
     contactTotal.value = 0
   } finally {
     syncCurrentContact(customerId)
+    await maybeOpenContactFromQuery(customerId)
     contactLoading.value = false
   }
 }

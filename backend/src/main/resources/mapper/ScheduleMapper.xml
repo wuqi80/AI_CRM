@@ -24,8 +24,20 @@
         LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
         LEFT JOIN manager_user u ON s.create_user_id = u.user_id
         WHERE 1=1
+        <if test="query.scheduleId != null">
+            AND s.schedule_id = #{query.scheduleId}
+        </if>
         <if test="query.customerId != null">
             AND s.customer_id = #{query.customerId}
+        </if>
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+                s.title LIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(s.description, '') LIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(s.location, '') LIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.company_name, '') LIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(ct.name, '') LIKE CONCAT('%', #{query.keyword}, '%')
+            )
         </if>
         <if test="query.type != null and query.type != ''">
             AND s.type = #{query.type}
@@ -35,6 +47,12 @@
         </if>
         <if test="query.endDate != null">
             AND s.start_time &lt;= #{query.endDate}
+        </if>
+        <if test="query.currentUserId != null">
+            AND (
+                s.create_user_id = #{query.currentUserId}
+                OR (',' || COALESCE(s.participant_user_ids, '') || ',') LIKE ('%,' || CAST(#{query.currentUserId} AS TEXT) || ',%')
+            )
         </if>
         ORDER BY s.start_time DESC
     </select>

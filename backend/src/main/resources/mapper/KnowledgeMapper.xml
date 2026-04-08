@@ -12,6 +12,7 @@
             k.customer_id,
             c.company_name AS customer_name,
             k.summary,
+            k.content_text,
             k.status,
             k.weknora_parse_status,
             k.upload_user_id,
