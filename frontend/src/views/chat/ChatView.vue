@@ -234,6 +234,31 @@
                 :key="message.id"
                 class="max-w-3xl mx-auto message-enter"
               >
+                <div
+                  v-if="getDocumentAttachments(message).length > 0"
+                  class="mb-4 flex"
+                  :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                >
+                  <div class="flex flex-wrap gap-3" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
+                    <a
+                      v-for="att in getDocumentAttachments(message)"
+                      :key="att.id || att.fileName"
+                      :href="att.accessUrl"
+                      target="_blank"
+                      class="group flex max-w-xs items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/60"
+                    >
+                      <div class="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <span class="material-symbols-outlined">description</span>
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <div class="truncate text-sm font-semibold text-slate-800">{{ att.fileName }}</div>
+                        <div class="mt-1 text-xs text-slate-400">{{ formatFileSize(att.fileSize) }}</div>
+                      </div>
+                      <span class="material-symbols-outlined text-slate-300 transition-colors group-hover:text-primary">open_in_new</span>
+                    </a>
+                  </div>
+                </div>
+
                 <!-- AI Message -->
                 <div v-if="message.role !== 'user'" class="flex gap-4 md:gap-5">
                   <div class="size-9 rounded-xl bg-primary flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20">
@@ -248,8 +273,8 @@
                       />
                     </div>
                     <!-- Attachments -->
-                    <div v-if="message.attachments && message.attachments.length > 0" class="space-y-2">
-                      <div v-for="att in message.attachments" :key="att.id || att.fileName">
+                    <div v-if="getInlineAttachments(message).length > 0" class="space-y-2">
+                      <div v-for="att in getInlineAttachments(message)" :key="att.id || att.fileName">
                         <template v-if="att.mimeType && att.mimeType.startsWith('image/')">
                           <el-image
                             :src="att.accessUrl"
@@ -299,8 +324,8 @@
                       <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
                     </div>
                     <!-- User Attachments -->
-                    <div v-if="message.attachments && message.attachments.length > 0" class="space-y-2">
-                      <div v-for="att in message.attachments" :key="att.id || att.fileName">
+                    <div v-if="getInlineAttachments(message).length > 0" class="space-y-2">
+                      <div v-for="att in getInlineAttachments(message)" :key="att.id || att.fileName">
                         <template v-if="att.mimeType && att.mimeType.startsWith('image/')">
                           <el-image
                             :src="att.accessUrl"
@@ -1004,6 +1029,22 @@ function handleFileSelect(event: Event) {
 
 function removeSelectedFile(index: number) {
   selectedFiles.value.splice(index, 1)
+}
+
+function isImageAttachment(attachment?: ChatAttachmentVO | null): boolean {
+  return Boolean(attachment?.mimeType?.startsWith('image/'))
+}
+
+function isDocumentAttachment(attachment?: ChatAttachmentVO | null): boolean {
+  return Boolean(attachment) && !isImageAttachment(attachment)
+}
+
+function getInlineAttachments(message: { attachments?: ChatAttachmentVO[] }): ChatAttachmentVO[] {
+  return (message.attachments || []).filter(isImageAttachment)
+}
+
+function getDocumentAttachments(message: { attachments?: ChatAttachmentVO[] }): ChatAttachmentVO[] {
+  return (message.attachments || []).filter(isDocumentAttachment)
 }
 
 function formatFileSize(bytes: number): string {
