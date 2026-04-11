@@ -27,8 +27,8 @@ import com.kakarote.ai_crm.mapper.FollowUpMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IFollowUpService;
 import com.kakarote.ai_crm.utils.AiMediaUtil;
+import com.kakarote.ai_crm.utils.DocumentTextExtractor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.tika.Tika;
 import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -100,7 +100,6 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     private DynamicChatClientProvider chatClientProvider;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final Tika tika = new Tika();
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -423,7 +422,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
                 return null;
             }
 
-            String text = tika.parseToString(inputStream);
+            String text = DocumentTextExtractor.parseToString(inputStream, null, filePath);
             if (StrUtil.isBlank(text)) {
                 return null;
             }

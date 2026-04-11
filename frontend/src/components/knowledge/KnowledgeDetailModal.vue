@@ -126,13 +126,17 @@
                 v-else-if="showOfficePreview"
                 :class="[
                   'office-preview-shell h-full overflow-auto',
-                  'bg-slate-100'
+                  'bg-slate-100',
+                  previewKind === 'pptx' ? 'office-preview-shell--pptx' : ''
                 ]"
               >
                 <component
                   :is="activePreviewComponent"
                   :src="previewSource"
-                  class="office-preview-viewer min-h-full"
+                  :class="[
+                    'office-preview-viewer min-h-full',
+                    previewKind === 'pptx' ? 'office-preview-viewer--pptx' : ''
+                  ]"
                   @rendered="handlePreviewRendered"
                   @error="handlePreviewError"
                 />
@@ -404,6 +408,7 @@ const mobileTabs = [
 const knowledge = ref<Knowledge | null>(null)
 const analysis = ref<KnowledgeAiAnalyzeVO | null>(null)
 const previewBlob = ref<Blob | null>(null)
+const officePreviewSource = ref<Blob | ArrayBuffer | null>(null)
 const previewKind = ref<PreviewKind>('none')
 const previewNotice = ref('')
 const previewText = ref('')
@@ -430,7 +435,7 @@ const activePreviewComponent = computed(() => {
   }
 })
 
-const previewSource = computed(() => previewBlob.value ?? undefined)
+const previewSource = computed(() => officePreviewSource.value ?? undefined)
 
 const showPdfPreview = computed(() => {
   return previewKind.value === 'pdf' && Boolean(previewBlob.value) && !previewFailed.value
@@ -459,6 +464,7 @@ const analysisStatusText = computed(() => {
 
 function resetPreviewState() {
   previewBlob.value = null
+  officePreviewSource.value = null
   previewKind.value = 'none'
   previewNotice.value = ''
   previewText.value = ''
@@ -550,6 +556,7 @@ function handlePreviewRendered() {
 function handlePreviewError(error: unknown) {
   console.error('Knowledge preview render failed:', error)
   previewBlob.value = null
+  officePreviewSource.value = null
   previewFailed.value = true
   previewNotice.value = previewNotice.value || '文件渲染失败，已切换为文本内容。'
 }
@@ -613,7 +620,12 @@ async function loadDocument(id: string) {
       return
     }
 
-    previewBlob.value = fileBlob
+    previewBlob.value = kind === 'pdf' ? fileBlob : null
+    officePreviewSource.value = kind === 'pdf'
+      ? null
+      : kind === 'pptx'
+        ? await fileBlob.arrayBuffer()
+        : fileBlob
   } catch (error) {
     console.error('Failed to load knowledge detail:', error)
     previewFailed.value = true
@@ -786,8 +798,46 @@ function getTypeIconColor(type?: string): string {
   overscroll-behavior: contain;
 }
 
+.office-preview-shell--pptx {
+  background: #edf3fb;
+}
+
 :deep(.office-preview-viewer) {
   min-height: 100%;
+}
+
+.office-preview-shell--pptx :deep(.office-preview-viewer--pptx) {
+  min-height: auto;
+}
+
+.office-preview-shell--pptx :deep(.vue-office-pptx) {
+  min-height: 100%;
+  padding: 12px 0 16px;
+}
+
+.office-preview-shell--pptx :deep(.vue-office-pptx-main) {
+  height: auto !important;
+  min-height: 100%;
+}
+
+.office-preview-shell--pptx :deep(.pptx-preview-wrapper) {
+  background: transparent !important;
+  width: 100% !important;
+  height: auto !important;
+  overflow: visible !important;
+  padding: 0 12px 16px;
+  box-sizing: border-box;
+}
+
+.office-preview-shell--pptx :deep(.pptx-preview-slide-wrapper) {
+  margin: 0 auto 16px !important;
+  max-width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.office-preview-shell--pptx :deep(.pptx-preview-slide-wrapper:last-child) {
+  margin-bottom: 0 !important;
 }
 
 .pdf-preview-shell {

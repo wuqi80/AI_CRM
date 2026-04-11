@@ -620,6 +620,8 @@ public class WeKnoraClient {
             body.put("summary_model_id", summaryModelId);
         }
         body.put("type", "document");
+        String storageProvider = StrUtil.blankToDefault(StrUtil.trim(config.getStorageProvider()), "local");
+        body.put("storage_provider_config", Map.of("provider", storageProvider.toLowerCase(Locale.ROOT)));
 
         HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
@@ -780,9 +782,16 @@ public class WeKnoraClient {
                 useAgentChat, knowledgeIds, abbreviateForLog(query));
         try {
             WeKnoraChatResult result = executeKnowledgeChat(ctx, sessionId, query, knowledgeIds, useAgentChat);
+            if (isUnavailableChatResult(result)) {
+                log.warn("WeKnora 问答结果不可用，重建会话后重试: tenantId={}, conversationId={}, sessionId={}, useAgentChat={}",
+                        tenantId, conversationId, sessionId, useAgentChat);
+                sessionId = recreateConversationSession(tenantId, conversationId, ctx);
+                result = executeKnowledgeChat(ctx, sessionId, query, knowledgeIds, useAgentChat);
+            }
             if (useAgentChat && isUnavailableChatResult(result)) {
                 log.warn("WeKnora 定向知识问答未返回可用结果，降级为通用知识库问答: tenantId={}, sessionId={}",
                         tenantId, sessionId);
+                sessionId = recreateConversationSession(tenantId, conversationId, ctx);
                 result = executeKnowledgeChat(ctx, sessionId, query, Collections.emptyList(), false);
             }
             log.debug("RAG问答请求完成: tenantId={}, conversationId={}, sessionId={}, answerLength={}, references={}, completed={}",
@@ -876,6 +885,17 @@ public class WeKnoraClient {
             String sessionId = createConversationSession(ctx.getKnowledgeBaseId(), ctx.getApiKey());
             conversationSessionCache.put(cacheKey, sessionId);
             log.debug("创建并缓存RAG会话: cacheKey={}, sessionId={}, kbId={}", cacheKey, sessionId, ctx.getKnowledgeBaseId());
+            return sessionId;
+        }
+    }
+
+    private String recreateConversationSession(Long tenantId, Long conversationId, TenantWeKnoraContext ctx) {
+        String cacheKey = buildConversationSessionKey(tenantId, conversationId);
+        synchronized (conversationSessionCache) {
+            conversationSessionCache.remove(cacheKey);
+            String sessionId = createConversationSession(ctx.getKnowledgeBaseId(), ctx.getApiKey());
+            conversationSessionCache.put(cacheKey, sessionId);
+            log.debug("重建RAG会话: cacheKey={}, sessionId={}, kbId={}", cacheKey, sessionId, ctx.getKnowledgeBaseId());
             return sessionId;
         }
     }
@@ -988,8 +1008,9 @@ public class WeKnoraClient {
 
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("query", query);
+        requestBody.put("knowledge_base_ids", List.of(ctx.getKnowledgeBaseId()));
+        requestBody.put("channel", "api");
         if (useAgentChat) {
-            requestBody.put("knowledge_base_ids", List.of(ctx.getKnowledgeBaseId()));
             requestBody.put("knowledge_ids", knowledgeIds);
             requestBody.put("agent_enabled", false);
             requestBody.put("web_search_enabled", false);

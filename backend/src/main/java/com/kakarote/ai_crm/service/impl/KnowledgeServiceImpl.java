@@ -33,9 +33,9 @@ import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
+import com.kakarote.ai_crm.utils.DocumentTextExtractor;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.tika.Tika;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -103,7 +103,6 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     private IGlobalSearchIndexService globalSearchIndexService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final Tika tika = new Tika();
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -892,7 +891,7 @@ self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), k
             byte[] bytes = inputStream.readNBytes(MAX_SEARCHABLE_CONTENT_LENGTH * 3);
             text = new String(bytes, StandardCharsets.UTF_8);
         } else if (isDocumentFile(mimeType, fileName)) {
-            text = tika.parseToString(inputStream);
+            text = DocumentTextExtractor.parseToString(inputStream, mimeType, fileName);
         } else {
             return null;
         }
@@ -904,11 +903,33 @@ self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), k
         if (StrUtil.isBlank(text)) {
             return null;
         }
-        String normalized = text.replaceAll("\\s+", " ").trim();
+        String sanitized = removeUnsupportedTextCharacters(text);
+        if (StrUtil.isBlank(sanitized)) {
+            return null;
+        }
+        String normalized = sanitized.replaceAll("\\s+", " ").trim();
         if (normalized.length() > MAX_SEARCHABLE_CONTENT_LENGTH) {
             normalized = normalized.substring(0, MAX_SEARCHABLE_CONTENT_LENGTH);
         }
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private String removeUnsupportedTextCharacters(String text) {
+        StringBuilder sanitized = new StringBuilder(text.length());
+        boolean modified = false;
+        for (int i = 0; i < text.length(); i++) {
+            char current = text.charAt(i);
+            if (current == '\u0000') {
+                modified = true;
+                continue;
+            }
+            if (Character.isISOControl(current) && !Character.isWhitespace(current)) {
+                modified = true;
+                continue;
+            }
+            sanitized.append(current);
+        }
+        return modified ? sanitized.toString() : text;
     }
 
     private boolean isPlainTextFile(String mimeType, String fileName) {

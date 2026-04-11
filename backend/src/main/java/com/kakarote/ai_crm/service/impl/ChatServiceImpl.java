@@ -23,9 +23,9 @@ import com.kakarote.ai_crm.mapper.ChatMessageMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
 import com.kakarote.ai_crm.service.*;
 import com.kakarote.ai_crm.utils.AiMediaUtil;
+import com.kakarote.ai_crm.utils.DocumentTextExtractor;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.tika.Tika;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -81,8 +81,6 @@ public class ChatServiceImpl implements IChatService {
     private KnowledgeTools knowledgeTools;
 
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
-
-    private final Tika tika = new Tika();
 
     private static final String SYSTEM_PROMPT_TEMPLATE = """
         你是一个AI驱动的CRM系统助手，帮助用户管理客户关系。
@@ -683,7 +681,7 @@ public class ChatServiceImpl implements IChatService {
     private String extractDocumentText(String filePath) {
         try (InputStream is = fileStorageService.getFileStream(filePath)) {
             if (is == null) return null;
-            String text = tika.parseToString(is);
+            String text = DocumentTextExtractor.parseToString(is, null, filePath);
             if (StrUtil.isBlank(text)) return null;
             if (text.length() > MAX_EXTRACTED_TEXT_LENGTH) {
                 text = text.substring(0, MAX_EXTRACTED_TEXT_LENGTH) + "\n...(内容过长已截断)";

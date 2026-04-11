@@ -154,22 +154,30 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
      */
     @Override
     public JSONObject auth(Long userId) {
-        String cacheKey = Const.USER_AUTH_CACHE_KET + UserUtil.getUserId();
+        String cacheKey = Const.USER_AUTH_CACHE_KET + userId;
         if (redis.exists(cacheKey)) {
             return redis.get(cacheKey);
         }
-        List<ManagerMenu> managerMenus = menuService.queryMenuList(userId);
+        List<ManagerMenu> managerMenus = new ArrayList<>(menuService.queryMenuList(userId));
         // 收集用户有权限的菜单的 parentId，只添加对应的父模块
         Set<Long> parentIds = managerMenus.stream()
                 .map(ManagerMenu::getParentId)
                 .collect(Collectors.toSet());
-        List<ManagerMenu> allMenus = menuService.list();
+        List<ManagerMenu> allMenus = new ArrayList<>(menuService.list());
+        Map<Long, ManagerMenu> authorizedMenus = managerMenus.stream()
+                .filter(menu -> menu != null && menu.getMenuId() != null)
+                .collect(Collectors.toMap(
+                        ManagerMenu::getMenuId,
+                        menu -> menu,
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
         for (ManagerMenu menu : allMenus) {
             if (Objects.equals(0L, menu.getParentId()) && parentIds.contains(menu.getMenuId())) {
-                managerMenus.add(menu);
+                authorizedMenus.putIfAbsent(menu.getMenuId(), menu);
             }
         }
-        JSONObject jsonObject = createMenu(new HashSet<>(managerMenus), 0L);
+        JSONObject jsonObject = createMenu(new HashSet<>(authorizedMenus.values()), 0L);
         redis.setex(cacheKey, 300, jsonObject);
         return jsonObject;
     }

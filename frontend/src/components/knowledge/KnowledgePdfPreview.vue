@@ -12,9 +12,18 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
-import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import PdfJsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
 
-GlobalWorkerOptions.workerSrc = workerSrc
+let workerPort: Worker | null = null
+
+function ensureWorkerPort() {
+  if (!workerPort) {
+    workerPort = new PdfJsWorker()
+  }
+  if (GlobalWorkerOptions.workerPort !== workerPort) {
+    GlobalWorkerOptions.workerPort = workerPort
+  }
+}
 
 const props = defineProps<{
   blob: Blob | null
@@ -117,6 +126,7 @@ async function loadPdfDocument(blob: Blob, generation: number) {
   }
 
   await destroyDocument()
+  ensureWorkerPort()
 
   const data = new Uint8Array(await blob.arrayBuffer())
   if (generation !== renderGeneration) {

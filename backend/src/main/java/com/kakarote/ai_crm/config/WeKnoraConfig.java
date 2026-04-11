@@ -16,6 +16,7 @@ public class WeKnoraConfig {
     /** 全局 API Key（仅作 fallback / admin 用途） */
     private String apiKey;
     private boolean enabled = false;
+    private String storageProvider = "local";
     private SearchConfig search = new SearchConfig();
     private InitModels initModels = new InitModels();
 
