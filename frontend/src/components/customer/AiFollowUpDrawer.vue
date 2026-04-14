@@ -73,12 +73,12 @@
                     type="file"
                     class="hidden"
                     multiple
-                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.md,.csv"
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.md,.csv,.mp3,.wav,.m4a,.aac,.webm"
                     @change="handleFileSelect"
                   />
                 </label>
 
-                <p class="text-[11px] text-slate-400">支持图片、PDF、Word、Excel、TXT、Markdown、CSV</p>
+                <p class="text-[11px] text-slate-400">支持图片、PDF、Word、Excel、TXT、Markdown、CSV、音频</p>
               </div>
 
               <div v-if="attachments.length > 0" class="flex flex-wrap gap-2">
@@ -260,7 +260,10 @@ interface ParsedFollowUpForm {
 
 
 const FOLLOW_UP_TYPES = new Set(['call', 'meeting', 'email', 'visit', 'other'])
-const SUPPORTED_ATTACHMENT_EXTENSIONS = new Set(['txt', 'md', 'csv', 'pdf', 'doc', 'docx', 'xls', 'xlsx'])
+const DEFAULT_ATTACHMENT_ONLY_CONTENT = '请结合附件内容生成跟进记录。'
+const SUPPORTED_ATTACHMENT_EXTENSIONS = new Set(['txt', 'md', 'csv', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'wav', 'm4a', 'aac', 'webm'])
+const CHINESE_RELATIVE_TIME_REGEX = /(明天|后天|明早|明晚|今天)\s*(凌晨|早上|早晨|上午|中午|下午|傍晚|晚上|今晚)?\s*(\d{1,2})(?:\s*[:点时]\s*(\d{1,2}))?(半)?\s*(?:分)?/g
+const ENGLISH_RELATIVE_TIME_REGEX = /\b(today|tomorrow|day after tomorrow)\b(?:\s+at)?(?:\s+(morning|afternoon|evening))?\s*(\d{1,2})(?::(\d{1,2}))?\s*(am|pm)?/ig
 
 const step = ref(1)
 const textInput = ref('')
@@ -271,6 +274,7 @@ const saving = ref(false)
 const recordingDuration = ref(0)
 const parsedData = ref<AiFollowUpParseVO | null>(null)
 const attachments = ref<Attachment[]>([])
+const uploadedAttachments = ref<ChatAttachmentDTO[]>([])
 const parsedForm = reactive<ParsedFollowUpForm>({
   type: 'other',
   content: '',
@@ -330,6 +334,7 @@ function clearAttachments() {
     }
   })
   attachments.value = []
+  uploadedAttachments.value = []
 }
 
 function stopRecordingTimer() {
@@ -379,22 +384,125 @@ function parseApiDateTime(value?: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-function normalizeParsedTimes(result: AiFollowUpParseVO) {
+function resolveChineseDayOffset(token: string): number {
+  if (token.startsWith('后天')) return 2
+  if (['明天', '明早', '明晚'].includes(token)) return 1
+  return 0
+}
+
+function resolveEnglishDayOffset(token: string): number {
+  const normalized = token.toLowerCase()
+  if (normalized.includes('day after tomorrow')) return 2
+  if (normalized.includes('tomorrow')) return 1
+  return 0
+}
+
+function deriveChinesePeriodToken(token: string): string {
+  if (token === '明早') return '上午'
+  if (token === '明晚') return '晚上'
+  return ''
+}
+
+function parseMinuteToken(value?: string, halfToken?: string): number | null {
+  if (value) {
+    const minute = Number.parseInt(value, 10)
+    return minute >= 0 && minute <= 59 ? minute : null
+  }
+  return halfToken ? 30 : 0
+}
+
+function normalizeHour(hour: number, periodToken?: string): number | null {
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null
+
+  const normalizedPeriod = String(periodToken || '').toLowerCase()
+  let normalizedHour = hour
+
+  if (
+    normalizedPeriod.includes('下午')
+    || normalizedPeriod.includes('傍晚')
+    || normalizedPeriod.includes('晚上')
+    || normalizedPeriod.includes('今晚')
+    || normalizedPeriod.includes('afternoon')
+    || normalizedPeriod.includes('evening')
+    || normalizedPeriod === 'pm'
+  ) {
+    if (normalizedHour < 12) normalizedHour += 12
+  } else if (normalizedPeriod.includes('中午')) {
+    if (normalizedHour < 11) normalizedHour += 12
+  } else if (
+    normalizedPeriod.includes('凌晨')
+    || normalizedPeriod.includes('早上')
+    || normalizedPeriod.includes('早晨')
+    || normalizedPeriod.includes('上午')
+    || normalizedPeriod.includes('morning')
+    || normalizedPeriod === 'am'
+  ) {
+    if (normalizedHour === 12) normalizedHour = 0
+  }
+
+  return normalizedHour >= 0 && normalizedHour <= 23 ? normalizedHour : null
+}
+
+function buildRelativeDateTime(now: Date, dayOffset: number, hour: number, minute: number): Date {
+  const candidate = new Date(now)
+  candidate.setDate(candidate.getDate() + dayOffset)
+  candidate.setHours(hour, minute, 0, 0)
+  return candidate
+}
+
+function inferNextFollowTimeFromContent(content: string, now: Date): string {
+  for (const match of content.matchAll(CHINESE_RELATIVE_TIME_REGEX)) {
+    const [, dayToken, rawPeriodToken, hourToken, minuteToken, halfToken] = match
+    const hour = Number.parseInt(hourToken, 10)
+    const minute = parseMinuteToken(minuteToken, halfToken)
+    const normalizedHour = normalizeHour(hour, rawPeriodToken || deriveChinesePeriodToken(dayToken))
+    if (minute === null || normalizedHour === null) continue
+
+    const candidate = buildRelativeDateTime(now, resolveChineseDayOffset(dayToken), normalizedHour, minute)
+    if (candidate.getTime() > now.getTime()) {
+      return formatDateForApi(candidate)
+    }
+  }
+
+  for (const match of content.matchAll(ENGLISH_RELATIVE_TIME_REGEX)) {
+    const [, dayToken, rawPeriodToken, hourToken, minuteToken, meridiemToken] = match
+    const hour = Number.parseInt(hourToken, 10)
+    const minute = parseMinuteToken(minuteToken)
+    const normalizedHour = normalizeHour(hour, meridiemToken || rawPeriodToken)
+    if (minute === null || normalizedHour === null) continue
+
+    const candidate = buildRelativeDateTime(now, resolveEnglishDayOffset(dayToken), normalizedHour, minute)
+    if (candidate.getTime() > now.getTime()) {
+      return formatDateForApi(candidate)
+    }
+  }
+
+  return ''
+}
+
+function normalizeParsedTimes(result: AiFollowUpParseVO, originalContent: string) {
   const now = new Date()
   const normalizedNow = formatDateForApi(now)
   let followTime = result.followTime || normalizedNow
   let nextFollowTime = result.nextFollowTime || ''
 
   const parsedFollowTime = parseApiDateTime(followTime)
-  const parsedNextFollowTime = parseApiDateTime(nextFollowTime)
+  let parsedNextFollowTime = parseApiDateTime(nextFollowTime)
+  const inferredNextFollowTime = inferNextFollowTimeFromContent(originalContent, now)
+  const parsedInferredNextFollowTime = parseApiDateTime(inferredNextFollowTime)
+
+  if (parsedFollowTime && parsedFollowTime.getTime() > now.getTime() + 5 * 60 * 1000) {
+    nextFollowTime = inferredNextFollowTime || (parsedNextFollowTime ? nextFollowTime : followTime)
+    followTime = normalizedNow
+    parsedNextFollowTime = parseApiDateTime(nextFollowTime)
+  }
 
   if (
-    parsedFollowTime
-    && parsedFollowTime.getTime() > now.getTime() + 5 * 60 * 1000
-    && !parsedNextFollowTime
+    parsedInferredNextFollowTime
+    && parsedInferredNextFollowTime.getTime() > now.getTime() + 5 * 60 * 1000
+    && (!parsedNextFollowTime || parsedNextFollowTime.getTime() <= now.getTime() + 5 * 60 * 1000)
   ) {
-    nextFollowTime = followTime
-    followTime = normalizedNow
+    nextFollowTime = inferredNextFollowTime
   }
 
   return {
@@ -404,6 +512,11 @@ function normalizeParsedTimes(result: AiFollowUpParseVO) {
 }
 
 function buildEditableContent(result: AiFollowUpParseVO, fallbackContent: string): string {
+  const trimmedFallback = fallbackContent.trim()
+  if (trimmedFallback && trimmedFallback !== DEFAULT_ATTACHMENT_ONLY_CONTENT) {
+    return trimmedFallback
+  }
+
   const blocks: string[] = []
 
   if (result.summary?.trim()) {
@@ -414,16 +527,16 @@ function buildEditableContent(result: AiFollowUpParseVO, fallbackContent: string
     blocks.push(`关键要点:\n${result.keyPoints.map(point => `- ${point}`).join('\n')}`)
   }
 
-  if (result.todos?.length) {
+  if (false && result.todos?.length) {
     blocks.push(`待办事项:\n${result.todos.map(todo => `- ${todo}`).join('\n')}`)
   }
 
   const content = blocks.join('\n\n').trim()
-  return content || fallbackContent.trim()
+  return content || trimmedFallback
 }
 
 function applyParsedResult(result: AiFollowUpParseVO, originalContent: string) {
-  const normalizedTimes = normalizeParsedTimes(result)
+  const normalizedTimes = normalizeParsedTimes(result, originalContent)
   parsedData.value = result
   parsedForm.type = normalizeFollowUpType(result.type)
   parsedForm.content = buildEditableContent(result, originalContent)
@@ -639,6 +752,10 @@ function isSupportedAttachment(file: File): boolean {
     return true
   }
 
+  if (file.type.startsWith('audio/')) {
+    return true
+  }
+
   const extension = file.name.includes('.')
     ? file.name.split('.').pop()?.toLowerCase() || ''
     : ''
@@ -648,11 +765,12 @@ function isSupportedAttachment(file: File): boolean {
 
 function handleFile(file: File) {
   if (!isSupportedAttachment(file)) {
-    ElMessage.warning('当前仅支持图片、PDF、Word、Excel、TXT、Markdown、CSV 附件')
+    ElMessage.warning('当前仅支持图片、PDF、Word、Excel、TXT、Markdown、CSV、音频附件')
     return
   }
 
   const id = Math.random().toString(36).slice(2, 11)
+  uploadedAttachments.value = []
   attachments.value.push({
     id,
     file,
@@ -665,11 +783,12 @@ function removeAttachment(id: string) {
   if (target?.preview) {
     URL.revokeObjectURL(target.preview)
   }
+  uploadedAttachments.value = []
   attachments.value = attachments.value.filter(item => item.id !== id)
 }
 
 async function uploadAttachments(): Promise<ChatAttachmentDTO[]> {
-  return Promise.all(
+  const result = await Promise.all(
     attachments.value.map(async ({ file }) => {
       const presigned = await getPresignedUploadUrl(file.name, file.type)
       await uploadToMinIO(file, presigned.uploadUrl)
@@ -681,6 +800,8 @@ async function uploadAttachments(): Promise<ChatAttachmentDTO[]> {
       }
     })
   )
+  uploadedAttachments.value = result
+  return result
 }
 
 async function handleSubmitText() {
@@ -691,10 +812,12 @@ async function handleSubmitText() {
 
   try {
     const attachmentDTOs = attachments.value.length > 0
-      ? await uploadAttachments()
+      ? (uploadedAttachments.value.length === attachments.value.length
+        ? uploadedAttachments.value
+        : await uploadAttachments())
       : undefined
 
-    const content = textInput.value.trim() || '请结合附件内容生成跟进记录。'
+    const content = textInput.value.trim() || DEFAULT_ATTACHMENT_ONLY_CONTENT
     const result = await aiParseFollowUp({
       content,
       customerName: props.customer?.companyName || '',
@@ -737,8 +860,20 @@ async function handleConfirmSave() {
       customerId: props.customer.customerId,
       type: normalizeFollowUpType(parsedForm.type),
       content,
+      summary: parsedData.value?.summary?.trim() || undefined,
+      sceneType: parsedData.value?.sceneType?.trim() || undefined,
+      aiGenerated: parsedData.value ? 1 : 0,
       followTime: parsedForm.followTime,
-      nextFollowTime: parsedForm.nextFollowTime || undefined
+      nextFollowTime: parsedForm.nextFollowTime || undefined,
+      attachments: uploadedAttachments.value.length > 0 ? uploadedAttachments.value : undefined,
+      suggestedTasks: parsedData.value?.todos?.length
+        ? parsedData.value.todos.map(todo => ({
+          title: todo,
+          description: parsedData.value?.summary || content,
+          dueDate: parsedForm.nextFollowTime || undefined,
+          taskType: '跟进'
+        }))
+        : undefined
     })
 
     ElMessage.success('跟进记录已保存')

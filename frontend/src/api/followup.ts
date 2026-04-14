@@ -1,5 +1,11 @@
-import { post, upload } from '@/utils/request'
-import type { FollowUp, FollowUpAddBO, FollowUpQueryBO, FollowUpUpdateBO } from '@/types/customer'
+import { get, post, upload, download } from '@/utils/request'
+import type {
+  FollowUp,
+  FollowUpAddBO,
+  FollowUpAttachment,
+  FollowUpQueryBO,
+  FollowUpUpdateBO
+} from '@/types/customer'
 import type { PageResult } from '@/types/api'
 import type { ChatAttachmentDTO } from '@/types/common'
 
@@ -50,6 +56,7 @@ export interface AiFollowUpParseBO {
 
 export interface AiFollowUpParseVO {
   summary: string
+  sceneType: string
   type: string
   followTime: string
   nextFollowTime: string
@@ -65,4 +72,16 @@ export function transcribeFollowUpAudio(file: File): Promise<string> {
   const formData = new FormData()
   formData.append('file', file)
   return upload('/followup/ai-transcribe', formData)
+}
+
+export function aiAnalyzeFollowUpAttachment(attachmentId: string): Promise<FollowUpAttachment> {
+  return post(`/followup/attachment/${attachmentId}/ai-analyze`)
+}
+
+export function getFollowUpAttachmentBlob(attachmentId: string): Promise<Blob> {
+  return get(`/followup/attachment/${attachmentId}/download`, { responseType: 'blob' })
+}
+
+export function downloadFollowUpAttachment(attachmentId: string, filename: string): Promise<void> {
+  return download(`/followup/attachment/${attachmentId}/download`, filename)
 }

@@ -622,6 +622,7 @@ async function handleSubmit() {
       ...formData,
       ...systemValues,
       companyName,
+      aiParseSnapshot: !isEdit.value && aiParseResult.value ? JSON.stringify(aiParseResult.value) : undefined,
       customFields: customValues
     }
 
@@ -635,9 +636,9 @@ async function handleSubmit() {
       ElMessage.success('更新成功')
       emit('success', { mode: 'edit', customerId })
     } else {
-      await customerStore.createCustomer(submitData)
+      const customerId = await customerStore.createCustomer(submitData)
       ElMessage.success('创建成功')
-      emit('success', { mode: 'create' })
+      emit('success', { mode: 'create', customerId: String(customerId) })
     }
 
     emit('update:modelValue', false)

@@ -70,7 +70,7 @@
       </div>
     </div>
 
-    <div class="p-5 bg-primary/5 rounded-2xl border border-primary/10">
+    <div v-if="showTip" class="p-5 bg-primary/5 rounded-2xl border border-primary/10">
       <h4 class="text-xs font-bold text-primary uppercase tracking-widest mb-2 flex items-center gap-2">
         <span class="material-symbols-outlined text-sm">lightbulb</span>
         小提示
@@ -109,10 +109,12 @@ withDefaults(
     emptyTitle?: string
     emptyDescription?: string
     scoreCaption?: string
+    showTip?: boolean
   }>(),
   {
     emptyTitle: '等待 AI 分析',
     emptyDescription: '',
+    showTip: true,
     scoreCaption: '基于行业匹配度、需求迫切度及规模评估'
   }
 )

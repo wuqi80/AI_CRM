@@ -32,6 +32,9 @@ public class TaskAddBO {
     @Schema(description = "客户ID")
     private Long customerId;
 
+    @Schema(description = "Source follow-up ID")
+    private Long sourceFollowUpId;
+
     @Schema(description = "是否AI生成")
     private Integer generatedByAi;
 

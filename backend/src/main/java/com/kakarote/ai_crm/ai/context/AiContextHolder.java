@@ -87,6 +87,28 @@ public class AiContextHolder {
     }
 
     /**
+     * 绑定当前线程的用户与租户上下文，不关联会话ID。
+     * 适用于线程池异步任务等需要显式传递上下文的场景。
+     */
+    public static void bindThreadContext(Long userId, Long tenantId) {
+        CURRENT_SESSION_ID.remove();
+        if (userId == null) {
+            CURRENT_USER_ID.remove();
+        } else {
+            CURRENT_USER_ID.set(userId);
+        }
+
+        if (tenantId == null) {
+            TenantContextHolder.clear();
+        } else {
+            TenantContextHolder.setTenantId(tenantId);
+        }
+
+        log.debug("绑定线程 AI 上下文: userId={}, tenantId={}, 线程={}",
+                userId, tenantId, Thread.currentThread().getName());
+    }
+
+    /**
      * 直接设置 sessionId（供 context-propagation 使用）
      * 优化：如果当前线程已有相同的 sessionId，跳过设置避免重复操作
      */
@@ -165,6 +187,16 @@ public class AiContextHolder {
         // SESSION_USER_MAP 的清理应该通过 clearSession 方法显式调用
         CURRENT_SESSION_ID.remove();
         CURRENT_USER_ID.remove();
+    }
+
+    /**
+     * 清理当前线程绑定的用户与租户上下文。
+     */
+    public static void clearThreadContext() {
+        log.trace("清理线程 AI 上下文: thread={}", Thread.currentThread().getName());
+        CURRENT_SESSION_ID.remove();
+        CURRENT_USER_ID.remove();
+        TenantContextHolder.clear();
     }
 
     /**

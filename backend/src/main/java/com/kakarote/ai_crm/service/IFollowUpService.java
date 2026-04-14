@@ -7,6 +7,7 @@ import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpUpdateBO;
 import com.kakarote.ai_crm.entity.PO.FollowUp;
+import com.kakarote.ai_crm.entity.VO.FollowUpAttachmentVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 
@@ -43,4 +44,8 @@ public interface IFollowUpService extends IService<FollowUp> {
      * AI 解析跟进内容
      */
     FollowUpAiParseVO aiParseFollowUp(FollowUpAiParseBO parseBO);
+
+    FollowUpAttachmentVO analyzeAttachment(Long attachmentId);
+
+    FollowUpAttachmentVO getAttachment(Long attachmentId);
 }

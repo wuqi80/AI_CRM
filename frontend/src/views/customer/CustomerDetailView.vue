@@ -134,6 +134,14 @@
                 <WkIcon name="ai" class="text-sm" />
                 AI 跟进
               </button>
+              <button
+                type="button"
+                class="h-8 px-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                @click="showBasicInfoDrawer = true"
+              >
+                <span class="material-symbols-outlined text-[18px] leading-none">info</span>
+                <span>{{ viewBasicInfoButtonText }}</span>
+              </button>
               <button v-if="canEditCustomer" class="h-8 px-4 bg-primary text-white rounded-lg text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-1.5 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed" :disabled="generatingAiReport" @click="handleGenerateReport">
                 <WkIcon name="ai" class="text-sm" />
                 <span class="text-sm leading-none">{{ generatingAiReport ? '生成中...' : '生成 AI 分析报告' }}</span>
@@ -308,101 +316,82 @@
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <!-- Left Column: Basic Info (col-span-3) -->
           <div class="lg:col-span-3 space-y-4">
-            <!-- Basic Info -->
             <section class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-              <h3 class="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <span :class="sectionIconBoxClass" :style="getSectionIconStyle('basicInfo')">
-                  <WkIcon name="profile" :size="15" />
-                </span>
-                基本信息
-              </h3>
-              <div class="space-y-5">
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">公司全称</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.companyName }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">所属行业</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.industry || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户来源</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.source || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户级别</p>
-                  <span
-                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold"
-                    :class="{
-                      'bg-emerald-50 text-emerald-600': customer.level === 'A',
-                      'bg-blue-50 text-blue-600': customer.level === 'B',
-                      'bg-slate-100 text-slate-500': customer.level === 'C'
-                    }"
-                  >{{ customer.level }}级</span>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">主要联系人</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ primaryContact?.name || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">联系电话</p>
-                  <p class="text-sm text-slate-900 font-medium font-mono px-2 py-1 -ml-2 truncate">{{ primaryContact?.phone || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">电子邮箱</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ primaryContact?.email || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户地址</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.address || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">公司网站</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.website || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">报价金额</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatAmount(customer.quotation) }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">备注</p>
-                  <p class="text-sm text-slate-600 leading-relaxed px-2 py-1 -ml-2 whitespace-pre-wrap break-words">{{ customer.remark || '暂无备注' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">AI 状态探测</p>
-                  <div class="px-2 py-1 -ml-2">
-                    <span
-                      v-if="getAiStatusMeta(customer.aiStatusDetection)"
-                      class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold shadow-sm"
-                      :class="getAiStatusMeta(customer.aiStatusDetection)?.badgeClass"
-                    >
-                      <span class="size-2 rounded-full" :class="getAiStatusMeta(customer.aiStatusDetection)?.dotClass"></span>
-                      {{ getAiStatusMeta(customer.aiStatusDetection)?.label }}
-                    </span>
-                    <p v-else class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{{ customer.aiStatusDetection || '暂无 AI 状态探测' }}</p>
+              <div class="mb-4 flex items-start justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('basicInfo')">
+                    <WkIcon name="ai" :size="15" />
+                  </span>
+                  <div>
+                    <h3 class="text-sm font-bold text-slate-900">{{ savedAiAnalysisTitle }}</h3>
+                    <p class="text-xs text-slate-400">{{ savedAiAnalysisDescription }}</p>
                   </div>
                 </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">AI 洞察</p>
-                  <p class="text-sm text-slate-600 leading-relaxed px-2 py-1 -ml-2 whitespace-pre-wrap break-words">{{ customer.aiInsight || '暂无 AI 洞察' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.ownerName || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">创建人</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.createUserName || customer.createUserId || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">创建时间</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatDate(customer.createTime) }}</p>
-                </div>
-                <div v-for="field in customFields" :key="field.fieldId">
-                  <p class="text-xs font-bold text-slate-400 tracking-wider mb-1">{{ field.fieldLabel }}</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatCustomFieldDisplayValue(field, customer.customFields?.[field.fieldName]) }}</p>
+                <div class="flex items-center gap-1 text-xs text-slate-400">
+                  <span class="material-symbols-outlined text-sm">schedule</span>
+                  <span>{{ aiAnalysisDisplayTime }}</span>
                 </div>
               </div>
+
+              <div
+                v-if="isAiAnalysisPending || isAiAnalysisFailed"
+                class="mb-4 rounded-2xl border px-4 py-3"
+                :class="isAiAnalysisFailed ? 'border-rose-200 bg-rose-50' : 'border-sky-200 bg-sky-50'"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl"
+                    :class="isAiAnalysisFailed ? 'bg-rose-100 text-rose-500' : 'bg-sky-100 text-sky-500'"
+                  >
+                    <span
+                      class="material-symbols-outlined text-[18px] leading-none"
+                      :class="{ 'animate-spin': aiAnalysisStatus === 'running' }"
+                    >{{ isAiAnalysisFailed ? 'error' : (aiAnalysisStatus === 'running' ? 'progress_activity' : 'schedule') }}</span>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-bold" :class="isAiAnalysisFailed ? 'text-rose-700' : 'text-sky-700'">
+                      {{ aiAnalysisStatusLabel }}
+                    </p>
+                    <p class="mt-1 text-xs leading-5" :class="isAiAnalysisFailed ? 'text-rose-600' : 'text-sky-600'">
+                      {{ aiAnalysisStatusDescription }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <AiParseInsightSidebar
+                :result="savedAiParseResult"
+                :show-tip="false"
+                :empty-title="aiAnalysisEmptyTitle"
+                :empty-description="aiAnalysisEmptyDescription"
+              />
+
+              <section
+                v-if="latestAiReport?.aiStatusDetection || latestAiReport?.aiInsight || customer.aiStatusDetection || customer.aiInsight"
+                class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
+              >
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-base text-primary">auto_awesome</span>
+                  <h4 class="text-xs font-bold uppercase tracking-widest text-slate-500">{{ aiReportSummaryTitle }}</h4>
+                </div>
+                <div class="mt-3">
+                  <span
+                    v-if="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)"
+                    class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold shadow-sm"
+                    :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.badgeClass"
+                  >
+                    <span class="size-2 rounded-full" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.dotClass"></span>
+                    {{ getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.label }}
+                  </span>
+                  <p
+                    v-else
+                    class="text-sm leading-6 text-slate-700 whitespace-pre-wrap break-words"
+                  >{{ latestAiReport?.aiStatusDetection || customer.aiStatusDetection }}</p>
+                </div>
+                <p class="mt-3 text-sm leading-6 text-slate-700 whitespace-pre-wrap break-words">
+                  {{ latestAiReport?.aiInsight || customer.aiInsight }}
+                </p>
+              </section>
             </section>
           </div>
 
@@ -458,7 +447,7 @@
                 </div>
                 <!-- flex-col + 固定高度占位：16px 间距在同行 flex 高度内，避免子项 margin 不撑开行高导致卡片贴在一起；左侧轨道 stretch 后竖线仍连续 -->
                 <div class="flex min-w-0 flex-1 flex-col">
-                  <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                  <div v-if="false" class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
                     <div class="flex items-center justify-between mb-3">
                       <div class="flex items-center gap-3">
                         <div class="size-8 rounded-lg flex items-center justify-center text-white shadow-sm bg-primary">
@@ -497,6 +486,13 @@
                     </div>
                     <p class="text-sm text-slate-600 leading-relaxed">{{ item.content }}</p>
                   </div>
+                  <FollowUpCard
+                    :item="item"
+                    :can-edit="canEditFollowUps"
+                    :can-delete="canDeleteFollowUps"
+                    @edit="handleEditFollowUp"
+                    @delete="confirmDeleteFollowUp"
+                  />
                   <div v-if="followUpIndex < followUps.length - 1" class="h-4 shrink-0" aria-hidden="true" />
                 </div>
               </div>
@@ -787,6 +783,144 @@
       @set-primary="handleSetPrimary"
     />
 
+    <el-drawer
+      v-model="showBasicInfoDrawer"
+      direction="rtl"
+      :size="isMobile ? '100%' : '420px'"
+      :with-header="false"
+      destroy-on-close
+      class="customer-basic-info-drawer"
+    >
+      <div v-if="customer" class="flex h-full flex-col bg-white shadow-2xl">
+        <div class="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/60 px-6 py-5">
+          <div class="flex min-w-0 items-center gap-3">
+            <div class="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <span class="material-symbols-outlined text-[20px] leading-none">info</span>
+            </div>
+            <div class="min-w-0">
+              <h3 class="truncate text-base font-bold text-slate-900">{{ basicInfoDrawerTitle }}</h3>
+              <p class="truncate text-xs text-slate-400">{{ basicInfoDrawerSubtitle }}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+            @click="showBasicInfoDrawer = false"
+          >
+            <span class="material-symbols-outlined text-[18px] leading-none">close</span>
+          </button>
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+          <div class="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
+            <div class="flex items-center gap-4">
+              <div class="flex size-16 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-2xl font-black text-slate-400">
+                {{ customer.companyName?.charAt(0) || '?' }}
+              </div>
+              <div class="min-w-0">
+                <h4 class="truncate text-lg font-bold text-slate-900">{{ customer.companyName }}</h4>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <span
+                    class="px-2 py-0.5 text-xs font-bold rounded uppercase"
+                    :class="getStageBadgeClass(customer.stage)"
+                  >{{ getStageLabel(customer.stage) }}</span>
+                  <span
+                    v-if="customer.level"
+                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold"
+                    :class="{
+                      'bg-emerald-50 text-emerald-600': customer.level === 'A',
+                      'bg-blue-50 text-blue-600': customer.level === 'B',
+                      'bg-slate-100 text-slate-500': customer.level === 'C'
+                    }"
+                  >{{ customer.level }}级</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-5">
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">公司全称</p>
+              <p class="text-sm text-slate-900 font-medium">{{ customer.companyName }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">所属行业</p>
+              <p class="text-sm text-slate-900 font-medium">{{ customer.industry || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户来源</p>
+              <p class="text-sm text-slate-900 font-medium">{{ customer.source || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">主要联系人</p>
+              <p class="text-sm text-slate-900 font-medium">{{ primaryContact?.name || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">联系电话</p>
+              <p class="text-sm text-slate-900 font-medium font-mono">{{ primaryContact?.phone || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">电子邮箱</p>
+              <p class="text-sm text-slate-900 font-medium break-all">{{ primaryContact?.email || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户地址</p>
+              <p class="text-sm text-slate-900 font-medium whitespace-pre-wrap break-words">{{ customer.address || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">公司网站</p>
+              <a
+                v-if="customer.website"
+                :href="customer.website"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-sm font-medium text-primary hover:underline break-all"
+              >
+                {{ customer.website }}
+              </a>
+              <p v-else class="text-sm text-slate-900 font-medium">-</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">报价金额</p>
+              <p class="text-sm text-slate-900 font-medium">{{ formatAmount(customer.quotation) }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">合同金额</p>
+              <p class="text-sm text-slate-900 font-medium">{{ formatAmount(customer.contractAmount) }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">回款金额</p>
+              <p class="text-sm text-slate-900 font-medium">{{ formatAmount(customer.revenue) }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
+              <p class="text-sm text-slate-900 font-medium">{{ customer.ownerName || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">创建人</p>
+              <p class="text-sm text-slate-900 font-medium">{{ customer.createUserName || customer.createUserId || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">创建时间</p>
+              <p class="text-sm text-slate-900 font-medium">{{ formatDateTime(customer.createTime) }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">更新时间</p>
+              <p class="text-sm text-slate-900 font-medium">{{ formatDateTime(customer.updateTime) }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">备注</p>
+              <p class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{{ customer.remark || '暂无备注' }}</p>
+            </div>
+            <div v-for="field in customFields" :key="`drawer-${field.fieldId}`">
+              <p class="text-xs font-bold text-slate-400 tracking-wider mb-1">{{ field.fieldLabel }}</p>
+              <p class="text-sm text-slate-900 font-medium whitespace-pre-wrap break-words">{{ formatCustomFieldDisplayValue(field, customer.customFields?.[field.fieldName]) }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
+
     <!-- Edit Customer Dialog -->
     <CustomerUpsertDialog
       v-model="showEditDialog"
@@ -833,12 +967,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, generateCustomerAiReport, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
+import type { CustomerAiParseVO } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } from '@/api/followup'
 import { deleteContact, queryContactPageList, queryContactsByCustomer, setPrimaryContact } from '@/api/contact'
@@ -849,6 +984,8 @@ import type { CustomField } from '@/types/customField'
 import { getCustomerAiStatusMeta } from '@/utils/customerAi'
 import { formatCustomFieldValue as formatCustomFieldDisplayValue } from '@/utils/customFieldDisplay'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
+import AiParseInsightSidebar from '@/components/crm/AiParseInsightSidebar.vue'
+import FollowUpCard from '@/components/customer/FollowUpCard.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import ContactUpsertDialog from '@/views/contact/components/ContactUpsertDialog.vue'
 import ContactDetailDrawer from '@/views/contact/components/ContactDetailDrawer.vue'
@@ -871,6 +1008,7 @@ const editingContact = ref<Contact | null>(null)
 const editingFollowUpId = ref('')
 const contactAiImagePickerToken = ref(0)
 const showEditDialog = ref(false)
+const showBasicInfoDrawer = ref(false)
 const showAiFollowUpDrawer = ref(false)
 const showAiReportDialog = ref(false)
 const showTerminalStageMenu = ref(false)
@@ -914,6 +1052,17 @@ const sectionIconBgColors = {
   todoTasks: '#00875A',
   documentCenter: '#0052CC',
 } as const
+
+const savedAiAnalysisTitle = '\u0041\u0049 \u667a\u80fd\u5206\u6790'
+const savedAiAnalysisDescription = '\u4fdd\u5b58\u5ba2\u6237\u540e\u81ea\u52a8\u751f\u6210\u7684 AI \u5ba2\u6237\u753b\u50cf\u548c\u63a8\u8fdb\u5efa\u8bae'
+const emptyAiAnalysisTitle = '\u6682\u65e0 AI \u5206\u6790'
+const emptyAiAnalysisDescription = '\u4fdd\u5b58\u5ba2\u6237\u540e\uff0c\u7cfb\u7edf\u4f1a\u81ea\u52a8\u89e6\u53d1 AI \u5206\u6790\uff0c\u7ed3\u679c\u4f1a\u5c55\u793a\u5728\u8fd9\u91cc\u3002'
+const aiReportSummaryTitle = 'AI \u62a5\u544a\u6458\u8981'
+const viewBasicInfoButtonText = '\u67e5\u770b\u57fa\u672c\u4fe1\u606f'
+const basicInfoDrawerTitle = '\u57fa\u672c\u4fe1\u606f'
+const basicInfoDrawerSubtitle = '\u67e5\u770b\u5e76\u7ef4\u62a4\u5ba2\u6237\u8be6\u7ec6\u8d44\u6599'
+const AI_ANALYSIS_POLL_INTERVAL_MS = 2500
+const AI_ANALYSIS_POLL_MAX_ATTEMPTS = 24
 
 type SectionIconKey = keyof typeof sectionIconBgColors
 
@@ -1020,6 +1169,115 @@ function applyPrimaryContactLocally(contactId: string) {
 }
 
 const primaryContact = computed(() => contacts.value.find(contact => isPrimaryContact(contact)) || contacts.value[0] || null)
+const savedAiParseResult = computed<CustomerAiParseVO | null>(() => {
+  const snapshot = customer.value?.aiParseSnapshot
+  if (!snapshot) return null
+
+  try {
+    const parsed = JSON.parse(snapshot)
+    return parsed && typeof parsed === 'object' ? parsed as CustomerAiParseVO : null
+  } catch {
+    return null
+  }
+})
+const aiAnalysisStatus = computed(() => customer.value?.aiAnalysisStatus || '')
+const isAiAnalysisPending = computed(() => aiAnalysisStatus.value === 'pending' || aiAnalysisStatus.value === 'running')
+const isAiAnalysisFailed = computed(() => aiAnalysisStatus.value === 'failed')
+const aiAnalysisDisplayTime = computed(() => formatDateTime(customer.value?.aiAnalysisRequestedAt || customer.value?.updateTime))
+const aiAnalysisStatusLabel = computed(() => {
+  switch (aiAnalysisStatus.value) {
+    case 'pending':
+      return 'AI 分析排队中'
+    case 'running':
+      return 'AI 分析生成中'
+    case 'failed':
+      return 'AI 分析未完成'
+    case 'success':
+      return 'AI 分析已更新'
+    default:
+      return ''
+  }
+})
+const aiAnalysisStatusDescription = computed(() => {
+  switch (aiAnalysisStatus.value) {
+    case 'pending':
+      return '客户已保存，系统正在排队处理最新一次 AI 分析任务。'
+    case 'running':
+      return '系统正在基于最新客户资料生成画像和推进建议，结果会自动刷新到当前页面。'
+    case 'failed':
+      return '本次自动分析未成功，可以重新保存客户资料，或点击右上角手动生成 AI 分析报告。'
+    default:
+      return ''
+  }
+})
+const aiAnalysisEmptyTitle = computed(() => {
+  if (isAiAnalysisPending.value) return 'AI 分析生成中'
+  if (isAiAnalysisFailed.value) return 'AI 分析未完成'
+  return emptyAiAnalysisTitle
+})
+const aiAnalysisEmptyDescription = computed(() => {
+  if (isAiAnalysisPending.value) {
+    return '客户资料已保存，系统正在后台生成 AI 客户画像和推进建议，请稍候自动刷新。'
+  }
+  if (isAiAnalysisFailed.value) {
+    return '最近一次自动分析没有成功生成结果。你可以重新保存客户，或手动点击“生成 AI 分析报告”。'
+  }
+  return emptyAiAnalysisDescription
+})
+
+let aiAnalysisPollTimer: ReturnType<typeof setTimeout> | null = null
+let aiAnalysisPollAttempts = 0
+
+function clearAiAnalysisPolling(resetAttempts = true) {
+  if (aiAnalysisPollTimer) {
+    clearTimeout(aiAnalysisPollTimer)
+    aiAnalysisPollTimer = null
+  }
+  if (resetAttempts) {
+    aiAnalysisPollAttempts = 0
+  }
+}
+
+function scheduleAiAnalysisPolling(customerId?: string, resetAttempts = false) {
+  if (!customerId) return
+  if (!isAiAnalysisPending.value) {
+    clearAiAnalysisPolling(resetAttempts)
+    return
+  }
+  if (resetAttempts) {
+    clearAiAnalysisPolling()
+  }
+  if (aiAnalysisPollTimer || aiAnalysisPollAttempts >= AI_ANALYSIS_POLL_MAX_ATTEMPTS) {
+    return
+  }
+
+  aiAnalysisPollTimer = setTimeout(async () => {
+    aiAnalysisPollTimer = null
+    if (String(route.params.id || '') !== customerId) {
+      clearAiAnalysisPolling()
+      return
+    }
+
+    aiAnalysisPollAttempts += 1
+    try {
+      await customerStore.fetchCustomerDetail(customerId)
+    } catch (error) {
+      console.error('Failed to poll customer ai analysis status:', error)
+    }
+
+    if (String(route.params.id || '') !== customerId) {
+      clearAiAnalysisPolling()
+      return
+    }
+
+    if (isAiAnalysisPending.value && aiAnalysisPollAttempts < AI_ANALYSIS_POLL_MAX_ATTEMPTS) {
+      scheduleAiAnalysisPolling(customerId)
+      return
+    }
+
+    clearAiAnalysisPolling()
+  }, AI_ANALYSIS_POLL_INTERVAL_MS)
+}
 
 
 function formatDateForApi(date: Date = new Date()): string {
@@ -1142,6 +1400,33 @@ onMounted(async () => {
     await Promise.all(fetchTasks)
     loading.value = false
   }
+})
+
+watch(
+  () => [customer.value?.customerId || '', customer.value?.aiAnalysisStatus || ''] as const,
+  ([customerId, status], previousValue) => {
+    const previousCustomerId = previousValue?.[0] || ''
+    const previousStatus = previousValue?.[1] || ''
+    if (!customerId) {
+      clearAiAnalysisPolling()
+      return
+    }
+    if (customerId !== previousCustomerId) {
+      clearAiAnalysisPolling()
+    }
+    if (status === 'pending' || status === 'running') {
+      scheduleAiAnalysisPolling(
+        customerId,
+        customerId !== previousCustomerId || (previousStatus !== 'pending' && previousStatus !== 'running')
+      )
+      return
+    }
+    clearAiAnalysisPolling()
+  }
+)
+
+onBeforeUnmount(() => {
+  clearAiAnalysisPolling()
 })
 
 async function fetchFollowUps(customerId: string, reset = false) {
@@ -1706,7 +1991,8 @@ function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('zh-CN')
 }
 
-function formatDateTime(dateStr: string): string {
+function formatDateTime(dateStr?: string): string {
+  if (!dateStr) return '-'
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
@@ -1743,6 +2029,10 @@ void formatCustomFieldValue
 </script>
 
 <style>
+.customer-basic-info-drawer .el-drawer__body {
+  padding: 0 !important;
+}
+
 .wk-stage-result-popover.el-popper,
 .wk-stage-result-popover.el-popover {
   padding: 0;

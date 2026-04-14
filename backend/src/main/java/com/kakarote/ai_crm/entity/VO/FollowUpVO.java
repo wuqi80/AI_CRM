@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 跟进记录视图对象
@@ -36,6 +37,15 @@ public class FollowUpVO {
     @Schema(description = "跟进内容")
     private String content;
 
+    @Schema(description = "AI summary")
+    private String summary;
+
+    @Schema(description = "Scene type")
+    private String sceneType;
+
+    @Schema(description = "AI generated flag")
+    private Integer aiGenerated;
+
     @Schema(description = "跟进时间")
     private Date followTime;
 
@@ -50,4 +60,10 @@ public class FollowUpVO {
 
     @Schema(description = "创建时间")
     private Date createTime;
+
+    @Schema(description = "Attachments")
+    private List<FollowUpAttachmentVO> attachments;
+
+    @Schema(description = "Linked tasks")
+    private List<FollowUpLinkedTaskVO> tasks;
 }

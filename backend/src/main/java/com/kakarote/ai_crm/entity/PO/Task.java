@@ -69,6 +69,12 @@ public class Task implements Serializable {
     private Long customerId;
 
     /**
+     * 来源跟进ID
+     */
+    @Schema(description = "Source follow-up ID")
+    private Long sourceFollowUpId;
+
+    /**
      * 是否AI生成: 0-否, 1-是
      */
     @Schema(description = "是否AI生成: 0-否, 1-是")

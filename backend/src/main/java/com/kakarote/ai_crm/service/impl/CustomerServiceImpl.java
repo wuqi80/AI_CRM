@@ -7,10 +7,14 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
 import cn.hutool.poi.excel.ExcelWriter;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.auth.DataPermissionContext;
+import com.kakarote.ai_crm.common.auth.DataPermissionHolder;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
@@ -36,9 +40,13 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
 import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -48,6 +56,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.Executor;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -62,6 +71,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private static final String CUSTOMER_TABLE_NAME = "crm_customer";
     private static final String CUSTOMER_SEARCH_TEXT_COLUMN = "search_text";
     private static final Set<String> SEARCHABLE_CUSTOM_FIELD_TYPES = Set.of("text", "textarea", "select", "multiselect");
+    private static final String AI_ANALYSIS_STATUS_PENDING = "pending";
+    private static final String AI_ANALYSIS_STATUS_RUNNING = "running";
+    private static final String AI_ANALYSIS_STATUS_SUCCESS = "success";
+    private static final String AI_ANALYSIS_STATUS_FAILED = "failed";
 
     @Autowired
     private ContactMapper contactMapper;
@@ -99,6 +112,13 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     @Autowired
     private IGlobalSearchIndexService globalSearchIndexService;
+
+    @Autowired
+    @Qualifier("customerAiAnalysisExecutor")
+    private Executor customerAiAnalysisExecutor;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -241,9 +261,14 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     @Transactional(rollbackFor = Exception.class)
     public Long addCustomer(CustomerAddBO customerAddBO) {
         // Create customer
+        Date analysisRequestedAt = new Date();
+        Long currentUserId = UserUtil.getUserId();
+        Long currentTenantId = UserUtil.getTenantId();
         Customer customer = BeanUtil.copyProperties(customerAddBO, Customer.class);
-        customer.setOwnerId(UserUtil.getUserId());
+        customer.setOwnerId(currentUserId);
         customer.setStatus(1);
+        customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
+        customer.setAiAnalysisRequestedAt(analysisRequestedAt);
         if (StrUtil.isEmpty(customer.getStage())) {
             customer.setStage("lead");
         }
@@ -274,6 +299,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
         refreshCustomerSearchText(customer.getCustomerId());
         globalSearchIndexService.refreshCustomerIndex(customer.getCustomerId());
+        scheduleCustomerAiAnalysis(customer.getCustomerId(),
+                currentUserId,
+                ObjectUtil.defaultIfNull(customer.getTenantId(), currentTenantId),
+                analysisRequestedAt);
 
         return customer.getCustomerId();
     }
@@ -281,11 +310,16 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateCustomer(CustomerUpdateBO customerUpdateBO) {
+        Date analysisRequestedAt = new Date();
+        Long currentUserId = UserUtil.getUserId();
+        Long currentTenantId = UserUtil.getTenantId();
         Customer customer = getById(customerUpdateBO.getCustomerId());
         if (ObjectUtil.isNull(customer)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
         }
         BeanUtil.copyProperties(customerUpdateBO, customer, "customerId", "createUserId", "createTime", "customFields");
+        customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
+        customer.setAiAnalysisRequestedAt(analysisRequestedAt);
         updateById(customer);
 
         // 更新自定义字段
@@ -296,6 +330,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         refreshCustomerSearchText(customer.getCustomerId());
         globalSearchIndexService.refreshCustomerIndex(customer.getCustomerId());
         globalSearchIndexService.refreshCustomerRelatedIndexes(customer.getCustomerId());
+        scheduleCustomerAiAnalysis(customer.getCustomerId(),
+                currentUserId,
+                ObjectUtil.defaultIfNull(customer.getTenantId(), currentTenantId),
+                analysisRequestedAt);
     }
 
     @Override
@@ -601,6 +639,19 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "瀹㈡埛涓嶅瓨鍦?");
         }
 
+        Date analysisRequestedAt = new Date();
+        updateCustomerAiAnalysisState(customerId, null, AI_ANALYSIS_STATUS_RUNNING, analysisRequestedAt);
+        try {
+            return generateAiReportInternal(customerId, analysisRequestedAt, true);
+        } catch (Exception exception) {
+            updateCustomerAiAnalysisState(customerId, analysisRequestedAt, AI_ANALYSIS_STATUS_FAILED, null);
+            throw exception;
+        }
+    }
+
+    private CustomerAiReportVO generateAiReportInternal(Long customerId,
+                                                        Date expectedRequestedAt,
+                                                        boolean persistCompletedStatus) {
         CustomerDetailVO detail = getCustomerDetail(customerId);
         List<FollowUpVO> recentFollowUps = followUpMapper.getRecentByCustomerId(customerId, 5);
 
@@ -619,16 +670,308 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
 
         report.setCustomerId(customerId);
+        String aiParseSnapshot = serializeCustomerAiParseSnapshot(buildCustomerAiParseSnapshot(detail, recentFollowUps, report));
 
-        lambdaUpdate()
+        LambdaUpdateWrapper<Customer> updateWrapper = Wrappers.lambdaUpdate(Customer.class)
                 .eq(Customer::getCustomerId, customerId)
                 .set(Customer::getAiStatusDetection, StrUtil.nullToEmpty(report.getAiStatusDetection()))
-                .set(Customer::getAiInsight, StrUtil.nullToEmpty(report.getAiInsight()))
-                .update();
+                .set(Customer::getAiInsight, StrUtil.nullToEmpty(report.getAiInsight()));
+        if (expectedRequestedAt != null) {
+            updateWrapper.eq(Customer::getAiAnalysisRequestedAt, expectedRequestedAt);
+        }
+        if (StrUtil.isNotBlank(aiParseSnapshot)) {
+            updateWrapper.set(Customer::getAiParseSnapshot, aiParseSnapshot);
+        }
+        if (persistCompletedStatus) {
+            updateWrapper.set(Customer::getAiAnalysisStatus, AI_ANALYSIS_STATUS_SUCCESS);
+        }
+        int updated = baseMapper.update(null, updateWrapper);
+        if (updated <= 0) {
+            log.info("skip stale customer ai analysis result, customerId={}", customerId);
+            return report;
+        }
 
         refreshCustomerSearchText(customerId);
         globalSearchIndexService.refreshCustomerIndex(customerId);
         return report;
+    }
+
+    private void scheduleCustomerAiAnalysis(Long customerId, Long userId, Long tenantId, Date analysisRequestedAt) {
+        if (customerId == null || userId == null || analysisRequestedAt == null) {
+            return;
+        }
+
+        Runnable triggerTask = () -> {
+            try {
+                customerAiAnalysisExecutor.execute(() -> runCustomerAiAnalysisAsync(customerId, userId, tenantId, analysisRequestedAt));
+            } catch (Exception exception) {
+                log.error("dispatch customer ai analysis failed, customerId={}", customerId, exception);
+            }
+        };
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    triggerTask.run();
+                }
+            });
+            return;
+        }
+
+        triggerTask.run();
+    }
+
+    private void runCustomerAiAnalysisAsync(Long customerId, Long userId, Long tenantId, Date analysisRequestedAt) {
+        if (tenantId == null) {
+            log.warn("skip customer ai analysis because tenant context is missing, customerId={}", customerId);
+            return;
+        }
+
+        bindCustomerAiAnalysisContext(userId, tenantId);
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                if (!updateCustomerAiAnalysisState(customerId, analysisRequestedAt, AI_ANALYSIS_STATUS_RUNNING, null)) {
+                    log.info("skip stale customer ai analysis before execution, customerId={}", customerId);
+                    return;
+                }
+                try {
+                    generateAiReportInternal(customerId, analysisRequestedAt, true);
+                } catch (Exception exception) {
+                    updateCustomerAiAnalysisState(customerId, analysisRequestedAt, AI_ANALYSIS_STATUS_FAILED, null);
+                    log.error("auto generate customer ai report failed, customerId={}", customerId, exception);
+                }
+            });
+        } finally {
+            clearCustomerAiAnalysisContext();
+        }
+    }
+
+    private void bindCustomerAiAnalysisContext(Long userId, Long tenantId) {
+        DataPermissionHolder.clear();
+        AiContextHolder.bindThreadContext(userId, tenantId);
+    }
+
+    private void clearCustomerAiAnalysisContext() {
+        DataPermissionHolder.clear();
+        AiContextHolder.clearThreadContext();
+    }
+
+    private boolean updateCustomerAiAnalysisState(Long customerId,
+                                                  Date expectedRequestedAt,
+                                                  String aiAnalysisStatus,
+                                                  Date nextRequestedAt) {
+        LambdaUpdateWrapper<Customer> updateWrapper = Wrappers.lambdaUpdate(Customer.class)
+                .eq(Customer::getCustomerId, customerId);
+        if (expectedRequestedAt != null) {
+            updateWrapper.eq(Customer::getAiAnalysisRequestedAt, expectedRequestedAt);
+        }
+        if (StrUtil.isNotBlank(aiAnalysisStatus)) {
+            updateWrapper.set(Customer::getAiAnalysisStatus, aiAnalysisStatus);
+        }
+        if (nextRequestedAt != null) {
+            updateWrapper.set(Customer::getAiAnalysisRequestedAt, nextRequestedAt);
+        }
+        return baseMapper.update(null, updateWrapper) > 0;
+    }
+
+    private String serializeCustomerAiParseSnapshot(CustomerAiParseVO snapshot) {
+        if (isEmptyCustomerAiParseResult(snapshot)) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (Exception exception) {
+            log.warn("serialize customer ai parse snapshot failed", exception);
+            return null;
+        }
+    }
+
+    private CustomerAiParseVO buildCustomerAiParseSnapshot(CustomerDetailVO detail,
+                                                           List<FollowUpVO> recentFollowUps,
+                                                           CustomerAiReportVO report) {
+        CustomerAiParseVO snapshot = new CustomerAiParseVO();
+        ContactVO primaryContact = findPrimaryContact(detail.getContacts());
+
+        snapshot.setCompanyName(detail.getCompanyName());
+        snapshot.setIndustry(detail.getIndustry());
+        snapshot.setLevel(detail.getLevel());
+        snapshot.setStage(detail.getStage());
+        snapshot.setSource(detail.getSource());
+        snapshot.setRemark(detail.getRemark());
+
+        if (primaryContact != null) {
+            snapshot.setContactName(primaryContact.getName());
+            snapshot.setContactPhone(primaryContact.getPhone());
+            snapshot.setContactEmail(primaryContact.getEmail());
+            snapshot.setContactPosition(primaryContact.getPosition());
+        }
+
+        snapshot.setScore(inferCustomerAiParseScore(detail, recentFollowUps, report.getAiStatusDetection()));
+        snapshot.setTags(buildCustomerAiParseTags(detail, report.getAiStatusDetection()));
+        snapshot.setSummary(buildCustomerAiParseSummary(detail, primaryContact, report));
+        snapshot.setNextStep(buildCustomerAiParseNextStep(detail, report.getAiStatusDetection()));
+        snapshot.setKeyPoints(buildCustomerAiParseKeyPoints(detail, primaryContact, recentFollowUps));
+        return snapshot;
+    }
+
+    private ContactVO findPrimaryContact(List<ContactVO> contacts) {
+        if (contacts == null || contacts.isEmpty()) {
+            return null;
+        }
+        return contacts.stream()
+                .filter(contact -> contact.getIsPrimary() != null && contact.getIsPrimary() == 1)
+                .findFirst()
+                .orElse(contacts.get(0));
+    }
+
+    private Integer inferCustomerAiParseScore(CustomerDetailVO detail,
+                                              List<FollowUpVO> recentFollowUps,
+                                              String aiStatus) {
+        int score = 45;
+
+        if ("A".equalsIgnoreCase(detail.getLevel())) {
+            score += 20;
+        } else if ("B".equalsIgnoreCase(detail.getLevel())) {
+            score += 12;
+        } else if ("C".equalsIgnoreCase(detail.getLevel())) {
+            score += 6;
+        }
+
+        switch (StrUtil.blankToDefault(detail.getStage(), "")) {
+            case "qualified" -> score += 8;
+            case "proposal" -> score += 12;
+            case "negotiation" -> score += 16;
+            case "closed" -> score += 18;
+            case "lost" -> score -= 20;
+            default -> score += 3;
+        }
+
+        if (detail.getQuotation() != null) {
+            score += 6;
+        }
+        if (detail.getContractAmount() != null) {
+            score += 8;
+        }
+        if (detail.getRevenue() != null) {
+            score += 6;
+        }
+        if (detail.getContacts() != null && !detail.getContacts().isEmpty()) {
+            score += 5;
+        }
+
+        FollowUpVO latestFollowUp = recentFollowUps == null || recentFollowUps.isEmpty() ? null : recentFollowUps.get(0);
+        if (latestFollowUp != null && latestFollowUp.getFollowTime() != null && getDaysSinceNow(latestFollowUp.getFollowTime()) <= 7) {
+            score += 8;
+        }
+        if (detail.getNextFollowTime() != null && !detail.getNextFollowTime().before(new Date())) {
+            score += 5;
+        }
+
+        switch (StrUtil.blankToDefault(aiStatus, "")) {
+            case "高意向" -> score += 10;
+            case "活跃状态" -> score += 6;
+            case "需跟进" -> score += 2;
+            case "休眠" -> score -= 15;
+            default -> {
+            }
+        }
+
+        return Math.max(20, Math.min(score, 98));
+    }
+
+    private List<String> buildCustomerAiParseTags(CustomerDetailVO detail, String aiStatus) {
+        LinkedHashSet<String> tags = new LinkedHashSet<>();
+        if (detail.getTags() != null) {
+            detail.getTags().stream()
+                    .map(CustomerTag::getTagName)
+                    .filter(StrUtil::isNotBlank)
+                    .forEach(tags::add);
+        }
+        if (StrUtil.isNotBlank(detail.getIndustry())) {
+            tags.add(detail.getIndustry());
+        }
+        if (StrUtil.isNotBlank(aiStatus)) {
+            tags.add(aiStatus);
+        }
+        if (StrUtil.isNotBlank(detail.getLevel())) {
+            tags.add(getLevelDisplayLabel(detail.getLevel()) + "客户");
+        }
+        if (StrUtil.isNotBlank(detail.getStage())) {
+            tags.add(getStageLabel(detail.getStage()));
+        }
+        return tags.stream().filter(StrUtil::isNotBlank).limit(5).collect(Collectors.toList());
+    }
+
+    private String buildCustomerAiParseSummary(CustomerDetailVO detail,
+                                               ContactVO primaryContact,
+                                               CustomerAiReportVO report) {
+        if (StrUtil.isNotBlank(report.getAiInsight())) {
+            return truncateText(report.getAiInsight(), 180);
+        }
+
+        List<String> parts = new ArrayList<>();
+        parts.add(StrUtil.blankToDefault(detail.getCompanyName(), "该客户"));
+        if (StrUtil.isNotBlank(detail.getIndustry())) {
+            parts.add("所属行业为" + detail.getIndustry());
+        }
+        parts.add("当前处于" + getStageLabel(detail.getStage()) + "阶段");
+        if (primaryContact != null && StrUtil.isNotBlank(primaryContact.getName())) {
+            parts.add("当前主要联系人为" + primaryContact.getName());
+        }
+        return String.join("，", parts) + "。";
+    }
+
+    private String buildCustomerAiParseNextStep(CustomerDetailVO detail, String aiStatus) {
+        if (detail.getNextFollowTime() != null && !detail.getNextFollowTime().before(new Date())) {
+            return "优先围绕已安排的下次跟进时间推进沟通，确认客户反馈、决策节点和下一步动作。";
+        }
+        return switch (StrUtil.blankToDefault(aiStatus, "")) {
+            case "高意向" -> "优先推进预算确认、方案收口和关键决策人同步，尽快约定下一次商务沟通。";
+            case "活跃状态" -> "保持当前沟通频率，继续围绕需求澄清、方案演示和关键角色对齐推进。";
+            case "休眠" -> "先确认客户沉默原因，再设计重新激活的话术或触达动作，寻找新的沟通窗口。";
+            default -> "尽快发起一次明确触达，确认客户当前反馈、阻塞点和下一次跟进时间。";
+        };
+    }
+
+    private List<String> buildCustomerAiParseKeyPoints(CustomerDetailVO detail,
+                                                       ContactVO primaryContact,
+                                                       List<FollowUpVO> recentFollowUps) {
+        List<String> keyPoints = new ArrayList<>();
+
+        if (primaryContact != null && StrUtil.isNotBlank(primaryContact.getName())) {
+            StringBuilder contactPoint = new StringBuilder("关键联系人：" + primaryContact.getName());
+            if (StrUtil.isNotBlank(primaryContact.getPosition())) {
+                contactPoint.append(" / ").append(primaryContact.getPosition());
+            }
+            if (StrUtil.isNotBlank(primaryContact.getPhone())) {
+                contactPoint.append(" / ").append(primaryContact.getPhone());
+            }
+            keyPoints.add(contactPoint.toString());
+        }
+
+        FollowUpVO latestFollowUp = recentFollowUps == null || recentFollowUps.isEmpty() ? null : recentFollowUps.get(0);
+        if (latestFollowUp != null && StrUtil.isNotBlank(latestFollowUp.getContent())) {
+            keyPoints.add("最近跟进：" + truncateText(latestFollowUp.getContent(), 60));
+        } else if (StrUtil.isNotBlank(detail.getRemark())) {
+            keyPoints.add("客户备注：" + truncateText(detail.getRemark(), 60));
+        }
+
+        if (detail.getNextFollowTime() != null) {
+            keyPoints.add("下次跟进：" + DateUtil.formatDateTime(detail.getNextFollowTime()));
+        }
+
+        if (detail.getQuotation() != null || detail.getContractAmount() != null || detail.getRevenue() != null) {
+            keyPoints.add("商机金额：报价" + formatNullableAmount(detail.getQuotation())
+                    + " / 合同" + formatNullableAmount(detail.getContractAmount())
+                    + " / 回款" + formatNullableAmount(detail.getRevenue()));
+        }
+
+        if (keyPoints.isEmpty()) {
+            keyPoints.add("当前阶段：" + getStageLabel(detail.getStage()));
+        }
+
+        return keyPoints.stream().filter(StrUtil::isNotBlank).limit(4).collect(Collectors.toList());
     }
 
     private String buildCustomerAiReportContext(CustomerDetailVO detail, List<FollowUpVO> recentFollowUps) {

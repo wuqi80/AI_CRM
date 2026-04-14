@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,15 +18,24 @@ import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
+import com.kakarote.ai_crm.entity.BO.FollowUpSuggestedTaskBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpUpdateBO;
+import com.kakarote.ai_crm.entity.BO.TaskAddBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.FollowUp;
+import com.kakarote.ai_crm.entity.PO.FollowUpAttachment;
+import com.kakarote.ai_crm.entity.PO.Task;
+import com.kakarote.ai_crm.entity.VO.FollowUpAttachmentVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
+import com.kakarote.ai_crm.entity.VO.FollowUpLinkedTaskVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.FollowUpAttachmentMapper;
 import com.kakarote.ai_crm.mapper.FollowUpMapper;
+import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IFollowUpService;
+import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.utils.AiMediaUtil;
 import com.kakarote.ai_crm.utils.DocumentTextExtractor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +56,13 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Follow-up service implementation.
@@ -62,7 +78,14 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
         DateTimeFormatter.ISO_LOCAL_DATE_TIME
     );
+    private static final Pattern CHINESE_RELATIVE_TIME_PATTERN = Pattern.compile(
+        "(明天|后天|明早|明晚|今天)\\s*(凌晨|早上|早晨|上午|中午|下午|傍晚|晚上|今晚)?\\s*(\\d{1,2})(?:\\s*[:点时]\\s*(\\d{1,2}))?(半)?\\s*(?:分)?"
+    );
+    private static final Pattern ENGLISH_RELATIVE_TIME_PATTERN = Pattern.compile(
+        "(?i)\\b(today|tomorrow|day after tomorrow)\\b(?:\\s+at)?(?:\\s+(morning|afternoon|evening))?\\s*(\\d{1,2})(?::(\\d{1,2}))?\\s*(am|pm)?"
+    );
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
+    private static final int MAX_ATTACHMENT_ANALYSIS_LENGTH = 4000;
 
     private static final String AI_PARSE_PROMPT_TEMPLATE = """
         You are a professional CRM assistant.
@@ -82,11 +105,14 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         2. If the content is describing a future plan or scheduled contact such as "tomorrow at 10am call the customer", keep `followTime` as Current time.
         3. Put planned future contact times into `nextFollowTime`.
         4. Do not put a future planned time into `followTime` when the content has not happened yet.
+        5. Resolve relative time phrases like "明天上午10点" or "tomorrow at 10am" against Current time and output concrete timestamps.
+        6. Example: if Current time is "2026-04-13 15:00:00" and the content says "明天上午10点电话沟通", then `followTime` must be "2026-04-13 15:00:00" and `nextFollowTime` must be "2026-04-14 10:00:00".
 
-        Keep summary, keyPoints, and todos in the same language as the user's content.
+        Keep summary, sceneType, keyPoints, and todos in the same language as the user's content.
         Return strict JSON only with this exact shape:
         {
           "summary": "short summary in 1-2 sentences",
+          "sceneType": "brief scene label in the same language, or empty string",
           "type": "one of: call, meeting, email, visit, other",
           "followTime": "yyyy-MM-dd HH:mm:ss",
           "nextFollowTime": "yyyy-MM-dd HH:mm:ss or empty string",
@@ -100,6 +126,16 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private FollowUpAttachmentMapper followUpAttachmentMapper;
+
+    @Autowired
+    private ITaskService taskService;
+
+    @Lazy
+    @Autowired
+    private AiAudioTranscriptionService aiAudioTranscriptionService;
 
     @Lazy
     @Autowired
@@ -119,7 +155,12 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         if (followUp.getFollowTime() == null) {
             followUp.setFollowTime(new Date());
         }
+        if (followUp.getAiGenerated() == null) {
+            followUp.setAiGenerated(0);
+        }
         save(followUp);
+        saveAttachments(followUp.getFollowUpId(), followUpAddBO.getAttachments());
+        createSuggestedTasks(followUp, followUpAddBO.getSuggestedTasks());
         syncCustomerFollowUpSummary(followUp.getCustomerId());
 
         return followUp.getFollowUpId();
@@ -154,6 +195,9 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Follow-up record does not exist");
         }
         Long customerId = followUp.getCustomerId();
+        followUpAttachmentMapper.delete(
+            Wrappers.<FollowUpAttachment>lambdaQuery().eq(FollowUpAttachment::getFollowUpId, followUpId)
+        );
         removeById(followUpId);
         syncCustomerFollowUpSummary(customerId);
     }
@@ -164,13 +208,16 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             .eq(FollowUp::getCustomerId, customerId)
             .orderByDesc(FollowUp::getFollowTime)
             .list();
-        return BeanUtil.copyToList(followUps, FollowUpVO.class);
+        List<FollowUpVO> result = BeanUtil.copyToList(followUps, FollowUpVO.class);
+        enrichFollowUps(result);
+        return result;
     }
 
     @Override
     public BasePage<FollowUpVO> queryPageList(FollowUpQueryBO queryBO) {
         BasePage<FollowUpVO> page = queryBO.parse();
         baseMapper.queryPageList(page, queryBO);
+        enrichFollowUps(page.getList());
         return page;
     }
 
@@ -207,6 +254,49 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         }
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public FollowUpAttachmentVO analyzeAttachment(Long attachmentId) {
+        FollowUpAttachment attachment = followUpAttachmentMapper.selectById(attachmentId);
+        if (attachment == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment does not exist");
+        }
+
+        attachment.setAnalysisStatus("processing");
+        followUpAttachmentMapper.updateById(attachment);
+
+        try {
+            String analysis = buildAttachmentAnalysis(attachment);
+            attachment.setAnalysisStatus("completed");
+            attachment.setAnalysisContent(analysis);
+            attachment.setAnalysisTime(new Date());
+            followUpAttachmentMapper.updateById(attachment);
+            return toAttachmentVO(attachment);
+        } catch (BusinessException ex) {
+            attachment.setAnalysisStatus("failed");
+            attachment.setAnalysisContent(ex.getMessage());
+            attachment.setAnalysisTime(new Date());
+            followUpAttachmentMapper.updateById(attachment);
+            return toAttachmentVO(attachment);
+        } catch (Exception ex) {
+            log.error("Attachment AI analysis failed, attachmentId={}", attachmentId, ex);
+            attachment.setAnalysisStatus("failed");
+            attachment.setAnalysisContent("AI analysis failed, please try again later.");
+            attachment.setAnalysisTime(new Date());
+            followUpAttachmentMapper.updateById(attachment);
+            return toAttachmentVO(attachment);
+        }
+    }
+
+    @Override
+    public FollowUpAttachmentVO getAttachment(Long attachmentId) {
+        FollowUpAttachment attachment = followUpAttachmentMapper.selectById(attachmentId);
+        if (attachment == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment does not exist");
+        }
+        return toAttachmentVO(attachment);
+    }
+
     private FollowUpAiParseVO parseAiResponse(String response, String originalContent, String now) {
         try {
             String json = response.trim();
@@ -222,6 +312,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
                 "summary",
                 originalContent.length() > 100 ? originalContent.substring(0, 100) + "..." : originalContent
             ));
+            vo.setSceneType(getTextOrDefault(root, "sceneType", ""));
             vo.setType(getTextOrDefault(root, "type", "other"));
             vo.setFollowTime(normalizeRequiredDateTime(getTextOrDefault(root, "followTime", now), now));
             vo.setNextFollowTime(normalizeOptionalDateTime(getTextOrDefault(root, "nextFollowTime", ""), now));
@@ -238,7 +329,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             }
             vo.setTodos(todos);
 
-            return normalizeParsedTimes(vo, now);
+            return normalizeParsedTimes(vo, originalContent, now);
         } catch (Exception e) {
             log.warn("AI response JSON parse failed: {}", e.getMessage());
             return buildFallbackResult(originalContent, now);
@@ -256,15 +347,16 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     private FollowUpAiParseVO buildFallbackResult(String content, String now) {
         FollowUpAiParseVO vo = new FollowUpAiParseVO();
         vo.setSummary(content.length() > 100 ? content.substring(0, 100) + "..." : content);
+        vo.setSceneType("");
         vo.setType("other");
         vo.setFollowTime(now);
         vo.setNextFollowTime("");
         vo.setKeyPoints(List.of());
         vo.setTodos(List.of());
-        return vo;
+        return normalizeParsedTimes(vo, content, now);
     }
 
-    private FollowUpAiParseVO normalizeParsedTimes(FollowUpAiParseVO vo, String now) {
+    private FollowUpAiParseVO normalizeParsedTimes(FollowUpAiParseVO vo, String originalContent, String now) {
         LocalDateTime nowTime = parseDateTime(now, LocalTime.now());
         if (nowTime == null) {
             return vo;
@@ -272,15 +364,191 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
         LocalDateTime followTime = parseDateTime(vo.getFollowTime(), nowTime.toLocalTime());
         LocalDateTime nextFollowTime = parseDateTime(vo.getNextFollowTime(), nowTime.toLocalTime());
+        LocalDateTime inferredNextFollowTime = inferNextFollowTimeFromContent(originalContent, nowTime);
 
-        if (followTime != null
-            && followTime.isAfter(nowTime.plusMinutes(5))
-            && nextFollowTime == null) {
-            vo.setNextFollowTime(AI_TIME_FORMATTER.format(followTime));
+        if (followTime != null && followTime.isAfter(nowTime.plusMinutes(5))) {
+            LocalDateTime normalizedNextFollowTime = chooseFutureNextFollowTime(
+                inferredNextFollowTime,
+                nextFollowTime,
+                followTime,
+                nowTime
+            );
+            if (normalizedNextFollowTime != null) {
+                vo.setNextFollowTime(AI_TIME_FORMATTER.format(normalizedNextFollowTime));
+                nextFollowTime = normalizedNextFollowTime;
+            }
             vo.setFollowTime(now);
+            followTime = nowTime;
+        }
+
+        if (inferredNextFollowTime != null
+            && inferredNextFollowTime.isAfter(nowTime.plusMinutes(5))
+            && (nextFollowTime == null || !nextFollowTime.isAfter(nowTime.plusMinutes(5)))) {
+            vo.setNextFollowTime(AI_TIME_FORMATTER.format(inferredNextFollowTime));
         }
 
         return vo;
+    }
+
+    private LocalDateTime chooseFutureNextFollowTime(
+        LocalDateTime inferredNextFollowTime,
+        LocalDateTime nextFollowTime,
+        LocalDateTime followTime,
+        LocalDateTime nowTime
+    ) {
+        if (inferredNextFollowTime != null && inferredNextFollowTime.isAfter(nowTime.plusMinutes(5))) {
+            return inferredNextFollowTime;
+        }
+        if (nextFollowTime != null && nextFollowTime.isAfter(nowTime.plusMinutes(5))) {
+            return nextFollowTime;
+        }
+        if (followTime != null && followTime.isAfter(nowTime.plusMinutes(5))) {
+            return followTime;
+        }
+        return null;
+    }
+
+    private LocalDateTime inferNextFollowTimeFromContent(String content, LocalDateTime nowTime) {
+        if (StrUtil.isBlank(content) || nowTime == null) {
+            return null;
+        }
+
+        LocalDateTime chineseCandidate = parseChineseRelativeTime(content, nowTime);
+        if (chineseCandidate != null) {
+            return chineseCandidate;
+        }
+
+        return parseEnglishRelativeTime(content, nowTime);
+    }
+
+    private LocalDateTime parseChineseRelativeTime(String content, LocalDateTime nowTime) {
+        Matcher matcher = CHINESE_RELATIVE_TIME_PATTERN.matcher(content);
+        while (matcher.find()) {
+            String dayToken = matcher.group(1);
+            String periodToken = StrUtil.blankToDefault(matcher.group(2), deriveChinesePeriodToken(dayToken));
+            Integer hour = parseHourToken(matcher.group(3));
+            Integer minute = parseMinuteToken(matcher.group(4), matcher.group(5));
+            Integer normalizedHour = normalizeHour(hour, periodToken);
+            if (normalizedHour == null || minute == null) {
+                continue;
+            }
+
+            LocalDateTime candidate = LocalDateTime.of(
+                nowTime.toLocalDate().plusDays(resolveChineseDayOffset(dayToken)),
+                LocalTime.of(normalizedHour, minute)
+            );
+            if (candidate.isAfter(nowTime)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private LocalDateTime parseEnglishRelativeTime(String content, LocalDateTime nowTime) {
+        Matcher matcher = ENGLISH_RELATIVE_TIME_PATTERN.matcher(content);
+        while (matcher.find()) {
+            String dayToken = matcher.group(1);
+            String periodToken = matcher.group(5) != null ? matcher.group(5) : matcher.group(2);
+            Integer hour = parseHourToken(matcher.group(3));
+            Integer minute = parseMinuteToken(matcher.group(4), null);
+            Integer normalizedHour = normalizeHour(hour, periodToken);
+            if (normalizedHour == null || minute == null) {
+                continue;
+            }
+
+            LocalDateTime candidate = LocalDateTime.of(
+                nowTime.toLocalDate().plusDays(resolveEnglishDayOffset(dayToken)),
+                LocalTime.of(normalizedHour, minute)
+            );
+            if (candidate.isAfter(nowTime)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private long resolveChineseDayOffset(String dayToken) {
+        if (StrUtil.startWith(dayToken, "后天")) {
+            return 2;
+        }
+        if (StrUtil.equalsAny(dayToken, "明天", "明早", "明晚")) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private long resolveEnglishDayOffset(String dayToken) {
+        String normalized = StrUtil.nullToEmpty(dayToken).toLowerCase(Locale.ROOT);
+        if (normalized.contains("day after tomorrow")) {
+            return 2;
+        }
+        if (normalized.contains("tomorrow")) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private String deriveChinesePeriodToken(String dayToken) {
+        if (StrUtil.equals(dayToken, "明早")) {
+            return "上午";
+        }
+        if (StrUtil.equals(dayToken, "明晚")) {
+            return "晚上";
+        }
+        return "";
+    }
+
+    private Integer parseHourToken(String value) {
+        try {
+            int hour = Integer.parseInt(StrUtil.trim(value));
+            return hour >= 0 && hour <= 23 ? hour : null;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private Integer parseMinuteToken(String value, String halfToken) {
+        if (StrUtil.isNotBlank(value)) {
+            try {
+                int minute = Integer.parseInt(StrUtil.trim(value));
+                return minute >= 0 && minute <= 59 ? minute : null;
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+        return StrUtil.isNotBlank(halfToken) ? 30 : 0;
+    }
+
+    private Integer normalizeHour(Integer hour, String periodToken) {
+        if (hour == null) {
+            return null;
+        }
+
+        String normalizedPeriod = StrUtil.nullToEmpty(periodToken).toLowerCase(Locale.ROOT);
+        int normalizedHour = hour;
+
+        if (normalizedPeriod.contains("下午") || normalizedPeriod.contains("傍晚") || normalizedPeriod.contains("晚上")
+            || normalizedPeriod.contains("今晚") || normalizedPeriod.contains("afternoon")
+            || normalizedPeriod.contains("evening") || normalizedPeriod.equals("pm")) {
+            if (normalizedHour < 12) {
+                normalizedHour += 12;
+            }
+        } else if (normalizedPeriod.contains("中午")) {
+            if (normalizedHour < 11) {
+                normalizedHour += 12;
+            }
+        } else if (normalizedPeriod.contains("凌晨")
+            || normalizedPeriod.contains("早上")
+            || normalizedPeriod.contains("早晨")
+            || normalizedPeriod.contains("上午")
+            || normalizedPeriod.contains("morning")
+            || normalizedPeriod.equals("am")) {
+            if (normalizedHour == 12) {
+                normalizedHour = 0;
+            }
+        }
+
+        return normalizedHour >= 0 && normalizedHour <= 23 ? normalizedHour : null;
     }
 
     private String normalizeRequiredDateTime(String value, String fallback) {
@@ -329,6 +597,217 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         }
     }
 
+    private void saveAttachments(Long followUpId, List<ChatSendBO.AttachmentDTO> attachments) {
+        if (followUpId == null || CollUtil.isEmpty(attachments)) {
+            return;
+        }
+
+        int sort = 0;
+        for (ChatSendBO.AttachmentDTO dto : attachments) {
+            if (dto == null || StrUtil.isBlank(dto.getFilePath())) {
+                continue;
+            }
+
+            FollowUpAttachment attachment = new FollowUpAttachment();
+            attachment.setFollowUpId(followUpId);
+            attachment.setFileName(StrUtil.blankToDefault(dto.getFileName(), "attachment"));
+            attachment.setFilePath(dto.getFilePath());
+            attachment.setFileSize(dto.getFileSize());
+            attachment.setMimeType(dto.getMimeType());
+            attachment.setSort(sort++);
+            attachment.setAnalysisStatus("idle");
+            followUpAttachmentMapper.insert(attachment);
+        }
+    }
+
+    private void createSuggestedTasks(FollowUp followUp, List<FollowUpSuggestedTaskBO> suggestedTasks) {
+        if (followUp == null || followUp.getCustomerId() == null || CollUtil.isEmpty(suggestedTasks)) {
+            return;
+        }
+
+        for (FollowUpSuggestedTaskBO suggestedTask : suggestedTasks) {
+            if (suggestedTask == null || StrUtil.isBlank(suggestedTask.getTitle())) {
+                continue;
+            }
+
+            TaskAddBO taskAddBO = new TaskAddBO();
+            taskAddBO.setTitle(suggestedTask.getTitle().trim());
+            taskAddBO.setDescription(StrUtil.blankToDefault(StrUtil.trim(suggestedTask.getDescription()), followUp.getSummary()));
+            taskAddBO.setDueDate(suggestedTask.getDueDate() != null ? suggestedTask.getDueDate() : followUp.getNextFollowTime());
+            taskAddBO.setPriority("medium");
+            taskAddBO.setTaskType(StrUtil.blankToDefault(suggestedTask.getTaskType(), "跟进"));
+            taskAddBO.setCustomerId(followUp.getCustomerId());
+            taskAddBO.setGeneratedByAi(1);
+            taskAddBO.setAiContext("Generated from follow-up " + followUp.getFollowUpId());
+            taskAddBO.setSourceFollowUpId(followUp.getFollowUpId());
+            taskService.addTask(taskAddBO);
+        }
+    }
+
+    private void enrichFollowUps(List<FollowUpVO> followUps) {
+        if (CollUtil.isEmpty(followUps)) {
+            return;
+        }
+
+        List<Long> followUpIds = followUps.stream()
+            .map(FollowUpVO::getFollowUpId)
+            .filter(ObjectUtil::isNotNull)
+            .toList();
+        if (followUpIds.isEmpty()) {
+            return;
+        }
+
+        Map<Long, List<FollowUpAttachmentVO>> attachmentMap = followUpAttachmentMapper.selectList(
+                Wrappers.<FollowUpAttachment>lambdaQuery()
+                    .in(FollowUpAttachment::getFollowUpId, followUpIds)
+                    .orderByAsc(FollowUpAttachment::getSort)
+                    .orderByAsc(FollowUpAttachment::getAttachmentId)
+            ).stream()
+            .map(this::toAttachmentVO)
+            .collect(Collectors.groupingBy(
+                FollowUpAttachmentVO::getFollowUpId,
+                LinkedHashMap::new,
+                Collectors.toList()
+            ));
+
+        Map<Long, List<FollowUpLinkedTaskVO>> taskMap = taskService.lambdaQuery()
+            .in(Task::getSourceFollowUpId, followUpIds)
+            .orderByAsc(Task::getDueDate)
+            .orderByAsc(Task::getCreateTime)
+            .list()
+            .stream()
+            .filter(task -> task.getSourceFollowUpId() != null)
+            .collect(Collectors.groupingBy(
+                Task::getSourceFollowUpId,
+                LinkedHashMap::new,
+                Collectors.mapping(this::toLinkedTaskVO, Collectors.toList())
+            ));
+
+        for (FollowUpVO followUp : followUps) {
+            followUp.setAttachments(attachmentMap.getOrDefault(followUp.getFollowUpId(), List.of()));
+            followUp.setTasks(taskMap.getOrDefault(followUp.getFollowUpId(), List.of()));
+        }
+    }
+
+    private FollowUpAttachmentVO toAttachmentVO(FollowUpAttachment attachment) {
+        return BeanUtil.copyProperties(attachment, FollowUpAttachmentVO.class);
+    }
+
+    private FollowUpLinkedTaskVO toLinkedTaskVO(Task task) {
+        FollowUpLinkedTaskVO vo = new FollowUpLinkedTaskVO();
+        vo.setTaskId(task.getTaskId());
+        vo.setTitle(task.getTitle());
+        vo.setDescription(task.getDescription());
+        vo.setDueDate(task.getDueDate());
+        vo.setStatus(task.getStatus());
+        vo.setTaskType(task.getTaskType());
+        vo.setGeneratedByAi(task.getGeneratedByAi());
+        return vo;
+    }
+
+    private String buildAttachmentAnalysis(FollowUpAttachment attachment) {
+        String mimeType = StrUtil.blankToDefault(attachment.getMimeType(), "");
+        String fileName = StrUtil.blankToDefault(attachment.getFileName(), "");
+        if (mimeType.startsWith("image/")) {
+            return analyzeImageAttachment(attachment);
+        }
+        if (isAudioFile(mimeType, fileName)) {
+            return analyzeAudioAttachment(attachment);
+        }
+
+        String content;
+        if (isTextFile(mimeType, fileName)) {
+            content = extractFileText(attachment.getFilePath());
+        } else if (isDocumentFile(mimeType, fileName)) {
+            content = extractDocumentText(attachment.getFilePath());
+        } else {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Current attachment type is not supported for AI analysis");
+        }
+
+        if (StrUtil.isBlank(content)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "No readable content could be extracted from this attachment");
+        }
+        return analyzeTextLikeAttachment(fileName, content);
+    }
+
+    private String analyzeImageAttachment(FollowUpAttachment attachment) {
+        AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
+        if (capabilities == null || !capabilities.isSupportsVision()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "The current model does not support image analysis");
+        }
+
+        String prompt = """
+            You are a CRM assistant.
+            Analyze this follow-up attachment image and reply in concise Simplified Chinese.
+            Keep the answer to 2-3 sentences. Mention the most important visible facts first, then at most one practical implication.
+            Do not use markdown or bullet points.
+            """;
+
+        try {
+            Media media = AiMediaUtil.buildMedia(
+                fileStorageService,
+                attachment.getFilePath(),
+                MimeType.valueOf(StrUtil.blankToDefault(attachment.getMimeType(), "image/jpeg"))
+            );
+            return StrUtil.blankToDefault(
+                chatClientProvider.getChatClient()
+                    .prompt()
+                    .user(user -> user.text(prompt).media(media))
+                    .call()
+                    .content(),
+                "图片内容较模糊，暂时无法形成有效分析。"
+            ).trim();
+        } catch (Exception ex) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Image analysis failed, please try again later");
+        }
+    }
+
+    private String analyzeAudioAttachment(FollowUpAttachment attachment) {
+        try (InputStream inputStream = fileStorageService.getFileStream(attachment.getFilePath())) {
+            if (inputStream == null) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment audio could not be loaded");
+            }
+            byte[] bytes = inputStream.readAllBytes();
+            String transcript = aiAudioTranscriptionService.transcribe(bytes, attachment.getFileName(), attachment.getMimeType());
+            if (StrUtil.isBlank(transcript)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "No valid transcript could be produced from this audio");
+            }
+            return analyzeTextLikeAttachment(
+                attachment.getFileName(),
+                "音频转写内容：\n" + limitText(transcript, MAX_ATTACHMENT_ANALYSIS_LENGTH)
+            );
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Audio analysis failed, please try again later");
+        }
+    }
+
+    private String analyzeTextLikeAttachment(String fileName, String content) {
+        String prompt = """
+            You are a CRM assistant.
+            Please analyze the attachment content below and reply in concise Simplified Chinese.
+            Requirements:
+            1. Keep the answer within 2-3 sentences.
+            2. Summarize the most important concrete facts from the attachment.
+            3. If helpful, add one practical follow-up implication in the last sentence.
+            4. Do not use markdown, bullet points, or quotation marks.
+
+            Attachment: %s
+            Content:
+            %s
+            """.formatted(fileName, limitText(content, MAX_ATTACHMENT_ANALYSIS_LENGTH));
+
+        try {
+            return StrUtil.blankToDefault(
+                chatClientProvider.getChatClient().prompt().user(prompt).call().content(),
+                "附件内容已读取，但暂时无法生成有效分析。"
+            ).trim();
+        } catch (Exception ex) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Attachment analysis failed, please try again later");
+        }
+    }
+
     private String buildAttachmentContext(List<ChatSendBO.AttachmentDTO> attachments, AiModelCapabilities capabilities) {
         if (CollUtil.isEmpty(attachments)) {
             return "";
@@ -361,6 +840,8 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
                 } else {
                     context.append(String.format("- Document: %s (text could not be extracted)\n", fileName));
                 }
+            } else if (isAudioFile(mimeType, fileName)) {
+                context.append(String.format("- Audio file: %s\n", fileName));
             } else {
                 context.append(String.format("- File: %s (type: %s)\n", fileName, mimeType));
             }
@@ -423,6 +904,20 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         return false;
     }
 
+    private boolean isAudioFile(String mimeType, String fileName) {
+        String lowerMimeType = StrUtil.blankToDefault(mimeType, "").toLowerCase(Locale.ROOT);
+        if (lowerMimeType.startsWith("audio/")) {
+            return true;
+        }
+        String lowerFileName = StrUtil.blankToDefault(fileName, "").toLowerCase(Locale.ROOT);
+        return lowerFileName.endsWith(".mp3")
+            || lowerFileName.endsWith(".wav")
+            || lowerFileName.endsWith(".m4a")
+            || lowerFileName.endsWith(".aac")
+            || lowerFileName.endsWith(".webm")
+            || lowerFileName.endsWith(".ogg");
+    }
+
     private String extractFileText(String filePath) {
         try (InputStream inputStream = fileStorageService.getFileStream(filePath)) {
             if (inputStream == null) {
@@ -459,6 +954,17 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             log.warn("Failed to extract document text: {}", filePath, e);
             return null;
         }
+    }
+
+    private String limitText(String content, int maxLength) {
+        if (content == null) {
+            return "";
+        }
+        String normalized = content.trim();
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, maxLength) + "\n...(truncated)";
     }
 
     private void syncCustomerFollowUpSummary(Long customerId) {

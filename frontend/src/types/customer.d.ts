@@ -13,6 +13,8 @@ export interface Customer {
   address?: string
   aiStatusDetection?: string
   aiInsight?: string
+  aiAnalysisStatus?: string
+  aiAnalysisRequestedAt?: string
   description?: string
   createTime: string
   updateTime: string
@@ -51,6 +53,7 @@ export interface CustomerDetailVO extends Customer {
   lastContactTime?: string
   nextFollowTime?: string
   remark?: string
+  aiParseSnapshot?: string
   ownerAvatar?: string
   createUserId?: string | number
   createUserName?: string
@@ -105,6 +108,7 @@ export interface CustomerAddBO {
   nextFollowTime?: string
   remark?: string
   description?: string
+  aiParseSnapshot?: string
   // Primary contact
   contactName?: string
   contactPhone?: string
@@ -253,13 +257,41 @@ export interface FollowUp {
   customerId: string
   type: FollowUpType
   content: string
+  summary?: string
+  sceneType?: string
+  aiGenerated?: number
   followTime: string
   result?: string
   nextPlan?: string
   nextFollowTime?: string
+  attachments?: FollowUpAttachment[]
+  tasks?: FollowUpTask[]
   createUserId: string
   createUserName?: string
   createTime: string
+}
+
+export interface FollowUpAttachment {
+  attachmentId: string
+  followUpId: string
+  fileName: string
+  filePath: string
+  fileSize?: number
+  mimeType?: string
+  sort?: number
+  analysisStatus?: 'idle' | 'processing' | 'completed' | 'failed' | string
+  analysisContent?: string
+  analysisTime?: string
+}
+
+export interface FollowUpTask {
+  taskId: string
+  title: string
+  description?: string
+  dueDate?: string
+  status?: string
+  taskType?: string
+  generatedByAi?: number
 }
 
 export type FollowUpType = 'call' | 'meeting' | 'email' | 'visit' | 'other'
@@ -268,9 +300,24 @@ export interface FollowUpAddBO {
   customerId: string
   type: string
   content: string
+  summary?: string
+  sceneType?: string
+  aiGenerated?: number
   followTime: string
   contactId?: string
   nextFollowTime?: string
+  attachments?: Array<{
+    fileName: string
+    filePath: string
+    fileSize: number
+    mimeType: string
+  }>
+  suggestedTasks?: Array<{
+    title: string
+    description?: string
+    dueDate?: string
+    taskType?: string
+  }>
 }
 
 export interface FollowUpUpdateBO {

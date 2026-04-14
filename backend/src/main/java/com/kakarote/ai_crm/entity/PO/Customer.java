@@ -119,6 +119,18 @@ public class Customer implements Serializable {
     @TableField("ai_insight")
     private String aiInsight;
 
+    @Schema(description = "新增时保存的 AI 分析快照(JSON)")
+    @TableField("ai_parse_snapshot")
+    private String aiParseSnapshot;
+
+    @Schema(description = "AI analysis task status")
+    @TableField("ai_analysis_status")
+    private String aiAnalysisStatus;
+
+    @Schema(description = "AI analysis request timestamp")
+    @TableField("ai_analysis_requested_at")
+    private Date aiAnalysisRequestedAt;
+
     /**
      * 主联系人姓名(冗余)
      */

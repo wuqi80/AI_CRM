@@ -51,6 +51,24 @@ public class FollowUp implements Serializable {
     private String content;
 
     /**
+     * AI摘要
+     */
+    @Schema(description = "AI summary")
+    private String summary;
+
+    /**
+     * 场景标签
+     */
+    @Schema(description = "Scene type")
+    private String sceneType;
+
+    /**
+     * 是否AI生成
+     */
+    @Schema(description = "AI generated flag")
+    private Integer aiGenerated;
+
+    /**
      * 跟进时间
      */
     @Schema(description = "跟进时间")

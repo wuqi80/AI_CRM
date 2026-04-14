@@ -11,6 +11,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -37,8 +38,9 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
     private static final String DASHSCOPE_TRANSCRIPTION_MODEL = "qwen3-asr-flash";
     private static final String OPENAI_TRANSCRIPTION_PROMPT = "请将音频内容准确转写为简体中文文本，只返回转写结果。";
     private static final String UNSUPPORTED_PROVIDER_MESSAGE =
-            "当前模型不支持语音识别，请配置支持的模型（目前支持 OpenAI、阿里云百炼）";
+        "当前模型不支持语音识别，请配置支持的模型（目前支持 OpenAI、阿里云百炼）。";
 
+    @Lazy
     @Autowired
     private DynamicChatClientProvider chatClientProvider;
 
@@ -50,9 +52,25 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
         if (audioFile == null || audioFile.isEmpty()) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请先提供录音文件");
         }
+        try {
+            return transcribe(
+                audioFile.getBytes(),
+                StrUtil.blankToDefault(audioFile.getOriginalFilename(), "followup-audio.webm"),
+                audioFile.getContentType()
+            );
+        } catch (IOException ex) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "语音识别失败，请稍后重试");
+        }
+    }
+
+    @Override
+    public String transcribe(byte[] audioBytes, String filename, String contentType) {
+        if (audioBytes == null || audioBytes.length == 0) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请先提供录音文件");
+        }
 
         DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig =
-                chatClientProvider.getCurrentRuntimeConfigSnapshot();
+            chatClientProvider.getCurrentRuntimeConfigSnapshot();
         if (runtimeConfig == null || StrUtil.isBlank(runtimeConfig.apiKey())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前未配置可用 AI 模型，请先完成配置");
         }
@@ -65,8 +83,8 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
         String providerCode = StrUtil.blankToDefault(runtimeConfig.providerCode(), "").trim().toLowerCase();
         try {
             return switch (providerCode) {
-                case "openai" -> transcribeWithOpenAi(runtimeConfig, audioFile);
-                case "dashscope" -> transcribeWithDashscope(runtimeConfig, audioFile);
+                case "openai" -> transcribeWithOpenAi(runtimeConfig, audioBytes, filename, contentType);
+                case "dashscope" -> transcribeWithDashscope(runtimeConfig, audioBytes, contentType);
                 default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, UNSUPPORTED_PROVIDER_MESSAGE);
             };
         } catch (BusinessException ex) {
@@ -78,29 +96,31 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
     }
 
     private String transcribeWithOpenAi(DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig,
-                                        MultipartFile audioFile) throws IOException {
+                                        byte[] audioBytes,
+                                        String filename,
+                                        String contentType) {
         String endpoint = DynamicChatClientProvider.resolveActualRequestBaseUrl(
-                runtimeConfig.providerCode(),
-                runtimeConfig.apiUrl()
+            runtimeConfig.providerCode(),
+            runtimeConfig.apiUrl()
         ) + "/v1/audio/transcriptions";
 
         MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
         bodyBuilder.part("model", OPENAI_TRANSCRIPTION_MODEL);
         bodyBuilder.part("response_format", "text");
         bodyBuilder.part("prompt", OPENAI_TRANSCRIPTION_PROMPT);
-        bodyBuilder.part("file", asResource(audioFile))
-                .contentType(resolveMediaType(audioFile.getContentType()));
+        bodyBuilder.part("file", asResource(audioBytes, filename))
+            .contentType(resolveMediaType(contentType));
 
         String response = webClient.post()
-                .uri(endpoint)
-                .headers(headers -> applyRequestHeaders(headers, runtimeConfig))
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(bodyBuilder.build()))
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, clientResponse ->
-                        clientResponse.bodyToMono(String.class).map(this::toBusinessException))
-                .bodyToMono(String.class)
-                .block();
+            .uri(endpoint)
+            .headers(headers -> applyRequestHeaders(headers, runtimeConfig))
+            .contentType(MediaType.MULTIPART_FORM_DATA)
+            .body(BodyInserters.fromMultipartData(bodyBuilder.build()))
+            .retrieve()
+            .onStatus(HttpStatusCode::isError, clientResponse ->
+                clientResponse.bodyToMono(String.class).map(this::toBusinessException))
+            .bodyToMono(String.class)
+            .block();
 
         String transcript = StrUtil.trimToEmpty(response);
         if (StrUtil.isBlank(transcript)) {
@@ -110,48 +130,48 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
     }
 
     private String transcribeWithDashscope(DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig,
-                                           MultipartFile audioFile) throws IOException {
+                                           byte[] audioBytes,
+                                           String contentType) {
         String endpoint = DynamicChatClientProvider.resolveActualRequestBaseUrl(
-                runtimeConfig.providerCode(),
-                runtimeConfig.apiUrl()
+            runtimeConfig.providerCode(),
+            runtimeConfig.apiUrl()
         ) + "/v1/chat/completions";
 
-        String mimeType = resolveMediaType(audioFile.getContentType()).toString();
-        String dataUri = "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(audioFile.getBytes());
+        String mimeType = resolveMediaType(contentType).toString();
+        String dataUri = "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(audioBytes);
 
         Map<String, Object> body = Map.of(
-                "model", DASHSCOPE_TRANSCRIPTION_MODEL,
-                "messages", List.of(Map.of(
-                        "role", "user",
-                        "content", List.of(Map.of(
-                                "type", "input_audio",
-                                "input_audio", Map.of("data", dataUri)
-                        ))
-                )),
-                "asr_options", Map.of("enable_itn", false)
+            "model", DASHSCOPE_TRANSCRIPTION_MODEL,
+            "messages", List.of(Map.of(
+                "role", "user",
+                "content", List.of(Map.of(
+                    "type", "input_audio",
+                    "input_audio", Map.of("data", dataUri)
+                ))
+            )),
+            "asr_options", Map.of("enable_itn", false)
         );
 
         String response = webClient.post()
-                .uri(endpoint)
-                .headers(headers -> applyRequestHeaders(headers, runtimeConfig))
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, clientResponse ->
-                        clientResponse.bodyToMono(String.class).map(this::toBusinessException))
-                .bodyToMono(String.class)
-                .block();
+            .uri(endpoint)
+            .headers(headers -> applyRequestHeaders(headers, runtimeConfig))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(body)
+            .retrieve()
+            .onStatus(HttpStatusCode::isError, clientResponse ->
+                clientResponse.bodyToMono(String.class).map(this::toBusinessException))
+            .bodyToMono(String.class)
+            .block();
 
         return parseDashscopeTranscript(response);
     }
 
-    private ByteArrayResource asResource(MultipartFile audioFile) throws IOException {
-        String filename = StrUtil.blankToDefault(audioFile.getOriginalFilename(), "followup-audio.webm");
-        byte[] data = audioFile.getBytes();
+    private ByteArrayResource asResource(byte[] data, String filename) {
+        String actualFilename = StrUtil.blankToDefault(filename, "followup-audio.webm");
         return new ByteArrayResource(data) {
             @Override
             public String getFilename() {
-                return filename;
+                return actualFilename;
             }
         };
     }
@@ -180,16 +200,16 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
 
         try {
             Map<String, Object> values = objectMapper.readValue(
-                    extraHeadersJson,
-                    new TypeReference<Map<String, Object>>() {
-                    }
+                extraHeadersJson,
+                new TypeReference<Map<String, Object>>() {
+                }
             );
             return values.entrySet().stream()
-                    .filter(entry -> StrUtil.isNotBlank(entry.getKey()) && entry.getValue() != null)
-                    .collect(java.util.stream.Collectors.toMap(
-                            entry -> entry.getKey().trim(),
-                            entry -> String.valueOf(entry.getValue())
-                    ));
+                .filter(entry -> StrUtil.isNotBlank(entry.getKey()) && entry.getValue() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                    entry -> entry.getKey().trim(),
+                    entry -> String.valueOf(entry.getValue())
+                ));
         } catch (Exception ex) {
             log.warn("Failed to parse extra headers for audio transcription: {}", ex.getMessage());
             return Map.of();

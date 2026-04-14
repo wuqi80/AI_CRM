@@ -551,8 +551,11 @@ async function handleLogout() {
   }
 }
 
-function handleCreateCustomerSuccess() {
+function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
   appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+  if (payload.mode === 'create' && payload.customerId) {
+    void router.push(`/customer/${payload.customerId}`)
+  }
 }
 </script>
 

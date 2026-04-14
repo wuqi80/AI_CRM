@@ -707,6 +707,10 @@ async function handleRemoveAiChip(key: string) {
 function handleUpsertSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
   // keep original behavior: refresh list after submit
   customerStore.fetchCustomerList(true)
+  if (payload.mode === 'create' && payload.customerId) {
+    router.push(`/customer/${payload.customerId}`)
+    return
+  }
   if (payload.mode === 'edit') {
     editingCustomer.value = null
   }

@@ -14,4 +14,14 @@ public interface AiAudioTranscriptionService {
      * @return transcript text
      */
     String transcribe(MultipartFile audioFile);
+
+    /**
+     * Transcribe audio bytes from stored attachments.
+     *
+     * @param audioBytes audio bytes
+     * @param filename original filename
+     * @param contentType mime type
+     * @return transcript text
+     */
+    String transcribe(byte[] audioBytes, String filename, String contentType);
 }

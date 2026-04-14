@@ -7,18 +7,29 @@ import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpUpdateBO;
+import com.kakarote.ai_crm.entity.VO.FollowUpAttachmentVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
+import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IFollowUpService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -34,6 +45,9 @@ public class FollowUpController {
 
     @Autowired
     private AiAudioTranscriptionService aiAudioTranscriptionService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
     @PostMapping("/add")
     @Operation(summary = "添加跟进记录")
@@ -80,10 +94,47 @@ public class FollowUpController {
     public Result<FollowUpAiParseVO> aiParse(@Valid @RequestBody FollowUpAiParseBO parseBO) {
         return Result.ok(followUpService.aiParseFollowUp(parseBO));
     }
+
+    @PostMapping("/attachment/{attachmentId}/ai-analyze")
+    @Operation(summary = "AI analyze follow-up attachment")
+    @RequirePermission("followup:view")
+    public Result<FollowUpAttachmentVO> aiAnalyzeAttachment(@PathVariable Long attachmentId) {
+        return Result.ok(followUpService.analyzeAttachment(attachmentId));
+    }
+
     @PostMapping("/ai-transcribe")
     @Operation(summary = "AI audio transcription")
     @RequirePermission("followup:create")
     public Result<String> aiTranscribe(@RequestPart("file") MultipartFile file) {
         return Result.ok(aiAudioTranscriptionService.transcribe(file));
+    }
+
+    @GetMapping("/attachment/{attachmentId}/download")
+    @Operation(summary = "Download follow-up attachment")
+    @RequirePermission("followup:view")
+    public ResponseEntity<Resource> downloadAttachment(@PathVariable Long attachmentId) {
+        FollowUpAttachmentVO attachment = followUpService.getAttachment(attachmentId);
+        InputStream inputStream = fileStorageService.getFileStream(attachment.getFilePath());
+        Resource resource = new InputStreamResource(inputStream);
+
+        MediaType mediaType = MediaTypeFactory.getMediaType(attachment.getFileName())
+            .orElse(MediaType.APPLICATION_OCTET_STREAM);
+        if (attachment.getMimeType() != null && !attachment.getMimeType().isBlank()) {
+            try {
+                mediaType = MediaType.parseMediaType(attachment.getMimeType());
+            } catch (Exception ignored) {
+                // fallback to filename-based media type
+            }
+        }
+
+        String encodedFilename = URLEncoder.encode(attachment.getFileName(), StandardCharsets.UTF_8)
+            .replace("+", "%20");
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
+            .contentType(mediaType)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename);
+        if (attachment.getFileSize() != null && attachment.getFileSize() >= 0) {
+            builder.contentLength(attachment.getFileSize());
+        }
+        return builder.body(resource);
     }
 }

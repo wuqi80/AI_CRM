@@ -49,6 +49,9 @@ public class CustomerAddBO {
     @Schema(description = "备注")
     private String remark;
 
+    @Schema(description = "新增时保存的 AI 分析快照(JSON)")
+    private String aiParseSnapshot;
+
     @Schema(description = "标签列表")
     private List<String> tags;
 
