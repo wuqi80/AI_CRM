@@ -3,7 +3,7 @@
     <Transition name="fade">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[150] bg-slate-900/60 backdrop-blur-sm"
+        class="fixed inset-0 z-[299] bg-slate-900/60 backdrop-blur-sm"
         @click="close"
       />
     </Transition>
@@ -11,7 +11,7 @@
     <Transition name="scale-fade">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[151] flex items-center justify-center p-4"
+        class="fixed inset-0 z-[300] flex items-center justify-center p-4"
       >
         <div
           :class="[
@@ -382,14 +382,14 @@ import type { Knowledge, KnowledgeAiAnalyzeVO } from '@/types/common'
 type PreviewKind = 'doc' | 'docx' | 'excel' | 'pdf' | 'pptx' | 'text' | 'unsupported' | 'none'
 
 const VueOfficeDocx = defineAsyncComponent(async () => {
-  await import('@vue-office/docx/lib/index.css')
-  const module = await import('@vue-office/docx')
+  await import('@vue-office/docx/lib/v3/index.css')
+  const module = await import('@vue-office/docx/lib/v3/index.js')
   return module.default
 })
 
 const VueOfficeExcel = defineAsyncComponent(async () => {
-  await import('@vue-office/excel/lib/index.css')
-  const module = await import('@vue-office/excel')
+  await import('@vue-office/excel/lib/v3/index.css')
+  const module = await import('@vue-office/excel/lib/v3/index.js')
   return module.default
 })
 
@@ -399,7 +399,7 @@ const KnowledgePdfPreview = defineAsyncComponent(async () => {
 })
 
 const VueOfficePptx = defineAsyncComponent(async () => {
-  const module = await import('@vue-office/pptx')
+  const module = await import('@vue-office/pptx/lib/v3/index.js')
   return module.default
 })
 
