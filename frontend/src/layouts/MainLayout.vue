@@ -180,7 +180,7 @@
     </Teleport>
 
     <div class="flex flex-1 flex-col overflow-hidden" :class="{ 'pt-14': isMobile }">
-      <header class="relative z-[200] flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8">
+      <header class="relative z-[100] flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8">
         <div class="flex flex-1 items-center gap-4">
           <div ref="searchPanelRef" class="relative w-full max-w-md">
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-xl text-slate-400">search</span>
