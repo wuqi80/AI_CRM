@@ -111,6 +111,16 @@ export function register(params: RegisterParams): Promise<string> {
   return post<string>('/auth/register', params)
 }
 
+export interface ResetPasswordParams {
+  email: string
+  password: string
+  verificationCode: string
+}
+
+export function resetPassword(params: ResetPasswordParams): Promise<string> {
+  return post<string>('/auth/reset-password', params)
+}
+
 export interface CaptchaData {
   originalImageBase64: string
   jigsawImageBase64: string

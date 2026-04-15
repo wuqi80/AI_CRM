@@ -10,6 +10,7 @@ import com.kakarote.ai_crm.config.security.service.TokenService;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.BO.LoginUserBO;
 import com.kakarote.ai_crm.entity.BO.RegisterBO;
+import com.kakarote.ai_crm.entity.BO.ResetPasswordBO;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.VO.LoginResponseVO;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
@@ -73,6 +74,13 @@ public class AuthController {
     public Result<String> register(@Valid @RequestBody RegisterBO registerBO) {
         registrationService.register(registerBO);
         return Result.ok("注册成功");
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "重置密码")
+    public Result<String> resetPassword(@Valid @RequestBody ResetPasswordBO resetPasswordBO) {
+        registrationService.resetPassword(resetPasswordBO);
+        return Result.ok("密码重置成功");
     }
 
     @PostMapping("/login")

@@ -148,6 +148,16 @@
                         </el-input>
                       </el-form-item>
 
+                      <div class="flex justify-end">
+                        <button
+                          type="button"
+                          class="text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
+                          @click="openForgotPasswordDialog"
+                        >
+                          忘记密码？
+                        </button>
+                      </div>
+
                       <el-form-item class="!mb-0">
                         <button
                           type="button"
@@ -406,6 +416,116 @@
       </div>
     </div>
 
+    <el-dialog
+      v-model="showForgotPasswordDialog"
+      title="找回密码"
+      width="480px"
+      destroy-on-close
+      align-center
+      @closed="handleForgotPasswordDialogClosed"
+    >
+      <div class="space-y-5">
+        <p class="text-sm leading-6 text-slate-500">
+          通过邮箱验证码重置登录密码。若该邮箱加入了多个企业，重置后会同步更新该邮箱下的所有账号密码。
+        </p>
+
+        <el-form
+          ref="forgotPasswordFormRef"
+          :model="forgotPasswordForm"
+          :rules="forgotPasswordRules"
+          class="auth-form space-y-5"
+          label-position="top"
+          hide-required-asterisk
+          @submit.prevent="handleForgotPasswordReset"
+        >
+          <el-form-item prop="email">
+            <template #label>
+              <span class="label-upper">邮箱</span>
+            </template>
+            <el-input
+              v-model="forgotPasswordForm.email"
+              size="large"
+              placeholder="请输入注册邮箱"
+              class="auth-el-input"
+            >
+              <template #prefix>
+                <el-icon class="text-slate-400"><Message /></el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+
+          <el-form-item prop="password">
+            <template #label>
+              <span class="label-upper">新密码</span>
+            </template>
+            <el-input
+              v-model="forgotPasswordForm.password"
+              type="password"
+              size="large"
+              placeholder="6-20 位新密码"
+              show-password
+              class="auth-el-input"
+            >
+              <template #prefix>
+                <el-icon class="text-slate-400"><Lock /></el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+
+          <el-form-item prop="confirmPassword">
+            <template #label>
+              <span class="label-upper">确认新密码</span>
+            </template>
+            <el-input
+              v-model="forgotPasswordForm.confirmPassword"
+              type="password"
+              size="large"
+              placeholder="请再次输入新密码"
+              show-password
+              class="auth-el-input"
+              @keyup.enter="handleForgotPasswordReset"
+            >
+              <template #prefix>
+                <el-icon class="text-slate-400"><Lock /></el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+
+          <el-form-item prop="verificationCode">
+            <template #label>
+              <span class="label-upper">验证码</span>
+            </template>
+            <div class="flex w-full gap-3">
+              <el-input
+                v-model="forgotPasswordForm.verificationCode"
+                size="large"
+                placeholder="请输入验证码"
+                class="auth-el-input flex-1"
+                @keyup.enter="handleForgotPasswordReset"
+              />
+              <button
+                type="button"
+                class="auth-send-code-btn shrink-0 px-4 text-sm font-medium text-slate-700 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                :disabled="forgotSendingCode || forgotCountdown > 0"
+                @click="handleForgotSendCode"
+              >
+                {{ forgotSendCodeText }}
+              </button>
+            </div>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <el-button @click="showForgotPasswordDialog = false">取消</el-button>
+          <el-button type="primary" :loading="forgotPasswordLoading" @click="handleForgotPasswordReset">
+            重置密码
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <SliderCaptchaDialog v-model="showCaptchaDialog" @verified="handleCaptchaVerified" />
   </div>
 </template>
@@ -426,7 +546,7 @@ import {
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import logoImg from '@/assets/images/logo.png'
-import { getOidcSessionToken, register, sendEmailCode } from '@/api/auth'
+import { getOidcSessionToken, register, resetPassword, sendEmailCode } from '@/api/auth'
 import SliderCaptchaDialog from '@/components/auth/SliderCaptchaDialog.vue'
 import type { LoginTenantOption } from '@/types/api'
 
@@ -435,22 +555,30 @@ const route = useRoute()
 const userStore = useUserStore()
 
 const isLogin = ref(true)
+type EmailCodeScene = 'register' | 'reset-password'
 
 const loginFormRef = ref<FormInstance>()
 const registerFormRef = ref<FormInstance>()
+const forgotPasswordFormRef = ref<FormInstance>()
 const loading = ref(false)
 const registerLoading = ref(false)
+const forgotPasswordLoading = ref(false)
 const sendingCode = ref(false)
+const forgotSendingCode = ref(false)
 const showCaptchaDialog = ref(false)
+const showForgotPasswordDialog = ref(false)
 const formScrollRef = ref<HTMLElement>()
 const stageRef = ref<HTMLElement>()
 const loginLayerRef = ref<HTMLElement>()
 const registerLayerRef = ref<HTMLElement>()
 const countdown = ref(0)
+const forgotCountdown = ref(0)
 const tenantOptions = ref<LoginTenantOption[]>([])
 const loginStep = ref<'credentials' | 'tenant-selection'>('credentials')
 const pendingTenantId = ref('')
+const pendingEmailCodeScene = ref<EmailCodeScene | ''>('')
 let countdownTimer: number | undefined
+let forgotCountdownTimer: number | undefined
 
 const reduceMotion =
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -517,6 +645,13 @@ const registerForm = reactive({
   verificationCode: ''
 })
 
+const forgotPasswordForm = reactive({
+  email: '',
+  password: '',
+  confirmPassword: '',
+  verificationCode: ''
+})
+
 const loginRules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [
@@ -528,6 +663,14 @@ const loginRules: FormRules = {
 const validateConfirmPassword = (_rule: unknown, value: string, callback: (e?: Error) => void) => {
   if (value !== registerForm.password) {
     callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+const validateForgotConfirmPassword = (_rule: unknown, value: string, callback: (e?: Error) => void) => {
+  if (value !== forgotPasswordForm.password) {
+    callback(new Error('两次输入的新密码不一致'))
   } else {
     callback()
   }
@@ -550,9 +693,31 @@ const registerRules: FormRules = {
   verificationCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
 }
 
+const forgotPasswordRules: FormRules = {
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, max: 20, message: '密码长度6-20位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入新密码', trigger: 'blur' },
+    { validator: validateForgotConfirmPassword, trigger: 'blur' }
+  ],
+  verificationCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
+}
+
 const sendCodeText = computed(() => {
   if (sendingCode.value) return '发送中...'
   if (countdown.value > 0) return `${countdown.value}s 后重试`
+  return '发送验证码'
+})
+
+const forgotSendCodeText = computed(() => {
+  if (forgotSendingCode.value) return '发送中...'
+  if (forgotCountdown.value > 0) return `${forgotCountdown.value}s 后重试`
   return '发送验证码'
 })
 
@@ -592,6 +757,7 @@ watch(
 
 function toggleMode() {
   resetTenantSelection()
+  showForgotPasswordDialog.value = false
   const nextIsLogin = !isLogin.value
   const rest = { ...route.query }
   delete rest.register
@@ -627,6 +793,30 @@ async function handleLogin() {
   } finally {
     loading.value = false
   }
+}
+
+function openForgotPasswordDialog() {
+  Object.assign(forgotPasswordForm, {
+    email: loginForm.username.trim(),
+    password: '',
+    confirmPassword: '',
+    verificationCode: ''
+  })
+  showForgotPasswordDialog.value = true
+  nextTick(() => {
+    forgotPasswordFormRef.value?.clearValidate()
+  })
+}
+
+function handleForgotPasswordDialogClosed() {
+  pendingEmailCodeScene.value = ''
+  Object.assign(forgotPasswordForm, {
+    email: '',
+    password: '',
+    confirmPassword: '',
+    verificationCode: ''
+  })
+  forgotPasswordFormRef.value?.clearValidate()
 }
 
 function handleBackToCredentials() {
@@ -724,6 +914,19 @@ async function handleSendCode() {
 
   try {
     await registerFormRef.value.validateField('email')
+    pendingEmailCodeScene.value = 'register'
+    showCaptchaDialog.value = true
+  } catch {
+    return
+  }
+}
+
+async function handleForgotSendCode() {
+  if (!forgotPasswordFormRef.value || forgotSendingCode.value || forgotCountdown.value > 0) return
+
+  try {
+    await forgotPasswordFormRef.value.validateField('email')
+    pendingEmailCodeScene.value = 'reset-password'
     showCaptchaDialog.value = true
   } catch {
     return
@@ -731,6 +934,25 @@ async function handleSendCode() {
 }
 
 async function handleCaptchaVerified(captchaVerification: string) {
+  const currentScene = pendingEmailCodeScene.value
+  pendingEmailCodeScene.value = ''
+
+  if (currentScene === 'reset-password') {
+    forgotSendingCode.value = true
+    try {
+      await sendEmailCode({
+        email: forgotPasswordForm.email.trim(),
+        type: 2,
+        captchaVerification
+      })
+      ElMessage.success('找回密码验证码已发送，请查收邮箱')
+      startCountdown('reset-password')
+    } finally {
+      forgotSendingCode.value = false
+    }
+    return
+  }
+
   sendingCode.value = true
   try {
     await sendEmailCode({
@@ -739,22 +961,65 @@ async function handleCaptchaVerified(captchaVerification: string) {
       captchaVerification
     })
     ElMessage.success('验证码已发送，请查收邮箱')
-    startCountdown()
+    startCountdown('register')
   } finally {
     sendingCode.value = false
   }
 }
 
-function startCountdown() {
-  countdown.value = 60
-  if (countdownTimer) {
-    window.clearInterval(countdownTimer)
+async function handleForgotPasswordReset() {
+  if (!forgotPasswordFormRef.value) return
+
+  try {
+    await forgotPasswordFormRef.value.validate()
+    forgotPasswordLoading.value = true
+
+    await resetPassword({
+      email: forgotPasswordForm.email.trim(),
+      password: forgotPasswordForm.password,
+      verificationCode: forgotPasswordForm.verificationCode.trim()
+    })
+
+    loginForm.username = forgotPasswordForm.email.trim()
+    loginForm.password = forgotPasswordForm.password
+    resetTenantSelection()
+    showForgotPasswordDialog.value = false
+    ElMessage.success('密码已重置，请使用新密码登录')
+  } catch (error) {
+    console.error('Reset password error:', error)
+  } finally {
+    forgotPasswordLoading.value = false
   }
-  countdownTimer = window.setInterval(() => {
-    countdown.value -= 1
-    if (countdown.value <= 0 && countdownTimer) {
+}
+
+function startCountdown(scene: EmailCodeScene) {
+  const isRegisterScene = scene === 'register'
+  const countdownRef = isRegisterScene ? countdown : forgotCountdown
+
+  countdownRef.value = 60
+
+  if (isRegisterScene) {
+    if (countdownTimer) {
       window.clearInterval(countdownTimer)
-      countdownTimer = undefined
+    }
+    countdownTimer = window.setInterval(() => {
+      countdownRef.value -= 1
+      if (countdownRef.value <= 0 && countdownTimer) {
+        window.clearInterval(countdownTimer)
+        countdownTimer = undefined
+      }
+    }, 1000)
+    return
+  }
+
+  if (forgotCountdownTimer) {
+    window.clearInterval(forgotCountdownTimer)
+  }
+  forgotCountdownTimer = window.setInterval(() => {
+    countdownRef.value -= 1
+    if (countdownRef.value <= 0 && forgotCountdownTimer) {
+      window.clearInterval(forgotCountdownTimer)
+      forgotCountdownTimer = undefined
     }
   }, 1000)
 }
@@ -768,6 +1033,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', snapStageHeightForResize)
   if (countdownTimer) {
     window.clearInterval(countdownTimer)
+  }
+  if (forgotCountdownTimer) {
+    window.clearInterval(forgotCountdownTimer)
   }
 })
 </script>

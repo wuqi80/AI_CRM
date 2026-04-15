@@ -9,6 +9,7 @@ import com.kakarote.ai_crm.common.redis.Redis;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.RegisterBO;
+import com.kakarote.ai_crm.entity.BO.ResetPasswordBO;
 import com.kakarote.ai_crm.entity.PO.CrmTenant;
 import com.kakarote.ai_crm.entity.PO.ManagerDept;
 import com.kakarote.ai_crm.entity.PO.ManagerRole;
@@ -25,7 +26,7 @@ import com.kakarote.ai_crm.utils.CloudUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,6 +71,9 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Autowired
     private Redis redis;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void register(RegisterBO registerBO) {
@@ -110,10 +114,9 @@ public class RegistrationServiceImpl implements RegistrationService {
                     .build();
             roleService.save(adminRole);
 
-            BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
             ManagerUser user = new ManagerUser();
             user.setUsername(email);
-            user.setPassword(encoder.encode(registerBO.getPassword()));
+            user.setPassword(passwordEncoder.encode(registerBO.getPassword()));
             user.setEmail(email);
             user.setRealname(StrUtil.isNotBlank(realname) ? realname : email);
             user.setDeptId(dept.getDeptId());
@@ -171,6 +174,46 @@ public class RegistrationServiceImpl implements RegistrationService {
 
         redis.setex(cacheKey, EMAIL_CODE_EXPIRE_SECONDS, code);
         log.info("发送邮箱验证码成功: email={}, type={}", normalizedEmail, type);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetPassword(ResetPasswordBO resetPasswordBO) {
+        String email = normalizeEmail(resetPasswordBO.getEmail());
+        verifyEmailCode(email, resetPasswordBO.getVerificationCode());
+
+        String password = resetPasswordBO.getPassword();
+        if (StrUtil.length(password) < 6) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_PASSWORD_TOO_SHORT);
+        }
+
+        var matchedUsers = manageUserService.queryUsersByUsername(email);
+        if (CollUtil.isEmpty(matchedUsers)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DOES_NOT_EXIST);
+        }
+
+        String encodedPassword = passwordEncoder.encode(password);
+        Long previousTenantId = TenantContextHolder.getTenantId();
+        try {
+            for (ManagerUser matchedUser : matchedUsers) {
+                if (matchedUser.getTenantId() != null) {
+                    TenantContextHolder.setTenantId(matchedUser.getTenantId());
+                } else {
+                    TenantContextHolder.clear();
+                }
+                matchedUser.setPassword(encodedPassword);
+                manageUserService.updateById(matchedUser);
+            }
+        } finally {
+            if (previousTenantId != null) {
+                TenantContextHolder.setTenantId(previousTenantId);
+            } else {
+                TenantContextHolder.clear();
+            }
+        }
+
+        redis.del(getEmailCodeCacheKey(email));
+        log.info("邮箱找回密码成功: email={}, userCount={}", email, matchedUsers.size());
     }
 
     private void validateSendScene(String email, Integer type) {
