@@ -59,7 +59,7 @@
 
     <div
       v-else
-      class="bg-white rounded-2xl border border-slate-200 border-dashed p-8 text-center space-y-3 min-h-[300px] flex flex-col items-center justify-center"
+      class="bg-white rounded-2xl border border-slate-200 border-dashed p-4 text-center space-y-3 min-h-[300px] flex flex-col items-center justify-center"
     >
       <div class="size-12 bg-slate-50 rounded-xl flex items-center justify-center mx-auto">
         <WkIcon name="ai" class="text-slate-300 text-2xl" />
@@ -68,6 +68,7 @@
         <h4 class="text-xs font-bold text-slate-900">{{ emptyTitle }}</h4>
         <p class="text-xs text-slate-400 mt-1 leading-relaxed whitespace-pre-line">{{ emptyDescription }}</p>
       </div>
+      <slot name="empty-extra" />
     </div>
 
     <div v-if="showTip" class="p-5 bg-primary/5 rounded-2xl border border-primary/10">
@@ -99,6 +100,7 @@
  *
  * Slots:
  * - tip: 底部「小提示」正文，用于各业务自定义引导文案；有默认内容
+ * - empty-extra: 无 result 时，标题与描述下方的扩展区域（如主操作按钮）
  */
 import WkIcon from '@/components/common/WkIcon.vue'
 import type { CustomerAiParseVO } from '@/api/customer'

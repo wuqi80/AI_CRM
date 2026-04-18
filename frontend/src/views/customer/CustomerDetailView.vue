@@ -319,18 +319,24 @@
           <!-- Left Column: Basic Info (col-span-3) -->
           <div class="lg:col-span-3 space-y-4">
             <section class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-              <div class="mb-4 flex items-start justify-between gap-3">
-                <div class="flex items-center gap-2 min-w-0">
-                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('basicInfo')">
-                    <WkIcon name="ai" :size="15" />
-                  </span>
-                  <h3 class="text-sm font-bold text-slate-900">{{ savedAiAnalysisTitle }}</h3>
-                </div>
-                <div class="flex shrink-0 flex-col items-end gap-1">
+              <div class="mb-4 space-y-1">
+                <!-- 上：图标 + 标题（整行展示，可换行）+ 刷新 -->
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex min-w-0 flex-1 items-center gap-2">
+                    <span
+                      :class="sectionIconBoxClass"
+                      :style="getSectionIconStyle('basicInfo')"
+                    >
+                      <WkIcon name="ai" :size="15" />
+                    </span>
+                    <h3 class="min-w-0 flex-1 text-sm font-bold leading-snug text-slate-900 break-words">
+                      {{ savedAiAnalysisTitle }}
+                    </h3>
+                  </div>
                   <button
                     v-if="canEditCustomer"
                     type="button"
-                    class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="flex size-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="generatingAiReport"
                     :title="generatingAiReport ? '生成中…' : '更新 AI 分析'"
                     :aria-label="generatingAiReport ? '生成中' : '更新 AI 分析'"
@@ -341,6 +347,9 @@
                       :class="{ 'animate-spin': generatingAiReport }"
                     >refresh</span>
                   </button>
+                </div>
+                <!-- 下：更新时间 -->
+                <div class="flex justify-end">
                   <p class="text-right text-xs leading-relaxed text-slate-400">
                     更新于：{{ aiAnalysisDisplayTime }}
                   </p>
@@ -378,7 +387,26 @@
                 :show-tip="false"
                 :empty-title="aiAnalysisEmptyTitle"
                 :empty-description="aiAnalysisEmptyDescription"
-              />
+              >
+                <template v-if="canEditCustomer" #empty-extra>
+                  <div class="mt-5 flex w-full justify-center px-1">
+                    <button
+                      type="button"
+                      class="inline-flex max-w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-white shadow-[0_8px_22px_-6px_rgba(37,99,235,0.55)] transition-[filter,transform] hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:brightness-100 disabled:active:scale-100"
+                      :disabled="generatingAiReport"
+                      :title="generatingAiReport ? '生成中…' : '获取 AI 分析报告'"
+                      @click="handleGenerateReport"
+                    >
+                      <span
+                        v-if="generatingAiReport"
+                        class="material-symbols-outlined shrink-0 text-[16px] leading-none animate-spin"
+                      >progress_activity</span>
+                      <WkIcon v-else name="ai" :size="14" class="shrink-0 text-white" />
+                      <span class="text-[12px] truncate">获取 AI 分析报告</span>
+                    </button>
+                  </div>
+                </template>
+              </AiParseInsightSidebar>
 
               <section
                 v-if="latestAiReport?.aiStatusDetection || latestAiReport?.aiInsight || customer.aiStatusDetection || customer.aiInsight"
