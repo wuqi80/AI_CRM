@@ -47,7 +47,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
- * AI聊天服务实现 - 使用Spring AI ChatClient
+ * AI聊天服务实现 - 使用Spring AI ChatClient。
+ * 负责串起消息落库、附件补充、RAG 路由、流式/非流式响应以及 AI 上下文清理，保证工具调用阶段仍能拿到正确的用户与租户信息。
  */
 @Slf4j
 @Service
@@ -292,6 +293,7 @@ public class ChatServiceImpl implements IChatService {
         Long currentUserId = UserUtil.getUserIdOrNull();
         Long currentTenantId = UserUtil.getTenantId();
         if (currentUserId != null) {
+            // Spring Security 上下文不会自动透传到 Reactor 线程，这里先把会话级上下文放进自定义 Holder 供工具调用读取。
             AiContextHolder.setContext(sessionId, currentUserId, currentTenantId);
             log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}", sessionId, currentUserId, currentTenantId);
         }
@@ -309,6 +311,7 @@ public class ChatServiceImpl implements IChatService {
         if (routedKnowledgeResponse != null) {
             saveMessage(sessionId, "assistant", routedKnowledgeResponse);
             updateSessionTime(sessionId);
+            // 这里直接返回前，先清理当前会话的 AiContextHolder。
             AiContextHolder.clear();
             return Flux.just(routedKnowledgeResponse);
         }
@@ -413,6 +416,7 @@ public class ChatServiceImpl implements IChatService {
                 return null;
             })
             .doOnComplete(() -> {
+                // SSE 场景下只有在流完成后才能拿到最终累积文本与较完整的 token 统计，因此持久化放在完成回调里统一处理。
                 TokenUsageSnapshot usage = resolveTokenUsage(
                     promptTokensRef.get(),
                     completionTokensRef.get(),
@@ -429,6 +433,7 @@ public class ChatServiceImpl implements IChatService {
                     usage.totalTokens(), modelNameRef.get());
                 consumeGiftTokensIfNecessary(currentTenantId, usage.totalTokens());
                 updateSessionTime(sessionId);
+                // 会话结束后清理当前会话的 AiContextHolder。
                 AiContextHolder.clear();
             })
             .doOnError(error -> {
@@ -555,6 +560,7 @@ public class ChatServiceImpl implements IChatService {
             saveMessage(sessionId, "assistant", errorMsg);
             return errorMsg;
         } finally {
+            // 非流式分支在 finally 清理当前会话的 AiContextHolder。
             AiContextHolder.clear();
         }
     }

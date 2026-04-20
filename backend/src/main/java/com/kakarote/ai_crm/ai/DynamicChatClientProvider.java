@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 
 /**
  * 动态 ChatClient 提供器。
+ * 按租户缓存 ChatClient，并在自定义配置不可用时回退到赠送模式，避免每次对话都重复构建底层模型对象。
  */
 @Slf4j
 @Component
@@ -115,6 +116,7 @@ public class DynamicChatClientProvider {
         long key = tenantId != null ? tenantId : 0L;
         ChatClient client = tenantChatClients.get(key);
         if (client == null) {
+            // 双重检查只保护首次创建；后续请求直接复用租户级客户端，减少流式对话阶段的重复初始化开销。
             synchronized (lock) {
                 client = tenantChatClients.get(key);
                 if (client == null) {
@@ -269,6 +271,7 @@ public class DynamicChatClientProvider {
     public static String resolveActualRequestBaseUrl(String providerCode, String baseUrl) {
         String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
         if ("openai".equalsIgnoreCase(providerCode) && OPENAI_PUBLIC_BASE_URL.equalsIgnoreCase(normalizedBaseUrl)) {
+            // 外部仍保存官方地址用于识别服务商能力，真正发请求时再切到代理地址，避免影响配置展示和规则判断。
             return OPENAI_PROXY_BASE_URL;
         }
         return normalizedBaseUrl;
@@ -319,6 +322,7 @@ public class DynamicChatClientProvider {
             );
         }
 
+        // 自定义模式缺少可用快照时统一回退到赠送模式，保证新租户或脏配置场景下仍能得到可工作的默认模型。
         String resolvedApiUrl = normalizeCompatibleBaseUrl(StrUtil.blankToDefault(giftBaseUrl, defaultBaseUrl));
         AiProviderDescriptor descriptor = AiProviderRegistry.resolve(null, resolvedApiUrl);
         String resolvedApiKey = StrUtil.blankToDefault(giftApiKey, defaultApiKey);
@@ -349,6 +353,7 @@ public class DynamicChatClientProvider {
             }
         });
 
+        // 兼容旧版单服务商字段，避免升级后历史租户因为尚未迁移 ai_provider_configs 而失去可用配置。
         SavedProviderConfigSnapshot legacySnapshot = buildLegacyProviderSnapshot(configs);
         if (legacySnapshot != null) {
             savedConfigs.putIfAbsent(legacySnapshot.providerCode(), legacySnapshot);

@@ -66,6 +66,7 @@ public class DataPermissionServiceImpl implements DataPermissionService {
     private DataPermissionContext createContextInternal(String scopeKey, boolean exactPermission) {
         DataPermissionContext cached = DataPermissionHolder.get(scopeKey);
         if (cached != null) {
+            // 同一请求内多次鉴权直接复用展开结果，避免重复查角色、部门树和下级用户树。
             return cached;
         }
 
@@ -112,6 +113,7 @@ public class DataPermissionServiceImpl implements DataPermissionService {
             allowedUserIds.add(currentUserId);
         }
         if (dataScopes.contains(SCOPE_SELF_AND_SUBORDINATES)) {
+            // “本人及下属”沿用户汇报线展开，与部门树无关，和部门权限可以叠加取并集。
             allowedUserIds.add(currentUserId);
             allowedUserIds.addAll(collectSubordinateUserIds(currentUserId, allUsers));
         }
@@ -119,6 +121,7 @@ public class DataPermissionServiceImpl implements DataPermissionService {
             allowedUserIds.addAll(collectUsersByDeptIds(Set.of(currentUser.getDeptId()), allUsers));
         }
         if (dataScopes.contains(SCOPE_DEPT_AND_SUB) && currentUser.getDeptId() != null) {
+            // “本部门及下属部门”先展开部门树，再映射回用户集合，保持与菜单 data_scope 语义一致。
             allowedUserIds.addAll(collectUsersByDeptIds(collectDeptIds(currentUser.getDeptId()), allUsers));
         }
 

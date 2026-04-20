@@ -104,6 +104,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         tenantService.save(tenant);
 
         Long newTenantId = tenant.getTenantId();
+        // 注册阶段还没有 JWT，后续部门/角色/用户初始化又依赖租户拦截器，因此必须先手动写入租户上下文。
         TenantContextHolder.setTenantId(newTenantId);
 
         try {
@@ -148,6 +149,7 @@ public class RegistrationServiceImpl implements RegistrationService {
 
             if (weKnoraClient.isEnabled()) {
                 try {
+                    // 这里做一次预热，失败不回滚主注册流程，首次真正使用知识库时仍会按懒初始化逻辑重试。
                     weKnoraClient.getOrCreateTenantContext(newTenantId);
                     log.info("WeKnora 租户初始化成功: tenantId={}", newTenantId);
                 } catch (Exception e) {
@@ -155,6 +157,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                 }
             }
         } finally {
+            // 注册请求结束必须清理，避免容器线程复用后把新租户上下文带到后续无关请求。
             TenantContextHolder.clear();
         }
     }
@@ -209,6 +212,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         Long previousTenantId = TenantContextHolder.getTenantId();
         try {
             for (ManagerUser matchedUser : matchedUsers) {
+                // 同一邮箱可能跨租户存在多个账号，逐个切换租户上下文后再更新，确保命中正确的租户行。
                 if (matchedUser.getTenantId() != null) {
                     TenantContextHolder.setTenantId(matchedUser.getTenantId());
                 } else {

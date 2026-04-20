@@ -20,7 +20,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * token过滤器 验证token有效性
+ * token过滤器 验证token有效性。
+ * 负责建立认证与租户上下文，并在请求结束后清理请求级状态。
  */
 @Component
 public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
@@ -37,7 +38,7 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities());
             authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-            // 设置租户上下文
+            // 尽早写入租户上下文，供后续业务层读取。
             Long tenantId = loginUser.getUser().getTenantId();
             if (tenantId != null) {
                 TenantContextHolder.setTenantId(tenantId);
@@ -46,7 +47,7 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
         try {
             chain.doFilter(request, response);
         } finally {
-            // 请求结束时清除租户上下文，防止线程复用导致数据泄露
+            // 请求结束后清理本次请求的上下文状态，避免线程复用残留。
             DataPermissionHolder.clear();
             TenantContextHolder.clear();
         }

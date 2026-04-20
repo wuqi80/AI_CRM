@@ -51,6 +51,7 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
             return null;
         }
 
+        // MyBatis-Plus 会按 SQL 中出现的表逐个回调这里，因此需要先把 mapper 映射成模块，再按具体表名生成过滤片段。
         String sqlSegment = buildSqlSegment(module, table, context.getUserIds());
         if (sqlSegment == null) {
             return null;
@@ -65,6 +66,7 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
     }
 
     private String resolveModule(String mappedStatementId) {
+        // 用 mapper 名推断权限模块，避免在每个 XML/方法上手工重复声明模块信息。
         return MODULE_BY_MAPPER.entrySet().stream()
                 .filter(entry -> mappedStatementId.contains(entry.getKey()))
                 .map(Map.Entry::getValue)
@@ -74,6 +76,7 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
 
     private String buildSqlSegment(String module, Table table, List<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) {
+            // 无可见用户时返回恒假表达式，显式拒绝访问，避免因为 null 片段而误放行整表数据。
             return "1 = 0";
         }
 
@@ -118,6 +121,7 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
         if (prefix == null || prefix.isBlank()) {
             return column;
         }
+        // 统一带别名可避免 JOIN 场景下列名歧义，否则数据权限 SQL 很容易在复杂查询里失效。
         return prefix + "." + column;
     }
 }

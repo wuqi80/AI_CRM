@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 /**
  * WeKnora REST 客户端
  * 支持多租户隔离：每个 CRM 租户对应一个 WeKnora 租户（独立 API Key）
+ * 采用懒初始化和多级回退，尽量把首次接入成本收敛在真正使用知识库时，而不是注册流程的强依赖上。
  */
 @Slf4j
 @Service
@@ -119,16 +120,16 @@ public class WeKnoraClient {
             throw new IllegalStateException("租户不存在: " + tenantId);
         }
 
-        // 快速路径：已完成初始化
+        // 快速路径：数据库里已落好 API Key 与 KB ID 时直接复用，避免每次问答都触发远端探测。
         if (StrUtil.isNotBlank(tenant.getWeKnoraApiKey()) && StrUtil.isNotBlank(tenant.getWeKnoraKnowledgeBaseId())) {
             return new TenantWeKnoraContext(tenant.getWeKnoraApiKey(), tenant.getWeKnoraKnowledgeBaseId());
         }
 
-        // 需要初始化 — 加锁防并发
+        // 以租户维度加锁，避免并发首访把“注册租户 / 创建模型 / 创建知识库”执行多次。
         Object lock = tenantLocks.computeIfAbsent(tenantId, k -> new Object());
         synchronized (lock) {
             try {
-                // double-check
+                // double-check，保证等待锁期间若别的线程已经完成初始化，这里不会重复创建远端资源。
                 tenant = crmTenantMapper.selectById(tenantId);
                 if (StrUtil.isNotBlank(tenant.getWeKnoraApiKey()) && StrUtil.isNotBlank(tenant.getWeKnoraKnowledgeBaseId())) {
                     return new TenantWeKnoraContext(tenant.getWeKnoraApiKey(), tenant.getWeKnoraKnowledgeBaseId());
@@ -186,6 +187,7 @@ public class WeKnoraClient {
                 return createTenantWithGlobalApiKey(username);
             } catch (RuntimeException e) {
                 createTenantError = e;
+                // 新接口失败后不立刻中断，继续尝试兼容旧版注册/登录链路，减少不同 WeKnora 版本间的接入差异。
                 log.warn("WeKnora /tenants 创建租户失败，回退到认证接口: {}", e.getMessage());
             }
         }
@@ -420,6 +422,7 @@ public class WeKnoraClient {
             }
             return models;
         } catch (Exception e) {
+            // 模型枚举失败不视为致命错误，后续会直接尝试创建默认模型，兼容权限不足或接口差异的部署环境。
             log.warn("WeKnora 获取模型列表失败，将尝试直接创建默认模型: {}", e.getMessage());
             return Collections.emptyList();
         }
@@ -783,12 +786,14 @@ public class WeKnoraClient {
         try {
             WeKnoraChatResult result = executeKnowledgeChat(ctx, sessionId, query, knowledgeIds, useAgentChat);
             if (isUnavailableChatResult(result)) {
+                // WeKnora 的会话偶发会残留不可用状态，先重建会话再重试，比直接把失败透给上层更稳妥。
                 log.warn("WeKnora 问答结果不可用，重建会话后重试: tenantId={}, conversationId={}, sessionId={}, useAgentChat={}",
                         tenantId, conversationId, sessionId, useAgentChat);
                 sessionId = recreateConversationSession(tenantId, conversationId, ctx);
                 result = executeKnowledgeChat(ctx, sessionId, query, knowledgeIds, useAgentChat);
             }
             if (useAgentChat && isUnavailableChatResult(result)) {
+                // 定向知识命中不到时再降级到整个知识库，优先保证回答可用，而不是死守知识 ID 过滤条件。
                 log.warn("WeKnora 定向知识问答未返回可用结果，降级为通用知识库问答: tenantId={}, sessionId={}",
                         tenantId, sessionId);
                 sessionId = recreateConversationSession(tenantId, conversationId, ctx);
@@ -876,6 +881,7 @@ public class WeKnoraClient {
             return cachedSessionId;
         }
 
+        // 会话缓存按“租户 + CRM 会话”维度隔离，既复用 WeKnora 上下文，又避免不同租户之间串话。
         synchronized (conversationSessionCache) {
             cachedSessionId = conversationSessionCache.get(cacheKey);
             if (StrUtil.isNotBlank(cachedSessionId)) {
