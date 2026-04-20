@@ -14,3 +14,4 @@ frontend/tsconfig.tsbuildinfo
 frontend/tsconfig.node.tsbuildinfo
 uploads/**
 backend/src/main/resources/public/
+backend/src/main/resources/cert/**

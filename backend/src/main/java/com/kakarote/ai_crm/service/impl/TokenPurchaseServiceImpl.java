@@ -215,7 +215,7 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
             if (order.getAmountFen() != null && order.getAmountFen() != amountFen) {
                 throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "微信回调金额校验失败");
             }
-
+            log.debug("微信回调: {}", body);
             if ("SUCCESS".equalsIgnoreCase(tradeState)) {
                 markOrderPaid(order, transactionId, body);
             } else if ("CLOSED".equalsIgnoreCase(tradeState)) {
@@ -337,6 +337,7 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
 
             String path = "/v3/pay/transactions/native";
             String body = objectMapper.writeValueAsString(payload);
+            log.debug("微信支付: {}", body);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setAccept(List.of(MediaType.APPLICATION_JSON));

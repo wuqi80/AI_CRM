@@ -1740,13 +1740,6 @@ async function handleAiFollowUpSaved() {
   await refreshFollowUpContext(customer.value.customerId, { resetFollowUps: true })
 }
 
-function handleOpenFollowUpDialog() {
-  if (!canCreateFollowUps.value) return
-  if (!customer.value) return
-  resetFollowUpForm(customer.value.customerId)
-  showAddFollowUpDialog.value = true
-}
-
 function handleEditFollowUp(followUp: FollowUp) {
   if (!canEditFollowUps.value) return
   editingFollowUpId.value = String(followUp.followUpId)
@@ -2322,6 +2315,7 @@ function formatAmount(value?: number | null): string {
   })}`
 }
 
+/* Legacy helper kept only as a reference during the custom field display refactor.
 function formatCustomFieldValue(field: CustomField, value: any): string {
   if (value === null || value === undefined || value === '') return '-'
   switch (field.fieldType) {
@@ -2339,7 +2333,7 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
     case 'datetime': return formatDateTime(value)
     default: return String(value)
   }
-}
+} */
 
 </script>
 
