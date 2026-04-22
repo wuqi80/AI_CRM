@@ -78,43 +78,23 @@
           暂未找到相关参考文档。
         </div>
 
-        <div v-else class="space-y-4">
-          <article
-            v-for="item in result.references"
-            :key="item.knowledgeId"
-            class="group flex flex-col gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md md:flex-row md:items-center md:justify-between md:p-6"
-          >
-            <div class="flex min-w-0 flex-1 items-start gap-4">
-              <div class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-slate-500">
-                <span class="material-symbols-outlined text-xl">{{ getTypeIcon(item.type) }}</span>
-              </div>
-
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <h4 class="truncate text-lg font-black tracking-tight text-slate-900">{{ item.name }}</h4>
-                  <span class="text-xs font-bold text-primary">相关度: {{ item.matchPercent }}%</span>
-                </div>
-
-                <p class="mt-1 text-xs text-slate-400">
-                  <span v-if="item.customerName">{{ item.customerName }}</span>
-                  <span v-if="item.customerName && item.createTime"> · </span>
-                  <span v-if="item.createTime">更新于 {{ formatDate(item.createTime) }}</span>
-                </p>
-
-                <p class="mt-3 line-clamp-3 text-sm leading-7 text-slate-500">
-                  {{ item.excerpt || item.summary || '暂无摘要' }}
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              class="shrink-0 rounded-full px-4 py-2 text-sm font-bold text-primary transition-all hover:bg-primary/5"
-              @click="$emit('open', item.knowledgeId)"
+        <div v-else class="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+          <ul class="space-y-3">
+            <li
+              v-for="item in result.references"
+              :key="item.knowledgeId"
+              class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm leading-6"
             >
-              立即阅读
-            </button>
-          </article>
+              <button
+                type="button"
+                class="max-w-full truncate font-bold text-primary transition-colors hover:text-primary/80 hover:underline"
+                @click="$emit('open', item.knowledgeId)"
+              >
+                《{{ formatReferenceName(item.name) }}》
+              </button>
+              <span class="text-xs font-bold text-primary/80">相关度 {{ item.matchPercent }}%</span>
+            </li>
+          </ul>
         </div>
       </section>
     </div>
@@ -137,7 +117,12 @@ defineEmits<{
   open: [knowledgeId: string | number]
 }>()
 
-const renderedAnswer = computed(() => renderMarkdown(props.result?.answer || ''))
+const normalizedAnswer = computed(() => {
+  const answer = props.result?.answer || ''
+  return answer.replace(/(?:\.\.\.|…)+\s*$/, '').trimEnd()
+})
+
+const renderedAnswer = computed(() => renderMarkdown(normalizedAnswer.value))
 
 function formatElapsed(ms?: number): string {
   if (!ms || ms <= 0) return '0.1s'
@@ -145,21 +130,8 @@ function formatElapsed(ms?: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString('zh-CN')
-}
-
-function getTypeIcon(type?: string): string {
-  const icons: Record<string, string> = {
-    meeting: 'groups',
-    email: 'mail',
-    recording: 'mic',
-    document: 'description',
-    proposal: 'slideshow',
-    contract: 'gavel'
-  }
-  return icons[(type || '').toLowerCase()] || 'description'
+function formatReferenceName(name?: string): string {
+  return String(name || '').replace(/^\d+[_-]+/, '').trim() || '未命名文件'
 }
 </script>
 
