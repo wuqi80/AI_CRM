@@ -169,16 +169,33 @@
               </div>
             </section>
 
-            <section
-              v-if="attachments.length > 0"
-              class="rounded-2xl border border-slate-200 bg-white p-4"
-            >
-              <p class="text-xs font-bold uppercase tracking-wider text-slate-500">已上传附件</p>
-              <div class="mt-3 flex flex-wrap gap-3">
+            <section class="rounded-2xl border border-slate-200 bg-white p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-xs font-bold uppercase tracking-wider text-slate-500">已上传附件</p>
+                  <p class="mt-1 text-[11px] text-slate-400">
+                    {{ attachments.length > 0 ? `共 ${attachments.length} 个附件` : '当前暂无附件，可继续上传新的附件' }}
+                  </p>
+                </div>
+
+                <label class="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-primary transition hover:border-primary/30 hover:bg-primary/5">
+                  <span class="material-symbols-outlined text-base">add</span>
+                  <span>新增</span>
+                  <input
+                    type="file"
+                    class="hidden"
+                    multiple
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.md,.csv,.mp3,.wav,.m4a,.aac,.webm"
+                    @change="handleFileSelect"
+                  />
+                </label>
+              </div>
+
+              <div v-if="attachments.length > 0" class="mt-3 flex flex-wrap gap-3">
                 <div
                   v-for="item in attachments"
                   :key="item.id"
-                  class="flex max-w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3"
+                  class="group relative flex max-w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 pr-10"
                 >
                   <img
                     v-if="item.preview"
@@ -191,8 +208,26 @@
                     <p class="truncate text-sm font-medium text-slate-700">{{ item.file.name }}</p>
                     <p class="mt-1 text-xs text-slate-400">{{ formatAttachmentSize(item.file.size) }}</p>
                   </div>
+                  <button
+                    type="button"
+                    class="absolute right-2 top-2 rounded-full bg-white p-1 text-slate-400 shadow-sm transition hover:text-red-500"
+                    @click="removeAttachment(item.id)"
+                  >
+                    <span class="material-symbols-outlined text-sm">close</span>
+                  </button>
                 </div>
               </div>
+
+              <div
+                v-else
+                class="mt-3 flex min-h-[88px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-xs text-slate-400"
+              >
+                暂无附件，点击右上角“新增”可继续上传
+              </div>
+
+              <p v-if="attachmentsChangedAfterParse" class="mt-3 text-xs text-amber-600">
+                附件已变更，如需让 AI 结合最新附件重新生成内容，可点击“重新录入”再次解析。
+              </p>
             </section>
 
             <section v-if="parsedData.summary" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -213,16 +248,71 @@
               </div>
             </section>
 
-            <section
-              v-if="parsedData.todos && parsedData.todos.length > 0"
-              class="rounded-2xl border border-slate-200 bg-white p-4"
-            >
-              <p class="text-xs font-bold uppercase tracking-wider text-slate-500">待办事项</p>
-              <div class="mt-3 space-y-2">
-                <div v-for="(todo, index) in parsedData.todos" :key="index" class="flex items-start gap-2">
-                  <span class="material-symbols-outlined text-base text-slate-400">radio_button_checked</span>
-                  <span class="text-sm text-slate-700">{{ todo }}</span>
+            <section class="rounded-2xl border border-slate-200 bg-white p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-xs font-bold uppercase tracking-wider text-slate-500">待办事项</p>
+                  <p class="mt-1 text-[11px] leading-5 text-slate-400">
+                    保存后会为当前客户创建任务，可在跟进记录中查看详情并标记完成。
+                  </p>
                 </div>
+
+                <button
+                  type="button"
+                  class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-primary transition hover:border-primary/30 hover:bg-primary/5"
+                  @click="addSuggestedTask"
+                >
+                  <span class="material-symbols-outlined text-base">add</span>
+                  <span>新增</span>
+                </button>
+              </div>
+
+              <div v-if="suggestedTasks.length > 0" class="mt-3 space-y-2.5">
+                <div
+                  v-for="item in suggestedTasks"
+                  :key="item.id"
+                  class="rounded-2xl border border-slate-200 bg-slate-50 p-3 transition"
+                  :class="item.enabled ? 'opacity-100' : 'opacity-70'"
+                >
+                  <div class="flex items-start gap-3">
+                    <button
+                      type="button"
+                      class="mt-1 inline-flex size-5 shrink-0 items-center justify-center rounded-md border transition"
+                      :class="item.enabled ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-transparent'"
+                      :aria-label="item.enabled ? '取消创建该任务' : '创建该任务'"
+                      @click="toggleSuggestedTask(item.id)"
+                    >
+                      <span class="material-symbols-outlined text-[14px] leading-none">check</span>
+                    </button>
+
+                    <div class="min-w-0 flex-1">
+                      <el-input
+                        v-model="item.title"
+                        maxlength="100"
+                        placeholder="输入待办标题"
+                      />
+                      <p class="mt-2 text-[11px] leading-5 text-slate-400">
+                        {{ item.enabled ? '将按当前下次跟进时间生成任务截止时间。' : '已跳过，保存时不会创建这条任务。' }}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-white hover:text-red-500"
+                      aria-label="删除待办"
+                      @click="removeSuggestedTask(item.id)"
+                    >
+                      <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-else
+                class="mt-3 flex min-h-[88px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-xs text-slate-400"
+              >
+                暂无待办事项，点击右上角“新增”可补充任务。
               </div>
             </section>
 
@@ -284,6 +374,12 @@ interface ParsedFollowUpForm {
   nextFollowTime: string
 }
 
+interface SuggestedTaskDraft {
+  id: string
+  title: string
+  enabled: boolean
+}
+
 
 const FOLLOW_UP_TYPES = new Set(['call', 'meeting', 'email', 'visit', 'other'])
 const DEFAULT_ATTACHMENT_ONLY_CONTENT = '请结合附件内容生成跟进记录。'
@@ -301,6 +397,8 @@ const recordingDuration = ref(0)
 const parsedData = ref<AiFollowUpParseVO | null>(null)
 const attachments = ref<Attachment[]>([])
 const uploadedAttachments = ref<ChatAttachmentDTO[]>([])
+const attachmentsChangedAfterParse = ref(false)
+const suggestedTasks = ref<SuggestedTaskDraft[]>([])
 const parsedForm = reactive<ParsedFollowUpForm>({
   type: 'other',
   content: '',
@@ -335,6 +433,8 @@ function resetDrawerState() {
   step.value = 1
   textInput.value = ''
   parsedData.value = null
+  attachmentsChangedAfterParse.value = false
+  suggestedTasks.value = []
   clearAttachments()
   resetParsedForm()
   isRecording.value = false
@@ -561,14 +661,62 @@ function buildEditableContent(result: AiFollowUpParseVO, fallbackContent: string
   return content || trimmedFallback
 }
 
+function createSuggestedTaskDraft(title = ''): SuggestedTaskDraft {
+  return {
+    id: Math.random().toString(36).slice(2, 11),
+    title,
+    enabled: true
+  }
+}
+
+function hydrateSuggestedTasks(todos?: string[]) {
+  suggestedTasks.value = (todos || [])
+    .map(todo => String(todo || '').trim())
+    .filter(Boolean)
+    .map(todo => createSuggestedTaskDraft(todo))
+}
+
 function applyParsedResult(result: AiFollowUpParseVO, originalContent: string) {
   const normalizedTimes = normalizeParsedTimes(result, originalContent)
   parsedData.value = result
+  attachmentsChangedAfterParse.value = false
+  hydrateSuggestedTasks(result.todos)
   parsedForm.type = normalizeFollowUpType(result.type)
   parsedForm.content = buildEditableContent(result, originalContent)
   parsedForm.followTime = normalizedTimes.followTime
   parsedForm.nextFollowTime = normalizedTimes.nextFollowTime
   step.value = 2
+}
+
+function addSuggestedTask() {
+  suggestedTasks.value.push(createSuggestedTaskDraft())
+}
+
+function toggleSuggestedTask(id: string) {
+  const target = suggestedTasks.value.find(item => item.id === id)
+  if (!target) return
+  target.enabled = !target.enabled
+}
+
+function removeSuggestedTask(id: string) {
+  suggestedTasks.value = suggestedTasks.value.filter(item => item.id !== id)
+}
+
+function buildSuggestedTaskPayload(content: string) {
+  const payload = suggestedTasks.value
+    .map(item => ({
+      title: item.title.trim(),
+      enabled: item.enabled
+    }))
+    .filter(item => item.enabled && item.title)
+    .map(item => ({
+      title: item.title,
+      description: parsedData.value?.summary || content,
+      dueDate: parsedForm.nextFollowTime || undefined,
+      taskType: '跟进'
+    }))
+
+  return payload.length > 0 ? payload : undefined
 }
 
 function handleClose() {
@@ -804,6 +952,9 @@ function handleFile(file: File) {
 
   const id = Math.random().toString(36).slice(2, 11)
   uploadedAttachments.value = []
+  if (step.value === 2) {
+    attachmentsChangedAfterParse.value = true
+  }
   attachments.value.push({
     id,
     file,
@@ -817,6 +968,9 @@ function removeAttachment(id: string) {
     URL.revokeObjectURL(target.preview)
   }
   uploadedAttachments.value = []
+  if (step.value === 2) {
+    attachmentsChangedAfterParse.value = true
+  }
   attachments.value = attachments.value.filter(item => item.id !== id)
 }
 
@@ -837,6 +991,19 @@ async function uploadAttachments(): Promise<ChatAttachmentDTO[]> {
   return result
 }
 
+async function ensureUploadedAttachments(): Promise<ChatAttachmentDTO[] | undefined> {
+  if (attachments.value.length === 0) {
+    uploadedAttachments.value = []
+    return undefined
+  }
+
+  if (uploadedAttachments.value.length === attachments.value.length) {
+    return uploadedAttachments.value
+  }
+
+  return uploadAttachments()
+}
+
 async function handleSubmitText() {
   if (isProcessing.value) return
   if (!textInput.value.trim() && attachments.value.length === 0) return
@@ -844,12 +1011,7 @@ async function handleSubmitText() {
   isProcessing.value = true
 
   try {
-    const attachmentDTOs = attachments.value.length > 0
-      ? (uploadedAttachments.value.length === attachments.value.length
-        ? uploadedAttachments.value
-        : await uploadAttachments())
-      : undefined
-
+    const attachmentDTOs = await ensureUploadedAttachments()
     const content = textInput.value.trim() || DEFAULT_ATTACHMENT_ONLY_CONTENT
     const result = await aiParseFollowUp({
       content,
@@ -889,6 +1051,9 @@ async function handleConfirmSave() {
   saving.value = true
 
   try {
+    const attachmentDTOs = await ensureUploadedAttachments()
+    const suggestedTaskPayload = buildSuggestedTaskPayload(content)
+
     await addFollowUp({
       customerId: props.customer.customerId,
       type: normalizeFollowUpType(parsedForm.type),
@@ -898,15 +1063,8 @@ async function handleConfirmSave() {
       aiGenerated: parsedData.value ? 1 : 0,
       followTime: parsedForm.followTime,
       nextFollowTime: parsedForm.nextFollowTime || undefined,
-      attachments: uploadedAttachments.value.length > 0 ? uploadedAttachments.value : undefined,
-      suggestedTasks: parsedData.value?.todos?.length
-        ? parsedData.value.todos.map(todo => ({
-          title: todo,
-          description: parsedData.value?.summary || content,
-          dueDate: parsedForm.nextFollowTime || undefined,
-          taskType: '跟进'
-        }))
-        : undefined
+      attachments: attachmentDTOs,
+      suggestedTasks: suggestedTaskPayload
     })
 
     ElMessage.success('跟进记录已保存')
@@ -922,6 +1080,7 @@ async function handleConfirmSave() {
 function handleRetry() {
   step.value = 1
   parsedData.value = null
+  suggestedTasks.value = []
   resetParsedForm()
 }
 </script>

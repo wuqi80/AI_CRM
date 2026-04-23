@@ -551,8 +551,11 @@
                     :item="item"
                     :can-edit="canEditFollowUps"
                     :can-delete="canDeleteFollowUps"
+                    :can-toggle-task-complete="canToggleTasks"
                     @edit="handleEditFollowUp"
                     @delete="confirmDeleteFollowUp"
+                    @task-click="handleViewFollowUpTask"
+                    @task-toggle-complete="handleToggleFollowUpTask"
                   />
                   <div v-if="followUpIndex < followUps.length - 1" class="h-3 shrink-0" aria-hidden="true" />
                 </div>
@@ -1193,6 +1196,7 @@
       :task="selectedCustomerTask"
       :is-mobile="isMobile"
       :can-edit="canCreateTasks"
+      :can-toggle-complete="canToggleTasks"
       @edit="handleCustomerTaskEditFromDetail"
       @mutated="refreshCustomerAfterTaskMutation"
     />
@@ -1226,7 +1230,7 @@ import { useTaskStore } from '@/stores/task'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, generateCustomerAiReport, queryCustomerList, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
-import { aiParseTask } from '@/api/task'
+import { aiParseTask, queryTaskList } from '@/api/task'
 import type { CustomerAiParseVO } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } from '@/api/followup'
@@ -1235,7 +1239,7 @@ import { getEnabledFieldsByEntity } from '@/api/customField'
 import { downloadKnowledge, queryKnowledgeList, uploadKnowledge } from '@/api/knowledge'
 import { ElMessage, ElMessageBox, UploadRequestOptions } from 'element-plus'
 import type { Knowledge, Task, TaskAddBO, TaskStatus } from '@/types/common'
-import type { Contact, CustomerAiReportVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpUpdateBO } from '@/types/customer'
+import type { Contact, CustomerAiReportVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { getCustomerAiStatusMeta } from '@/utils/customerAi'
 import { formatCustomFieldValue as formatCustomFieldDisplayValue } from '@/utils/customFieldDisplay'
@@ -1619,6 +1623,7 @@ const canEditFollowUps = computed(() => userStore.hasPermission('followup:edit')
 const canDeleteFollowUps = computed(() => userStore.hasPermission('followup:delete'))
 const canViewTasks = computed(() => userStore.hasPermission('task:view'))
 const canCreateTasks = computed(() => userStore.hasPermission('task:create'))
+const canToggleTasks = computed(() => userStore.hasPermission('task:update_status'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
 const canUploadKnowledge = computed(() => userStore.hasPermission('knowledge:upload'))
 const filteredTransferUserList = computed(() => {
@@ -2127,10 +2132,10 @@ function formatTaskDateTimeLocal(dateStr: string): string {
 
 async function refreshCustomerAfterTaskMutation() {
   if (!customer.value) return
-  await customerStore.fetchCustomerDetail(customer.value.customerId)
+  await refreshFollowUpContext(customer.value.customerId)
   const id = selectedCustomerTask.value?.taskId
   if (id && customer.value.tasks) {
-    selectedCustomerTask.value = customer.value.tasks.find((t: Task) => t.taskId === id) || null
+    selectedCustomerTask.value = customer.value.tasks.find((t: Task) => String(t.taskId) === String(id)) || null
   }
 }
 
@@ -2239,6 +2244,49 @@ async function handleCustomerTaskAiParse() {
 function handleViewCustomerTask(task: Task) {
   if (!canViewTasks.value) return
   selectedCustomerTask.value = task
+}
+
+async function resolveCustomerTaskDetail(taskId: string): Promise<Task | null> {
+  const normalizedTaskId = String(taskId)
+  const localTask = customer.value?.tasks?.find((task: Task) => String(task.taskId) === normalizedTaskId) || null
+  if (localTask) {
+    return localTask
+  }
+
+  const result = await queryTaskList({
+    taskId: normalizedTaskId,
+    page: 1,
+    limit: 1
+  })
+
+  return result.list?.[0] || null
+}
+
+async function handleViewFollowUpTask(task: FollowUpTask) {
+  if (!canViewTasks.value) return
+
+  const detail = await resolveCustomerTaskDetail(task.taskId)
+  if (!detail) {
+    ElMessage.warning('任务不存在或已被删除')
+    return
+  }
+
+  selectedCustomerTask.value = detail
+}
+
+async function handleToggleFollowUpTask(task: FollowUpTask) {
+  if (!canToggleTasks.value) return
+
+  const detail = await resolveCustomerTaskDetail(task.taskId)
+  if (!detail) {
+    ElMessage.warning('任务不存在或已被删除')
+    return
+  }
+
+  const newStatus: TaskStatus = detail.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'
+  await taskStore.changeTaskStatus(detail.taskId, newStatus)
+  await refreshCustomerAfterTaskMutation()
+  ElMessage.success(newStatus === 'COMPLETED' ? '任务已标记完成' : '任务已重新打开')
 }
 
 function handleAddTask() {

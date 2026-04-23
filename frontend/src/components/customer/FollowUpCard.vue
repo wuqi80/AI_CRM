@@ -181,15 +181,31 @@
         <div
           v-for="task in tasks"
           :key="task.taskId"
-          class="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3"
+          class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-3"
         >
-          <div class="min-w-0 flex items-center gap-3">
-            <span
-              class="size-5 rounded border flex items-center justify-center shrink-0"
-              :class="isTaskCompleted(task) ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-transparent'"
-            >
-              <span class="material-symbols-outlined text-[14px]">check</span>
-            </span>
+          <button
+            v-if="canToggleTaskComplete"
+            type="button"
+            class="size-5 shrink-0 rounded border flex items-center justify-center transition"
+            :class="isTaskCompleted(task) ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-transparent hover:border-primary/40'"
+            :aria-label="isTaskCompleted(task) ? '标记为未完成' : '标记为已完成'"
+            @click.stop="$emit('task-toggle-complete', task)"
+          >
+            <span class="material-symbols-outlined text-[14px]">check</span>
+          </button>
+          <span
+            v-else
+            class="size-5 rounded border flex items-center justify-center shrink-0"
+            :class="isTaskCompleted(task) ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-transparent'"
+          >
+            <span class="material-symbols-outlined text-[14px]">check</span>
+          </span>
+
+          <button
+            type="button"
+            class="min-w-0 flex-1 rounded-xl px-1 py-1 text-left transition hover:bg-white/80"
+            @click="$emit('task-click', task)"
+          >
             <div class="min-w-0">
               <p class="truncate text-sm font-medium" :class="isTaskCompleted(task) ? 'text-slate-400 line-through' : 'text-slate-700'">
                 {{ task.title }}
@@ -198,14 +214,25 @@
                 {{ task.description }}
               </p>
             </div>
+          </button>
+
+          <div class="flex shrink-0 items-center gap-2">
+            <span
+              v-if="task.dueDate"
+              class="rounded-lg px-2 py-1 text-xs font-medium"
+              :class="isTaskCompleted(task) ? 'bg-slate-200 text-slate-500' : 'border border-slate-200 bg-white text-slate-500'"
+            >
+              {{ formatDueBadge(task.dueDate) }}
+            </span>
+            <button
+              type="button"
+              class="inline-flex size-8 items-center justify-center rounded-lg text-slate-300 transition hover:bg-white hover:text-primary"
+              aria-label="查看任务详情"
+              @click="$emit('task-click', task)"
+            >
+              <span class="material-symbols-outlined text-[18px] leading-none">chevron_right</span>
+            </button>
           </div>
-          <span
-            v-if="task.dueDate"
-            class="shrink-0 rounded-lg px-2 py-1 text-xs font-medium"
-            :class="isTaskCompleted(task) ? 'bg-slate-200 text-slate-500' : 'bg-white text-slate-500 border border-slate-200'"
-          >
-            {{ formatDueBadge(task.dueDate) }}
-          </span>
         </div>
       </div>
     </div>
@@ -223,15 +250,20 @@ import {
 } from '@/api/followup'
 import type { FollowUp, FollowUpAttachment, FollowUpTask } from '@/types/customer'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   item: FollowUp
   canEdit?: boolean
   canDelete?: boolean
-}>()
+  canToggleTaskComplete?: boolean
+}>(), {
+  canToggleTaskComplete: true
+})
 
 defineEmits<{
   (e: 'edit', value: FollowUp): void
   (e: 'delete', value: string): void
+  (e: 'task-click', value: FollowUpTask): void
+  (e: 'task-toggle-complete', value: FollowUpTask): void
 }>()
 
 const attachments = ref<FollowUpAttachment[]>([])
