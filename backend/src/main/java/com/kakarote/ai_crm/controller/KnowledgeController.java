@@ -177,6 +177,16 @@ public class KnowledgeController {
         return Result.ok();
     }
 
+    @PostMapping("/updateCustomer")
+    @Operation(summary = "Update knowledge related customer")
+    @RequirePermission("knowledge:upload")
+    public Result<String> updateCustomer(
+            @Parameter(description = "Knowledge ID") @RequestParam Long knowledgeId,
+            @Parameter(description = "Customer ID") @RequestParam(required = false) Long customerId) {
+        knowledgeService.updateCustomer(knowledgeId, customerId);
+        return Result.ok();
+    }
+
     @PostMapping("/{id}/ai-analyze")
     @Operation(summary = "AI analyze knowledge document")
     @RequirePermission("knowledge:view")

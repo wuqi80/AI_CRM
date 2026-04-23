@@ -494,6 +494,30 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
 
     // ==================== AI 文档分析 ====================
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateCustomer(Long knowledgeId, Long customerId) {
+        Knowledge knowledge = getById(knowledgeId);
+        if (ObjectUtil.isNull(knowledge)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Knowledge file does not exist");
+        }
+
+        if (customerId != null) {
+            Customer customer = customerMapper.selectById(customerId);
+            if (ObjectUtil.isNull(customer)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist or is inaccessible");
+            }
+        }
+
+        if (ObjectUtil.equal(knowledge.getCustomerId(), customerId)) {
+            return;
+        }
+
+        knowledge.setCustomerId(customerId);
+        updateById(knowledge);
+        globalSearchIndexService.refreshKnowledgeIndex(knowledgeId);
+    }
+
     private static final String AI_ANALYZE_PROMPT_TEMPLATE = """
         你是一个专业的 CRM 助手。请分析以下知识库文档，提取关键信息并以 JSON 格式返回。
 

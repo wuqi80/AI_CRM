@@ -49,6 +49,8 @@ public interface IKnowledgeService extends IService<Knowledge> {
      */
     void addTag(Long knowledgeId, String tagName);
 
+    void updateCustomer(Long knowledgeId, Long customerId);
+
     /**
      * AI分析文档内容（核心提炼、推荐话术、关联实体）
      */

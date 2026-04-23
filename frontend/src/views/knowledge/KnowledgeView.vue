@@ -354,6 +354,11 @@
                             <span class="material-symbols-outlined text-sm">download</span>下载
                           </span>
                         </el-dropdown-item>
+                        <el-dropdown-item v-if="canUploadKnowledge" @click="openAssociateDialog(item)">
+                          <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-sm">link</span>关联客户
+                          </span>
+                        </el-dropdown-item>
                         <el-dropdown-item v-if="item.weKnoraParseStatus === 'failed'" @click="handleReparse(item)">
                           <span class="flex items-center gap-2">
                             <span class="material-symbols-outlined text-sm">refresh</span>重新解析
@@ -464,6 +469,15 @@
                 >
                   <span class="material-symbols-outlined text-sm">delete</span>
                 </button>
+                <button
+                  v-if="canUploadKnowledge"
+                  type="button"
+                  class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-emerald-50 hover:text-emerald-600"
+                  title="关联客户"
+                  @click.stop="openAssociateDialog(item)"
+                >
+                  <span class="material-symbols-outlined text-sm">link</span>
+                </button>
               </div>
             </div>
           </div>
@@ -504,6 +518,64 @@
         </div>
       </div>
     </div>
+
+    <el-dialog
+      v-model="showAssociateDialog"
+      title="关联客户"
+      :width="isMobile ? '92%' : '460px'"
+      destroy-on-close
+    >
+      <div class="space-y-4">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <p class="text-xs font-bold uppercase tracking-widest text-slate-400">文档</p>
+          <p class="mt-2 break-all text-sm font-bold text-slate-900">{{ associateTarget?.name || '-' }}</p>
+        </div>
+
+        <div>
+          <p class="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">客户</p>
+          <el-select
+            v-model="associateCustomerId"
+            filterable
+            remote
+            reserve-keyword
+            clearable
+            default-first-option
+            placeholder="搜索客户名称"
+            :remote-method="searchAssociateCustomers"
+            :loading="customerSearchLoading"
+            class="w-full"
+          >
+            <el-option
+              v-for="item in customerOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <p class="mt-2 text-xs text-slate-400">不选择客户也可以保存，用于取消当前关联。</p>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex gap-3">
+          <button
+            type="button"
+            class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50"
+            @click="showAssociateDialog = false"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            class="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="associateSubmitting"
+            @click="handleConfirmAssociate"
+          >
+            {{ associateSubmitting ? '保存中...' : '保存关联' }}
+          </button>
+        </div>
+      </template>
+    </el-dialog>
 
     <!-- Upload Dialog -->
     <el-dialog
@@ -663,13 +735,16 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useResponsive } from '@/composables/useResponsive'
+import { useUserStore } from '@/stores/user'
+import { queryCustomerList } from '@/api/customer'
 import {
   queryKnowledgeList,
   uploadKnowledge,
   deleteKnowledge,
   downloadKnowledge,
   reparseKnowledge,
-  aiSearchKnowledge
+  aiSearchKnowledge,
+  updateKnowledgeCustomer
 } from '@/api/knowledge'
 import { ElMessage, ElMessageBox, UploadInstance, UploadRequestOptions } from 'element-plus'
 import type { Knowledge, KnowledgeQueryBO, KnowledgeType, KnowledgeAiSearchVO } from '@/types/common'
@@ -680,6 +755,7 @@ import KnowledgeScriptGeneratorDialog from '@/components/knowledge/KnowledgeScri
 const { isMobile } = useResponsive()
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 /** 桌面侧栏折叠，仅 UI */
 const sidebarCollapsed = ref(false)
 const hotSearchTags = ['产品知识库', '销售话术', '售后服务', '入职培训', '客户FAQ']
@@ -691,6 +767,7 @@ const uploading = ref(false)
 const showUploadDialog = ref(false)
 const showDetailModal = ref(false)
 const showScriptDialog = ref(false)
+const showAssociateDialog = ref(false)
 const selectedKnowledgeId = ref('')
 const knowledgeList = ref<Knowledge[]>([])
 const totalCount = ref(0)
@@ -699,6 +776,11 @@ const aiSearchResult = ref<KnowledgeAiSearchVO | null>(null)
 const uploadingFile = ref<File | null>(null)
 const uploadRef = ref<UploadInstance>()
 const selectedCategory = ref('all')
+const associateSubmitting = ref(false)
+const customerSearchLoading = ref(false)
+const associateTarget = ref<Knowledge | null>(null)
+const associateCustomerId = ref('')
+const customerOptions = ref<Array<{ value: string; label: string }>>([])
 
 const categories = [
   { id: 'all', label: '全部知识', icon: 'auto_stories' },
@@ -724,6 +806,7 @@ const uploadForm = reactive({
 
 const totalPages = computed(() => Math.ceil(totalCount.value / (queryParams.limit || 12)))
 const showAiSearchResult = computed(() => aiSearchLoading.value || aiSearchResult.value !== null)
+const canUploadKnowledge = computed(() => userStore.hasPermission('knowledge:upload'))
 
 const visiblePages = computed(() => {
   const total = totalPages.value
@@ -753,6 +836,15 @@ watch(
     }
   }
 )
+
+watch(showAssociateDialog, (visible) => {
+  if (!visible) {
+    associateSubmitting.value = false
+    associateTarget.value = null
+    associateCustomerId.value = ''
+    customerOptions.value = []
+  }
+})
 
 async function fetchList() {
   loading.value = true
@@ -875,6 +967,53 @@ function handleKnowledgeSummaryUpdated(payload: { knowledgeId: string; summary: 
           : item
       )
     }
+  }
+}
+
+function openAssociateDialog(item: Knowledge) {
+  associateTarget.value = item
+  associateCustomerId.value = item.customerId ? String(item.customerId) : ''
+  customerOptions.value = item.customerId && item.customerName
+    ? [{ value: String(item.customerId), label: item.customerName }]
+    : []
+  showAssociateDialog.value = true
+}
+
+async function searchAssociateCustomers(query: string) {
+  const keyword = query.trim()
+  if (!keyword) {
+    customerOptions.value = associateTarget.value?.customerId && associateTarget.value.customerName
+      ? [{ value: String(associateTarget.value.customerId), label: associateTarget.value.customerName }]
+      : []
+    return
+  }
+
+  customerSearchLoading.value = true
+  try {
+    const res = await queryCustomerList({ keyword, page: 1, limit: 20 })
+    customerOptions.value = (res.list || []).map((customer: { customerId: string; companyName?: string }) => ({
+      value: String(customer.customerId),
+      label: customer.companyName || ''
+    }))
+  } catch (error) {
+    console.warn('Customer search failed:', error)
+    customerOptions.value = []
+  } finally {
+    customerSearchLoading.value = false
+  }
+}
+
+async function handleConfirmAssociate() {
+  if (!associateTarget.value) return
+
+  associateSubmitting.value = true
+  try {
+    await updateKnowledgeCustomer(associateTarget.value.knowledgeId, associateCustomerId.value || undefined)
+    ElMessage.success(associateCustomerId.value ? '关联客户已更新' : '已取消关联客户')
+    showAssociateDialog.value = false
+    await fetchList()
+  } finally {
+    associateSubmitting.value = false
   }
 }
 
