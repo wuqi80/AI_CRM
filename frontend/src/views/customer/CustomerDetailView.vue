@@ -1265,8 +1265,22 @@
           </div>
         </section>
         <section class="rounded-xl border border-slate-200 bg-white px-4 py-4">
-          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">AI 洞察</p>
-          <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{{ latestAiReport?.aiInsight || customer?.aiInsight || '暂无 AI 洞察' }}</p>
+          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">AI 深度分析</p>
+          <ul v-if="aiReportDialogDeepInsightSegments.length" class="mt-2 space-y-1.5">
+            <li
+              v-for="(segment, index) in aiReportDialogDeepInsightSegments"
+              :key="`${segment}-${index}`"
+              class="flex items-start gap-2 text-sm leading-6 text-slate-700"
+            >
+              <span class="mt-2 size-1 shrink-0 rounded-full bg-slate-500"></span>
+              <span class="min-w-0 break-words">{{ segment }}</span>
+            </li>
+          </ul>
+          <p v-else class="mt-2 text-sm leading-6 text-slate-700">暂无 AI 深度分析</p>
+          <div v-if="currentAiNextStep" class="mt-4 border-t border-slate-100 pt-4">
+            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">建议下一步行动</p>
+            <p class="mt-2 whitespace-pre-line break-words text-sm leading-6 text-slate-700">{{ currentAiNextStep }}</p>
+          </div>
         </section>
       </div>
     </el-dialog>
@@ -1603,11 +1617,12 @@ const savedAiParseResult = computed<CustomerAiParseVO | null>(() => {
     }
 
     const snapshotResult = parsed as CustomerAiParseVO
-    const sidebarResult = {
-      ...snapshotResult,
-      summary: undefined
+    const sidebarResult = { ...snapshotResult }
+    if (isSameAsListAiSummary(sidebarResult.summary)) {
+      sidebarResult.summary = undefined
     }
     const hasSidebarContent = sidebarResult.score != null
+      || !!sidebarResult.summary
       || !!sidebarResult.nextStep
       || (sidebarResult.tags?.length || 0) > 0
       || (sidebarResult.keyPoints?.length || 0) > 0
@@ -1616,6 +1631,9 @@ const savedAiParseResult = computed<CustomerAiParseVO | null>(() => {
     return null
   }
 })
+const currentAiDeepInsight = computed(() => (latestAiReport.value?.aiDeepInsight || savedAiParseResult.value?.summary || '').trim())
+const currentAiNextStep = computed(() => (latestAiReport.value?.aiNextStep || savedAiParseResult.value?.nextStep || '').trim())
+const aiReportDialogDeepInsightSegments = computed(() => splitAiInsightSegments(currentAiDeepInsight.value))
 const aiAnalysisStatus = computed(() => customer.value?.aiAnalysisStatus || '')
 const isAiAnalysisPending = computed(() => aiAnalysisStatus.value === 'pending' || aiAnalysisStatus.value === 'running')
 const isAiAnalysisFailed = computed(() => aiAnalysisStatus.value === 'failed')
@@ -1634,6 +1652,33 @@ const aiAnalysisStatusLabel = computed(() => {
       return ''
   }
 })
+
+function isSameAsListAiSummary(value?: string | null): boolean {
+  const summary = String(value || '').replace(/\s+/g, ' ').trim()
+  const listSummary = currentAiInsight.value.replace(/\s+/g, ' ').trim()
+  return !!summary && !!listSummary && summary.length <= 90 && summary === listSummary
+}
+
+function splitAiInsightSegments(value?: string | null): string[] {
+  const normalized = String(value || '')
+    .replace(/\\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim()
+  if (!normalized) return []
+
+  return normalized
+    .split(/\n+/)
+    .flatMap(line => line.match(/[^。！？!?；;\n]+[。！？!?；;]?/g) || [line])
+    .map(cleanAiInsightSegment)
+    .filter(Boolean)
+}
+
+function cleanAiInsightSegment(value: string): string {
+  return value
+    .replace(/^\s*(?:[-*•·]|[0-9]+[.)、]|[一二三四五六七八九十]+[.)、]|（[一二三四五六七八九十]+）)\s*/, '')
+    .trim()
+}
+
 const aiAnalysisStatusDescription = computed(() => {
   switch (aiAnalysisStatus.value) {
     case 'pending':

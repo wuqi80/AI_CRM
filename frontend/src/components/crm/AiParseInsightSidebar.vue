@@ -29,14 +29,23 @@
             <span class="material-symbols-outlined text-sm text-primary">analytics</span>
             AI 深度分析
           </h4>
-          <p class="text-xs text-slate-700 leading-relaxed">{{ result.summary }}</p>
+          <ul class="space-y-1.5">
+            <li
+              v-for="(segment, index) in insightSegments"
+              :key="`${segment}-${index}`"
+              class="flex items-start gap-2 text-xs text-slate-700 leading-relaxed"
+            >
+              <span class="mt-[0.35rem] size-1 shrink-0 rounded-full bg-slate-500"></span>
+              <span class="min-w-0 break-words">{{ segment }}</span>
+            </li>
+          </ul>
         </div>
         <div v-if="result.nextStep" :class="{ 'pt-4 border-t border-slate-100': result.summary }">
           <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
             <span class="material-symbols-outlined text-sm text-primary">rocket_launch</span>
             建议下一步行动
           </h4>
-          <p class="text-xs text-slate-700 leading-relaxed">{{ result.nextStep }}</p>
+          <p class="text-xs text-slate-700 leading-relaxed whitespace-pre-line break-words">{{ result.nextStep }}</p>
         </div>
       </div>
 
@@ -102,10 +111,11 @@
  * - tip: 底部「小提示」正文，用于各业务自定义引导文案；有默认内容
  * - empty-extra: 无 result 时，标题与描述下方的扩展区域（如主操作按钮）
  */
+import { computed } from 'vue'
 import WkIcon from '@/components/common/WkIcon.vue'
 import type { CustomerAiParseVO } from '@/api/customer'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     result: CustomerAiParseVO | null
     emptyTitle?: string
@@ -120,4 +130,28 @@ withDefaults(
     scoreCaption: '基于行业匹配度、需求迫切度及规模评估'
   }
 )
+
+const insightSegments = computed(() => splitAiInsightSegments(props.result?.summary))
+
+function splitAiInsightSegments(value?: string | null): string[] {
+  const normalized = String(value || '')
+    .replace(/\\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim()
+  if (!normalized) return []
+
+  const lines = normalized
+    .split(/\n+/)
+    .flatMap(line => line.match(/[^。！？!?；;\n]+[。！？!?；;]?/g) || [line])
+
+  return lines
+    .map(cleanInsightSegment)
+    .filter(Boolean)
+}
+
+function cleanInsightSegment(value: string): string {
+  return value
+    .replace(/^\s*(?:[-*•·]|[0-9]+[.)、]|[一二三四五六七八九十]+[.)、]|（[一二三四五六七八九十]+）)\s*/, '')
+    .trim()
+}
 </script>

@@ -210,14 +210,17 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         你是一位资深 CRM 销售分析师。请基于下面的客户资料，生成客户 AI 分析报告，并严格返回 JSON：
         {
           "aiStatusDetection": "只能是 高意向、活跃状态、需跟进、休眠 之一",
-          "aiInsight": "40-70字，输出一句短摘要：阶段/沟通状态/需求/联系人 + 建议 + 风险提醒"
+          "aiInsight": "40-70字，输出一句短摘要：阶段/沟通状态/需求/联系人 + 建议 + 风险提醒",
+          "aiDeepInsight": "120-300字，输出3-5条深度分析要点，用\\n分隔，覆盖阶段、需求、决策链、风险，不要重复aiInsight",
+          "aiNextStep": "40-100字，输出一个具体可执行的下一步行动建议"
         }
 
         要求：
         1. 使用中文。
         2. aiStatusDetection 只能返回以下四个值之一：高意向、活跃状态、需跟进、休眠。
         3. aiInsight 是列表和客户基本信息中的摘要，不要写长段落；参考格式：线索阶段，未沟通，需求不明，无联系人。建议尽快触达并完善信息，避免流失。
-        4. 只返回 JSON，不要返回 Markdown、代码块或额外说明。
+        4. aiDeepInsight 用于客户详情页，不需要像列表摘要一样精简；每条独立成句，便于前端分段展示。
+        5. 只返回 JSON，不要返回 Markdown、代码块或额外说明。
 
         客户资料：
         %s
@@ -1120,8 +1123,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
         snapshot.setScore(inferCustomerAiParseScore(detail, recentFollowUps, report.getAiStatusDetection()));
         snapshot.setTags(buildCustomerAiParseTags(detail, report.getAiStatusDetection()));
-        snapshot.setSummary(buildCustomerAiParseSummary(detail, primaryContact, report));
-        snapshot.setNextStep(buildCustomerAiParseNextStep(detail, report.getAiStatusDetection()));
+        snapshot.setSummary(buildCustomerAiParseSummary(detail, recentFollowUps, report));
+        snapshot.setNextStep(StrUtil.blankToDefault(report.getAiNextStep(), buildCustomerAiParseNextStep(detail, report.getAiStatusDetection())));
         snapshot.setKeyPoints(buildCustomerAiParseKeyPoints(detail, primaryContact, recentFollowUps));
         return snapshot;
     }
@@ -1209,22 +1212,12 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     }
 
     private String buildCustomerAiParseSummary(CustomerDetailVO detail,
-                                               ContactVO primaryContact,
+                                               List<FollowUpVO> recentFollowUps,
                                                CustomerAiReportVO report) {
-        if (StrUtil.isNotBlank(report.getAiInsight())) {
-            return truncateText(report.getAiInsight(), 180);
+        if (StrUtil.isNotBlank(report.getAiDeepInsight())) {
+            return normalizeAiDeepInsightText(report.getAiDeepInsight());
         }
-
-        List<String> parts = new ArrayList<>();
-        parts.add(StrUtil.blankToDefault(detail.getCompanyName(), "该客户"));
-        if (StrUtil.isNotBlank(detail.getIndustry())) {
-            parts.add("所属行业为" + detail.getIndustry());
-        }
-        parts.add("当前处于" + getStageLabel(detail.getStage()) + "阶段");
-        if (primaryContact != null && StrUtil.isNotBlank(primaryContact.getName())) {
-            parts.add("当前主要联系人为" + primaryContact.getName());
-        }
-        return String.join("，", parts) + "。";
+        return buildDeepAiInsight(detail, recentFollowUps, report.getAiStatusDetection());
     }
 
     private String buildCustomerAiParseNextStep(CustomerDetailVO detail, String aiStatus) {
@@ -1315,16 +1308,27 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             CustomerAiReportVO report = new CustomerAiReportVO();
             report.setAiStatusDetection(normalizeAiStatusDetection(getJsonText(root, "aiStatusDetection"), detail, recentFollowUps));
             report.setAiInsight(normalizeAiReportText(getJsonText(root, "aiInsight")));
-            if (StrUtil.isAllBlank(report.getAiStatusDetection(), report.getAiInsight())) {
+            report.setAiDeepInsight(normalizeAiDeepInsightText(getJsonText(root, "aiDeepInsight")));
+            report.setAiNextStep(normalizeAiDeepInsightText(getJsonText(root, "aiNextStep")));
+            if (StrUtil.isAllBlank(report.getAiStatusDetection(), report.getAiInsight(), report.getAiDeepInsight(), report.getAiNextStep())) {
                 return buildFallbackCustomerAiReportV2(detail, recentFollowUps);
             }
-            if (StrUtil.isBlank(report.getAiStatusDetection()) || StrUtil.isBlank(report.getAiInsight())) {
+            if (StrUtil.isBlank(report.getAiStatusDetection())
+                    || StrUtil.isBlank(report.getAiInsight())
+                    || StrUtil.isBlank(report.getAiDeepInsight())
+                    || StrUtil.isBlank(report.getAiNextStep())) {
                 CustomerAiReportVO fallback = buildFallbackCustomerAiReportV2(detail, recentFollowUps);
                 if (StrUtil.isBlank(report.getAiStatusDetection())) {
                     report.setAiStatusDetection(fallback.getAiStatusDetection());
                 }
                 if (StrUtil.isBlank(report.getAiInsight())) {
                     report.setAiInsight(fallback.getAiInsight());
+                }
+                if (StrUtil.isBlank(report.getAiDeepInsight())) {
+                    report.setAiDeepInsight(fallback.getAiDeepInsight());
+                }
+                if (StrUtil.isBlank(report.getAiNextStep())) {
+                    report.setAiNextStep(fallback.getAiNextStep());
                 }
             }
             return report;
@@ -1389,7 +1393,60 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
         report.setAiStatusDetection(aiStatus);
         report.setAiInsight(buildCompactAiInsight(detail, recentFollowUps, aiStatus));
+        report.setAiDeepInsight(buildDeepAiInsight(detail, recentFollowUps, aiStatus));
+        report.setAiNextStep(buildCustomerAiParseNextStep(detail, aiStatus));
         return report;
+    }
+
+    private String buildDeepAiInsight(CustomerDetailVO detail, List<FollowUpVO> recentFollowUps, String aiStatus) {
+        ContactVO primaryContact = findPrimaryContact(detail.getContacts());
+        FollowUpVO latestFollowUp = recentFollowUps == null || recentFollowUps.isEmpty() ? null : recentFollowUps.get(0);
+        List<String> points = new ArrayList<>();
+
+        StringBuilder stagePoint = new StringBuilder();
+        stagePoint.append("客户当前处于").append(getStageLabel(detail.getStage())).append("阶段");
+        if (StrUtil.isNotBlank(detail.getIndustry())) {
+            stagePoint.append("，所属行业为").append(detail.getIndustry());
+        }
+        if (detail.getQuotation() != null) {
+            stagePoint.append("，已有预计成交金额").append(detail.getQuotation().stripTrailingZeros().toPlainString());
+        } else {
+            stagePoint.append("，预算和成交金额仍需进一步确认");
+        }
+        stagePoint.append("。");
+        points.add(stagePoint.toString());
+
+        if (primaryContact != null && StrUtil.isNotBlank(primaryContact.getName())) {
+            StringBuilder contactPoint = new StringBuilder("关键联系人已记录为").append(primaryContact.getName());
+            if (StrUtil.isNotBlank(primaryContact.getPosition())) {
+                contactPoint.append("（").append(primaryContact.getPosition()).append("）");
+            }
+            contactPoint.append("，建议继续补充其决策权限、业务痛点和内部协同角色。");
+            points.add(contactPoint.toString());
+        } else {
+            points.add("决策链信息尚未建立，需优先补齐关键联系人、使用部门和最终拍板人，避免后续推进缺少明确对象。");
+        }
+
+        if (latestFollowUp != null && StrUtil.isNotBlank(latestFollowUp.getContent())) {
+            points.add("最近跟进记录显示：" + truncateText(latestFollowUp.getContent(), 80) + "，后续应围绕客户反馈继续验证需求真实性和紧急程度。");
+        } else if (StrUtil.isNotBlank(detail.getRemark())) {
+            points.add("现有备注显示：" + truncateText(detail.getRemark(), 80) + "，仍需通过下一次沟通补齐可执行的推进依据。");
+        } else {
+            points.add("当前缺少有效跟进记录，需求、预算、时间表和竞争情况都不够清晰，需要尽快通过一次结构化沟通补齐。");
+        }
+
+        String riskPoint = switch (StrUtil.blankToDefault(aiStatus, "")) {
+            case "高意向" -> "风险点在于成交条件未及时收口，若预算、方案和关键决策人不同步，可能错过最佳推进窗口。";
+            case "活跃状态" -> "风险点在于沟通热度可能回落，需要把持续互动转化为明确的下一步节点和客户侧承诺。";
+            case "休眠" -> "风险点在于客户已进入低响应状态，需要先判断沉默原因，再决定重新激活或阶段性搁置。";
+            default -> "风险点在于跟进节奏和客户反馈不够明确，若持续缺少下一步安排，商机容易被动降温。";
+        };
+        points.add(riskPoint);
+
+        return points.stream()
+                .filter(StrUtil::isNotBlank)
+                .map(point -> "- " + point)
+                .collect(Collectors.joining("\n"));
     }
 
     private String buildCompactAiInsight(CustomerDetailVO detail, List<FollowUpVO> recentFollowUps, String aiStatus) {
@@ -1559,6 +1616,20 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             return null;
         }
         return compactAiReportText(value);
+    }
+
+    private String normalizeAiDeepInsightText(String value) {
+        if (StrUtil.isBlank(value)) {
+            return null;
+        }
+        return StrUtil.trimToEmpty(value)
+                .replace("\\n", "\n")
+                .replace("\r\n", "\n")
+                .replace('\r', '\n')
+                .replaceAll("[ \\t\\x0B\\f]+", " ")
+                .replaceAll("(?m)^\\s*[-*•·]\\s*", "- ")
+                .replaceAll("\\n{3,}", "\n\n")
+                .trim();
     }
 
     private String compactAiReportText(String value) {

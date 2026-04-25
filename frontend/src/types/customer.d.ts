@@ -199,6 +199,8 @@ export interface CustomerAiReportVO {
   customerId: string
   aiStatusDetection?: string
   aiInsight?: string
+  aiDeepInsight?: string
+  aiNextStep?: string
 }
 
 export interface CustomerAiSearchParseVO {

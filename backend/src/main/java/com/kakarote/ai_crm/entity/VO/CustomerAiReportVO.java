@@ -18,4 +18,10 @@ public class CustomerAiReportVO {
 
     @Schema(description = "AI洞察")
     private String aiInsight;
+
+    @Schema(description = "AI深度分析")
+    private String aiDeepInsight;
+
+    @Schema(description = "AI建议下一步行动")
+    private String aiNextStep;
 }
