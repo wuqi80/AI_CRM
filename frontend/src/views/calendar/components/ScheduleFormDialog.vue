@@ -20,18 +20,21 @@
           </div>
         </div>
         <button
-          class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+          class="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
           type="button"
           aria-label="关闭"
           @click="visible = false"
         >
-          <span class="material-symbols-outlined">close</span>
+          <span class="material-symbols-outlined text-[22px] leading-none">close</span>
         </button>
       </div>
     </template>
 
     <div class="space-y-6 bg-white px-5 pb-6 pt-5 md:px-6 md:pb-7 md:pt-6">
-      <section class="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/5 via-white to-slate-50 p-4 shadow-sm">
+      <section
+        v-if="!isEdit"
+        class="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/5 via-white to-slate-50 p-4 shadow-sm"
+      >
         <div class="flex items-center gap-2 mb-3">
           <WkIcon name="ai" class="text-primary text-sm" />
           <span class="text-xs font-bold text-primary uppercase tracking-wide">智能解析</span>
@@ -166,7 +169,7 @@
               :value="item.value"
             />
           </el-select>
-          <p v-if="participantAiWarning" class="mt-1 text-xs font-medium text-amber-600">
+          <p v-if="!isEdit && participantAiWarning" class="mt-1 text-xs font-medium text-amber-600">
             AI 识别到但未匹配到系统员工：{{ participantAiWarning }}
           </p>
         </div>

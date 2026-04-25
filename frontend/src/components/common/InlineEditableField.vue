@@ -318,9 +318,10 @@ watch(() => [props.modelValue, resolvedFieldName.value], () => {
 }
 
 .inline-editable-field__display {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 0;
   min-width: 0;
   max-width: 100%;
 }
@@ -329,6 +330,14 @@ watch(() => [props.modelValue, resolvedFieldName.value], () => {
   min-width: 0;
   max-width: 100%;
   flex: 1 1 auto;
+  padding-right: 0;
+  box-sizing: border-box;
+}
+
+/* 悬停/聚焦编辑钮时预留宽度，避免绝对定位按钮盖住省略号文案 */
+.inline-editable-field:has(.inline-editable-field__edit):hover .inline-editable-field__content,
+.inline-editable-field:has(.inline-editable-field__edit:focus-visible) .inline-editable-field__content {
+  padding-right: 32px;
 }
 
 .inline-editable-field__fallback {
@@ -339,6 +348,10 @@ watch(() => [props.modelValue, resolvedFieldName.value], () => {
 }
 
 .inline-editable-field__edit {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -349,9 +362,9 @@ watch(() => [props.modelValue, resolvedFieldName.value], () => {
   color: #0b84ff;
   background: #e8f3ff;
   opacity: 0;
-  transform: translateX(-2px);
-  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
-  flex: 0 0 auto;
+  transform: translateY(-50%);
+  transition: background 0.15s ease;
+  pointer-events: none;
 }
 
 .inline-editable-field__edit:hover {
@@ -361,7 +374,7 @@ watch(() => [props.modelValue, resolvedFieldName.value], () => {
 .inline-editable-field:hover .inline-editable-field__edit,
 .inline-editable-field__edit:focus-visible {
   opacity: 1;
-  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .inline-editable-field__edit .material-symbols-outlined,
