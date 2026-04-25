@@ -228,11 +228,12 @@
                       </div>
                     </template>
                     <template v-else-if="field.fieldName === 'aiStatusDetection'">
-                      <div class="flex items-center justify-start py-1">
+                      <div class="wk-cell-status-badges flex items-center justify-start py-1">
                         <span
                           v-if="getAiStatusMeta(row.aiStatusDetection)"
-                          class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
+                          class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
                           :class="getAiStatusMeta(row.aiStatusDetection)?.badgeClass"
+                          :title="getAiStatusMeta(row.aiStatusDetection)?.label"
                         >
                           <span class="size-1.5 rounded-full mr-1.5" :class="getAiStatusMeta(row.aiStatusDetection)?.dotClass"></span>
                           {{ getAiStatusMeta(row.aiStatusDetection)?.label }}
@@ -261,24 +262,28 @@
                       <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
                     </template>
                     <template v-else-if="field.fieldName === 'level'">
-                      <span
-                        v-if="row.level"
-                        class="inline-flex items-center justify-start h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
-                        :class="getLevelBadgeClass(row.level)"
-                      >
-                        {{ getLevelLabel(field, row.level) }}
-                      </span>
+                      <div v-if="row.level" class="wk-cell-status-badges">
+                        <span
+                          class="inline-flex shrink-0 items-center justify-center h-6 px-2 rounded-lg font-bold text-xs whitespace-nowrap"
+                          :class="getLevelBadgeClass(row.level)"
+                          :title="getLevelLabel(field, row.level)"
+                        >
+                          {{ getLevelLabel(field, row.level) }}
+                        </span>
+                      </div>
                       <span v-else class="text-slate-300">-</span>
                     </template>
                     <template v-else-if="field.fieldName === 'stage'">
-                      <span
-                        v-if="row.stage"
-                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
-                        :class="getStageBadgeClass(row.stage)"
-                      >
-                        <span class="size-1.5 rounded-full mr-1.5" :class="getStageDotClass(row.stage)"></span>
-                        {{ getConfiguredStageLabel(field, row.stage) }}
-                      </span>
+                      <div v-if="row.stage" class="wk-cell-status-badges">
+                        <span
+                          class="inline-flex shrink-0 items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
+                          :class="getStageBadgeClass(row.stage)"
+                          :title="getConfiguredStageLabel(field, row.stage)"
+                        >
+                          <span class="size-1.5 shrink-0 rounded-full mr-1.5" :class="getStageDotClass(row.stage)"></span>
+                          {{ getConfiguredStageLabel(field, row.stage) }}
+                        </span>
+                      </div>
                       <span v-else class="text-slate-300">-</span>
                     </template>
                     <span
@@ -438,11 +443,12 @@
 
                       <div class="min-w-0">
                         <div class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">level</div>
-                        <div class="mt-0.5">
+                        <div class="mt-0.5 min-w-0 wk-cell-status-badges">
                           <span
                             v-if="row.level"
-                            class="inline-flex items-center justify-start h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
+                            class="inline-flex shrink-0 items-center justify-start h-6 px-2 rounded-lg font-bold text-xs whitespace-nowrap"
                             :class="getLevelBadgeClass(row.level)"
+                            :title="getMobileLevelText(row)"
                           >
                             {{ getMobileLevelText(row) }}
                           </span>
@@ -992,7 +998,7 @@ function getFieldMinWidth(field: CustomField): number {
     aiInsight: 320,
     industry: 120,
     stage: 130,
-    level: 110,
+    level: 124,
     source: 140,
     website: 180,
     quotation: 130,
@@ -1372,6 +1378,26 @@ async function handleImportSuccess(_result: CustomerImportResult) {
 
 .wk-customer-table :deep(.el-table__empty-block) {
   min-height: 220px;
+}
+
+/* 状态 / 级别 / AI 状态徽章：单行不换行；列极窄时横向微滚动，避免字内断行 */
+.wk-cell-status-badges {
+  box-sizing: border-box;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.wk-cell-status-badges::-webkit-scrollbar {
+  height: 3px;
+}
+
+.wk-cell-status-badges::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(148 163 184 / 0.55);
 }
 
 .wk-ai-insight-text {

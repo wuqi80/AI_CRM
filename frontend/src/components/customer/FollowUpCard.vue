@@ -173,7 +173,10 @@
       :attachment="previewAttachment"
     />
 
-    <div v-if="tasks.length > 0" class="mt-5 rounded-2xl border border-slate-200 p-4">
+    <div
+      v-if="tasks.length > 0"
+      class="mt-5 p-3 bg-slate-50/30 rounded-[1.25rem] border border-slate-100/80 backdrop-blur-sm relative overflow-hidden"
+    >
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-primary">task_alt</span>
@@ -184,17 +187,17 @@
         </span>
       </div>
 
-      <div class="mt-3 space-y-3">
+      <div class="mt-3 space-y-1.5">
         <div
           v-for="task in tasks"
           :key="task.taskId"
-          class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-3"
+          class="group/task flex items-center gap-2.5 rounded-lg border border-transparent bg-white/50 p-2 transition-all duration-300 hover:border-slate-200 hover:bg-white"
         >
           <button
             v-if="canToggleTaskComplete"
             type="button"
-            class="size-5 shrink-0 rounded border flex items-center justify-center transition"
-            :class="isTaskCompleted(task) ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-transparent hover:border-primary/40'"
+            class="size-5 shrink-0 rounded border flex items-center justify-center transition duration-300"
+            :class="isTaskCompleted(task) ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-transparent hover:border-primary/40 group-hover/task:border-primary'"
             :aria-label="isTaskCompleted(task) ? '标记为未完成' : '标记为已完成'"
             @click.stop="$emit('task-toggle-complete', task)"
           >
@@ -202,19 +205,22 @@
           </button>
           <span
             v-else
-            class="size-5 rounded border flex items-center justify-center shrink-0"
-            :class="isTaskCompleted(task) ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-transparent'"
+            class="size-5 rounded border flex items-center justify-center shrink-0 transition duration-300"
+            :class="isTaskCompleted(task) ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-transparent group-hover/task:border-primary'"
           >
             <span class="material-symbols-outlined text-[14px]">check</span>
           </span>
 
           <button
             type="button"
-            class="min-w-0 flex-1 rounded-xl px-1 py-1 text-left transition hover:bg-white/80"
+            class="min-w-0 flex-1 rounded-lg px-1 py-1 text-left transition hover:bg-transparent"
             @click="$emit('task-click', task)"
           >
             <div class="min-w-0">
-              <p class="truncate text-sm font-medium" :class="isTaskCompleted(task) ? 'text-slate-400 line-through' : 'text-slate-700'">
+              <p
+                class="truncate text-sm font-medium transition duration-300"
+                :class="isTaskCompleted(task) ? 'text-slate-300 line-through' : 'text-slate-600 group-hover/task:text-slate-900'"
+              >
                 {{ task.title }}
               </p>
               <p v-if="task.description" class="mt-1 text-xs text-slate-400 truncate">
@@ -226,14 +232,14 @@
           <div class="flex shrink-0 items-center gap-2">
             <span
               v-if="task.dueDate"
-              class="rounded-lg px-2 py-1 text-xs font-medium"
-              :class="isTaskCompleted(task) ? 'bg-slate-200 text-slate-500' : 'border border-slate-200 bg-white text-slate-500'"
+              class="rounded-lg px-2 py-1 text-xs font-medium transition duration-300"
+              :class="isTaskCompleted(task) ? 'bg-slate-200 text-slate-500' : 'border border-slate-200 bg-slate-100 text-slate-500 group-hover/task:border-slate-200 group-hover/task:bg-white'"
             >
               {{ formatDueBadge(task.dueDate) }}
             </span>
             <button
               type="button"
-              class="inline-flex size-8 items-center justify-center rounded-lg text-slate-300 transition hover:bg-white hover:text-primary"
+              class="inline-flex size-8 items-center justify-center rounded-lg text-slate-300 transition duration-300 group-hover/task:text-primary"
               aria-label="查看任务详情"
               @click="$emit('task-click', task)"
             >
