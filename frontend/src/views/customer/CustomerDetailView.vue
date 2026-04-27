@@ -364,9 +364,38 @@
 
       <!-- 3-Column Content -->
       <div class="wk-mobile-px-15 md:px-8 pb-8 pt-6">
+        <div class="lg:hidden mb-4">
+          <div class="flex items-center gap-2 p-1 rounded-xl bg-slate-100">
+            <button
+              type="button"
+              class="flex-1 h-9 px-3 rounded-lg text-sm font-bold transition-colors"
+              :class="detailTab === 'ai' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'"
+              @click="detailTab = 'ai'"
+            >
+              AI智能分析
+            </button>
+            <button
+              v-if="canViewFollowUps"
+              type="button"
+              class="flex-1 h-9 px-3 rounded-lg text-sm font-bold transition-colors"
+              :class="detailTab === 'activity' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'"
+              @click="detailTab = 'activity'"
+            >
+              最近活动
+            </button>
+            <button
+              type="button"
+              class="flex-1 h-9 px-3 rounded-lg text-sm font-bold transition-colors"
+              :class="detailTab === 'related' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'"
+              @click="detailTab = 'related'"
+            >
+              关联模块
+            </button>
+          </div>
+        </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <!-- Left Column: Basic Info (col-span-3) -->
-          <div class="lg:col-span-3 space-y-4">
+          <div :class="[detailTab === 'ai' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
             <section class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
               <div class="mb-4 space-y-1">
                 <!-- 上：图标 + 标题（整行展示，可换行）+ 刷新 -->
@@ -461,7 +490,10 @@
           </div>
 
           <!-- Center Column: Follow-ups Timeline (col-span-6)；标题图标与时间轴节点共用 28px 轨宽以便纵轴对齐 -->
-          <div v-if="canViewFollowUps" class="lg:col-span-6 space-y-4">
+          <div
+            v-if="canViewFollowUps"
+            :class="[detailTab === 'activity' ? 'block' : 'hidden', 'lg:block lg:col-span-6 space-y-4']"
+          >
             <div class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-start gap-x-2 md:items-center">
               <span
                 :class="sectionIconBoxClass"
@@ -595,7 +627,7 @@
           </div>
 
           <!-- Right Column: Related Modules (col-span-3) -->
-          <div class="lg:col-span-3 space-y-4">
+          <div :class="[detailTab === 'related' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
             <div class="flex items-center justify-between px-1">
               <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedBusiness')">
@@ -1324,6 +1356,7 @@ const showAiReportDialog = ref(false)
 const showTerminalStageMenu = ref(false)
 const showTransferPopover = ref(false)
 const headerMoreButtonRef = ref<HTMLElement | null>(null)
+const detailTab = ref<'ai' | 'activity' | 'related'>('ai')
 const newTagName = ref('')
 const followUps = ref<FollowUp[]>([])
 const followUpTotal = ref(0)

@@ -34,13 +34,13 @@
         <!-- Calendar Views -->
         <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative">
           <!-- Week View -->
-          <div v-if="viewMode === 'grid'" class="grid grid-cols-7 divide-x divide-slate-200 min-h-[400px]">
+          <div v-if="viewMode === 'grid'" class="grid grid-cols-7 divide-x divide-slate-200 min-h-[180px]">
             <div
               v-for="day in weekDays"
               :key="day.label"
               class="flex flex-col bg-white"
             >
-              <div class="p-5 flex items-center justify-between border-b border-slate-100">
+              <div class="p-3 sm:p-5 flex items-center justify-between border-b border-slate-100">
                 <div class="hidden sm:flex sm:flex-col">
                   <span class="text-sm font-medium" :class="day.isToday ? 'text-primary' : 'text-slate-400'">
                     {{ day.label }}
@@ -50,48 +50,61 @@
                   </span>
                 </div>
                 <span
-                  class="size-7 flex items-center justify-center rounded-full text-sm font-bold"
+                  class="size-7 shrink-0 flex items-center justify-center rounded-full text-sm font-bold"
                   :class="day.isToday ? 'bg-primary text-white' : 'text-slate-900'"
                 >{{ day.date }}</span>
               </div>
-              <div class="flex-1 p-3 space-y-3">
-                <div
-                  v-for="event in getEventsForDate(day.fullDate)"
-                  :key="event.scheduleId"
-                  @click="selectedEvent = event; selectedTask = null"
-                  class="p-[3px] sm:p-3 rounded-xl border border-primary/20 bg-primary/5 shadow-sm hover:shadow-md hover:bg-primary/10 transition-all cursor-pointer"
-                >
-                  <p class="text-xs font-bold text-primary mb-1 truncate">{{ event.title }}</p>
-                  <p class="text-xs text-slate-500 truncate">{{ formatTime(event.startTime) }} • {{ event.customerName || event.participantNames || '' }}</p>
+              <div
+                class="flex-1 p-3 space-y-3"
+                :class="isMobile && getEventsForDate(day.fullDate).length ? 'cursor-pointer' : ''"
+                @click="openMobileEventsDialog(day.fullDate)"
+              >
+                <div v-if="isMobile" class="flex h-full items-center justify-center">
+                  <span
+                    v-if="getEventsForDate(day.fullDate).length || getTasksForDate(day.fullDate).length"
+                    class="size-2 rounded-full bg-primary/70"
+                    aria-hidden="true"
+                  />
                 </div>
-                <!-- Tasks -->
-                <div
-                  v-for="task in getTasksForDate(day.fullDate)"
-                  :key="task.taskId"
-                  class="p-3 rounded-xl border border-slate-200 bg-white shadow-sm transition-all flex items-start gap-2"
-                >
-                  <button
-                    @click.stop="handleToggleTask(task)"
-                    class="mt-0.5 shrink-0 size-4 rounded-sm border flex items-center justify-center transition-colors"
-                    :class="task.status === 'COMPLETED'
-                      ? 'bg-emerald-500 border-emerald-500 text-white'
-                      : 'border-slate-300 hover:border-primary text-transparent hover:text-primary/20'"
+                <template v-else>
+                  <div
+                    v-for="event in getEventsForDate(day.fullDate)"
+                    :key="event.scheduleId"
+                    @click="selectedEvent = event; selectedTask = null"
+                    class="p-[3px] sm:p-3 rounded-xl border border-primary/20 bg-primary/5 shadow-sm hover:shadow-md hover:bg-primary/10 transition-all cursor-pointer"
                   >
-                    <span class="material-symbols-outlined text-[12px] font-bold">check</span>
-                  </button>
-                  <div class="min-w-0 flex-1" @click="selectTask(task)">
-                    <p class="text-xs font-bold mb-1 truncate" :class="task.status === 'COMPLETED' ? 'text-slate-500 line-through' : 'text-slate-700'">
-                      {{ task.title }}
-                    </p>
-                    <p class="text-xs text-slate-400 truncate">{{ task.customerName || '' }}</p>
+                    <p class="text-xs font-bold text-primary mb-1 truncate">{{ event.title }}</p>
+                    <p class="text-xs text-slate-500 truncate">{{ formatTime(event.startTime) }} • {{ event.customerName || event.participantNames || '' }}</p>
                   </div>
-                </div>
+                  <!-- Tasks -->
+                  <div
+                    v-for="task in getTasksForDate(day.fullDate)"
+                    :key="task.taskId"
+                    class="p-3 rounded-xl border border-slate-200 bg-white shadow-sm transition-all flex items-start gap-2"
+                  >
+                    <button
+                      @click.stop="handleToggleTask(task)"
+                      class="mt-0.5 shrink-0 size-4 rounded-sm border flex items-center justify-center transition-colors"
+                      :class="task.status === 'COMPLETED'
+                        ? 'bg-emerald-500 border-emerald-500 text-white'
+                        : 'border-slate-300 hover:border-primary text-transparent hover:text-primary/20'"
+                    >
+                      <span class="material-symbols-outlined text-[12px] font-bold">check</span>
+                    </button>
+                    <div class="min-w-0 flex-1" @click="selectTask(task)">
+                      <p class="text-xs font-bold mb-1 truncate" :class="task.status === 'COMPLETED' ? 'text-slate-500 line-through' : 'text-slate-700'">
+                        {{ task.title }}
+                      </p>
+                      <p class="text-xs text-slate-400 truncate">{{ task.customerName || '' }}</p>
+                    </div>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
 
           <!-- Month View -->
-          <div v-else-if="viewMode === 'month'" class="min-h-[600px] flex flex-col">
+          <div v-else-if="viewMode === 'month'" class="min-h-[400px] flex flex-col">
             <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
               <div
                 v-for="dayLabel in ['周一','周二','周三','周四','周五','周六','周日']"
@@ -105,53 +118,70 @@
               <div
                 v-for="(cell, i) in monthCells"
                 :key="i"
-                class="min-h-[120px] p-2"
+                class="min-h-[30px] p-2"
                 :class="{ 'bg-slate-50/50': !cell.isCurrentMonth }"
               >
                 <div class="flex justify-between items-start mb-1">
-                  <div class="flex flex-col gap-0.5">
+                  <div class="flex flex-col gap-0.5 item-center w-full text-center">
                     <span
-                      class="size-6 flex items-center justify-center rounded-full text-xs font-medium"
+                      class="size-6 flex items-center justify-center rounded-full w-full text-xs font-medium"
                       :class="cell.isToday
                         ? 'bg-primary text-white font-bold'
                         : !cell.isCurrentMonth ? 'text-slate-300' : 'text-slate-700'"
                     >
                       {{ cell.isCurrentMonth ? cell.date : '' }}
                     </span>
-                    <span v-if="cell.isCurrentMonth && cell.fullDate" class="text-xs text-slate-400 leading-none">
+                    <span v-if="cell.isCurrentMonth && cell.fullDate && !isMobile" class="text-xs text-slate-400 leading-none">
                       {{ getLunarText(cell.fullDate) }}
                     </span>
                   </div>
                 </div>
-                <div v-if="cell.fullDate" class="space-y-1">
+                <div
+                  v-if="cell.fullDate"
+                  class="space-y-1"
+                  :class="isMobile && getEventsForDate(cell.fullDate).length ? 'cursor-pointer' : ''"
+                  @click="handleMobileMonthCellClick(cell.fullDate)"
+                >
                   <div
-                    v-for="event in getEventsForDate(cell.fullDate)"
-                    :key="event.scheduleId"
-                    @click="selectedEvent = event; selectedTask = null"
-                    class="px-2 py-1 text-xs font-medium bg-primary/10 text-primary rounded truncate cursor-pointer hover:bg-primary/20"
+                    v-if="isMobile"
+                    class="flex items-center justify-center"
                   >
-                    {{ formatTime(event.startTime) }} {{ event.title }}
-                  </div>
-                  <div
-                    v-for="task in getTasksForDate(cell.fullDate)"
-                    :key="task.taskId"
-                    class="px-2 py-1 text-xs font-medium rounded truncate cursor-pointer flex items-center gap-1 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                  >
-                    <div
-                      class="shrink-0 size-3 rounded-sm border flex items-center justify-center transition-colors"
-                      :class="task.status === 'COMPLETED'
-                        ? 'bg-emerald-500 border-emerald-500 text-white'
-                        : 'border-slate-300 text-transparent'"
-                      @click.stop="handleToggleTask(task)"
-                    >
-                      <span class="material-symbols-outlined text-xs font-bold">check</span>
-                    </div>
                     <span
-                      @click="selectTask(task)"
-                      class="truncate"
-                      :class="task.status === 'COMPLETED' ? 'line-through text-slate-500' : ''"
-                    >{{ task.title }}</span>
+                      v-if="getEventsForDate(cell.fullDate).length || getTasksForDate(cell.fullDate).length"
+                      class="size-1.5 rounded-full bg-primary/70"
+                      aria-hidden="true"
+                    />
                   </div>
+                  <template v-else>
+                    <div
+                      v-for="event in getEventsForDate(cell.fullDate)"
+                      :key="event.scheduleId"
+                      @click="selectedEvent = event; selectedTask = null"
+                      class="px-2 py-1 text-xs font-medium bg-primary/10 text-primary rounded truncate cursor-pointer hover:bg-primary/20"
+                    >
+                      {{ formatTime(event.startTime) }} {{ event.title }}
+                    </div>
+                    <div
+                      v-for="task in getTasksForDate(cell.fullDate)"
+                      :key="task.taskId"
+                      class="px-2 py-1 text-xs font-medium rounded truncate cursor-pointer flex items-center gap-1 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    >
+                      <div
+                        class="shrink-0 size-3 rounded-sm border flex items-center justify-center transition-colors"
+                        :class="task.status === 'COMPLETED'
+                          ? 'bg-emerald-500 border-emerald-500 text-white'
+                          : 'border-slate-300 text-transparent'"
+                        @click.stop="handleToggleTask(task)"
+                      >
+                        <span class="material-symbols-outlined text-xs font-bold">check</span>
+                      </div>
+                      <span
+                        @click="selectTask(task)"
+                        class="truncate"
+                        :class="task.status === 'COMPLETED' ? 'line-through text-slate-500' : ''"
+                      >{{ task.title }}</span>
+                    </div>
+                  </template>
                 </div>
               </div>
             </div>
@@ -249,6 +279,51 @@
       </div>
     </div>
 
+    <el-dialog
+      v-model="showMobileMonthEventsDialog"
+      :width="isMobile ? '92%' : '520px'"
+      top="12vh"
+      :close-on-click-modal="true"
+      :append-to-body="true"
+      class="wk-dialog--flush"
+    >
+      <template #header>
+        <div class="flex items-center justify-between gap-3 pr-2">
+          <div class="min-w-0">
+            <p class="text-base font-bold text-slate-900 truncate">
+              {{ mobileMonthEventsDialogDate ? `${mobileMonthEventsDialogDate} 日程` : '日程' }}
+            </p>
+            <p v-if="mobileMonthEventsDialogDate" class="text-xs text-slate-400 mt-0.5">
+              农历 {{ getLunarText(mobileMonthEventsDialogDate) }}
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <div class="max-h-[60vh] overflow-auto pb-[env(safe-area-inset-bottom)]">
+        <div v-if="mobileMonthEvents.length === 0" class="py-10 text-center text-sm text-slate-400">
+          当天暂无日程
+        </div>
+        <div v-else class="space-y-2">
+          <button
+            v-for="event in mobileMonthEvents"
+            :key="event.scheduleId"
+            type="button"
+            class="w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2.5 hover:bg-slate-50 transition-colors"
+            @click="handleSelectEventFromMobileDialog(event)"
+          >
+            <p class="text-sm font-bold text-slate-900 truncate">{{ event.title }}</p>
+            <p class="mt-0.5 text-xs text-slate-500 truncate">
+              {{ formatTime(event.startTime) }}
+              <template v-if="event.customerName || event.participantNames">
+                • {{ event.customerName || event.participantNames }}
+              </template>
+            </p>
+          </button>
+        </div>
+      </div>
+    </el-dialog>
+
     <ScheduleDetailDrawer
       v-model="showScheduleDetailDrawer"
       :schedule="selectedEvent"
@@ -331,6 +406,24 @@ function getLunarText(dateStr: string): string {
   }
 }
 
+function openMobileEventsDialog(dateStr: string) {
+  if (!isMobile.value) return
+  const events = getEventsForDate(dateStr)
+  if (!events.length) return
+  mobileMonthEventsDialogDate.value = dateStr
+  showMobileMonthEventsDialog.value = true
+}
+
+function handleMobileMonthCellClick(dateStr: string) {
+  openMobileEventsDialog(dateStr)
+}
+
+function handleSelectEventFromMobileDialog(event: ScheduleVO) {
+  selectedEvent.value = event
+  selectedTask.value = null
+  showMobileMonthEventsDialog.value = false
+}
+
 const showScheduleDetailDrawer = computed({
   get: () => !!selectedEvent.value,
   set: (val: boolean) => {
@@ -354,6 +447,8 @@ const tasks = ref<Task[]>([])
 const showTaskEditDialog = ref(false)
 const editingTask = ref<Task | null>(null)
 const submitting = ref(false)
+const showMobileMonthEventsDialog = ref(false)
+const mobileMonthEventsDialogDate = ref<string | null>(null)
 const aiParseInput = ref('')
 const aiParsing = ref(false)
 const customerOptions = ref<{ value: string; label: string }[]>([])
@@ -377,6 +472,11 @@ const viewModes = [
   { value: 'month' as const, label: '月' },
   { value: 'list' as const, label: '列表' },
 ]
+
+const mobileMonthEvents = computed(() => {
+  if (!mobileMonthEventsDialogDate.value) return []
+  return getEventsForDate(mobileMonthEventsDialogDate.value)
+})
 
 const now = new Date()
 const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
