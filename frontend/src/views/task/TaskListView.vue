@@ -9,9 +9,9 @@
             <h2 class="text-xl md:text-2xl font-bold text-slate-900">AI 优先行动中心</h2>
             <p class="text-sm text-slate-500 mt-1">基于客户价值与成交概率，AI 已为您自动排序今日任务。</p>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center justify-end gap-3">
             <!-- Segmented filter -->
-            <div class="hidden md:flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+            <div class="wk-x-scroll-hidden flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-w-[70vw] md:max-w-none">
               <button
                 @click="handleValueFilter('all')"
                 :class="[
@@ -711,5 +711,11 @@ function getRelativeTime(dateStr: string): string {
 </script>
 
 <style scoped>
-/* (moved into reusable components) */
+.wk-x-scroll-hidden {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.wk-x-scroll-hidden::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
 </style>

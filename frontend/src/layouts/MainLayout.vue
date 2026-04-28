@@ -185,14 +185,14 @@
         <!-- <button class="flex size-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100">
           <span class="material-symbols-outlined">notifications</span>
         </button> -->
-        <button
+        <!-- <button
           type="button"
           class="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100"
           @click="showUserMenu = !showUserMenu"
         >
           <img v-if="userStore.avatar" :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
           <span v-else class="text-xs font-bold text-primary">{{ userStore.realname?.charAt(0) || 'U' }}</span>
-        </button>
+        </button> -->
       </div>
     </div>
 

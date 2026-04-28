@@ -104,7 +104,7 @@
           </div>
         </el-popover>
         <!-- 视图切换：侧栏 + 表格/卡片/阶段 -->
-        <div class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+        <div v-if="!isMobile" class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
           <button
             v-if="!isMobile"
             type="button"
@@ -670,6 +670,8 @@ const createDialogInitialStage = ref<CustomerStage | null>(null)
 const editingCustomer = ref<CustomerListVO | null>(null)
 const listFields = ref<CustomField[]>([])
 const listViewMode = ref<'list' | 'card' | 'stage'>('list')
+const lastNonMobileListViewMode = ref<'list' | 'card' | 'stage'>('list')
+const listViewModeAutoSwitching = ref(false)
 const showListInsightSidebar = ref(true)
 
 const AI_CUSTOMER_LIST_FIELDS: CustomField[] = [
@@ -1311,6 +1313,13 @@ onMounted(async () => {
     /* ignore */
   }
 
+  lastNonMobileListViewMode.value = listViewMode.value
+  if (isMobile.value) {
+    listViewModeAutoSwitching.value = true
+    listViewMode.value = 'card'
+    listViewModeAutoSwitching.value = false
+  }
+
   aiSearchInput.value = aiSearchState.value?.normalizedQuery || aiSearchState.value?.originalQuery || ''
   queueTableHeightUpdate()
   window.addEventListener('resize', queueTableHeightUpdate, { passive: true })
@@ -1357,7 +1366,26 @@ watch(() => [customerStore.totalCount, customerStore.customerList.length], async
   queueTableHeightUpdate()
 })
 
+watch(isMobile, (mobile) => {
+  if (mobile) {
+    if (listViewMode.value !== 'card') {
+      lastNonMobileListViewMode.value = listViewMode.value
+    }
+    listViewModeAutoSwitching.value = true
+    listViewMode.value = 'card'
+    listViewModeAutoSwitching.value = false
+    return
+  }
+
+  if (listViewMode.value === 'card') {
+    listViewModeAutoSwitching.value = true
+    listViewMode.value = lastNonMobileListViewMode.value
+    listViewModeAutoSwitching.value = false
+  }
+})
+
 watch(listViewMode, (v) => {
+  if (listViewModeAutoSwitching.value) return
   try {
     localStorage.setItem(CUSTOMER_LIST_VIEW_MODE_STORAGE_KEY, v)
   } catch {

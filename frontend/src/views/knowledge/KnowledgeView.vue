@@ -400,11 +400,11 @@
             <div
               v-for="item in knowledgeList"
               :key="'list-' + item.knowledgeId"
-              class="group grid cursor-pointer grid-cols-1 items-center gap-2 border-b border-slate-50 px-4 py-4 transition-colors last:border-0 hover:bg-primary/5 md:grid-cols-12 md:gap-4 md:px-6"
+              class="group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-slate-50 px-4 py-4 transition-colors last:border-0 hover:bg-primary/5 md:grid-cols-12 md:gap-4 md:px-6"
               @click="openDetail(item)"
             >
               <!-- Name -->
-              <div class="flex min-w-0 items-center gap-3 md:col-span-4">
+              <div class="col-span-2 flex min-w-0 items-center gap-3 md:col-span-4">
                 <div
                   :class="[
                     'flex size-8 shrink-0 items-center justify-center rounded-lg',
@@ -444,7 +444,7 @@
                 <span class="text-xs text-slate-400">{{ formatDate(item.createTime) }}</span>
               </div>
               <!-- Actions -->
-              <div class="md:col-span-2 flex flex-wrap items-center justify-end gap-1" @click.stop>
+              <div class="md:col-span-2 flex flex-nowrap md:flex-wrap items-center justify-end gap-1" @click.stop>
                 <button
                   type="button"
                   class="rounded-lg px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/10"

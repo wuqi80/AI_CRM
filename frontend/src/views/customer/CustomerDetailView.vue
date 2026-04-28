@@ -35,7 +35,9 @@
                 </div>
                 <div class="min-w-0 space-y-2">
                   <div class="flex flex-col items-start gap-1 md:flex-row md:items-center md:gap-3 md:flex-wrap">
-                    <h2 class="text-lg md:text-xl font-bold text-slate-900 truncate">{{ customer.companyName }}</h2>
+                    <h2 class="text-lg md:text-xl font-bold text-slate-900 truncate min-w-0 w-full md:w-auto">
+                      {{ customer.companyName }}
+                    </h2>
                     <!-- <span
                       class="px-2 py-0.5 text-xs font-bold rounded uppercase"
                       :class="getStageBadgeClass(customer.stage)"
@@ -137,96 +139,96 @@
                   </button>
                 </div>
               </div>
-              <div class="flex w-full flex-wrap justify-end gap-2 md:w-auto md:flex-nowrap md:justify-start shrink-0">
-              <el-popover
-                v-if="canTransferCustomer"
-                :visible="showTransferPopover"
-                trigger="manual"
-                virtual-triggering
-                :virtual-ref="headerMoreButtonRef"
-                placement="bottom-end"
-                :width="260"
-                @show="handleTransferPopoverShow"
-                @hide="handleTransferPopoverHide"
-                @update:visible="showTransferPopover = $event"
-              >
-                <div class="space-y-3">
-                  <el-input
-                    v-model="ownerSearch"
-                    placeholder="搜索用户"
-                    size="small"
-                    clearable
-                  />
-                  <div v-loading="ownerListLoading" class="max-h-56 overflow-auto space-y-1">
-                    <button
-                      v-for="user in filteredTransferUserList"
-                      :key="user.userId"
-                      type="button"
-                      class="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors hover:bg-slate-100"
-                      :class="{ 'bg-primary/5': String(user.userId) === String(customer.ownerId) }"
-                      @click="handleTransferOwner(user)"
-                    >
-                      <div class="size-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                        {{ user.realname?.charAt(0) || '?' }}
-                      </div>
-                      <div class="min-w-0 flex-1">
-                        <p class="text-sm font-medium text-slate-700 truncate">{{ user.realname }}</p>
-                        <p class="text-xs text-slate-400 truncate">{{ user.username || '-' }}</p>
-                      </div>
-                      <span
-                        v-if="String(user.userId) === String(customer.ownerId)"
-                        class="material-symbols-outlined text-primary text-sm shrink-0"
-                      >check</span>
-                    </button>
-                    <p v-if="!ownerListLoading && filteredTransferUserList.length === 0" class="py-4 text-center text-sm text-slate-400">
-                      暂无匹配用户
-                    </p>
-                  </div>
-                </div>
-              </el-popover>
-              <button v-if="canEditCustomer" class="h-8 px-4 inline-flex items-center border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors" @click="handleEdit">编辑资料</button>
-              <button v-if="canCreateFollowUps" class="h-8 px-4 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors" @click="handleAiFollowUp">
-                <WkIcon name="ai" class="text-sm" />
-                AI 跟进
-              </button>
-              <button
-                type="button"
-                class="h-8 shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-md shadow-primary/25 transition-colors hover:bg-primary/90 whitespace-nowrap"
-                @click="showBasicInfoDrawer = true"
-              >
-                <span class="material-symbols-outlined text-base leading-none">description</span>
-                <span>{{ viewBasicInfoButtonText }}</span>
-              </button>
-              <el-dropdown
-                v-if="canTransferCustomer || canDeleteCustomer"
-                trigger="click"
-                @visible-change="onHeaderMoreDropdownVisible"
-              >
-                <button
-                  ref="headerMoreButtonRef"
-                  type="button"
-                  class="h-8 w-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-solid border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
-                  title="更多操作"
+              <div class="flex w-full flex-nowrap justify-start gap-2 md:overflow-visible md:w-auto md:flex-nowrap md:justify-start shrink-0">
+                <el-popover
+                  v-if="canTransferCustomer"
+                  :visible="showTransferPopover"
+                  trigger="manual"
+                  virtual-triggering
+                  :virtual-ref="headerMoreButtonRef"
+                  placement="bottom-end"
+                  :width="260"
+                  @show="handleTransferPopoverShow"
+                  @hide="handleTransferPopoverHide"
+                  @update:visible="showTransferPopover = $event"
                 >
-                  <span class="material-symbols-outlined text-lg">more_horiz</span>
+                  <div class="space-y-3">
+                    <el-input
+                      v-model="ownerSearch"
+                      placeholder="搜索用户"
+                      size="small"
+                      clearable
+                    />
+                    <div v-loading="ownerListLoading" class="max-h-56 overflow-auto space-y-1">
+                      <button
+                        v-for="user in filteredTransferUserList"
+                        :key="user.userId"
+                        type="button"
+                        class="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors hover:bg-slate-100"
+                        :class="{ 'bg-primary/5': String(user.userId) === String(customer.ownerId) }"
+                        @click="handleTransferOwner(user)"
+                      >
+                        <div class="size-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                          {{ user.realname?.charAt(0) || '?' }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <p class="text-sm font-medium text-slate-700 truncate">{{ user.realname }}</p>
+                          <p class="text-xs text-slate-400 truncate">{{ user.username || '-' }}</p>
+                        </div>
+                        <span
+                          v-if="String(user.userId) === String(customer.ownerId)"
+                          class="material-symbols-outlined text-primary text-sm shrink-0"
+                        >check</span>
+                      </button>
+                      <p v-if="!ownerListLoading && filteredTransferUserList.length === 0" class="py-4 text-center text-sm text-slate-400">
+                        暂无匹配用户
+                      </p>
+                    </div>
+                  </div>
+                </el-popover>
+                <button v-if="canEditCustomer" class="h-8 px-4 inline-flex items-center border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors whitespace-nowrap" @click="handleEdit">编辑</button>
+                <button v-if="canCreateFollowUps" class="h-8 px-4 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors whitespace-nowrap" @click="handleAiFollowUp">
+                  <WkIcon name="ai" class="text-sm" />
+                  AI 跟进
                 </button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item v-if="canTransferCustomer" @click="openTransferPopoverFromMenu">
-                      <span class="flex items-center gap-2">
-                        <span class="material-symbols-outlined text-sm">swap_horiz</span>
-                        转移负责人
-                      </span>
-                    </el-dropdown-item>
-                    <el-dropdown-item v-if="canDeleteCustomer" :divided="!!canTransferCustomer" @click="handleDeleteCustomerConfirm">
-                      <span class="flex items-center gap-2 text-red-500">
-                        <span class="material-symbols-outlined text-sm">delete</span>
-                        删除
-                      </span>
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+                <button
+                  type="button"
+                  class="h-8 shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-md shadow-primary/25 transition-colors hover:bg-primary/90 whitespace-nowrap"
+                  @click="showBasicInfoDrawer = true"
+                >
+                  <span class="material-symbols-outlined text-base leading-none">description</span>
+                  <span>{{ viewBasicInfoButtonText }}</span>
+                </button>
+                <el-dropdown
+                  v-if="canTransferCustomer || canDeleteCustomer"
+                  trigger="click"
+                  @visible-change="onHeaderMoreDropdownVisible"
+                >
+                  <button
+                    ref="headerMoreButtonRef"
+                    type="button"
+                    class="h-8 w-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-solid border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                    title="更多操作"
+                  >
+                    <span class="material-symbols-outlined text-lg">more_horiz</span>
+                  </button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item v-if="canTransferCustomer" @click="openTransferPopoverFromMenu">
+                        <span class="flex items-center gap-2">
+                          <span class="material-symbols-outlined text-sm">swap_horiz</span>
+                          转移负责人
+                        </span>
+                      </el-dropdown-item>
+                      <el-dropdown-item v-if="canDeleteCustomer" :divided="!!canTransferCustomer" @click="handleDeleteCustomerConfirm">
+                        <span class="flex items-center gap-2 text-red-500">
+                          <span class="material-symbols-outlined text-sm">delete</span>
+                          删除
+                        </span>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
             </div>
           </div>
 

@@ -118,7 +118,7 @@
       <div class="flex gap-3 border-t border-slate-100 px-4 py-3">
         <el-button class="flex-1" type="primary" size="large" @click="$emit('edit', member)">
           <span class="material-symbols-outlined text-base mr-1">edit</span>
-          编辑资料
+          编辑
         </el-button>
         <el-button size="large" type="danger" plain class="!px-3" @click="$emit('delete', member)">
           <span class="material-symbols-outlined text-base">delete</span>
