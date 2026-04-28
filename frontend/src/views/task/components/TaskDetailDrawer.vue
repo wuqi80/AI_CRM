@@ -87,6 +87,24 @@
             </div>
             <p class="text-xs font-bold uppercase text-primary">{{ getStatusLabel(task.status) }}</p>
           </div>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">person</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">创建人</p>
+            </div>
+            <p class="text-xs font-bold text-slate-700 break-words">{{ displayCreateUserName }}</p>
+          </div>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">calendar_clock</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">创建时间</p>
+            </div>
+            <p class="text-xs font-bold text-slate-700 break-words">{{ displayCreateTime }}</p>
+          </div>
         </div>
 
         <div class="space-y-8">
@@ -225,6 +243,20 @@
           </div>
           <p class="text-xs font-bold uppercase text-primary">{{ getStatusLabel(task.status) }}</p>
         </div>
+        <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          <div class="mb-1.5 flex items-center gap-1.5">
+            <span class="material-symbols-outlined shrink-0 text-[14px] text-primary leading-none">person</span>
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">创建人</p>
+          </div>
+          <p class="text-xs font-bold text-slate-700 break-words">{{ displayCreateUserName }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          <div class="mb-1.5 flex items-center gap-1.5">
+            <span class="material-symbols-outlined shrink-0 text-[14px] text-primary leading-none">calendar_clock</span>
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">创建时间</p>
+          </div>
+          <p class="text-xs font-bold text-slate-700 break-words">{{ displayCreateTime }}</p>
+        </div>
       </div>
 
       <div v-if="task.participantNames" class="mb-6">
@@ -349,6 +381,17 @@ const displayAiInsight = computed(() => {
   if (override) return props.aiInsight!.trim()
   if (!props.task) return ''
   return getTaskAiInsightText(props.task)
+})
+
+const displayCreateTime = computed(() => {
+  const t = props.task?.createTime
+  if (!t) return '未知'
+  return formatDateTime(t)
+})
+
+const displayCreateUserName = computed(() => {
+  const name = props.task?.createUserName?.trim()
+  return name || '未知'
 })
 
 async function handleToggleComplete() {

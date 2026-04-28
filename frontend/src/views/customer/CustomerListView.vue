@@ -154,17 +154,31 @@
           <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
           <span>新增客户</span>
         </button>
-        <!-- Import/Export - desktop only -->
-        <div v-if="!isMobile" class="flex items-center gap-1.5 border-l border-slate-200 pl-3 ml-0">
-          <button class="h-10 px-4 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2" @click="showImportDialog = true">
-            <span class="material-symbols-outlined text-[18px] leading-none">upload</span>
-            导入
+        <el-dropdown v-if="!isMobile" trigger="click">
+          <button
+            type="button"
+            class="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-primary/30 hover:bg-slate-50 hover:text-primary"
+            title="导入导出"
+          >
+            <span class="material-symbols-outlined text-[22px]">more_vert</span>
           </button>
-          <button class="h-10 px-4 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2" :disabled="exporting" @click="handleExport">
-            <span class="material-symbols-outlined text-[18px] leading-none">download</span>
-            导出
-          </button>
-        </div>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="showImportDialog = true">
+                <span class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[16px]">upload</span>
+                  导入
+                </span>
+              </el-dropdown-item>
+              <el-dropdown-item :disabled="exporting" @click="handleExport">
+                <span class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[16px]">download</span>
+                  {{ exporting ? '导出中...' : '导出' }}
+                </span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 
@@ -206,7 +220,10 @@
       <div class="w-full min-w-0 flex-1 space-y-6">
         <div
           ref="tableCardRef"
-          class="bg-white border border-slate-200 rounded-xl shadow-sm flex min-h-0 min-w-0 flex-col overflow-hidden"
+          class="flex min-h-0 min-w-0 flex-col"
+          :class="listViewMode === 'list'
+            ? 'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'
+            : 'overflow-visible bg-transparent shadow-none'"
           v-loading="customerStore.loading"
         >
           <div v-if="listViewMode === 'list' && !isMobile">
@@ -541,7 +558,10 @@
           <div
             v-if="customerStore.totalCount > 0"
             ref="paginationBarRef"
-            class="shrink-0 px-6 py-4 bg-slate-50/50 flex items-center justify-between border-t border-slate-200"
+            class="shrink-0 flex items-center justify-between"
+            :class="listViewMode === 'list'
+              ? 'border-t border-slate-200 bg-slate-50/50 px-6 py-4'
+              : 'px-0 pt-4 pb-0'"
           >
             <span class="text-sm text-slate-500">
               共 {{ customerStore.totalCount }} 条<span class="hidden md:inline">客户数据</span>
@@ -1569,6 +1589,7 @@ async function handleTransfer(customer: CustomerListVO, user: any) {
 // ==================== Import / Export ====================
 
 async function handleExport() {
+  if (exporting.value) return
   exporting.value = true
   try {
     const blob = await exportCustomers(buildExportPayload())

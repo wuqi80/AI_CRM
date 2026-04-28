@@ -1,10 +1,10 @@
 <template>
-  <div class="flex h-full bg-background-light">
+  <div class="flex h-full min-h-0 bg-background-light">
     <!-- Calendar Main -->
-    <div class="flex-1 p-4 md:p-8 overflow-y-auto" :class="{ 'border-r border-slate-100': selectedEvent || selectedTask }">
-      <div class="w-full space-y-6">
+    <div class="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-8" :class="{ 'border-r border-slate-100': selectedEvent || selectedTask }">
+      <div class="flex min-h-0 w-full flex-1 flex-col gap-6">
         <!-- Header -->
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="shrink-0 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6 min-w-0">
             <div class="min-w-0">
               <h2 class="text-2xl font-bold text-slate-900">智能日程安排</h2>
@@ -61,7 +61,10 @@
         </div>
 
         <!-- Calendar Views -->
-        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative">
+        <div
+          class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative"
+          :class="viewMode === 'month' ? 'min-h-0 flex flex-1 flex-col' : 'shrink-0'"
+        >
           <Transition name="wk-cal-view" mode="out-in">
           <!-- Week View -->
           <div v-if="viewMode === 'grid'" key="grid" class="grid grid-cols-7 divide-x divide-slate-200 min-h-[180px]">
@@ -134,7 +137,7 @@
           </div>
 
           <!-- Month View -->
-          <div v-else-if="viewMode === 'month'" key="month" class="min-h-[400px] flex flex-col">
+          <div v-else-if="viewMode === 'month'" key="month" class="min-h-[560px] flex flex-1 flex-col">
             <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
               <div
                 v-for="dayLabel in ['周一','周二','周三','周四','周五','周六','周日']"
@@ -144,11 +147,11 @@
                 {{ dayLabel }}
               </div>
             </div>
-            <div class="flex-1 grid grid-cols-7 grid-rows-5 divide-x divide-y divide-slate-100">
+            <div class="grid flex-1 grid-cols-7 grid-rows-5 divide-x divide-y divide-slate-100">
               <div
                 v-for="(cell, i) in monthCells"
                 :key="i"
-                class="min-h-[30px] p-2"
+                class="min-h-0 p-2"
                 :class="{ 'bg-slate-50/50': !cell.isCurrentMonth }"
               >
                 <div class="flex justify-between items-start mb-1">
