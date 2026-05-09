@@ -31,6 +31,9 @@ export const useChatStore = defineStore('chat', () => {
 
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
+  // Tracks the last "new session" that is still empty (draft).
+  // Used to avoid creating multiple empty sessions by repeated clicks.
+  const draftSessionId = ref<string | null>(null)
   const messagesBySessionId = ref<Record<string, LocalMessage[]>>({})
   const streamingTasks = ref<Record<string, StreamingTask>>({})
   const loading = ref(false)
@@ -66,7 +69,22 @@ export const useChatStore = defineStore('chat', () => {
     setSessionMessages(sessionId, [])
     await fetchSessions()
     currentSessionId.value = sessionId
+    draftSessionId.value = sessionId
     return sessionId
+  }
+
+  async function startNewSessionIfNeeded(title?: string, agentId?: string, customerId?: string): Promise<string> {
+    const id = draftSessionId.value
+    if (id) {
+      const msgs = messagesBySessionId.value[id] || []
+      if (msgs.length === 0 && !streamingTasks.value[id]) {
+        // Ensure we really switch to and load the draft session.
+        await selectSession(id)
+        return id
+      }
+      draftSessionId.value = null
+    }
+    return await startNewSession(title, agentId, customerId)
   }
 
   async function selectSession(sessionId: string) {
@@ -89,6 +107,9 @@ export const useChatStore = defineStore('chat', () => {
 
     if (currentSessionId.value === sessionId) {
       currentSessionId.value = null
+    }
+    if (draftSessionId.value === sessionId) {
+      draftSessionId.value = null
     }
   }
 
@@ -115,6 +136,9 @@ export const useChatStore = defineStore('chat', () => {
       timestamp: new Date(),
       attachments: attachmentVOs
     })
+    if (draftSessionId.value === sessionId) {
+      draftSessionId.value = null
+    }
 
     appendSessionMessage(sessionId, {
       id: assistantMessageId,
@@ -331,6 +355,7 @@ export const useChatStore = defineStore('chat', () => {
     currentSession,
     fetchSessions,
     startNewSession,
+    startNewSessionIfNeeded,
     selectSession,
     removeSession,
     sendMessage,

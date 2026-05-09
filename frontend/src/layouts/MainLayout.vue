@@ -14,16 +14,19 @@
         </div>
       </div>
 
-      <nav class="flex-1 overflow-y-auto px-4 py-4">
+      <!-- Chat: New session (fixed, not scroll with nav) -->
+      <div class="px-4 pt-2 pb-3">
+        <button
+          class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0d0d0d] transition-colors hover:bg-slate-100"
+          @click="handleNewSession"
+        >
+          <span class="material-symbols-outlined wk-plus-button-icon text-[22px] leading-none">add</span>
+          新对话
+        </button>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto px-4 pb-4">
         <div class="space-y-1">
-          <!-- Chat: New session (acts like a primary nav item) -->
-          <button
-            class="flex w-full items-center justify-left gap-2 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
-            @click="handleNewSession"
-          >
-            <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">add</span>
-            新对话
-          </button>
 
           <template v-for="group in pcMainNavGroups" :key="group.title || 'default'">
             <div v-if="group.title" class="pb-2 pt-4">
@@ -34,7 +37,7 @@
               :key="item.key"
               @click="handlePrimaryNavClick(item)"
               class="flex w-full items-center gap-2 rounded-lg px-3 py-2 transition-colors"
-              :class="isPrimaryActive(item) ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'"
+              :class="isPrimaryActive(item) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
             >
               <WkIcon :name="item.icon" :size="22" class="shrink-0" />
               <span class="truncate text-sm font-medium">{{ item.label }}</span>
@@ -77,7 +80,7 @@
                   <div class="flex min-w-0 items-center gap-2">
                     <span
                       class="block min-w-0 flex-1 truncate text-sm leading-5"
-                      :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
+                      :class="isSessionActive(session.sessionId) ? 'text-[#0d0d0d]' : 'text-[#0d0d0d]'"
                       :title="session.title || '新对话'"
                     >{{ session.title || '新对话' }}</span>
                     <span
@@ -106,7 +109,7 @@
                   <div class="flex min-w-0 items-center gap-2">
                     <span
                       class="block min-w-0 flex-1 truncate text-sm leading-5"
-                      :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
+                      :class="isSessionActive(session.sessionId) ? 'text-[#0d0d0d]' : 'text-[#0d0d0d]'"
                       :title="session.title || '新对话'"
                     >{{ session.title || '新对话' }}</span>
                     <span
@@ -117,7 +120,7 @@
                       @click.stop="handleDeleteSession(session.sessionId)"
                     >close</span>
                   </div>
-                  <span class="text-xs font-medium text-slate-400">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
+                  <!-- <span class="text-xs font-medium text-slate-400">{{ formatSessionTime(session.updateTime || session.createTime) }}</span> -->
                 </button>
               </template>
 
@@ -135,7 +138,7 @@
                   <div class="flex min-w-0 items-center gap-2">
                     <span
                       class="block min-w-0 flex-1 truncate text-sm leading-5"
-                      :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
+                      :class="isSessionActive(session.sessionId) ? 'text-[#0d0d0d]' : 'text-[#0d0d0d]'"
                       :title="session.title || '新对话'"
                     >{{ session.title || '新对话' }}</span>
                     <span
@@ -155,7 +158,7 @@
         </div>
       </nav>
 
-      <div v-if="showConfigSection" class="shrink-0 border-t border-slate-200 px-4 py-3">
+      <div v-if="false && showConfigSection" class="shrink-0 border-t border-slate-200 px-4 py-3">
         <div class="pb-2 pt-1">
           <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">配置与服务</p>
         </div>
@@ -164,7 +167,7 @@
           :key="item.route"
           @click="navigateTo(item.route)"
           class="flex w-full items-center gap-2 rounded-lg px-3 py-2 transition-colors"
-          :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'"
+          :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
         >
           <WkIcon :name="item.icon" :size="22" class="shrink-0" />
           <span class="truncate text-sm font-medium">{{ item.label }}</span>
@@ -225,6 +228,22 @@
               </button>
 
               <button
+                v-for="item in configNavItems"
+                :key="item.route"
+                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
+                :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
+                @click="navigateTo(item.route)"
+              >
+                <WkIcon
+                  :name="item.icon"
+                  :size="24"
+                  class="transition-colors"
+                  :class="isActive(item.route) ? 'text-primary' : 'text-slate-400 group-hover:text-primary'"
+                />
+                <span class="text-sm font-medium">{{ item.label }}</span>
+              </button>
+
+              <button
                 class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-rose-600 transition-colors hover:bg-rose-50"
                 @click="handleLogout"
               >
@@ -244,9 +263,9 @@
       >
         <div class="flex items-center justify-between px-4 py-5">
           <p class="truncate text-xs font-bold tracking-wider text-slate-400">{{ secondaryTitle }}</p>
-          <button class="text-slate-300 transition-colors hover:text-slate-500" @click="selectedPrimaryKey = ''">
+          <!-- <button class="text-slate-300 transition-colors hover:text-slate-500" @click="selectedPrimaryKey = ''">
             <span class="material-symbols-outlined text-sm">close</span>
-          </button>
+          </button> -->
         </div>
 
         <div class="flex-1 overflow-y-auto px-4 pb-4">
@@ -278,7 +297,7 @@
     <div v-if="isMobile" class="fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-4">
       <button
         @click="drawerVisible = true"
-        class="flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
+        class="flex size-10 shrink-0 items-center justify-center rounded-lg text-[#0d0d0d] hover:bg-slate-100"
       >
         <span class="material-symbols-outlined">menu</span>
       </button>
@@ -387,7 +406,7 @@
               <div v-for="item in group.items" :key="item.key" class="space-y-1">
                 <button
                   class="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors"
-                  :class="isPrimaryActive(item) ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'"
+                  :class="isPrimaryActive(item) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
                   @click="handleMobilePrimaryNavClick(item)"
                 >
                   <WkIcon :name="item.icon" :size="22" class="shrink-0" />
@@ -435,7 +454,7 @@
                 :key="item.route"
                 @click="mobileNavigate(item.route)"
                 class="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors"
-                :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'"
+                :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
               >
                 <WkIcon :name="item.icon" :size="22" class="shrink-0" />
                 <span class="text-sm font-medium">{{ item.label }}</span>
@@ -497,6 +516,22 @@
                   </button>
 
                   <button
+                    v-for="item in configNavItems"
+                    :key="item.route"
+                    class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
+                    :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
+                    @click="navigateTo(item.route)"
+                  >
+                    <WkIcon
+                      :name="item.icon"
+                      :size="24"
+                      class="transition-colors"
+                      :class="isActive(item.route) ? 'text-primary' : 'text-slate-400 group-hover:text-primary'"
+                    />
+                    <span class="text-sm font-medium">{{ item.label }}</span>
+                  </button>
+
+                  <button
                     class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-rose-600 transition-colors hover:bg-rose-50"
                     @click="handleLogout"
                   >
@@ -552,6 +587,22 @@
               >
                 <WkIcon name="settings" :size="24" class="text-slate-400 transition-colors group-hover:text-primary" />
                 <span class="text-sm font-medium">账号设置</span>
+              </button>
+
+              <button
+                v-for="item in configNavItems"
+                :key="item.route"
+                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
+                :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
+                @click="navigateTo(item.route)"
+              >
+                <WkIcon
+                  :name="item.icon"
+                  :size="24"
+                  class="transition-colors"
+                  :class="isActive(item.route) ? 'text-primary' : 'text-slate-400 group-hover:text-primary'"
+                />
+                <span class="text-sm font-medium">{{ item.label }}</span>
               </button>
 
               <button
@@ -742,7 +793,7 @@ const allMainNavItems: MainNavItem[] = [
     label: 'CRM管理',
     route: '/customer',
     permission: 'customer',
-    groupTitle: '业务应用',
+    groupTitle: '悟空技能',
     secondaryTitle: 'CRM管理',
     children: [
       { key: 'crm-customer', icon: 'customer', label: '客户管理', route: '/customer' },
@@ -932,8 +983,18 @@ const groupedChatSessions = computed(() => {
 async function handleNewSession() {
   selectedPrimaryKey.value = ''
   await router.push('/chat')
-  chatStore.clearMessages()
-  await chatStore.startNewSession('新对话')
+  // HMR can keep an old store instance; fall back to legacy behavior if method missing.
+  const api = chatStore as unknown as {
+    startNewSessionIfNeeded?: (title?: string) => Promise<string>
+    clearMessages?: () => void
+    startNewSession?: (title?: string) => Promise<string>
+  }
+  if (api.startNewSessionIfNeeded) {
+    await api.startNewSessionIfNeeded('新对话')
+    return
+  }
+  api.clearMessages?.()
+  await api.startNewSession?.('新对话')
 }
 
 async function handleSelectSession(sessionId: string) {
@@ -959,18 +1020,6 @@ async function handleDeleteSession(sessionId: string) {
   } catch {
     // User cancelled
   }
-}
-
-function formatSessionTime(dateStr: string): string {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const time = date.getTime()
-
-  if (time >= todayStart) {
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-  }
-  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function navigateTo(path: string) {

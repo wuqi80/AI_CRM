@@ -146,7 +146,10 @@
     >
       <!-- Chat View -->
       <template v-if="currentView === 'chat'">
-        <div class="flex-1 flex flex-col overflow-hidden">
+        <div
+          class="flex-1 flex flex-col overflow-hidden relative"
+          :class="isChatEmpty ? 'justify-center -translate-y-[100px]' : ''"
+        >
           <!-- Mobile top bar (chat detail) -->
           <div
             v-if="isMobile"
@@ -174,19 +177,25 @@
           </div>
 
           <!-- Messages Area -->
-          <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth pb-4">
+          <div
+            ref="messagesContainer"
+            class="p-4 md:p-8 space-y-8 scroll-smooth"
+            :class="isChatEmpty ? 'overflow-hidden' : 'flex-1 overflow-y-auto pb-4'"
+            @scroll="handleMessagesScroll"
+          >
             <!-- Welcome Section (no messages) -->
             <template v-if="chatStore.messages.length === 0">
-              <div class="max-w-3xl mx-auto flex flex-col items-center text-center space-y-4 py-12">
-                <div class="size-16 bg-primary/5 rounded-2xl flex items-center justify-center text-primary mb-2 border border-primary/10">
+              <div class="max-w-3xl mx-auto flex flex-col items-center text-center space-y-4 py-6">
+                <!-- <div class="size-16 bg-primary/5 rounded-2xl flex items-center justify-center text-primary mb-2 border border-primary/10">
                   <WkIcon name="ai" class="text-4xl" />
-                </div>
+                </div> -->
                 <h1 class="text-2xl font-bold tracking-tight text-slate-900">
-                  您好，{{ userStore.realname || '用户' }}。
+                  <!-- 您好，{{ userStore.realname || '用户' }} -->
+                   今天有什么可以帮您的？
                 </h1>
-                <p class="text-slate-400 text-base max-w-md">
+                <!-- <p class="text-slate-400 text-base max-w-md">
                   我是您的智能销售助手。今天想处理哪些客户或商机？
-                </p>
+                </p> -->
               </div>
             </template>
 
@@ -195,7 +204,8 @@
               <div
                 v-for="message in chatStore.messages"
                 :key="message.id"
-                class="w-full max-w-4xl mx-auto message-enter"
+                class="mx-auto message-enter"
+                :class="isMobile ? 'w-full' : 'w-[768px] max-w-[768px]'"
               >
                 <div
                   v-if="getDocumentAttachments(message).length > 0"
@@ -228,7 +238,17 @@
                     <WkIcon name="ai" class="text-lg" />
                   </div>
                   <div class="flex-1 space-y-3 min-w-0">
-                    <div class="text-slate-700 rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-left leading-relaxed text-[16px]">
+                    <div class="relative text-[#0d0d0d] rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-left leading-relaxed text-[16px]">
+                      <div class="absolute -bottom-7 left-0 z-10 size-10 flex items-center justify-center">
+                        <button
+                          type="button"
+                          class="size-8 rounded-lg border-slate-200 bg-white text-slate-500 transition-colors hover:bg-[#E7E7E7] hover:text-slate-900 flex items-center justify-center"
+                          aria-label="复制内容"
+                          @click="copyMessageContent(message, 'assistant')"
+                        >
+                          <span class="material-symbols-outlined text-[20px] leading-none">content_copy</span>
+                        </button>
+                      </div>
                       <div
                         class="wk-markdown"
                         :class="{ 'streaming-cursor': message.isStreaming }"
@@ -264,12 +284,12 @@
                         </template>
                       </div>
                     </div>
-                    <div
+                    <!-- <div
                       class="text-xs font-medium"
                       :class="message.isStreaming ? 'text-primary/70' : 'text-slate-400'"
                     >
-                      {{ getAssistantMessageStatus(message) }} · {{ formatTime(message.timestamp) }}
-                    </div>
+                      {{ _getAssistantMessageStatus(message) }} · {{ _formatTime(message.timestamp) }}
+                    </div> -->
                   </div>
                 </div>
 
@@ -289,7 +309,19 @@
                   </div>
                   <div class="space-y-3 min-w-0" :class="isMobile ? 'max-w-[85%]' : 'max-w-[70%]'">
                     <!-- <div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-lg shadow-primary/10 text-sm leading-relaxed"> -->
-                    <div class="bg-[#e9e9e980] text-[#0d0d0d] rounded-[24px] px-4 py-[0.6rem] text-[16px] leading-relaxed">
+                    <div class="group relative bg-[#e9e9e980] text-[#0d0d0d] rounded-[24px] px-4 py-[0.6rem] text-[16px] leading-relaxed">
+                      <div
+                        class="absolute -bottom-10 left-0 z-10 size-10 flex items-center justify-center opacity-0 pointer-events-none transition-all group-hover:opacity-100 group-hover:pointer-events-auto"
+                      >
+                        <button
+                          type="button"
+                          class="size-8 rounded-lg border-slate-200 bg-white text-slate-500 transition-colors flex items-center justify-center hover:bg-[#E7E7E7] hover:text-slate-900"
+                          aria-label="复制内容"
+                          @click="copyMessageContent(message, 'user')"
+                        >
+                          <span class="material-symbols-outlined text-[20px] leading-none">content_copy</span>
+                        </button>
+                      </div>
                       <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
                     </div>
                     <!-- User Attachments -->
@@ -327,9 +359,24 @@
             </template>
           </div>
 
+          <Transition name="scroll-to-bottom">
+            <button
+              v-if="showScrollToBottomButton"
+              type="button"
+              class="absolute left-1/2 -translate-x-1/2 bottom-[140px] md:bottom-[220px] z-20 size-8 rounded-full border border-slate-200 bg-white shadow-lg shadow-slate-200/60 text-slate-600 transition-all flex items-center justify-center hover:bg-slate-50 hover:text-slate-900"
+              aria-label="回到底部"
+              @click="scrollToBottomSmooth"
+            >
+              <span class="material-symbols-outlined text-[18px] leading-none">arrow_downward</span>
+            </button>
+          </Transition>
+
           <!-- Input Area -->
-          <div class="shrink-0 p-4 md:p-8 bg-gradient-to-t from-white via-white to-transparent">
-            <div class="max-w-4xl mx-auto space-y-4">
+          <div
+            class="shrink-0 pb-2 md:pb-2"
+            :class="isChatEmpty ? 'bg-transparent pt-0' : 'bg-gradient-to-t from-white via-white to-transparent'"
+          >
+            <div class="max-w-4xl mx-auto space-y-8">
 
               <!-- Selected Files Preview -->
               <div v-if="false && selectedFiles.length > 0" class="flex flex-wrap gap-2">
@@ -351,12 +398,14 @@
               </div>
 
               <!-- Input Box -->
-              <div class="relative group">
-                <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl group-focus-within:bg-primary/10 transition-all opacity-0 group-focus-within:opacity-100"></div>
+              <div class="relative group" :class="isMobile ? '' : 'w-[768px] mx-auto'">
+                <!-- <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl group-focus-within:bg-primary/10 transition-all opacity-0 group-focus-within:opacity-100"></div> -->
+                <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl transition-all opacity-0"></div>
                 <!-- focus-within:border-primary -->
                 <div
                   class="relative flex bg-white border border-[#0d0d0d0d] rounded-2xl p-2 shadow-[0_0_#0000,0_0_#0000,0_0_#0000,0_0_#0000,0px_3px_6px_0px_#0000000a,0px_4px_80px_8px_#0000000a,0px_0px_1px_0px_#0000009e]  transition-all"
                   :class="isMobile ? 'flex-col items-stretch gap-2' : 'items-center rounded-[28px] p-[6px]'"
+                  @mousedown="handleInputBoxMouseDown"
                 >
                   <div class="w-full">
                   <input
@@ -417,58 +466,85 @@
                     </div>
                   </div>
 
-                  <div class="flex items-center w-full">
-                    <button
-                      class="size-10 flex items-center justify-center text-slate-400 hover:text-primary transition-colors"
-                      :disabled="isUploading"
-                      @click="handleUpload"
-                    >
-                      <span class="material-symbols-outlined">attach_file</span>
-                    </button>
+                  <!-- PC: input (2nd line) -->
+                  <div v-if="!isMobile" class="w-full">
                     <input
+                      ref="textInputRef"
                       v-model="inputText"
                       type="text"
-                      class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[16px] placeholder:text-[#909090] placeholder:text-[16px]"
+                      class="w-full bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[16px] placeholder:text-[#909090] placeholder:text-[16px]"
                       placeholder="输入指令，如：总结今天与张总的会议..."
                       :disabled="chatStore.isStreaming || isUploading"
                       @keydown.enter.exact.prevent="handleSend"
                       @paste="handlePaste"
                     />
-                    <div class="flex items-center gap-2 pr-1 shrink-0">
-                    <button
-                      v-if="!isMobile"
-                      type="button"
-                      class="h-10 rounded-full border px-3.5 text-sm shadow-sm transition-all"
-                      :class="chatStore.ragEnabled
-                        ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
-                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'"
-                      :aria-pressed="chatStore.ragEnabled"
-                      :title="chatStore.ragEnabled ? '已启用 知识库 检索' : '点击启用 知识库 检索'"
-                      @click="chatStore.setRagEnabled(!chatStore.ragEnabled)"
-                    >
-                      <span class="flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-[18px] leading-none">
-                          menu_book
+                  </div>
+
+                  <!-- PC: controls (3rd line) -->
+                  <div v-if="!isMobile" class="flex items-center justify-between w-full px-1 pb-1 select-none mt-3">
+                    <div class="flex items-center gap-2">
+                      <button
+                        class="size-10 flex items-center justify-center text-[#0d0d0d] hover:text-primary transition-colors"
+                        :disabled="isUploading"
+                        @click="handleUpload"
+                      >
+                        <span class="material-symbols-outlined text-[1.2rem] leading-none">attach_file</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="h-10 rounded-full pl-1 pr-3.5 text-sm transition-all"
+                        :class="chatStore.ragEnabled
+                          ? 'border-primary/25 text-primary shadow-primary/10'
+                          : 'border-slate-200 bg-white text-[#0d0d0d] hover:border-slate-300 hover:text-slate-700'"
+                        :aria-pressed="chatStore.ragEnabled"
+                        :title="chatStore.ragEnabled ? '已启用 知识库 检索' : '点击启用 知识库 检索'"
+                        @click="chatStore.setRagEnabled(!chatStore.ragEnabled)"
+                      >
+                        <span class="flex items-center gap-1.5">
+                          <span class="material-symbols-outlined text-[18px] leading-none">
+                            menu_book
+                          </span>
+                          <span>知识库检索</span>
                         </span>
-                        <span>知识库检索</span>
-                      </span>
-                    </button>
-                    <button
-                      v-if="!isMobile"
-                      class="size-10 rounded-full flex items-center justify-center transition-colors"
-                      :class="chatStore.isStreaming
-                        ? 'bg-[#e5e5e5] text-[#0d0d0d]'
-                        : ((!inputText.trim() && selectedFiles.length === 0) || isUploading)
-                          ? 'bg-[#e5e5e5] text-[#909090]'
-                          : 'bg-[#0d0d0d] text-white hover:bg-[#0d0d0d]/90'"
-                      :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
-                      @click="handleSend"
-                    >
-                      <span v-if="chatStore.isStreaming" class="material-symbols-outlined text-[20px] leading-none">stop</span>
-                      <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
-                      <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
-                    </button>
+                      </button>
                     </div>
+
+                    <div class="flex items-center pr-1 shrink-0">
+                      <button
+                        class="size-10 rounded-full flex items-center justify-center transition-colors"
+                        :class="chatStore.isStreaming
+                          ? 'bg-[#e5e5e5] text-[#0d0d0d]'
+                          : ((!inputText.trim() && selectedFiles.length === 0) || isUploading)
+                            ? 'bg-[#e5e5e5] text-[#0d0d0d]'
+                            : 'bg-[#0d0d0d] text-white hover:bg-[#0d0d0d]/90'"
+                        :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
+                        @click="handleSend"
+                      >
+                        <span v-if="chatStore.isStreaming" class="material-symbols-outlined text-[20px] leading-none">stop</span>
+                        <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
+                        <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Mobile: keep original (upload + input on one line) -->
+                  <div v-else class="flex items-center w-full">
+                    <button
+                      class="size-10 flex items-center justify-center text-slate-400 hover:text-primary transition-colors"
+                      :disabled="isUploading"
+                      @click="handleUpload"
+                    >
+                      <span class="material-symbols-outlined text-[0.875rem] leading-none">attach_file</span>
+                    </button>
+                    <input
+                      v-model="inputText"
+                      type="text"
+                      class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[16px] placeholder:text-[#0d0d0d] placeholder:text-[16px]"
+                      placeholder="输入指令，如：总结今天与张总的会议..."
+                      :disabled="chatStore.isStreaming || isUploading"
+                      @keydown.enter.exact.prevent="handleSend"
+                      @paste="handlePaste"
+                    />
                   </div>
                   </div>
 
@@ -478,7 +554,7 @@
                       class="h-10 self-start inline-flex rounded-xl border px-3.5 text-sm shadow-sm transition-all"
                       :class="chatStore.ragEnabled
                         ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
-                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'"
+                        : 'border-slate-200 bg-white text-[#0d0d0d] hover:border-slate-300 hover:text-slate-700'"
                       :aria-pressed="chatStore.ragEnabled"
                       :title="chatStore.ragEnabled ? '已启用 知识库 检索' : '点击启用 知识库 检索'"
                       @click="chatStore.setRagEnabled(!chatStore.ragEnabled)"
@@ -510,17 +586,17 @@
               </div>
 
               <!-- Quick Action Chips -->
-              <div v-if="chatStore.messages.length === 0" class="flex flex-wrap gap-2 justify-center">
+              <div v-if="chatStore.messages.length === 0" class="flex flex-wrap gap-2 justify-center mt-6">
                 <button
                   v-for="action in quickActions"
                   :key="action.label"
-                  class="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-sm text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
+                  class="px-4 py-[9px] bg-white border border-slate-200 rounded-full text-[14px] text-[#5d5d5d] hover:border-primary hover:text-primary transition-all shadow-sm"
                   @click="sendQuickMessage(action.text)"
                 >
                   {{ action.label }}
                 </button>
               </div>
-              <p class="text-center text-xs text-slate-300 uppercase tracking-[0.4em]">内容由AI生成，请核查重要信息</p>
+              <p v-if="chatStore.messages.length > 0" class="text-center text-xs text-[#5d5d5d] uppercase tracking-[0.4em]" style="margin-top: 10px !important;">内容由AI生成，请核查重要信息</p>
             </div>
           </div>
         </div>
@@ -663,12 +739,38 @@ const { loadAiConfig, ensureAiAvailableForSend } = useAiQuota()
 
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
+const showScrollToBottomButton = ref(false)
 const mobilePanel = ref<'sessions' | 'chat'>('sessions')
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const textInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
 const currentView = ref<'chat' | 'notifications'>('chat')
 const userAvatarLoadFailed = ref(false)
+
+const isChatEmpty = computed(() => chatStore.messages.length === 0)
+
+const SCROLL_TO_BOTTOM_THRESHOLD_PX = 200
+function updateScrollToBottomVisibility() {
+  const el = messagesContainer.value
+  if (!el || chatStore.messages.length === 0) {
+    showScrollToBottomButton.value = false
+    return
+  }
+  const distanceToBottom = el.scrollHeight - (el.scrollTop + el.clientHeight)
+  showScrollToBottomButton.value = distanceToBottom > SCROLL_TO_BOTTOM_THRESHOLD_PX
+}
+
+function handleMessagesScroll() {
+  updateScrollToBottomVisibility()
+}
+
+function scrollToBottomSmooth() {
+  const el = messagesContainer.value
+  if (!el) return
+  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  showScrollToBottomButton.value = false
+}
 
 const selectedFilePreviewUrlMap = new WeakMap<File, string>()
 function getSelectedFilePreviewUrl(file: File): string {
@@ -688,6 +790,15 @@ function revokeSelectedFilePreviewUrl(file: File) {
 
 function revokeAllSelectedFilePreviewUrls() {
   for (const file of selectedFiles.value) revokeSelectedFilePreviewUrl(file)
+}
+
+function handleInputBoxMouseDown(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  if (!target) return
+  // Don't steal focus from buttons / interactive elements.
+  if (target.closest('button')) return
+  if (chatStore.isStreaming || isUploading.value) return
+  textInputRef.value?.focus()
 }
 
 const MAX_FILE_SIZE = MAX_CHAT_ATTACHMENT_SIZE
@@ -755,10 +866,10 @@ const groupedSessions = computed(() => {
 })
 
 const quickActions = [
-  { label: '创建新客户', text: '帮我创建一个新客户' },
-  { label: '查询客户状态', text: '帮我查询客户列表' },
-  { label: '生成跟进任务', text: '帮我生成跟进任务' },
-  { label: '分析本月销售目标', text: '分析本月销售目标的缺口' }
+  { label: '把今天新增但还没跟进的客户列出来', text: '把今天新增但还没跟进的客户列出来' },
+  { label: '找出快丢单的客户', text: '帮我找出快丢单的客户' },
+  { label: '筛选出高意向客户', text: '帮我筛选出高意向客户' },
+  { label: '总结本周的销售情况', text: '总结本周的销售情况，并生成销售报告' }
 ]
 
 const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
@@ -785,6 +896,7 @@ function scrollToBottom() {
     scrollTimer = null
     if (messagesContainer.value) {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+      updateScrollToBottomVisibility()
     }
   }, 100)
 }
@@ -878,7 +990,44 @@ function renderAssistantMessage(content: string, isStreaming = false): string {
   return renderMarkdown(normalized || getAssistantMessagePlaceholder(isStreaming))
 }
 
-function getAssistantMessageStatus(message: { isStreaming?: boolean }): string {
+function htmlToText(html: string): string {
+  const div = document.createElement('div')
+  div.innerHTML = html
+  return (div.textContent || '').replace(/\u00a0/g, ' ').trim()
+}
+
+async function copyToClipboard(text: string) {
+  const value = text.trim()
+  if (!value) return
+
+  try {
+    await navigator.clipboard.writeText(value)
+    ElMessage.success('已复制')
+  } catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = value
+    textarea.setAttribute('readonly', 'true')
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    if (ok) ElMessage.success('已复制')
+    else ElMessage.warning('复制失败')
+  }
+}
+
+async function copyMessageContent(message: { content: string; isStreaming?: boolean }, kind: 'assistant' | 'user') {
+  if (kind === 'assistant') {
+    const html = renderAssistantMessage(message.content || '', Boolean(message.isStreaming))
+    await copyToClipboard(htmlToText(html))
+    return
+  }
+  await copyToClipboard(message.content || '')
+}
+
+function _getAssistantMessageStatus(message: { isStreaming?: boolean }): string {
   return getAssistantMessageStatusLabel(Boolean(message.isStreaming))
 }
 
@@ -1008,12 +1157,15 @@ function formatSessionTime(dateStr: string): string {
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function formatTime(date: Date): string {
+function _formatTime(date: Date): string {
   return new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
     minute: '2-digit'
   }).format(date)
 }
+
+void _getAssistantMessageStatus
+void _formatTime
 
 </script>
 
@@ -1052,14 +1204,44 @@ function formatTime(date: Date): string {
 
 /* Streaming cursor */
 .streaming-cursor::after {
-  content: '▊';
-  animation: blink 1s infinite;
-  margin-left: 2px;
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  border-radius: 9999px;
+  background: #0d0d0d;
+  transform-origin: center;
+  animation: breathingDot 1.2s ease-in-out infinite;
 }
 
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+@keyframes breathingDot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* Scroll-to-bottom button transition */
+.scroll-to-bottom-enter-active,
+.scroll-to-bottom-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.scroll-to-bottom-enter-from,
+.scroll-to-bottom-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 10px);
+}
+
+.scroll-to-bottom-enter-to,
+.scroll-to-bottom-leave-from {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 /* Material Symbols fill variant */
