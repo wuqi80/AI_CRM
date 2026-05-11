@@ -379,7 +379,7 @@
             class="shrink-0 pb-2 md:pb-2"
             :class="isChatEmpty ? 'bg-transparent pt-0' : 'bg-gradient-to-t from-white via-white to-transparent'"
           >
-            <div class="max-w-4xl mx-auto space-y-8">
+            <div class="mx-auto space-y-8 w-[calc(100%-20px)] max-w-4xl md:w-full">
 
               <!-- Selected Files Preview -->
               <div v-if="false && selectedFiles.length > 0" class="flex flex-wrap gap-2">
@@ -534,7 +534,7 @@
                   <!-- Mobile: upload + multiline input -->
                   <div v-else class="flex items-end w-full">
                     <button
-                      class="size-10 flex items-center justify-center text-slate-400 hover:text-primary transition-colors shrink-0"
+                      class="size-12 flex items-center justify-center text-[#0d0d0d] hover:text-primary transition-colors shrink-0"
                       :disabled="isUploading"
                       @click="handleUpload"
                     >
@@ -544,7 +544,7 @@
                       ref="textInputRef"
                       v-model="inputText"
                       rows="1"
-                      class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#0d0d0d] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
+                      class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none pl-1 pr-3 py-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#0d0d0d] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
                       placeholder="输入指令，如：总结今天与张总的会议..."
                       :disabled="chatStore.isStreaming || isUploading"
                       @input="resizeChatTextarea"
@@ -1147,7 +1147,7 @@ async function handleNewSession() {
 }
 
 async function handleSelectSession(sessionId: string) {
-  if (chatStore.currentSessionId === sessionId && currentView.value === 'chat') return
+  // if (chatStore.currentSessionId === sessionId && currentView.value === 'chat') return
   currentView.value = 'chat'
   await chatStore.selectSession(sessionId)
   if (isMobile.value) {

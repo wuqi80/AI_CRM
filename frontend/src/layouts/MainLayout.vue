@@ -421,7 +421,7 @@
       </Transition>
       <Transition name="drawer-panel">
         <aside v-if="isMobile && drawerVisible" class="fixed bottom-0 left-0 top-0 z-[101] flex w-72 flex-col bg-white shadow-2xl">
-          <div class="flex items-center gap-3 p-6">
+          <div class="flex items-center gap-3 pt-6 pb-[6px] px-6">
             <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent">
               <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
             </div>
