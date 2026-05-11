@@ -14,6 +14,8 @@ html, body, #app {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  font-family: 'Microsoft YaHei', '微软雅黑', 'PingFang SC', 'Helvetica Neue', Arial, 'Noto Sans SC',
+    ui-sans-serif, system-ui, sans-serif;
 }
 
 /*

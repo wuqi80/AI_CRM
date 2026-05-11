@@ -1,48 +1,74 @@
 <template>
   <div class="flex wk-screen bg-background-light">
-    <aside v-if="!isMobile" class="relative flex wk-screen w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-white">
-      <div class="flex items-center gap-3 p-6">
-        <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent">
+    <aside
+      v-if="!isMobile"
+      class="relative z-20 flex wk-screen flex-shrink-0 flex-col overflow-x-visible overflow-y-visible border-r border-slate-200 bg-white transition-[width] duration-200 ease-in-out"
+      :class="primarySidebarCollapsed ? 'w-16' : 'w-64'"
+    >
+      <div class="relative z-30 flex items-center gap-3 overflow-visible pt-6 pb-[6px] px-6" :class="primarySidebarCollapsed ? 'justify-center px-2' : ''">
+        <div
+          v-if="enterpriseStore.hasLogo"
+          class="flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent"
+          :class="primarySidebarCollapsed ? 'size-8' : 'size-10'"
+        >
           <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
         </div>
-        <div v-else class="size-10 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent">
+        <div
+          v-else
+          class="flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent"
+          :class="primarySidebarCollapsed ? 'size-8' : 'size-10'"
+        >
           <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
         </div>
-        <div class="min-w-0">
+        <div v-if="!primarySidebarCollapsed" class="min-w-0 flex-1 pr-1">
           <h1 class="line-clamp-2 text-lg font-bold leading-tight text-slate-900">{{ enterpriseStore.displayName }}</h1>
           <p class="text-xs uppercase tracking-widest text-slate-500">{{ enterpriseStore.displayDescription }}</p>
         </div>
-      </div>
-
-      <!-- Chat: New session (fixed, not scroll with nav) -->
-      <div class="px-4 pt-2 pb-3">
         <button
-          class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0d0d0d] transition-colors hover:bg-slate-100"
-          @click="handleNewSession"
+          type="button"
+          class="absolute -right-3 top-10 z-[60] flex size-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm hover:text-primary"
+          :title="primarySidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+          @click="primarySidebarCollapsed = !primarySidebarCollapsed"
         >
-          <span class="material-symbols-outlined wk-plus-button-icon text-[22px] leading-none">add</span>
-          新对话
+          <span class="material-symbols-outlined text-sm">{{ primarySidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</span>
         </button>
       </div>
 
-      <nav class="flex-1 overflow-y-auto px-4 pb-4">
+      <!-- Chat: New session (fixed, not scroll with nav) -->
+      <div class="px-4 pt-[6px] pb-[6px]" :class="primarySidebarCollapsed ? 'px-2' : ''">
+        <button
+          class="flex w-full items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors hover:bg-slate-100"
+          :class="primarySidebarCollapsed ? 'justify-center px-0' : 'gap-2 px-3'"
+          :title="primarySidebarCollapsed ? '新对话' : undefined"
+          @click="handleNewSession"
+        >
+          <span class="material-symbols-outlined wk-plus-button-icon text-[22px] leading-none">add</span>
+          <span v-if="!primarySidebarCollapsed">新对话</span>
+        </button>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto px-4 pb-4" :class="primarySidebarCollapsed ? 'px-2' : ''">
         <div class="space-y-1">
 
           <template v-for="group in pcMainNavGroups" :key="group.title || 'default'">
-            <div v-if="group.title" class="pb-2 pt-4">
+            <div v-if="group.title && !primarySidebarCollapsed" class="pb-[6px] pt-3">
               <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">{{ group.title }}</p>
             </div>
             <button
               v-for="item in group.items"
               :key="item.key"
+              :title="primarySidebarCollapsed ? item.label : undefined"
               @click="handlePrimaryNavClick(item)"
-              class="flex w-full items-center gap-2 rounded-lg px-3 py-2 transition-colors"
-              :class="isPrimaryActive(item) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
+              class="flex w-full items-center rounded-lg pt-[6px] pb-[6px] transition-colors"
+              :class="[
+                isPrimaryActive(item) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100',
+                primarySidebarCollapsed ? 'justify-center px-0' : 'gap-2 px-3',
+              ]"
             >
               <WkIcon :name="item.icon" :size="22" class="shrink-0" />
-              <span class="truncate text-sm font-medium">{{ item.label }}</span>
+              <span v-if="!primarySidebarCollapsed" class="truncate text-sm font-normal">{{ item.label }}</span>
               <span
-                v-if="item.children?.length"
+                v-if="item.children?.length && !primarySidebarCollapsed"
                 class="material-symbols-outlined ml-auto shrink-0 text-base"
                 :class="isPrimarySelected(item) ? 'text-primary' : 'text-slate-300'"
               >
@@ -52,6 +78,7 @@
           </template>
 
           <!-- Chat: recent sessions under Knowledge menu -->
+          <template v-if="!primarySidebarCollapsed">
           <div class="pt-2" />
           <div class="mx-1 h-px bg-slate-100" />
           <div class="space-y-1 pt-2">
@@ -154,6 +181,7 @@
               </template>
             </template>
           </div>
+          </template>
 
         </div>
       </nav>
@@ -174,19 +202,26 @@
         </button>
       </div>
 
-      <div class="border-slate-200 p-4">
-        <div class="flex cursor-pointer items-center gap-3 rounded-xl bg-slate-50 p-2" @click="showUserMenu = !showUserMenu">
+      <div class="border-slate-200 p-4" :class="primarySidebarCollapsed ? 'px-2' : ''">
+        <div
+          class="flex cursor-pointer items-center rounded-xl bg-slate-50 p-2"
+          :class="primarySidebarCollapsed ? 'justify-center' : 'gap-3'"
+          :title="primarySidebarCollapsed ? (userStore.realname || userStore.username || '用户') : undefined"
+          @click="showUserMenu = !showUserMenu"
+        >
           <div v-if="userStore.avatar" class="size-8 overflow-hidden rounded-full">
             <img :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
           </div>
           <div v-else class="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
             {{ userStore.realname?.charAt(0) || 'U' }}
           </div>
-          <div class="min-w-0 flex-1">
-            <p class="truncate text-xs font-semibold text-slate-900">{{ userStore.realname || userStore.username }}</p>
-            <p class="truncate text-xs text-slate-500">{{ userStore.userInfo?.deptName || '用户' }}</p>
-          </div>
-          <span class="material-symbols-outlined text-sm text-slate-400">unfold_more</span>
+          <template v-if="!primarySidebarCollapsed">
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-xs font-semibold text-slate-900">{{ userStore.realname || userStore.username }}</p>
+              <p class="truncate text-xs text-slate-500">{{ userStore.userInfo?.deptName || '用户' }}</p>
+            </div>
+            <span class="material-symbols-outlined text-sm text-slate-400">unfold_more</span>
+          </template>
         </div>
       </div>
 
@@ -259,7 +294,7 @@
     <Transition name="secondary-panel">
       <aside
         v-if="!isMobile && showSecondaryPanel"
-        class="relative flex wk-screen w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-white"
+        class="relative z-10 flex wk-screen w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-white"
       >
         <div class="flex items-center justify-between px-4 py-5">
           <p class="truncate text-xs font-bold tracking-wider text-slate-400">{{ secondaryTitle }}</p>
@@ -410,7 +445,7 @@
                   @click="handleMobilePrimaryNavClick(item)"
                 >
                   <WkIcon :name="item.icon" :size="22" class="shrink-0" />
-                  <span class="text-sm font-medium">{{ item.label }}</span>
+                  <span class="text-sm font-normal">{{ item.label }}</span>
                   <span
                     v-if="item.children?.length"
                     class="material-symbols-outlined ml-auto shrink-0 text-base transition-transform"
@@ -744,6 +779,8 @@ const { isMobile } = useResponsive()
 const { isOpen: chatDrawerOpen } = useChatDrawer()
 
 const drawerVisible = ref(false)
+/** PC：一级侧栏收起为图标栏 */
+const primarySidebarCollapsed = ref(false)
 const showUserMenu = ref(false)
 const showAccountSettingsModal = ref(false)
 const showCreateCustomer = ref(false)
@@ -864,6 +901,12 @@ const activeSecondaryItems = computed(() => selectedPrimaryItem.value?.children 
 
 const showSecondaryPanel = computed(() => activeSecondaryItems.value.length > 0)
 
+watch(showSecondaryPanel, open => {
+  if (!isMobile.value && open) {
+    primarySidebarCollapsed.value = true
+  }
+})
+
 const secondaryTitle = computed(() => {
   if (!selectedPrimaryItem.value) return '二级菜单'
   return selectedPrimaryItem.value.secondaryTitle || `${selectedPrimaryItem.value.label} / 二级菜单`
@@ -908,6 +951,11 @@ watch(
     if (selectedPrimaryKey.value && !selectedPrimaryItem.value) {
       selectedPrimaryKey.value = ''
     }
+    const scopeRaw = route.query.scope
+    const scope = Array.isArray(scopeRaw) ? scopeRaw[0] : scopeRaw
+    if (route.path === '/settings/team' && scope === 'profile') {
+      selectedPrimaryKey.value = ''
+    }
   }
 )
 
@@ -919,6 +967,12 @@ watch(
     }
   }
 )
+
+watch(showUserMenu, open => {
+  if (open && !isMobile.value && primarySidebarCollapsed.value) {
+    primarySidebarCollapsed.value = false
+  }
+})
 
 onMounted(() => {
   enterpriseStore.loadConfig()

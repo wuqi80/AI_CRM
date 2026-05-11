@@ -254,7 +254,7 @@
                       </div>
                       <div
                         class="wk-markdown"
-                        :class="{ 'streaming-cursor': message.isStreaming }"
+                        :class="{ 'streaming-cursor': message.isStreaming && message.content.length == 0 }"
                         v-html="renderAssistantMessage(message.content, message.isStreaming)"
                       />
                     </div>
@@ -314,7 +314,7 @@
                     <!-- <div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-lg shadow-primary/10 text-sm leading-relaxed"> -->
                     <div class="group relative bg-[#e9e9e980] text-[#0d0d0d] rounded-[24px] px-4 py-[0.6rem] text-[16px] leading-relaxed">
                       <div
-                        class="absolute -bottom-10 left-0 z-10 size-10 flex items-center justify-center opacity-0 pointer-events-none transition-all group-hover:opacity-100 group-hover:pointer-events-auto"
+                        class="absolute -bottom-10 right-0 z-10 size-10 flex items-center justify-center opacity-0 pointer-events-none transition-all group-hover:opacity-100 group-hover:pointer-events-auto"
                       >
                         <button
                           type="button"
@@ -471,13 +471,14 @@
 
                   <!-- PC: input (2nd line) -->
                   <div v-if="!isMobile" class="w-full">
-                    <input
+                    <textarea
                       ref="textInputRef"
                       v-model="inputText"
-                      type="text"
-                      class="w-full bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[16px] placeholder:text-[#909090] placeholder:text-[16px]"
+                      rows="1"
+                      class="w-full bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#909090] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
                       placeholder="输入指令，如：总结今天与张总的会议..."
                       :disabled="chatStore.isStreaming || isUploading"
+                      @input="resizeChatTextarea"
                       @keydown.enter.exact.prevent="handleSend"
                       @paste="handlePaste"
                     />
@@ -530,21 +531,23 @@
                     </div>
                   </div>
 
-                  <!-- Mobile: keep original (upload + input on one line) -->
-                  <div v-else class="flex items-center w-full">
+                  <!-- Mobile: upload + multiline input -->
+                  <div v-else class="flex items-end w-full">
                     <button
-                      class="size-10 flex items-center justify-center text-slate-400 hover:text-primary transition-colors"
+                      class="size-10 flex items-center justify-center text-slate-400 hover:text-primary transition-colors shrink-0"
                       :disabled="isUploading"
                       @click="handleUpload"
                     >
                       <span class="material-symbols-outlined text-[0.875rem] leading-none">attach_file</span>
                     </button>
-                    <input
+                    <textarea
+                      ref="textInputRef"
                       v-model="inputText"
-                      type="text"
-                      class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[16px] placeholder:text-[#0d0d0d] placeholder:text-[16px]"
+                      rows="1"
+                      class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#0d0d0d] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
                       placeholder="输入指令，如：总结今天与张总的会议..."
                       :disabled="chatStore.isStreaming || isUploading"
+                      @input="resizeChatTextarea"
                       @keydown.enter.exact.prevent="handleSend"
                       @paste="handlePaste"
                     />
@@ -745,7 +748,28 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const showScrollToBottomButton = ref(false)
 const mobilePanel = ref<'sessions' | 'chat'>('sessions')
 const fileInputRef = ref<HTMLInputElement | null>(null)
-const textInputRef = ref<HTMLInputElement | null>(null)
+const textInputRef = ref<HTMLTextAreaElement | null>(null)
+
+/** 纵向最多展示约 10 行，再继续增高则出现纵向滚动条 */
+function getChatTextareaMaxHeightPx(el: HTMLTextAreaElement): number {
+  const cs = window.getComputedStyle(el)
+  const lh = parseFloat(cs.lineHeight)
+  const linePx = Number.isFinite(lh) && lh > 0 ? lh : 26
+  const pt = parseFloat(cs.paddingTop) || 0
+  const pb = parseFloat(cs.paddingBottom) || 0
+  return pt + pb + linePx * 10
+}
+
+function resizeChatTextarea() {
+  const el = textInputRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  const maxH = getChatTextareaMaxHeightPx(el)
+  el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
+}
+
+watch(inputText, () => nextTick(resizeChatTextarea))
+watch(isMobile, () => nextTick(resizeChatTextarea))
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
 const currentView = ref<'chat' | 'notifications'>('chat')
@@ -880,6 +904,8 @@ const userAvatarFallback = computed(() => (userStore.realname || userStore.usern
 
 onMounted(async () => {
   registerAiQuotaResumeSendHandler(handleSend)
+  await nextTick()
+  resizeChatTextarea()
   await Promise.all([
     chatStore.fetchSessions(),
     agentStore.fetchEnabledAgents(),
