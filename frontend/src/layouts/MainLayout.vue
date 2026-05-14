@@ -13,14 +13,14 @@
         <div class="flex min-w-0 flex-1 items-start gap-2.5 pl-[10px]">
           <div
             v-if="enterpriseStore.hasLogo"
-            class="size-8 shrink-0 overflow-hidden rounded-lg border border-[#ececec] bg-transparent"
+            class="size-8 shrink-0 overflow-hidden rounded-lg bg-transparent"
           >
             <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
           </div>
-          <div v-else class="size-8 shrink-0 overflow-hidden rounded-lg border border-[#ececec] bg-transparent">
+          <div v-else class="size-8 shrink-0 overflow-hidden rounded-lg  bg-transparent">
             <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
           </div>
-          <div class="min-w-0 flex-1 pr-1 pt-0.5">
+          <div v-if="false" class="min-w-0 flex-1 pr-1 pt-0.5">
             <h1 class="line-clamp-2 text-[15px] font-semibold leading-snug text-[#0d0d0d]">
               {{ enterpriseStore.displayName }}
             </h1>
@@ -86,7 +86,7 @@
         >
           <!-- <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">edit_square</span> -->
           <WkIcon name="new-chat" :size="18" class="shrink-0" />
-          <span v-if="!primarySidebarCollapsed">新对话</span>
+          <span style="margin-left: 2px;" v-if="!primarySidebarCollapsed">新对话</span>
         </button>
       </div>
 
@@ -99,7 +99,7 @@
       <nav
         ref="primaryNavRef"
         class="wk-scrollbar-gutter-stable flex-1 overflow-y-auto px-3 pb-4"
-        :class="primarySidebarCollapsed ? '!px-2' : ''"
+        :class="primarySidebarCollapsed ? '!pl-2 !pr-[3px]' : ''"
       >
         <div class="space-y-1">
 
@@ -114,7 +114,7 @@
               @click="handlePrimaryNavClick(item)"
               class="flex w-full items-center rounded-lg pt-[8px] pb-[8px] transition-colors pl-[10px] pr-[10px] ml-[2px] mr-[6px]"
               :class="[
-                isPrimaryActive(item) ? 'bg-[#f0f0f0]' : 'text-[#0d0d0d] hover:bg-[#f9f9f9]',
+                isPrimaryActive(item) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] hover:bg-[#f9f9f9]',
                 primarySidebarCollapsed ? 'justify-center' : 'gap-2',
               ]"
             >
@@ -133,7 +133,7 @@
           <!-- Chat: recent sessions under Knowledge menu -->
           <template v-if="!primarySidebarCollapsed">
           <!-- <div class="pt-2" /> -->
-          <div class="mx-1 h-px bg-slate-100" />
+          <!-- <div class="mx-1 h-px bg-slate-100" /> -->
           <div class="space-y-1 pt-0">
             <button
               type="button"
@@ -172,7 +172,7 @@
                   :key="session.sessionId"
                   class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
                   :class="isSessionActive(session.sessionId)
-                    ? 'bg-[#f0f0f0]'
+                    ? 'bg-[#f3f3f3]'
                     : 'hover:bg-[#f9f9f9]'"
                   @click="handleSelectSession(session.sessionId)"
                 >
@@ -193,7 +193,7 @@
                   :key="session.sessionId"
                   class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[0px] ml-[2px] mr-[6px] text-left transition-all"
                   :class="isSessionActive(session.sessionId)
-                    ? 'bg-[#f0f0f0]'
+                    ? 'bg-[#f3f3f3]'
                     : 'hover:bg-[#f9f9f9]'"
                   @click="handleSelectSession(session.sessionId)"
                 >
@@ -214,7 +214,7 @@
                   :key="session.sessionId"
                   class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
                   :class="isSessionActive(session.sessionId)
-                    ? 'bg-[#f0f0f0]'
+                    ? 'bg-[#f3f3f3]'
                     : 'hover:bg-[#f9f9f9]'"
                   @click="handleSelectSession(session.sessionId)"
                 >
@@ -253,8 +253,8 @@
 
       <div class="border-t border-[#ececec] p-3" :class="primarySidebarCollapsed ? '!px-2 !py-2' : ''">
         <div
-          class="flex cursor-pointer items-center rounded-xl bg-[#fff] p-2 transition-colors hover:bg-[#f9f9f9]"
-          :class="primarySidebarCollapsed ? 'justify-center' : 'gap-3'"
+          class="flex cursor-pointer items-center rounded-xl bg-[#fff] transition-colors hover:bg-[#f9f9f9]"
+          :class="primarySidebarCollapsed ? 'justify-center' : 'gap-3 p-2'"
           :title="primarySidebarCollapsed ? (userStore.realname || userStore.username || '用户') : undefined"
           @click="showUserMenu = !showUserMenu"
         >
@@ -307,7 +307,7 @@
                 class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-700 transition-colors hover:bg-slate-50"
                 @click="handleOpenAccountSettings"
               >
-                <WkIcon name="settings" :size="24" class="text-slate-400 transition-colors group-hover:text-primary" />
+                <WkIcon name="set" :size="24" class="text-slate-400 transition-colors group-hover:text-primary" />
                 <span class="text-sm font-medium">账号设置</span>
               </button>
 
@@ -595,7 +595,7 @@
                     class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-700 transition-colors hover:bg-slate-50"
                     @click="handleOpenAccountSettings"
                   >
-                    <WkIcon name="settings" :size="24" class="text-slate-400 transition-colors group-hover:text-primary" />
+                    <WkIcon name="set" :size="24" class="text-slate-400 transition-colors group-hover:text-primary" />
                     <span class="text-sm font-medium">账号设置</span>
                   </button>
 
@@ -669,7 +669,7 @@
                 class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-700 transition-colors hover:bg-slate-50"
                 @click="handleOpenAccountSettings"
               >
-                <WkIcon name="settings" :size="24" class="text-slate-400 transition-colors group-hover:text-primary" />
+                <WkIcon name="set" :size="24" class="text-slate-400 transition-colors group-hover:text-primary" />
                 <span class="text-sm font-medium">账号设置</span>
               </button>
 
@@ -902,15 +902,15 @@ const allMainNavItems: MainNavItem[] = [
     secondaryTitle: 'CRM管理',
     children: [
       { key: 'crm-customer', icon: 'customer', label: '客户管理', route: '/customer' },
-      { key: 'crm-task', icon: 'task', label: '任务管理', route: '/task' },
-      { key: 'crm-calendar', icon: 'meetingRecord', label: '日程安排', route: '/calendar' },
-      { key: 'crm-settings', icon: 'settings', label: '系统设置', route: '/settings/role', query: { scope: 'crm' } },
+      { key: 'crm-task', icon: 'task-1', label: '任务管理', route: '/task' },
+      { key: 'crm-calendar', icon: 'event', label: '日程安排', route: '/calendar' },
+      { key: 'crm-settings', icon: 'set', label: '系统设置', route: '/settings/role', query: { scope: 'crm' } },
     ],
   },
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
-  { icon: 'settings', label: '系统设置', route: '/settings/team', permission: ['user', 'role', 'config', 'dept', 'customField'], query: { scope: 'profile' } },
+  { icon: 'set', label: '系统设置', route: '/settings/team', permission: ['user', 'role', 'config', 'dept', 'customField'], query: { scope: 'profile' } },
 ]
 
 const mainNavItems = computed(() =>
@@ -1379,7 +1379,7 @@ function getSearchResultIcon(entityType: GlobalSearchResult['entityType']): WkIc
     case 'task':
       return 'task'
     case 'schedule':
-      return 'meetingRecord'
+      return 'event'
     case 'knowledge':
     default:
       return 'knowledge'

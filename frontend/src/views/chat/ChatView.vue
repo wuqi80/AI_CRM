@@ -249,7 +249,7 @@
                           aria-label="复制内容"
                           @click="copyMessageContent(message, 'assistant')"
                         >
-                          <span class="material-symbols-outlined text-[20px] leading-none">content_copy</span>
+                          <WkIcon name="copy" :box-size="20" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
                         </button>
                       </div>
                       <div
@@ -322,7 +322,7 @@
                           aria-label="复制内容"
                           @click="copyMessageContent(message, 'user')"
                         >
-                          <span class="material-symbols-outlined text-[20px] leading-none">content_copy</span>
+                        <WkIcon name="copy" :box-size="20" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
                         </button>
                       </div>
                       <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
@@ -582,10 +582,50 @@
                       </button>
                     </div>
 
-                    <div class="flex items-center pr-1 shrink-0">
+                    <div class="flex items-center gap-1.5 pr-1 shrink-0">
+                      <el-popover
+                        v-model:visible="chatModelPopoverVisible"
+                        trigger="click"
+                        placement="top-end"
+                        width="280"
+                        :show-arrow="false"
+                        :teleported="true"
+                        popper-class="wk-chat-model-popper"
+                      >
+                        <template #reference>
+                          <button
+                            type="button"
+                            class="inline-flex h-9 max-w-[148px] shrink-0 items-center gap-0.5 rounded-full border border-[#ececec] bg-[#f5f5f5] px-2.5 text-left text-[13px] font-semibold text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
+                            :title="`当前模型：${selectedChatModel.label}`"
+                          >
+                            <span class="min-w-0 truncate">{{ selectedChatModel.label }}</span>
+                            <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-[#8f8f8f]">expand_more</span>
+                          </button>
+                        </template>
+                        <div class="wk-chat-model-menu">
+                          <button
+                            v-for="m in CHAT_MODEL_OPTIONS"
+                            :key="m.id"
+                            type="button"
+                            class="wk-chat-model-menu__item"
+                            @click="selectChatModel(m.id)"
+                          >
+                            <div class="min-w-0 flex-1">
+                              <div class="text-[14px] font-semibold leading-tight text-[#0d0d0d]">{{ m.label }}</div>
+                              <div class="mt-0.5 text-[12px] leading-snug text-[#909090]">{{ m.description }}</div>
+                            </div>
+                            <span
+                              v-if="selectedChatModelId === m.id"
+                              class="material-symbols-outlined shrink-0 text-[20px] leading-none text-primary"
+                            >
+                              check
+                            </span>
+                          </button>
+                        </div>
+                      </el-popover>
                       <button
                         type="button"
-                        class="group relative size-10 shrink-0 rounded-full flex items-center justify-center transition-colors"
+                        class="relative size-10 shrink-0 rounded-full flex items-center justify-center transition-colors"
                         :class="sendBarActionButtonClass"
                         :disabled="sendBarActionDisabled"
                         :title="sendBarActionTitle"
@@ -595,13 +635,12 @@
                         <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                         <span v-else-if="isTranscribing" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                         <span v-else-if="isRecording" class="material-symbols-outlined text-[20px] leading-none">stop</span>
-                        <span
+                        <WkIcon
                           v-else-if="isChatInputEmpty"
-                          class="relative flex size-5 items-center justify-center"
-                        >
-                          <span class="material-symbols-outlined absolute inset-0 flex items-center justify-center text-[20px] leading-none opacity-100 transition-opacity group-hover:opacity-0">arrow_upward</span>
-                          <span class="material-symbols-outlined absolute inset-0 flex items-center justify-center text-[20px] leading-none opacity-0 transition-opacity group-hover:opacity-100">mic</span>
-                        </span>
+                          name="voice"
+                          :box-size="20"
+                          class="material-symbols-outlined text-[20px] leading-none"
+                        />
                         <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
                       </button>
                     </div>
@@ -716,7 +755,7 @@
 
                     <button
                       type="button"
-                      class="group relative size-10 shrink-0 rounded-full flex items-center justify-center transition-colors"
+                      class="relative size-10 shrink-0 rounded-full flex items-center justify-center transition-colors"
                       :class="sendBarActionButtonClass"
                       :disabled="sendBarActionDisabled"
                       :title="sendBarActionTitle"
@@ -726,13 +765,12 @@
                       <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                       <span v-else-if="isTranscribing" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                       <span v-else-if="isRecording" class="material-symbols-outlined text-[20px] leading-none">stop</span>
-                      <span
+                      <WkIcon
                         v-else-if="isChatInputEmpty"
-                        class="relative flex size-5 items-center justify-center"
-                      >
-                        <span class="material-symbols-outlined absolute inset-0 flex items-center justify-center text-[20px] leading-none opacity-100 transition-opacity group-hover:opacity-0">arrow_upward</span>
-                        <span class="material-symbols-outlined absolute inset-0 flex items-center justify-center text-[20px] leading-none opacity-0 transition-opacity group-hover:opacity-100">mic</span>
-                      </span>
+                        name="voice"
+                        :box-size="20"
+                        class="material-symbols-outlined text-[20px] leading-none"
+                      />
                       <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
                     </button>
                   </div>
@@ -914,6 +952,30 @@ function activeChatInputEl(): HTMLTextAreaElement | null {
 
 const chatUploadMenuVisible = ref(false)
 
+type ChatModelOption = {
+  id: string
+  label: string
+  description: string
+}
+
+/** 模型切换（测试数据，后续可对接接口） */
+const CHAT_MODEL_OPTIONS: ChatModelOption[] = [
+  { id: 'sonnet-46', label: 'Sonnet 4.6', description: '适合日常工作的均衡模型' },
+  { id: 'haiku-45', label: 'Haiku 4.5', description: '更快、更省资源' },
+]
+
+const chatModelPopoverVisible = ref(false)
+const selectedChatModelId = ref(CHAT_MODEL_OPTIONS[0]!.id)
+
+const selectedChatModel = computed(
+  () => CHAT_MODEL_OPTIONS.find(m => m.id === selectedChatModelId.value) ?? CHAT_MODEL_OPTIONS[0]!
+)
+
+function selectChatModel(id: string) {
+  selectedChatModelId.value = id
+  chatModelPopoverVisible.value = false
+}
+
 /** 纵向最多展示约 10 行，再继续增高则出现纵向滚动条 */
 function getChatTextareaMaxHeightPx(el: HTMLTextAreaElement): number {
   const cs = window.getComputedStyle(el)
@@ -947,7 +1009,7 @@ const sendBarActionButtonClass = computed(() => {
   if (chatStore.isStreaming) return 'bg-[#e5e5e5] text-[#0d0d0d]'
   if (isRecording.value) return 'bg-red-500 text-white hover:bg-red-600'
   if (isTranscribing.value || isUploading.value) return 'bg-[#e5e5e5] text-[#909090]'
-  if (isChatInputEmpty.value) return 'bg-[#e5e5e5] text-[#0d0d0d] hover:bg-[#dcdcdc]'
+  if (isChatInputEmpty.value) return 'bg-[#000] text-white hover:bg-[#575757]'
   return 'bg-[#0d0d0d] text-white hover:bg-[#0d0d0d]/90'
 })
 
@@ -960,7 +1022,7 @@ const sendBarActionTitle = computed(() => {
   if (isUploading.value) return '上传中'
   if (isTranscribing.value) return '语音识别中…'
   if (isRecording.value) return '点击结束录音'
-  if (isChatInputEmpty.value) return '语音输入（悬停显示麦克风）'
+  if (isChatInputEmpty.value) return '语音输入'
   return '发送'
 })
 
@@ -1817,5 +1879,41 @@ void _formatTime
 
 .wk-chat-upload-submenu-popper.el-popper {
   z-index: 3100 !important;
+}
+
+.wk-chat-model-popper.el-popper {
+  padding: 0 !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  border: unset !important;
+  box-shadow: 0 0 #0000, 0 0 #0000, 0 0 #0000, 0 0 #0000, 0px 8px 12px 0px #00000014, 0px 0px 1px 0px #0000009e !important;
+  z-index: 3000 !important;
+}
+
+.wk-chat-model-popper .el-popper__arrow,
+.wk-chat-model-popper .el-popper__arrow::before {
+  display: none !important;
+}
+
+.wk-chat-model-menu {
+  padding: 6px;
+}
+
+.wk-chat-model-menu__item {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  padding: 10px 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.wk-chat-model-menu__item:hover {
+  background: #f5f5f5;
 }
 </style>

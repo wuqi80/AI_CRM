@@ -18,7 +18,7 @@
       >
         <template #reference>
           <span
-            class="material-symbols-outlined inline-flex size-7 shrink-0 items-center justify-center rounded-md text-[18px] leading-none text-slate-300 transition-all hover:text-[#0d0d0d]"
+            class="material-symbols-outlined inline-flex size-7 shrink-0 items-center justify-center rounded-md text-[18px] leading-none text-[#8f8f8f] transition-all hover:text-[#0d0d0d]"
             :class="visibilityClass"
             tabindex="-1"
             role="button"

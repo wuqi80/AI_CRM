@@ -15,6 +15,10 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.wk-icon-event:before {
+  content: "\e6bc";
+}
+
 .wk-icon-voice:before {
   content: "\e6ad";
 }
