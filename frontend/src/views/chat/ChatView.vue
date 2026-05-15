@@ -674,84 +674,28 @@
                       </button> -->
                     </div>
 
-                    <div class="flex items-center gap-1.5 pr-1 shrink-0">
-                      <el-popover
-                        v-model:visible="chatModelPopoverVisible"
-                        trigger="click"
-                        placement="top-end"
-                        width="280"
-                        :show-arrow="false"
-                        :teleported="true"
-                        transition="el-zoom-in-bottom"
-                        popper-class="wk-chat-model-popper"
+                    <div class="flex items-center gap-2 pr-1 shrink-0">
+                      <el-select
+                        v-model="chatStore.selectedModelKey"
+                        class="w-[220px]"
+                        size="large"
+                        :disabled="chatStore.isStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
+                        :placeholder="chatStore.modelOptionsLoading ? '加载模型...' : (chatStore.modelOptions.length > 0 ? '选择模型' : '暂无可选模型')"
+                        @change="chatStore.setSelectedModelKey"
                       >
-                        <template #reference>
-                          <button
-                            type="button"
-                            class="inline-flex h-9 max-w-[178px] shrink-0 items-center gap-1.5 rounded-[18px] border border-[#ececec] bg-[#f5f5f5] pl-2 pr-2 text-left text-[13px] text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
-                            :title="`当前模型：${selectedChatModel.label}`"
-                          >
-                            <span
-                              class="relative size-7 shrink-0 overflow-hidden rounded-md bg-[#ececec]"
-                              aria-hidden="true"
-                            >
-                              <img
-                                v-if="chatModelShowImage(selectedChatModel)"
-                                :src="chatModelIconSrc(selectedChatModel)"
-                                alt=""
-                                class="size-full object-cover"
-                                @error="onChatModelIconError(selectedChatModel.id)"
-                              />
-                              <span
-                                v-else
-                                class="flex size-full items-center justify-center text-[11px] font-semibold text-[#909090]"
-                              >
-                                {{ selectedChatModel.label.slice(0, 1) }}
-                              </span>
-                            </span>
-                            <span class="min-w-0 flex-1 truncate">{{ selectedChatModel.label }}</span>
-                            <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-[#8f8f8f]">expand_more</span>
-                          </button>
-                        </template>
-                        <div class="wk-chat-model-menu">
-                          <button
-                            v-for="m in CHAT_MODEL_OPTIONS"
-                            :key="m.id"
-                            type="button"
-                            class="wk-chat-model-menu__item"
-                            @click="selectChatModel(m.id)"
-                          >
-                            <span
-                              class="relative mt-0.5 size-8 shrink-0 overflow-hidden rounded-lg bg-[#ececec]"
-                              aria-hidden="true"
-                            >
-                              <img
-                                v-if="chatModelShowImage(m)"
-                                :src="chatModelIconSrc(m)"
-                                alt=""
-                                class="size-full object-cover"
-                                @error="onChatModelIconError(m.id)"
-                              />
-                              <span
-                                v-else
-                                class="flex size-full items-center justify-center text-[12px] font-semibold text-[#909090]"
-                              >
-                                {{ m.label.slice(0, 1) }}
-                              </span>
-                            </span>
-                            <div class="min-w-0 flex-1">
-                              <div class="text-[14px] leading-tight text-[#0d0d0d]">{{ m.label }}</div>
-                              <div class="mt-0.5 text-[12px] leading-snug text-[#909090]">{{ m.description }}</div>
-                            </div>
-                            <span
-                              v-if="selectedChatModelId === m.id"
-                              class="material-symbols-outlined mt-0.5 shrink-0 text-[20px] leading-none text-primary"
-                            >
-                              check
-                            </span>
-                          </button>
-                        </div>
-                      </el-popover>
+                        <el-option
+                          v-for="option in chatStore.modelOptions"
+                          :key="chatStore.toModelKey(option)"
+                          :label="option.displayName || option.modelName"
+                          :value="chatStore.toModelKey(option)"
+                        >
+                          <div class="flex items-center justify-between gap-4">
+                            <span class="truncate">{{ option.displayName || option.modelName }}</span>
+                            <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
+                          </div>
+                        </el-option>
+                      </el-select>
+
                       <button
                         type="button"
                         class="group/send-bar-action relative flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full transition-colors"
@@ -926,12 +870,11 @@
                     </div>
 
                     <el-select
-                      v-if="chatStore.modelOptions.length > 0"
                       v-model="chatStore.selectedModelKey"
                       class="min-w-0 flex-1"
                       size="large"
-                      :disabled="chatStore.isStreaming || isUploading || chatStore.modelOptionsLoading"
-                      placeholder="选择模型"
+                      :disabled="chatStore.isStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
+                      :placeholder="chatStore.modelOptionsLoading ? '加载模型...' : (chatStore.modelOptions.length > 0 ? '选择模型' : '暂无可选模型')"
                       @change="chatStore.setSelectedModelKey"
                     >
                       <el-option
@@ -1161,52 +1104,6 @@ const chatUploadMenuVisible = ref(false)
 const chatKnowledgePickerVisible = ref(false)
 const showKnowledgeFollowUpChips = ref(false)
 
-type ChatModelOption = {
-  id: string
-  label: string
-  description: string
-  /** 模型图标图片路径（如 `/logo.png` 或完整 URL），缺省或加载失败时显示占位 */
-  icon?: string
-}
-
-/** 模型切换（测试数据，后续可对接接口） */
-const CHAT_MODEL_OPTIONS: ChatModelOption[] = [
-  {
-    id: 'sonnet-46',
-    label: 'Sonnet 4.6',
-    description: '适合日常工作的均衡模型',
-    icon: '/logo.png',
-  },
-  { id: 'haiku-45', label: 'Haiku 4.5', description: '更快、更省资源' },
-]
-
-const chatModelIconLoadFailed = ref<Record<string, boolean>>({})
-
-function onChatModelIconError(id: string) {
-  chatModelIconLoadFailed.value = { ...chatModelIconLoadFailed.value, [id]: true }
-}
-
-function chatModelIconSrc(m: ChatModelOption): string | undefined {
-  const u = m.icon?.trim()
-  return u || undefined
-}
-
-function chatModelShowImage(m: ChatModelOption): boolean {
-  return Boolean(chatModelIconSrc(m)) && !chatModelIconLoadFailed.value[m.id]
-}
-
-const chatModelPopoverVisible = ref(false)
-const selectedChatModelId = ref(CHAT_MODEL_OPTIONS[0]!.id)
-
-const selectedChatModel = computed(
-  () => CHAT_MODEL_OPTIONS.find(m => m.id === selectedChatModelId.value) ?? CHAT_MODEL_OPTIONS[0]!
-)
-
-function selectChatModel(id: string) {
-  selectedChatModelId.value = id
-  chatModelPopoverVisible.value = false
-}
-
 /** 纵向最多展示约 10 行，再继续增高则出现纵向滚动条 */
 function getChatTextareaMaxHeightPx(el: HTMLTextAreaElement): number {
   const cs = window.getComputedStyle(el)
@@ -1390,8 +1287,8 @@ watch(composerFocusNonce, () => {
 function handleInputBoxMouseDown(event: MouseEvent) {
   const target = event.target as HTMLElement | null
   if (!target) return
-  // Don't steal focus from buttons / interactive elements.
-  if (target.closest('button')) return
+  // Don't steal focus from controls embedded in the composer.
+  if (target.closest('button, input, textarea, select, a, [role="button"], .el-select, .el-input')) return
   if (chatStore.isStreaming || isUploading.value) return
   activeChatInputEl()?.focus()
 }
@@ -2294,39 +2191,4 @@ void _formatTime
   z-index: 3100 !important;
 }
 
-.wk-chat-model-popper.el-popper {
-  padding: 0 !important;
-  border-radius: 14px !important;
-  overflow: hidden;
-  border: unset !important;
-  box-shadow: 0 0 #0000, 0 0 #0000, 0 0 #0000, 0 0 #0000, 0px 8px 12px 0px #00000014, 0px 0px 1px 0px #0000009e !important;
-  z-index: 3000 !important;
-}
-
-.wk-chat-model-popper .el-popper__arrow,
-.wk-chat-model-popper .el-popper__arrow::before {
-  display: none !important;
-}
-
-.wk-chat-model-menu {
-  padding: 6px;
-}
-
-.wk-chat-model-menu__item {
-  display: flex;
-  width: 100%;
-  align-items: flex-start;
-  gap: 10px;
-  border-radius: 20px;
-  border: none;
-  background: transparent;
-  padding: 10px 10px;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.12s ease;
-}
-
-.wk-chat-model-menu__item:hover {
-  background: #f5f5f5;
-}
 </style>
