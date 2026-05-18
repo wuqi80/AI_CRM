@@ -95,16 +95,17 @@
         </button>
       </div>
 
-      <!-- <div
+      <div
         v-if="primaryNavHasScrollbar"
-        class="mx-3 h-px bg-slate-100"
-        :class="primarySidebarCollapsed ? '!mx-2' : ''"
-      /> -->
+        class="ml-0 h-px w-full shrink-0 transition-colors duration-150 mr-2"
+        :class="primaryNavScrolling ? 'bg-slate-100' : 'bg-white'"
+      />
 
       <nav
         ref="primaryNavRef"
         class="wk-scrollbar-gutter-stable flex-1 overflow-y-auto px-3 pb-4"
         :class="primarySidebarCollapsed ? '!pl-2 !pr-[3px]' : ''"
+        @scroll.passive="onPrimaryNavScroll"
       >
         <div class="space-y-1">
 
@@ -908,6 +909,18 @@ function onCollapsedPrimarySidebarLeave() {
 
 const primaryNavRef = ref<HTMLElement | null>(null)
 const primaryNavHasScrollbar = ref(false)
+const primaryNavScrolling = ref(false)
+let primaryNavScrollEndTimer: ReturnType<typeof setTimeout> | null = null
+
+function onPrimaryNavScroll() {
+  if (!primaryNavHasScrollbar.value) return
+  primaryNavScrolling.value = true
+  if (primaryNavScrollEndTimer) clearTimeout(primaryNavScrollEndTimer)
+  primaryNavScrollEndTimer = setTimeout(() => {
+    primaryNavScrollEndTimer = null
+    primaryNavScrolling.value = false
+  }, 400)
+}
 /** PC 侧栏「最近」对话列表折叠 */
 const recentChatSessionsExpanded = ref(true)
 const showUserMenu = ref(false)
@@ -1167,10 +1180,13 @@ function updatePrimaryNavScrollbar() {
   const el = primaryNavRef.value
   if (!el) {
     primaryNavHasScrollbar.value = false
+    primaryNavScrolling.value = false
     return
   }
   // +1 to avoid off-by-one from subpixel layout
-  primaryNavHasScrollbar.value = el.scrollHeight > el.clientHeight + 1
+  const hasScrollbar = el.scrollHeight > el.clientHeight + 1
+  primaryNavHasScrollbar.value = hasScrollbar
+  if (!hasScrollbar) primaryNavScrolling.value = false
 }
 
 onMounted(() => {
@@ -1214,6 +1230,10 @@ onBeforeUnmount(() => {
   if (primaryNavResizeObserver) {
     primaryNavResizeObserver.disconnect()
     primaryNavResizeObserver = null
+  }
+  if (primaryNavScrollEndTimer) {
+    clearTimeout(primaryNavScrollEndTimer)
+    primaryNavScrollEndTimer = null
   }
   if (globalSearchTimer) {
     clearTimeout(globalSearchTimer)

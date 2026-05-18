@@ -241,15 +241,15 @@
                     <div class="relative text-[#0d0d0d] rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-left leading-relaxed text-[16px]">
                       <div
                         v-if="!message.isStreaming"
-                        class="absolute -bottom-7 left-0 z-10 size-10 flex items-center justify-center"
+                        class="absolute -bottom-7 left-0 ml-[5px] z-10 size-10 flex items-center justify-center"
                       >
                         <button
                           type="button"
-                          class="size-8 rounded-lg border-slate-200 bg-white text-slate-500 transition-colors hover:bg-[#E7E7E7] hover:text-slate-900 flex items-center justify-center"
+                          class="size-8 rounded-lg border-slate-200 bg-white text-slate-500 transition-colors hover:bg-[#E8E8E8] hover:text-slate-900 flex items-center justify-center"
                           aria-label="复制内容"
                           @click="copyMessageContent(message, 'assistant')"
                         >
-                          <WkIcon name="copy" :box-size="20" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
+                          <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
                         </button>
                       </div>
                       <div
@@ -312,17 +312,17 @@
                   </div>
                   <div class="space-y-3 min-w-0" :class="isMobile ? 'max-w-[85%]' : 'max-w-[70%]'">
                     <!-- <div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-lg shadow-primary/10 text-sm leading-relaxed"> -->
-                    <div class="group relative bg-[#e9e9e980] text-[#0d0d0d] rounded-[24px] px-4 py-[0.6rem] text-[16px] leading-relaxed">
+                    <div class="group relative bg-[#e9e9e980] text-[#0d0d0d] rounded-[22px] px-4 py-[0.6rem] text-[16px] leading-relaxed">
                       <div
                         class="absolute -bottom-10 right-0 z-10 size-10 flex items-center justify-center opacity-0 pointer-events-none transition-all group-hover:opacity-100 group-hover:pointer-events-auto"
                       >
                         <button
                           type="button"
-                          class="size-8 rounded-lg border-slate-200 bg-white text-slate-500 transition-colors flex items-center justify-center hover:bg-[#E7E7E7] hover:text-slate-900"
+                          class="size-8 rounded-lg border-slate-200 bg-white text-slate-500 transition-colors flex items-center justify-center hover:bg-[#E8E8E8] hover:text-slate-900"
                           aria-label="复制内容"
                           @click="copyMessageContent(message, 'user')"
                         >
-                        <WkIcon name="copy" :box-size="20" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
+                        <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
                         </button>
                       </div>
                       <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
@@ -461,7 +461,7 @@
                     <template v-for="item in composerAttachmentPreviewItems" :key="item.key">
                       <div
                         v-if="item.kind === 'knowledge'"
-                        class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] px-3"
+                        class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] pl-3"
                       >
                         <div
                           class="size-10 rounded-xl flex items-center justify-center shrink-0"
@@ -505,7 +505,7 @@
 
                       <div
                         v-else-if="item.kind === 'file'"
-                        class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] px-3"
+                        class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] pl-3 pr-[30px]"
                       >
                         <div
                           class="size-10 rounded-xl flex items-center justify-center shrink-0"
@@ -724,7 +724,7 @@
                         v-model:visible="chatModelPopoverVisible"
                         trigger="click"
                         placement="top-end"
-                        width="280"
+                        width="300"
                         :show-arrow="false"
                         :teleported="true"
                         :disabled="chatStore.isStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
@@ -739,7 +739,7 @@
                             :title="`当前模型：${chatComposerModelLabel}`"
                           >
                             <span
-                              class="relative size-7 shrink-0 overflow-hidden rounded-md bg-[#ececec]"
+                              class="relative w-[20px] h-[20px] shrink-0 overflow-hidden rounded-md bg-[#ececec]"
                               aria-hidden="true"
                             >
                               <template v-if="chatStore.selectedModel">
@@ -747,7 +747,7 @@
                                   v-if="chatModelShowImage(chatStore.selectedModel)"
                                   :src="chatModelIconSrc(chatStore.selectedModel)"
                                   alt=""
-                                  class="size-full object-cover"
+                                  class="size-full object-fill"
                                   @error="onChatModelImageError($event)"
                                 />
                                 <span
@@ -777,14 +777,14 @@
                             @click="selectChatModelFromPopover(chatStore.toModelKey(option))"
                           >
                             <span
-                              class="relative mt-0.5 size-8 shrink-0 overflow-hidden rounded-lg bg-[#ececec]"
+                              class="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg"
                               aria-hidden="true"
                             >
                               <img
                                 v-if="chatModelShowImage(option)"
                                 :src="chatModelIconSrc(option)"
                                 alt=""
-                                class="size-full object-cover"
+                                class="size-5 object-fill"
                                 @error="onChatModelImageError($event)"
                               />
                               <span
@@ -795,19 +795,20 @@
                               </span>
                             </span>
                             <div class="min-w-0 flex-1">
-                              <div class="flex items-start justify-between gap-2">
-                                <div class="min-w-0 flex-1 text-[14px] leading-tight text-[#0d0d0d]">
+                              <div class="flex items-center justify-start gap-2">
+                                <div class="min-w-0 text-[14px] leading-tight text-[#0d0d0d]">
                                   {{ modelOptionLabel(option) }}
                                 </div>
                                 <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
                               </div>
-                              <div class="mt-0.5 truncate text-[12px] leading-snug text-[#909090]">
+                              <!-- <div class="mt-0.5 truncate text-[12px] leading-snug text-[#909090]">
                                 {{ option.providerLabel || option.provider }}
-                              </div>
+                              </div> -->
                             </div>
                             <span
-                              v-if="chatStore.selectedModelKey === chatStore.toModelKey(option)"
-                              class="material-symbols-outlined mt-0.5 shrink-0 text-[20px] leading-none text-primary"
+                              class="material-symbols-outlined flex size-5 shrink-0 items-center justify-center text-[20px] leading-none"
+                              :class="chatStore.selectedModelKey === chatStore.toModelKey(option) ? 'text-primary' : 'invisible'"
+                              aria-hidden="true"
                             >
                               check
                             </span>
@@ -2407,13 +2408,13 @@ void _formatTime
   align-items: center;
   gap: 10px;
   padding: 10px 10px;
-  border-radius: 16px;
+  border-radius: 8px;
   color: #0d0d0d;
   transition: background-color 150ms ease, color 150ms ease;
 }
 
 .wk-chat-upload-menu__item:hover {
-  background: #f9f9f9;
+  background: #f6f6f6;
 }
 
 .wk-chat-upload-menu__item:disabled {
@@ -2458,7 +2459,7 @@ void _formatTime
 }
 
 .wk-chat-upload-submenu {
-  padding: 2px;
+  padding: 10px;
 }
 
 .wk-chat-upload-submenu__btn {
@@ -2529,12 +2530,12 @@ void _formatTime
 .wk-chat-model-menu__item {
   display: flex;
   width: 100%;
-  align-items: flex-start;
-  gap: 10px;
-  border-radius: 20px;
+  align-items: center;
+  gap: 5px;
+  border-radius: 8px;
   border: none;
   background: transparent;
-  padding: 10px 10px;
+  padding: 2px 10px;
   text-align: left;
   cursor: pointer;
   transition: background-color 0.12s ease;
