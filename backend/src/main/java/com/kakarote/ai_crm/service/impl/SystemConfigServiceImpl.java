@@ -12,10 +12,12 @@ import com.kakarote.ai_crm.ai.provider.AiProviderRegistry;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
+import com.kakarote.ai_crm.entity.BO.AiBillingConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.PO.CrmTenant;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
+import com.kakarote.ai_crm.entity.VO.AiBillingConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
@@ -82,6 +84,9 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Autowired
     private AiQuotaService aiQuotaService;
+
+    @Autowired
+    private AiBillingConfigService aiBillingConfigService;
 
     @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode}")
     private String defaultApiUrl;
@@ -311,6 +316,16 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         chatClientProvider.refreshChatClient();
         log.info("AI 模式已切换为自定义模型: tenantId={}, provider={}, model={}",
                 UserUtil.getTenantId(), targetConfig.providerCode(), targetConfig.model());
+    }
+
+    @Override
+    public AiBillingConfigVO getAiBillingConfig() {
+        return aiBillingConfigService.getConfig();
+    }
+
+    @Override
+    public void updateAiBillingConfig(AiBillingConfigUpdateBO updateBO) {
+        aiBillingConfigService.updateConfig(updateBO);
     }
 
     /**

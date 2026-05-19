@@ -3,10 +3,12 @@ package com.kakarote.ai_crm.controller;
 import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.config.OidcConfig;
+import com.kakarote.ai_crm.entity.BO.AiBillingConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.AiProviderActivateBO;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
+import com.kakarote.ai_crm.entity.VO.AiBillingConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
@@ -102,6 +104,21 @@ public class SystemConfigController {
     @RequirePermission("config:ai")
     public Result<String> useCustomAiConfig() {
         systemConfigService.useCustomAiConfig();
+        return Result.ok();
+    }
+
+    @GetMapping("/ai/billing")
+    @Operation(summary = "Get AI billing config")
+    @RequirePermission("config:ai")
+    public Result<AiBillingConfigVO> getAiBillingConfig() {
+        return Result.ok(systemConfigService.getAiBillingConfig());
+    }
+
+    @PostMapping("/ai/billing/update")
+    @Operation(summary = "Update AI billing config")
+    @RequirePermission("config:ai")
+    public Result<String> updateAiBillingConfig(@Valid @RequestBody AiBillingConfigUpdateBO updateBO) {
+        systemConfigService.updateAiBillingConfig(updateBO);
         return Result.ok();
     }
 

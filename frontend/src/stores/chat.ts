@@ -316,7 +316,8 @@ export const useChatStore = defineStore('chat', () => {
         selectedModel.value?.provider,
         selectedModel.value?.modelName,
         knowledgeIds,
-        abortController.signal
+        abortController.signal,
+        selectedModel.value?.modelSource
       )
     } catch (error) {
       console.error('sendMessage error:', error)
@@ -352,7 +353,8 @@ export const useChatStore = defineStore('chat', () => {
         effectiveAppCode,
         effectiveAppCode === KNOWLEDGE_APP_CODE,
         selectedModel.value?.provider,
-        selectedModel.value?.modelName
+        selectedModel.value?.modelName,
+        selectedModel.value?.modelSource
       )
 
       appendSessionMessage(sessionId, {
@@ -558,7 +560,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function toModelKey(option: ChatModelOption): string {
-    return `${option.provider}:${option.modelName}`
+    return `${option.modelSource || 'system'}:${option.provider}:${option.modelName}`
   }
 
   return {

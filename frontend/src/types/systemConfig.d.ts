@@ -82,6 +82,14 @@ export interface AiConfigUpdateBO {
   extraHeadersJson?: string
 }
 
+export interface AiBillingConfig {
+  tokensPerCredit: number
+}
+
+export interface AiBillingConfigUpdateBO {
+  tokensPerCredit: number
+}
+
 export interface AiProviderActivateBO {
   provider: AiProvider
 }
