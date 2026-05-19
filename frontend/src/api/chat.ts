@@ -57,6 +57,7 @@ export async function sendMessageStream(
   ragEnabled?: boolean,
   modelProvider?: string,
   modelName?: string,
+  modelSource?: string,
   knowledgeIds?: string[],
   signal?: AbortSignal
 ): Promise<void> {
@@ -92,6 +93,7 @@ export async function sendMessageStream(
         ragEnabled,
         modelProvider: modelProvider || undefined,
         modelName: modelName || undefined,
+        modelSource: modelSource || undefined,
         knowledgeIds:
           knowledgeIds?.length && knowledgeIds.length > 0
             ? knowledgeIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n))
@@ -189,6 +191,7 @@ export function sendMessageSync(
   ragEnabled?: boolean,
   modelProvider?: string,
   modelName?: string,
+  modelSource?: string,
   knowledgeIds?: string[]
 ): Promise<string> {
   return post('/chat/sendSync', {
@@ -199,6 +202,7 @@ export function sendMessageSync(
     ragEnabled,
     modelProvider: modelProvider || undefined,
     modelName: modelName || undefined,
+    modelSource: modelSource || undefined,
     knowledgeIds:
       knowledgeIds?.length && knowledgeIds.length > 0
         ? knowledgeIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n))

@@ -31,6 +31,9 @@ public class AiQuotaService {
     @Autowired
     private ICrmTenantService tenantService;
 
+    @Autowired
+    private AiBillingConfigService aiBillingConfigService;
+
     /**
      * 确保额度可用。
      */
@@ -239,9 +242,9 @@ public class AiQuotaService {
             return;
         }
         tenantService.consumeCredits(tenantId, creditsUsed);
-        log.info("AI积分扣减完成: tenantId={}, action={}, totalTokens={}, multiplier={}, creditsUsed={}",
+        log.info("AI积分扣减完成: tenantId={}, action={}, totalTokens={}, multiplier={}, tokensPerCredit={}, creditsUsed={}",
             tenantId, normalizeActionName(actionName), totalTokens,
-            normalizeCreditMultiplier(creditMultiplier), creditsUsed);
+            normalizeCreditMultiplier(creditMultiplier), aiBillingConfigService.getTokensPerCredit(), creditsUsed);
     }
 
     /**
@@ -252,8 +255,10 @@ public class AiQuotaService {
             return 0L;
         }
         BigDecimal multiplier = normalizeCreditMultiplier(creditMultiplier);
+        BigDecimal tokensPerCredit = BigDecimal.valueOf(aiBillingConfigService.getTokensPerCredit());
         return BigDecimal.valueOf(totalTokens.longValue())
             .multiply(multiplier)
+            .divide(tokensPerCredit, 0, RoundingMode.CEILING)
             .setScale(0, RoundingMode.CEILING)
             .max(BigDecimal.ONE)
             .longValue();

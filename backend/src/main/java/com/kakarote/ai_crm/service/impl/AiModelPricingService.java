@@ -2,6 +2,7 @@ package com.kakarote.ai_crm.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.ai.AiModelSource;
 import com.kakarote.ai_crm.ai.provider.AiProviderRegistry;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
@@ -12,9 +13,12 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -41,7 +45,44 @@ public class AiModelPricingService {
             .orderByAsc(AiModelPricing::getProvider)
             .orderByAsc(AiModelPricing::getModelName);
 
-        return mapper.selectList(wrapper).stream().map(this::toOptionVO).toList();
+        return mapper.selectList(wrapper).stream()
+            .map(pricing -> toOptionVO(pricing, AiModelSource.SYSTEM))
+            .toList();
+    }
+
+    public List<AiModelOptionVO> listConfiguredOptions(Collection<ModelOptionSeed> seeds) {
+        if (seeds == null || seeds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, ModelOptionSeed> deduplicatedSeeds = new LinkedHashMap<>();
+        for (ModelOptionSeed seed : seeds) {
+            if (seed == null || StrUtil.hasBlank(seed.provider(), seed.modelName(), seed.modelSource())) {
+                continue;
+            }
+            String provider = normalizeProvider(seed.provider());
+            String model = StrUtil.nullToEmpty(seed.modelName()).trim();
+            String source = AiModelSource.normalize(seed.modelSource());
+            if (StrUtil.hasBlank(provider, model, source)) {
+                continue;
+            }
+            deduplicatedSeeds.putIfAbsent(source + "|" + provider + "|" + model,
+                new ModelOptionSeed(provider, seed.providerLabel(), model, source));
+        }
+        if (deduplicatedSeeds.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> providers = new HashSet<>();
+        deduplicatedSeeds.values().forEach(seed -> providers.add(seed.provider()));
+        List<AiModelPricing> pricingRows = mapper.selectList(new LambdaQueryWrapper<AiModelPricing>()
+            .in(AiModelPricing::getProvider, providers));
+        Map<String, AiModelPricing> pricingByKey = new HashMap<>();
+        pricingRows.forEach(pricing -> pricingByKey.put(pricingKey(pricing.getProvider(), pricing.getModelName()), pricing));
+
+        return deduplicatedSeeds.values().stream()
+            .map(seed -> toConfiguredOption(seed, pricingByKey.get(pricingKey(seed.provider(), seed.modelName()))))
+            .toList();
     }
 
     public PricingSnapshot resolvePricing(String provider, String modelName, boolean requireEnabled) {
@@ -71,13 +112,30 @@ public class AiModelPricingService {
         return new PricingSnapshot(normalizedProvider, normalizedModel, multiplier);
     }
 
-    private AiModelOptionVO toOptionVO(AiModelPricing pricing) {
+    private AiModelOptionVO toOptionVO(AiModelPricing pricing, String modelSource) {
         AiModelOptionVO vo = new AiModelOptionVO();
         vo.setProvider(pricing.getProvider());
         vo.setProviderLabel(AiProviderRegistry.get(pricing.getProvider()).getDisplayName());
         vo.setModelName(pricing.getModelName());
         vo.setDisplayName(StrUtil.blankToDefault(pricing.getDisplayName(), pricing.getModelName()));
         vo.setCreditMultiplier(pricing.getCreditMultiplier() != null ? pricing.getCreditMultiplier() : DEFAULT_MULTIPLIER);
+        vo.setModelSource(modelSource);
+        return vo;
+    }
+
+    private AiModelOptionVO toConfiguredOption(ModelOptionSeed seed, AiModelPricing pricing) {
+        AiModelOptionVO vo = new AiModelOptionVO();
+        vo.setProvider(seed.provider());
+        vo.setProviderLabel(StrUtil.blankToDefault(seed.providerLabel(), AiProviderRegistry.get(seed.provider()).getDisplayName()));
+        vo.setModelName(seed.modelName());
+        vo.setModelSource(seed.modelSource());
+        if (pricing != null && Boolean.TRUE.equals(pricing.getEnabled())) {
+            vo.setDisplayName(StrUtil.blankToDefault(pricing.getDisplayName(), seed.modelName()));
+            vo.setCreditMultiplier(pricing.getCreditMultiplier() != null ? pricing.getCreditMultiplier() : DEFAULT_MULTIPLIER);
+        } else {
+            vo.setDisplayName(seed.modelName());
+            vo.setCreditMultiplier(DEFAULT_MULTIPLIER);
+        }
         return vo;
     }
 
@@ -99,6 +157,13 @@ public class AiModelPricingService {
         return StrUtil.nullToEmpty(provider).trim().toLowerCase(Locale.ROOT);
     }
 
+    private String pricingKey(String provider, String modelName) {
+        return normalizeProvider(provider) + "|" + StrUtil.nullToEmpty(modelName).trim();
+    }
+
     public record PricingSnapshot(String provider, String modelName, BigDecimal creditMultiplier) {
+    }
+
+    public record ModelOptionSeed(String provider, String providerLabel, String modelName, String modelSource) {
     }
 }

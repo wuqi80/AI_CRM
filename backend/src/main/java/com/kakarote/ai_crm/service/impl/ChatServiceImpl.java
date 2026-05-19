@@ -5,6 +5,8 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.ai.AiMode;
+import com.kakarote.ai_crm.ai.AiModelSource;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.ai.app.ChatApplicationCodes;
 import com.kakarote.ai_crm.ai.app.ChatApplicationDefinition;
@@ -96,6 +98,9 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private AiModelPricingService aiModelPricingService;
+
+    @Autowired
+    private ICrmTenantService tenantService;
 
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
 
@@ -356,7 +361,23 @@ public class ChatServiceImpl implements IChatService {
      */
     @Override
     public List<AiModelOptionVO> getModelOptions() {
-        return aiModelPricingService.listEnabledOptions(chatClientProvider.getAvailableProviderCodes());
+        if (chatClientProvider.getCurrentMode() != AiMode.CUSTOM) {
+            return aiModelPricingService.listEnabledOptions(chatClientProvider.getSystemProviderCodes());
+        }
+
+        List<AiModelPricingService.ModelOptionSeed> customSeeds = chatClientProvider.getSavedCustomModelOptions().stream()
+            .map(snapshot -> new AiModelPricingService.ModelOptionSeed(
+                snapshot.providerCode(),
+                snapshot.providerLabel(),
+                snapshot.model(),
+                AiModelSource.CUSTOM))
+            .toList();
+        List<AiModelOptionVO> options = new ArrayList<>(aiModelPricingService.listConfiguredOptions(customSeeds));
+        Long tenantId = UserUtil.getTenantId();
+        if (tenantId != null && tenantService.getTotalCreditRemaining(tenantId) > 0) {
+            options.addAll(aiModelPricingService.listEnabledOptions(chatClientProvider.getSystemProviderCodes()));
+        }
+        return options;
     }
 
     @Override
@@ -485,6 +506,7 @@ public class ChatServiceImpl implements IChatService {
         }
 
         ChatClient chatClient = chatClientProvider.getChatClient(
+            billingContext.modelSource(),
             billingContext.runtimeConfig().providerCode(),
             billingContext.runtimeConfig().model(),
             application.code()
@@ -676,6 +698,7 @@ public class ChatServiceImpl implements IChatService {
             }
 
             ChatClient chatClient = chatClientProvider.getChatClient(
+                billingContext.modelSource(),
                 billingContext.runtimeConfig().providerCode(),
                 billingContext.runtimeConfig().model(),
                 application.code()
@@ -1012,17 +1035,25 @@ public class ChatServiceImpl implements IChatService {
      * 解析本次聊天模型与计费倍率。
      */
     private ChatBillingContext resolveChatBillingContext(ChatSendBO sendBO) {
-        boolean explicitModelSelection = StrUtil.isNotBlank(sendBO.getModelProvider()) || StrUtil.isNotBlank(sendBO.getModelName());
+        String requestedSource = AiModelSource.normalize(sendBO.getModelSource());
+        boolean explicitModelSelection = StrUtil.isNotBlank(requestedSource)
+            || StrUtil.isNotBlank(sendBO.getModelProvider())
+            || StrUtil.isNotBlank(sendBO.getModelName());
         DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig = chatClientProvider.getRuntimeConfigSnapshot(
-            sendBO.getModelProvider(), sendBO.getModelName());
+            requestedSource, sendBO.getModelProvider(), sendBO.getModelName());
+        String resolvedSource = StrUtil.isNotBlank(requestedSource)
+            ? requestedSource
+            : (runtimeConfig.mode() == AiMode.CUSTOM ? AiModelSource.CUSTOM : AiModelSource.SYSTEM);
         AiModelPricingService.PricingSnapshot pricing = aiModelPricingService.resolvePricing(
-            runtimeConfig.providerCode(), runtimeConfig.model(), explicitModelSelection);
-        return new ChatBillingContext(runtimeConfig, pricing);
+            runtimeConfig.providerCode(), runtimeConfig.model(),
+            explicitModelSelection && !AiModelSource.isCustom(resolvedSource));
+        return new ChatBillingContext(runtimeConfig, pricing, resolvedSource);
     }
 
     private record ChatBillingContext(
         DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig,
-        AiModelPricingService.PricingSnapshot pricing
+        AiModelPricingService.PricingSnapshot pricing,
+        String modelSource
     ) {
     }
 

@@ -37,10 +37,12 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Comparator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -164,6 +166,14 @@ public class DynamicChatClientProvider {
         return selectedModelChatClients.computeIfAbsent(cacheKey, key -> createChatClient(runtimeConfig, appCode));
     }
 
+    public ChatClient getChatClient(String modelSource, String providerCode, String modelName, String appCode) {
+        AiRuntimeConfig runtimeConfig = StrUtil.isBlank(modelSource) && StrUtil.isBlank(providerCode) && StrUtil.isBlank(modelName)
+                ? resolveRuntimeConfig(loadAiConfigsFromDB())
+                : resolveRuntimeConfigForSelection(loadAiConfigsFromDB(), modelSource, providerCode, modelName);
+        String cacheKey = buildSelectedClientCacheKey(runtimeConfig, appCode);
+        return selectedModelChatClients.computeIfAbsent(cacheKey, key -> createChatClient(runtimeConfig, appCode));
+    }
+
     /**
      * 刷新聊天客户端。
      */
@@ -226,6 +236,13 @@ public class DynamicChatClientProvider {
         return toSnapshot(runtimeConfig);
     }
 
+    public AiRuntimeConfigSnapshot getRuntimeConfigSnapshot(String modelSource, String providerCode, String modelName) {
+        AiRuntimeConfig runtimeConfig = StrUtil.isBlank(modelSource) && StrUtil.isBlank(providerCode) && StrUtil.isBlank(modelName)
+                ? resolveRuntimeConfig(loadAiConfigsFromDB())
+                : resolveRuntimeConfigForSelection(loadAiConfigsFromDB(), modelSource, providerCode, modelName);
+        return toSnapshot(runtimeConfig);
+    }
+
     /**
      * 获取当前租户可调用的服务商编码。
      */
@@ -251,6 +268,37 @@ public class DynamicChatClientProvider {
         }
 
         return providers.stream().sorted().toList();
+    }
+
+    public List<String> getSystemProviderCodes() {
+        Set<String> providers = new LinkedHashSet<>();
+        AiRuntimeConfig giftRuntimeConfig = resolveGiftRuntimeConfig();
+        if (StrUtil.isNotBlank(giftRuntimeConfig.apiKey())) {
+            providers.add(giftRuntimeConfig.providerCode());
+        }
+
+        loadSystemProviderSnapshots().values().stream()
+                .filter(snapshot -> StrUtil.isNotBlank(snapshot.apiKey()))
+                .forEach(snapshot -> providers.add(snapshot.providerCode()));
+        return List.copyOf(providers);
+    }
+
+    public List<ConfiguredModelSnapshot> getSavedCustomModelOptions() {
+        Map<String, String> configs = loadAiConfigsFromDB();
+        Map<String, SavedProviderConfigSnapshot> savedConfigs = loadSavedProviderConfigs(configs);
+        String activeProviderCode = StrUtil.nullToEmpty(configs.get(AI_PROVIDER_KEY)).trim().toLowerCase();
+        return savedConfigs.values().stream()
+                .filter(snapshot -> StrUtil.isNotBlank(snapshot.apiKey()) && StrUtil.isNotBlank(snapshot.model()))
+                .sorted(Comparator
+                        .comparing((SavedProviderConfigSnapshot snapshot) ->
+                                !snapshot.providerCode().equalsIgnoreCase(activeProviderCode))
+                        .thenComparing(SavedProviderConfigSnapshot::providerCode)
+                        .thenComparing(SavedProviderConfigSnapshot::model))
+                .map(snapshot -> new ConfiguredModelSnapshot(
+                        snapshot.providerCode(),
+                        AiProviderRegistry.get(snapshot.providerCode()).getDisplayName(),
+                        snapshot.model()))
+                .toList();
     }
 
     private AiRuntimeConfigSnapshot toSnapshot(AiRuntimeConfig runtimeConfig) {
@@ -496,6 +544,28 @@ public class DynamicChatClientProvider {
     private AiRuntimeConfig resolveRuntimeConfigForSelection(Map<String, String> configs,
                                                              String providerCode,
                                                              String modelName) {
+        return resolveRuntimeConfigForSelection(configs, null, providerCode, modelName);
+    }
+
+    private AiRuntimeConfig resolveRuntimeConfigForSelection(Map<String, String> configs,
+                                                             String modelSource,
+                                                             String providerCode,
+                                                             String modelName) {
+        String normalizedSource = AiModelSource.normalize(modelSource);
+        if (!AiModelSource.isKnown(normalizedSource)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "未知的模型来源");
+        }
+        if (AiModelSource.isCustom(normalizedSource)) {
+            return resolveCustomRuntimeConfig(configs, providerCode, modelName);
+        }
+        if (AiModelSource.isSystem(normalizedSource)) {
+            AiRuntimeConfig runtimeConfig = resolveSystemOrGiftRuntimeConfig(providerCode, modelName);
+            if (runtimeConfig == null) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前系统模型服务商未配置，无法切换模型");
+            }
+            return runtimeConfig;
+        }
+
         String rawRequestedProvider = StrUtil.nullToEmpty(providerCode).trim();
         String requestedProvider = StrUtil.isBlank(rawRequestedProvider)
                 ? ""
@@ -563,6 +633,70 @@ public class DynamicChatClientProvider {
         }
 
         throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前模型服务商未配置，无法切换模型");
+    }
+
+    private AiRuntimeConfig resolveCustomRuntimeConfig(Map<String, String> configs, String providerCode, String modelName) {
+        String requestedProvider = StrUtil.isBlank(providerCode)
+                ? ""
+                : AiProviderRegistry.resolve(providerCode, null).getCode();
+        String requestedModel = StrUtil.nullToEmpty(modelName).trim();
+        if (StrUtil.hasBlank(requestedProvider, requestedModel)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请选择可用的自定义 AI 模型");
+        }
+
+        SavedProviderConfigSnapshot savedProvider = loadSavedProviderConfigs(configs).get(requestedProvider);
+        if (savedProvider == null || StrUtil.isBlank(savedProvider.apiKey())
+                || !requestedModel.equals(savedProvider.model())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前自定义模型未配置，无法切换模型");
+        }
+
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(savedProvider.providerCode(), savedProvider.apiUrl());
+        return new AiRuntimeConfig(
+                savedProvider.providerCode(),
+                savedProvider.apiUrl(),
+                savedProvider.apiKey(),
+                savedProvider.model(),
+                savedProvider.temperature(),
+                savedProvider.maxTokens(),
+                savedProvider.extraHeadersJson(),
+                descriptor.resolveCapabilities(savedProvider.model()),
+                AiMode.CUSTOM
+        );
+    }
+
+    private AiRuntimeConfig resolveSystemOrGiftRuntimeConfig(String providerCode, String modelName) {
+        String requestedProvider = StrUtil.isBlank(providerCode)
+                ? ""
+                : AiProviderRegistry.resolve(providerCode, null).getCode();
+        String requestedModel = StrUtil.nullToEmpty(modelName).trim();
+        if (StrUtil.isBlank(requestedProvider)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请选择可用的系统 AI 模型");
+        }
+
+        AiRuntimeConfig systemRuntimeConfig = resolveSystemRuntimeConfig(requestedProvider, requestedModel);
+        if (systemRuntimeConfig != null) {
+            return systemRuntimeConfig;
+        }
+
+        AiRuntimeConfig giftRuntimeConfig = resolveGiftRuntimeConfig();
+        if (!Objects.equals(giftRuntimeConfig.providerCode(), requestedProvider)
+                || StrUtil.isBlank(giftRuntimeConfig.apiKey())) {
+            return null;
+        }
+
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(giftRuntimeConfig.providerCode(), giftRuntimeConfig.apiUrl());
+        String model = StrUtil.blankToDefault(requestedModel, giftRuntimeConfig.model());
+        return new AiRuntimeConfig(
+                giftRuntimeConfig.providerCode(),
+                giftRuntimeConfig.apiUrl(),
+                giftRuntimeConfig.apiKey(),
+                model,
+                giftRuntimeConfig.temperature(),
+                giftRuntimeConfig.maxTokens(),
+                giftRuntimeConfig.extraHeadersJson(),
+                descriptor.resolveCapabilities(model),
+                giftRuntimeConfig.mode()
+        );
     }
 
     private AiRuntimeConfig resolveSystemRuntimeConfig(String providerCode, String requestedModel) {
@@ -909,6 +1043,13 @@ public class DynamicChatClientProvider {
             String extraHeadersJson,
             AiModelCapabilities capabilities,
             AiMode mode
+    ) {
+    }
+
+    public record ConfiguredModelSnapshot(
+            String providerCode,
+            String providerLabel,
+            String model
     ) {
     }
 

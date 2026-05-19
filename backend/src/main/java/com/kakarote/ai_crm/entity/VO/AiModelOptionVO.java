@@ -17,4 +17,6 @@ public class AiModelOptionVO implements Serializable {
     private String displayName;
 
     private BigDecimal creditMultiplier;
+
+    private String modelSource;
 }

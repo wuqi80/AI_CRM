@@ -42,11 +42,11 @@ public class TokenPurchaseProperties {
 
         if (resolved.isEmpty()) {
             Plan defaultPlan = new Plan();
-            defaultPlan.setId("starter-100w");
-            defaultPlan.setName("快速选购方案");
-            defaultPlan.setDescription("1,000,000 积分");
-            defaultPlan.setCreditAmount(1_000_000L);
-            defaultPlan.setPriceFen(6000);
+            defaultPlan.setId("starter-5000");
+            defaultPlan.setName("5,000 积分加油包");
+            defaultPlan.setDescription("5,000 积分");
+            defaultPlan.setCreditAmount(5_000L);
+            defaultPlan.setPriceFen(9900);
             defaultPlan.setSort(1);
             resolved.add(defaultPlan);
         }
