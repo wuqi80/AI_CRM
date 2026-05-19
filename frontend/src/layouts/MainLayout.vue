@@ -840,6 +840,7 @@ import { useResponsive } from '@/composables/useResponsive'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import type { ChatSession } from '@/types/common'
 
 const route = useRoute()
@@ -987,7 +988,7 @@ const allMainNavItems: MainNavItem[] = [
 
 const allConfigNavItems: ConfigNavItem[] = [
   { icon: 'import', label: '数据同步', route: '/sync', permission: ['config'] },
-  { icon: 'set', label: '系统设置', route: '/settings', permission: ['user', 'role', 'config', 'dept', 'customField'] },
+  // { icon: 'set', label: '系统设置', route: '/settings', permission: ['user', 'role', 'config', 'dept', 'customField'] },
   { icon: 'set', label: '系统设置', route: '/settings/team', permission: ['user', 'role', 'config', 'dept', 'customField'], query: { scope: 'profile' } },
 ]
 
@@ -1349,12 +1350,7 @@ function isSessionActive(sessionId: string): boolean {
 
 async function handleDeleteSession(sessionId: string) {
   try {
-    await ElMessageBox.confirm('确定要删除这个对话吗？删除后无法恢复。', '删除对话', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-      confirmButtonClass: 'el-button--danger',
-    })
+    await confirmDeleteChatSession()
     await chatStore.removeSession(sessionId)
     ElMessage.success('对话已删除')
   } catch {

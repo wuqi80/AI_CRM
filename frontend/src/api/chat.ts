@@ -57,7 +57,8 @@ export async function sendMessageStream(
   ragEnabled?: boolean,
   modelProvider?: string,
   modelName?: string,
-  knowledgeIds?: string[]
+  knowledgeIds?: string[],
+  signal?: AbortSignal
 ): Promise<void> {
   const token = getToken()
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
@@ -82,6 +83,7 @@ export async function sendMessageStream(
         'Accept': 'text/event-stream',
         ...(token ? { 'Manager-Token': token } : {})
       },
+      signal,
       body: JSON.stringify({
         sessionId,
         content,
@@ -143,8 +145,12 @@ export async function sendMessageStream(
     // Stream completed successfully
     onComplete?.()
   } catch (error) {
-    onError?.(error as Error)
-    throw error
+    const err = error instanceof Error ? error : new Error(String(error))
+    if (err.name === 'AbortError') {
+      return
+    }
+    onError?.(err)
+    throw err
   } finally {
     cleanup()
   }

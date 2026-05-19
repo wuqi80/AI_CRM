@@ -15,6 +15,26 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.wk-icon-OpenAi:before {
+  content: "\e688";
+}
+
+.wk-icon-moonshot:before {
+  content: "\e605";
+}
+
+.wk-icon-dashscope:before {
+  content: "\e694";
+}
+
+.wk-icon-deepseek:before {
+  content: "\e603";
+}
+
+.wk-icon-file:before {
+  content: "\e6bd";
+}
+
 .wk-icon-event:before {
   content: "\e6bc";
 }

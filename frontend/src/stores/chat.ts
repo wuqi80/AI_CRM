@@ -26,6 +26,7 @@ interface StreamingTask {
   userMessageId: string
   assistantMessageId: string
   startedAt: number
+  abortController: AbortController
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -279,11 +280,13 @@ export const useChatStore = defineStore('chat', () => {
       isStreaming: true
     })
 
+    const abortController = new AbortController()
     streamingTasks.value[sessionId] = {
       sessionId,
       userMessageId,
       assistantMessageId,
-      startedAt: Date.now()
+      startedAt: Date.now(),
+      abortController
     }
 
     try {
@@ -312,7 +315,8 @@ export const useChatStore = defineStore('chat', () => {
         effectiveAppCode === KNOWLEDGE_APP_CODE,
         selectedModel.value?.provider,
         selectedModel.value?.modelName,
-        knowledgeIds
+        knowledgeIds,
+        abortController.signal
       )
     } catch (error) {
       console.error('sendMessage error:', error)
@@ -403,6 +407,14 @@ export const useChatStore = defineStore('chat', () => {
 
   function isSessionStreaming(sessionId: string): boolean {
     return Boolean(streamingTasks.value[sessionId])
+  }
+
+  function stopStreaming(sessionId?: string) {
+    const targetSessionId = sessionId ?? currentSessionId.value
+    if (!targetSessionId) return
+    const task = streamingTasks.value[targetSessionId]
+    if (!task) return
+    task.abortController.abort()
   }
 
   function getSessionMessages(sessionId: string): LocalMessage[] {
@@ -588,6 +600,7 @@ export const useChatStore = defineStore('chat', () => {
     setSelectedAppCode,
     toModelKey,
     setCrmContextEnabled,
-    isSessionStreaming
+    isSessionStreaming,
+    stopStreaming
   }
 })

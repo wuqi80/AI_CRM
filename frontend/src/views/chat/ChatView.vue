@@ -185,14 +185,24 @@
           >
             <!-- Welcome Section (no messages) -->
             <template v-if="chatStore.messages.length === 0">
-              <div class="max-w-3xl mx-auto flex flex-col items-center text-center space-y-4 py-6">
+              <div class="max-w-3xl mx-auto flex flex-col items-center space-y-4 py-6">
                 <!-- <div class="size-16 bg-primary/5 rounded-2xl flex items-center justify-center text-primary mb-2 border border-primary/10">
                   <WkIcon name="ai" class="text-4xl" />
                 </div> -->
-                <h1 class="text-2xl font-bold tracking-tight text-slate-900">
-                  <!-- 您好，{{ userStore.realname || '用户' }} -->
-                   今天有什么可以帮您的？
-                </h1>
+                <div class="flex items-center gap-3">
+                  <div
+                    v-if="enterpriseStore.hasLogo"
+                    class="size-8 shrink-0 overflow-hidden rounded-lg bg-transparent"
+                  >
+                    <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
+                  </div>
+                  <div v-else class="size-8 shrink-0 overflow-hidden rounded-lg bg-transparent">
+                    <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
+                  </div>
+                  <h1 class="text-2xl font-bold tracking-tight text-slate-900">
+                    今天有什么可以帮您的？
+                  </h1>
+                </div>
                 <!-- <p class="text-slate-400 text-base max-w-md">
                   我是您的智能销售助手。今天想处理哪些客户或商机？
                 </p> -->
@@ -245,7 +255,7 @@
                       >
                         <button
                           type="button"
-                          class="size-8 rounded-lg border-slate-200 bg-white text-slate-500 transition-colors hover:bg-[#E8E8E8] hover:text-slate-900 flex items-center justify-center"
+                          class="size-8 rounded-lg border-slate-200 bg-white text-[#8f8f8f] transition-colors hover:bg-[#E8E8E8] hover:text-slate-900 flex items-center justify-center"
                           aria-label="复制内容"
                           @click="copyMessageContent(message, 'assistant')"
                         >
@@ -318,7 +328,7 @@
                       >
                         <button
                           type="button"
-                          class="size-8 rounded-lg border-slate-200 bg-white text-slate-500 transition-colors flex items-center justify-center hover:bg-[#E8E8E8] hover:text-slate-900"
+                          class="size-8 rounded-lg border-slate-200 bg-white text-[#8f8f8f] transition-colors flex items-center justify-center hover:bg-[#E8E8E8] hover:text-slate-900"
                           aria-label="复制内容"
                           @click="copyMessageContent(message, 'user')"
                         >
@@ -461,7 +471,7 @@
                     <template v-for="item in composerAttachmentPreviewItems" :key="item.key">
                       <div
                         v-if="item.kind === 'knowledge'"
-                        class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] pl-3"
+                        class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] pl-3 pr-[30px]"
                       >
                         <div
                           class="size-10 rounded-xl flex items-center justify-center shrink-0"
@@ -554,7 +564,7 @@
                       ref="pcChatInputRef"
                       v-model="inputText"
                       rows="1"
-                      class="w-full bg-transparent border-none focus:ring-0 focus:outline-none px-3 pt-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#909090] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
+                      class="w-full bg-transparent border-none focus:ring-0 focus:outline-none px-3 pt-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#909090] placeholder:text-[16px] resize-none font-weight: overflow-x-hidden overflow-y-auto min-h-[50px]"
                       :placeholder="chatInputPlaceholder"
                       :disabled="chatStore.isStreaming || isUploading"
                       style="min-height: 90px;"
@@ -601,7 +611,8 @@
                             :disabled="isUploading"
                             @click="handleChatUploadMenuAddFile"
                           >
-                            <span class="wk-chat-upload-menu__icon material-symbols-outlined">attach_file</span>
+                            <WkIcon name="file" :box-size="18" class="shrink-0" />
+                            <!-- <span class="wk-chat-upload-menu__icon material-symbols-outlined">attach_file</span> -->
                             <span class="wk-chat-upload-menu__label">上传照片和文件</span>
                           </button>
                           <button
@@ -614,13 +625,14 @@
                             <span class="wk-chat-upload-menu__label">选择知识库文件</span>
                           </button>
                           <el-popover
-                            :trigger="isMobile ? 'click' : 'hover'"
+                            v-model:visible="chatUploadSubmenuVisible"
+                            trigger="hover"
                             placement="right-end"
                             :show-arrow="false"
                             :disabled="isUploading"
-                            :teleported="true"
+                            :teleported="false"
                             :offset="8"
-                            :hide-after="isMobile ? 0 : 220"
+                            :hide-after="220"
                             width="200"
                             popper-class="wk-chat-upload-menu-popper wk-chat-upload-submenu-popper"
                           >
@@ -632,7 +644,7 @@
                               >
                                 <WkIcon name="application" :size="18" class="shrink-0" />
                                 <!-- <span class="wk-chat-upload-menu__icon material-symbols-outlined">apps</span> -->
-                                <span class="wk-chat-upload-menu__label">应用</span>
+                                <span class="wk-chat-upload-menu__label">悟空技能</span>
                                 <span class="wk-chat-upload-menu__chevron material-symbols-outlined">chevron_right</span>
                               </div>
                             </template>
@@ -665,7 +677,7 @@
                                   class="shrink-0"
                                   :class="chatStore.selectedAppCode === 'knowledge' ? '!text-[#0169cc]' : ''"
                                 />
-                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'knowledge' ? 'text-[#0169cc]' : 'text-[#0d0d0d]'">知识库</span>
+                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'knowledge' ? 'text-[#0169cc]' : 'text-[#0d0d0d]'">知识库检索</span>
                                 <span
                                   v-if="chatStore.selectedAppCode === 'knowledge'"
                                   class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
@@ -825,7 +837,11 @@
                         :aria-label="sendBarActionTitle"
                         @click="handleSendBarClick"
                       >
-                        <span v-if="chatStore.isStreaming" class="material-symbols-outlined text-[20px] leading-none">stop</span>
+                        <span
+                          v-if="chatStore.currentSessionIsStreaming"
+                          class="inline-block size-[10px] rounded-[2px] shrink-0 bg-[#000]"
+                          aria-hidden="true"
+                        />
                         <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                         <span v-else-if="isTranscribing" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                         <span v-else-if="isRecording" class="material-symbols-outlined text-[20px] leading-none">stop</span>
@@ -904,7 +920,7 @@
                               tabindex="0"
                             >
                               <span class="wk-chat-upload-menu__icon material-symbols-outlined">apps</span>
-                              <span class="wk-chat-upload-menu__label">应用</span>
+                              <span class="wk-chat-upload-menu__label">悟空技能</span>
                               <span class="wk-chat-upload-menu__chevron material-symbols-outlined">chevron_right</span>
                             </div>
                           </template>
@@ -937,7 +953,7 @@
                                 class="shrink-0"
                                 :class="chatStore.selectedAppCode === 'knowledge' ? 'text-primary' : ''"
                               />
-                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">知识库</span>
+                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">知识库检索</span>
                               <span
                                 v-if="chatStore.selectedAppCode === 'knowledge'"
                                 class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
@@ -1036,7 +1052,11 @@
                       :aria-label="sendBarActionTitle"
                       @click="handleSendBarClick"
                     >
-                      <span v-if="chatStore.isStreaming" class="material-symbols-outlined text-[20px] leading-none">stop</span>
+                      <span
+                        v-if="chatStore.currentSessionIsStreaming"
+                        class="inline-block size-[10px] rounded-[2px] shrink-0 bg-[#000]"
+                        aria-hidden="true"
+                      />
                       <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                       <span v-else-if="isTranscribing" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                       <span v-else-if="isRecording" class="material-symbols-outlined text-[20px] leading-none">stop</span>
@@ -1059,7 +1079,7 @@
               </div>
 
               <!-- Quick Action Chips -->
-              <div v-if="chatStore.messages.length === 0" class="flex flex-wrap gap-2 justify-center mt-6">
+              <div v-if="chatStore.messages.length === 0 && selectedChatAppLabel === 'CRM管理'" class="flex flex-wrap gap-2 justify-center mt-6">
                 <button
                   v-for="action in quickActions"
                   :key="action.label"
@@ -1187,8 +1207,9 @@ import { storeToRefs } from 'pinia'
 import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
+import { useEnterpriseStore } from '@/stores/enterprise'
 import { useResponsive } from '@/composables/useResponsive'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig } from '@/api/systemConfig'
@@ -1211,6 +1232,7 @@ import {
 } from '@/utils/chatMessage'
 import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
+import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
 import { wkIconNames } from '@/components/common/wkIcon'
@@ -1220,6 +1242,7 @@ import dashscopeBrandUrl from '@/assets/model-provider-brands/dashscope.svg?url'
 import openaiBrandUrl from '@/assets/model-provider-brands/openai.svg?url'
 import deepseekBrandUrl from '@/assets/model-provider-brands/deepseek.svg?url'
 import moonshotBrandUrl from '@/assets/model-provider-brands/moonshot.svg?url'
+import defaultLogoImg from '@/assets/images/logo.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -1227,6 +1250,7 @@ const chatStore = useChatStore()
 const { composerFocusNonce } = storeToRefs(chatStore)
 const agentStore = useAgentStore()
 const userStore = useUserStore()
+const enterpriseStore = useEnterpriseStore()
 const { isMobile } = useResponsive()
 const { loadAiConfig, ensureAiAvailableForSend } = useAiQuota()
 
@@ -1245,6 +1269,12 @@ function activeChatInputEl(): HTMLTextAreaElement | null {
 }
 
 const chatUploadMenuVisible = ref(false)
+const chatUploadSubmenuVisible = ref(false)
+watch(chatUploadMenuVisible, (visible) => {
+  if (!visible) {
+    chatUploadSubmenuVisible.value = false
+  }
+})
 const chatKnowledgePickerVisible = ref(false)
 const showKnowledgeFollowUpChips = ref(false)
 const chatModelPopoverVisible = ref(false)
@@ -1263,9 +1293,11 @@ function modelOptionLabel(option: ChatModelOption): string {
 }
 
 const selectedChatAppLabel = computed(() => {
-  if (chatStore.selectedApp?.label) return chatStore.selectedApp.label
+  if (chatStore.selectedApp?.label) {
+    return chatStore.selectedApp.label == '知识库' ? '知识库检索' : chatStore.selectedApp.label
+  }
   if (chatStore.selectedAppCode === 'crm') return 'CRM管理'
-  if (chatStore.selectedAppCode === 'knowledge') return '知识库'
+  if (chatStore.selectedAppCode === 'knowledge') return '知识库检索'
   return ''
 })
 
@@ -1471,7 +1503,7 @@ watch(
 )
 
 const sendBarActionButtonClass = computed(() => {
-  if (chatStore.isStreaming) return 'bg-[#e5e5e5] text-[#0d0d0d]'
+  if (chatStore.currentSessionIsStreaming) return 'bg-[#e5e5e5] text-[#0d0d0d] hover:bg-[#d4d4d4]'
   if (isRecording.value) return 'bg-red-500 text-white hover:bg-red-600'
   if (isTranscribing.value || isUploading.value) return 'bg-[#e5e5e5] text-[#909090]'
   if (isChatInputEmpty.value) return 'bg-[#000] text-white hover:bg-[#575757]'
@@ -1479,11 +1511,11 @@ const sendBarActionButtonClass = computed(() => {
 })
 
 const sendBarActionDisabled = computed(
-  () => isUploading.value || isTranscribing.value || chatStore.isStreaming
+  () => isUploading.value || isTranscribing.value
 )
 
 const sendBarActionTitle = computed(() => {
-  if (chatStore.isStreaming) return '回复生成中'
+  if (chatStore.currentSessionIsStreaming) return '停止生成'
   if (isUploading.value) return '上传中'
   if (isTranscribing.value) return '语音识别中…'
   if (isRecording.value) return '点击结束录音'
@@ -1820,7 +1852,11 @@ async function handleSend() {
 }
 
 function handleSendBarClick() {
-  if (isUploading.value || isTranscribing.value || chatStore.isStreaming) return
+  if (isUploading.value || isTranscribing.value) return
+  if (chatStore.currentSessionIsStreaming) {
+    chatStore.stopStreaming()
+    return
+  }
   if (isRecording.value) {
     handleStopChatAudioRecording()
     return
@@ -2055,7 +2091,9 @@ async function handleChatUploadMenuChooseKnowledge() {
 }
 
 function handleChatUploadMenuSelectApp(appCode: string) {
-  chatUploadMenuVisible.value = false
+  if (isMobile.value) {
+    chatUploadMenuVisible.value = false
+  }
   chatStore.setSelectedAppCode(chatStore.selectedAppCode === appCode ? 'general' : appCode)
 }
 
@@ -2280,12 +2318,7 @@ function isSessionActive(sessionId: string): boolean {
 
 async function handleDeleteSession(sessionId: string) {
   try {
-    await ElMessageBox.confirm('确定要删除这个对话吗？删除后无法恢复。', '删除对话', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-      confirmButtonClass: 'el-button--danger'
-    })
+    await confirmDeleteChatSession()
     await chatStore.removeSession(sessionId)
     ElMessage.success('对话已删除')
   } catch {
@@ -2441,7 +2474,7 @@ void _formatTime
   align-items: center;
   gap: 10px;
   padding: 10px 10px;
-  border-radius: 16px;
+  border-radius: 8px;
   color: #0d0d0d;
   cursor: default;
   outline: none;
@@ -2449,7 +2482,7 @@ void _formatTime
 }
 
 .wk-chat-upload-menu__apps-ref:hover {
-  background: #f9f9f9;
+  background: #f6f6f6;
 }
 
 .wk-chat-upload-menu__chevron {
@@ -2491,9 +2524,10 @@ void _formatTime
   /* box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14); */
 }
 
-/* 主菜单（不含子菜单类名）在更底层，子菜单气泡叠在上面 */
+/* 主菜单（不含子菜单类名）在更底层，子菜单气泡叠在上面；overflow: visible 避免非 teleport 子菜单被裁切 */
 .wk-chat-upload-menu-popper.el-popper:not(.wk-chat-upload-submenu-popper) {
   z-index: 3000 !important;
+  overflow: visible !important;
 }
 
 .wk-chat-upload-menu-popper .el-popper__arrow,
