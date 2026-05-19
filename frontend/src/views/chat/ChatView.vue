@@ -1538,24 +1538,35 @@ const userAvatarLoadFailed = ref(false)
 
 const isChatEmpty = computed(() => chatStore.messages.length === 0)
 
-const SCROLL_TO_BOTTOM_THRESHOLD_PX = 200
+const SCROLL_TO_BOTTOM_THRESHOLD_PX = 100
+/** When true, new content / streaming keeps the viewport pinned to the bottom. */
+const isPinnedToBottom = ref(true)
+
+function getMessagesDistanceToBottom(el: HTMLElement) {
+  return el.scrollHeight - (el.scrollTop + el.clientHeight)
+}
+
 function updateScrollToBottomVisibility() {
   const el = messagesContainer.value
   if (!el || chatStore.messages.length === 0) {
     showScrollToBottomButton.value = false
     return
   }
-  const distanceToBottom = el.scrollHeight - (el.scrollTop + el.clientHeight)
-  showScrollToBottomButton.value = distanceToBottom > SCROLL_TO_BOTTOM_THRESHOLD_PX
+  showScrollToBottomButton.value = getMessagesDistanceToBottom(el) > SCROLL_TO_BOTTOM_THRESHOLD_PX
 }
 
 function handleMessagesScroll() {
+  const el = messagesContainer.value
+  if (el) {
+    isPinnedToBottom.value = getMessagesDistanceToBottom(el) <= SCROLL_TO_BOTTOM_THRESHOLD_PX
+  }
   updateScrollToBottomVisibility()
 }
 
 function scrollToBottomSmooth() {
   const el = messagesContainer.value
   if (!el) return
+  isPinnedToBottom.value = true
   el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   showScrollToBottomButton.value = false
 }
@@ -1733,12 +1744,14 @@ onBeforeUnmount(() => {
   disconnectComposerAttachmentScrollResizeObserver()
 })
 
-// Auto scroll to bottom when new messages arrive or during streaming
+// Auto scroll to bottom when new messages arrive or during streaming (only while pinned)
 let scrollTimer: ReturnType<typeof setTimeout> | null = null
 function scrollToBottom() {
+  if (!isPinnedToBottom.value) return
   if (scrollTimer) return
   scrollTimer = setTimeout(() => {
     scrollTimer = null
+    if (!isPinnedToBottom.value) return
     if (messagesContainer.value) {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
       updateScrollToBottomVisibility()
@@ -1777,6 +1790,8 @@ async function handleSend() {
   const hasKnowledge = selectedKnowledgeItems.value.length > 0
   if ((!text && !hasFiles && !hasKnowledge) || chatStore.isStreaming || isUploading.value) return
   if (!(await ensureAiAvailableForSend())) return
+
+  isPinnedToBottom.value = true
 
   const content =
     text ||
@@ -2273,6 +2288,7 @@ function applyKnowledgeDocPrompt(text: string) {
 }
 
 async function handleNewSession() {
+  isPinnedToBottom.value = true
   await chatStore.startNewSessionIfNeeded('新对话')
   currentView.value = 'chat'
   if (isMobile.value) {
@@ -2283,6 +2299,7 @@ async function handleNewSession() {
 
 async function handleSelectSession(sessionId: string) {
   // if (chatStore.currentSessionId === sessionId && currentView.value === 'chat') return
+  isPinnedToBottom.value = true
   currentView.value = 'chat'
   await chatStore.selectSession(sessionId)
   if (isMobile.value) {

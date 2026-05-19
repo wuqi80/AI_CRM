@@ -48,7 +48,7 @@
           </button>
         </div>
       </div>
-      <div v-else class="relative z-30 flex justify-center overflow-visible py-2 px-0 pl-[5px]">
+      <div v-else class="relative z-30 flex justify-center overflow-visible py-2 px-0 pl-[0px]">
         <button
           type="button"
           class="relative flex size-8 items-center justify-center overflow-hidden rounded-lg bg-[#f5f5f5] text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
@@ -84,8 +84,10 @@
       <!-- Chat: New session (fixed, not scroll with nav) -->
       <div class="px-3 pt-1 mb-[4px]" :class="primarySidebarCollapsed ? '!px-2' : ''">
         <button
-          class="flex w-full items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors hover:bg-[#f9f9f9] pl-[10px] pr-[10px] ml-[2px] mr-[6px] "
-          :class="primarySidebarCollapsed ? 'justify-center' : 'gap-2'"
+          class="flex items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors hover:bg-[#f9f9f9]"
+          :class="primarySidebarCollapsed
+            ? 'mx-auto w-[35px] shrink-0 justify-center px-0'
+            : 'ml-[2px] mr-[6px] w-full gap-2 pl-[10px] pr-[10px]'"
           :title="primarySidebarCollapsed ? '新对话' : undefined"
           @click="handleNewSession"
         >
@@ -105,11 +107,14 @@
 
       <nav
         ref="primaryNavRef"
-        class="wk-primary-nav-scroll wk-scrollbar-gutter-stable flex-1 overflow-y-auto px-3 pb-4"
-        :class="primarySidebarCollapsed ? '!pl-2 !pr-[3px]' : ''"
+        class="wk-primary-nav-scroll wk-scrollbar-gutter-stable flex-1 flex w-full overflow-y-auto pb-4"
+        :class="primarySidebarCollapsed ? '!px-2' : 'px-3'"
         @scroll.passive="onPrimaryNavScroll"
       >
-        <div class="space-y-1">
+        <div
+          class="space-y-1 w-full"
+          :class="primarySidebarCollapsed ? 'flex flex-col items-center' : ''"
+        >
 
           <template v-for="group in pcMainNavGroups" :key="group.title || 'default'">
             <div v-if="group.title && !primarySidebarCollapsed" class="pt-[8px] pb-[3px]" style="margin-top: 8px; margin-bottom: 0px;">
@@ -120,10 +125,12 @@
               :key="item.key"
               :title="primarySidebarCollapsed ? item.label : undefined"
               @click="handlePrimaryNavClick(item)"
-              class="flex w-full items-center rounded-lg pt-[8px] pb-[8px] transition-colors pl-[10px] pr-[10px] ml-[2px] mr-[6px]"
+              class="flex items-center rounded-lg pt-[8px] pb-[8px] transition-colors"
               :class="[
                 isPrimaryActive(item) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] hover:bg-[#f9f9f9]',
-                primarySidebarCollapsed ? 'justify-center' : 'gap-2',
+                primarySidebarCollapsed
+                  ? 'mx-auto w-[35px] shrink-0 justify-center px-0'
+                  : 'ml-[2px] mr-[2px] w-full gap-2 pl-[10px] pr-[8px]',
               ]"
             >
               <WkIcon :name="item.icon" :box-size="20" class="shrink-0" />

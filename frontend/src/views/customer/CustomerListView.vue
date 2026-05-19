@@ -992,7 +992,7 @@ async function handleRemoveAiChip(key: string) {
 }
 
 function handleUpsertSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
-  customerStore.fetchCustomerList(false)
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
   if (payload.mode === 'create' && payload.customerId) {
     router.push(buildCustomerDetailRoute(payload.customerId))
     return
@@ -1434,7 +1434,7 @@ watch(
 )
 
 const offCustomerListRefresh = appEvents.on(APP_EVENT.CUSTOMER_LIST_REFRESH, () => {
-  customerStore.fetchCustomerList(false)
+  void customerStore.fetchCustomerList(false, false, { silent: true })
 })
 
 onBeforeUnmount(() => {

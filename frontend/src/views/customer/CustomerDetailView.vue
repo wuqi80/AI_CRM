@@ -1810,6 +1810,7 @@ async function handleTransferOwner(user: TransferUserOption) {
 
 async function handleEditSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
   if (payload.mode !== 'edit') return
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
   if (customer.value?.customerId) {
     await customerStore.fetchCustomerDetail(customer.value.customerId)
   }

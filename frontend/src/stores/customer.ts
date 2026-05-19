@@ -68,13 +68,19 @@ export const useCustomerStore = defineStore('customer', () => {
   })
 
   // Actions
-  async function fetchCustomerList(reset = false, append = false) {
+  async function fetchCustomerList(
+    reset = false,
+    append = false,
+    options: { silent?: boolean } = {}
+  ) {
     if (reset) {
       queryParams.value.page = 1
       customerList.value = []
     }
 
-    loading.value = true
+    if (!options.silent) {
+      loading.value = true
+    }
     try {
       const result = await queryCustomerList(queryParams.value)
       if (append) {
@@ -86,7 +92,9 @@ export const useCustomerStore = defineStore('customer', () => {
       }
       totalCount.value = result.totalRow
     } finally {
-      loading.value = false
+      if (!options.silent) {
+        loading.value = false
+      }
     }
   }
 
@@ -104,14 +112,11 @@ export const useCustomerStore = defineStore('customer', () => {
   }
 
   async function createCustomer(data: CustomerAddBO): Promise<string> {
-    const customerId = await addCustomer(data)
-    await fetchCustomerList(true)
-    return customerId
+    return addCustomer(data)
   }
 
   async function editCustomer(data: CustomerUpdateBO): Promise<void> {
     await updateCustomer(data)
-    await fetchCustomerList(true)
     if (currentCustomer.value?.customerId === data.customerId) {
       await fetchCustomerDetail(data.customerId)
     }
@@ -120,7 +125,7 @@ export const useCustomerStore = defineStore('customer', () => {
   async function editCustomerField(data: CustomerFieldUpdateBO, options: { refreshList?: boolean } = {}): Promise<CustomerDetailVO> {
     const detail = await updateCustomerField(data)
     if (options.refreshList ?? true) {
-      await fetchCustomerList(false)
+      await fetchCustomerList(false, false, { silent: true })
     }
     if (currentCustomer.value?.customerId === data.customerId) {
       currentCustomer.value = {
