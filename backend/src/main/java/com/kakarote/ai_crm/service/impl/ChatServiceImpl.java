@@ -361,10 +361,6 @@ public class ChatServiceImpl implements IChatService {
      */
     @Override
     public List<AiModelOptionVO> getModelOptions() {
-        if (chatClientProvider.getCurrentMode() != AiMode.CUSTOM) {
-            return aiModelPricingService.listEnabledOptions(chatClientProvider.getSystemProviderCodes());
-        }
-
         List<AiModelPricingService.ModelOptionSeed> customSeeds = chatClientProvider.getSavedCustomModelOptions().stream()
             .map(snapshot -> new AiModelPricingService.ModelOptionSeed(
                 snapshot.providerCode(),
@@ -372,10 +368,20 @@ public class ChatServiceImpl implements IChatService {
                 snapshot.model(),
                 AiModelSource.CUSTOM))
             .toList();
-        List<AiModelOptionVO> options = new ArrayList<>(aiModelPricingService.listConfiguredOptions(customSeeds));
+        List<AiModelOptionVO> customOptions = aiModelPricingService.listConfiguredOptions(customSeeds);
+        List<AiModelOptionVO> systemOptions = aiModelPricingService.listEnabledOptions(chatClientProvider.getSystemProviderCodes());
         Long tenantId = UserUtil.getTenantId();
-        if (tenantId != null && tenantService.getTotalCreditRemaining(tenantId) > 0) {
-            options.addAll(aiModelPricingService.listEnabledOptions(chatClientProvider.getSystemProviderCodes()));
+        boolean canUseSystemModels = tenantId != null && tenantService.getTotalCreditRemaining(tenantId) > 0;
+
+        if (chatClientProvider.getCurrentMode() != AiMode.CUSTOM) {
+            List<AiModelOptionVO> options = new ArrayList<>(systemOptions);
+            options.addAll(customOptions);
+            return options;
+        }
+
+        List<AiModelOptionVO> options = new ArrayList<>(customOptions);
+        if (canUseSystemModels) {
+            options.addAll(systemOptions);
         }
         return options;
     }

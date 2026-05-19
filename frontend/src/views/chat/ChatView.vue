@@ -789,50 +789,58 @@
                           </button>
                         </template>
                         <div class="wk-chat-model-menu">
-                          <button
-                            v-for="option in chatStore.modelOptions"
-                            :key="chatStore.toModelKey(option)"
-                            type="button"
-                            class="wk-chat-model-menu__item"
-                            @click="selectChatModelFromPopover(chatStore.toModelKey(option))"
-                          >
-                            <span
-                              class="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg"
-                              aria-hidden="true"
+                          <template v-for="group in chatModelOptionGroups" :key="group.source">
+                            <div
+                              v-if="chatModelOptionGroups.length > 1"
+                              class="wk-chat-model-menu__group-label"
                             >
-                              <img
-                                v-if="chatModelShowImage(option)"
-                                :src="chatModelIconSrc(option)"
-                                alt=""
-                                class="size-5 object-fill"
-                                @error="onChatModelImageError($event)"
-                              />
-                              <span
-                                v-else
-                                class="flex size-full items-center justify-center text-[12px] font-semibold text-[#909090]"
-                              >
-                                {{ modelOptionLabel(option).slice(0, 1) }}
-                              </span>
-                            </span>
-                            <div class="min-w-0 flex-1">
-                              <div class="flex items-center justify-start gap-2">
-                                <div class="min-w-0 text-[14px] leading-tight text-[#0d0d0d]">
-                                  {{ modelOptionLabel(option) }}
-                                </div>
-                                <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
-                              </div>
-                              <!-- <div class="mt-0.5 truncate text-[12px] leading-snug text-[#909090]">
-                                {{ option.providerLabel || option.provider }}
-                              </div> -->
+                              {{ group.label }}
                             </div>
-                            <span
-                              class="material-symbols-outlined flex size-5 shrink-0 items-center justify-center text-[20px] leading-none"
-                              :class="chatStore.selectedModelKey === chatStore.toModelKey(option) ? 'text-primary' : 'invisible'"
-                              aria-hidden="true"
+                            <button
+                              v-for="option in group.options"
+                              :key="chatStore.toModelKey(option)"
+                              type="button"
+                              class="wk-chat-model-menu__item"
+                              @click="selectChatModelFromPopover(chatStore.toModelKey(option))"
                             >
-                              check
-                            </span>
-                          </button>
+                              <span
+                                class="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg"
+                                aria-hidden="true"
+                              >
+                                <img
+                                  v-if="chatModelShowImage(option)"
+                                  :src="chatModelIconSrc(option)"
+                                  alt=""
+                                  class="size-5 object-fill"
+                                  @error="onChatModelImageError($event)"
+                                />
+                                <span
+                                  v-else
+                                  class="flex size-full items-center justify-center text-[12px] font-semibold text-[#909090]"
+                                >
+                                  {{ modelOptionLabel(option).slice(0, 1) }}
+                                </span>
+                              </span>
+                              <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-start gap-2">
+                                  <div class="min-w-0 text-[14px] leading-tight text-[#0d0d0d]">
+                                    {{ modelOptionLabel(option) }}
+                                  </div>
+                                  <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
+                                </div>
+                                <!-- <div class="mt-0.5 truncate text-[12px] leading-snug text-[#909090]">
+                                  {{ option.providerLabel || option.provider }}
+                                </div> -->
+                              </div>
+                              <span
+                                class="material-symbols-outlined flex size-5 shrink-0 items-center justify-center text-[20px] leading-none"
+                                :class="chatStore.selectedModelKey === chatStore.toModelKey(option) ? 'text-primary' : 'invisible'"
+                                aria-hidden="true"
+                              >
+                                check
+                              </span>
+                            </button>
+                          </template>
                         </div>
                       </el-popover>
 
@@ -1047,17 +1055,23 @@
                       :placeholder="chatStore.modelOptionsLoading ? '加载模型...' : (chatStore.modelOptions.length > 0 ? '选择模型' : '暂无可选模型')"
                       @change="chatStore.setSelectedModelKey"
                     >
-                      <el-option
-                        v-for="option in chatStore.modelOptions"
-                        :key="chatStore.toModelKey(option)"
-                        :label="option.displayName || option.modelName"
-                        :value="chatStore.toModelKey(option)"
+                      <el-option-group
+                        v-for="group in chatModelOptionGroups"
+                        :key="group.source"
+                        :label="group.label"
                       >
-                        <div class="flex items-center justify-between gap-4">
-                          <span class="truncate">{{ option.displayName || option.modelName }}</span>
-                          <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
-                        </div>
-                      </el-option>
+                        <el-option
+                          v-for="option in group.options"
+                          :key="chatStore.toModelKey(option)"
+                          :label="option.displayName || option.modelName"
+                          :value="chatStore.toModelKey(option)"
+                        >
+                          <div class="flex items-center justify-between gap-4">
+                            <span class="truncate">{{ option.displayName || option.modelName }}</span>
+                            <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
+                          </div>
+                        </el-option>
+                      </el-option-group>
                     </el-select>
 
                     <button
@@ -1271,7 +1285,7 @@ const agentStore = useAgentStore()
 const userStore = useUserStore()
 const enterpriseStore = useEnterpriseStore()
 const { isMobile } = useResponsive()
-const { loadAiConfig, ensureAiAvailableForSend } = useAiQuota()
+const { aiConfig, loadAiConfig, ensureAiAvailableForSend } = useAiQuota()
 
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
@@ -1333,6 +1347,15 @@ const showKnowledgeFollowUpChips = ref(false)
 const chatModelPopoverVisible = ref(false)
 /** 按图片最终 URL 记录加载失败（含接口 icon 与本地 /model-provider-logos/{provider}.svg） */
 const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
+
+const chatModelOptionGroups = computed(() => {
+  const customOptions = chatStore.modelOptions.filter(option => option.modelSource === 'custom')
+  const systemOptions = chatStore.modelOptions.filter(option => option.modelSource !== 'custom')
+  return [
+    { source: 'custom', label: '自定义模型', options: customOptions },
+    { source: 'system', label: '系统模型', options: systemOptions },
+  ].filter(group => group.options.length > 0)
+})
 
 const chatComposerModelLabel = computed(() => {
   if (chatStore.modelOptionsLoading) return '加载模型...'
@@ -1418,6 +1441,18 @@ watch(
     chatModelImageLoadFailed.value = {}
   },
   { deep: true }
+)
+
+let hasSeenInitialAiConfigForModelRefresh = false
+watch(
+  () => [aiConfig.value?.mode, aiConfig.value?.customConfigSaved, aiConfig.value?.updateTime],
+  () => {
+    if (!hasSeenInitialAiConfigForModelRefresh) {
+      hasSeenInitialAiConfigForModelRefresh = true
+      return
+    }
+    void chatStore.fetchModelOptions()
+  }
 )
 
 /** 纵向最多展示约 10 行，再继续增高则出现纵向滚动条 */
@@ -2641,6 +2676,14 @@ void _formatTime
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
+}
+
+.wk-chat-model-menu__group-label {
+  padding: 8px 10px 4px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: #8a94a6;
 }
 
 .wk-chat-model-menu__item {
