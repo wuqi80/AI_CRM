@@ -95,15 +95,17 @@
         </button>
       </div>
 
-      <div
-        v-if="primaryNavHasScrollbar"
-        class="ml-0 h-px w-full shrink-0 transition-colors duration-150 mr-2"
-        :class="primaryNavScrolling ? 'bg-slate-100' : 'bg-white'"
-      />
+      <div class="ml-0 h-px w-full shrink-0 transition-colors duration-150 mr-2">
+        <div
+          v-if="primaryNavHasScrollbar"
+          class="ml-0 h-px w-full shrink-0 transition-colors duration-150"
+          :class="primaryNavScrolling ? 'bg-slate-100' : 'bg-white'"
+        />
+      </div>
 
       <nav
         ref="primaryNavRef"
-        class="wk-scrollbar-gutter-stable flex-1 overflow-y-auto px-3 pb-4"
+        class="wk-primary-nav-scroll wk-scrollbar-gutter-stable flex-1 overflow-y-auto px-3 pb-4"
         :class="primarySidebarCollapsed ? '!pl-2 !pr-[3px]' : ''"
         @scroll.passive="onPrimaryNavScroll"
       >
@@ -1627,4 +1629,5 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
 </style>

@@ -376,7 +376,7 @@
             <button
               v-if="showScrollToBottomButton"
               type="button"
-              class="absolute left-1/2 -translate-x-1/2 bottom-[140px] md:bottom-[330px] z-20 size-8 rounded-full border border-slate-200 bg-white shadow-lg shadow-slate-200/60 text-slate-600 transition-all flex items-center justify-center hover:bg-slate-50 hover:text-slate-900"
+              class="absolute left-1/2 -translate-x-1/2 bottom-[140px] md:bottom-[220px] z-20 size-8 rounded-full border border-slate-200 bg-white shadow-lg shadow-slate-200/60 text-slate-600 transition-all flex items-center justify-center hover:bg-slate-50 hover:text-slate-900"
               aria-label="回到底部"
               @click="scrollToBottomSmooth"
             >
@@ -1079,8 +1079,8 @@
               </div>
 
               <!-- Quick Action Chips -->
-              <div class="flex flex-wrap gap-2 justify-center mt-6 min-h-[88px]">
-                <div v-if="chatStore.messages.length === 0 && selectedChatAppLabel === 'CRM管理'" >
+              <div v-if="chatStore.messages.length === 0" class="flex flex-wrap gap-2 justify-center mt-6 min-h-[88px]">
+                <div v-if="selectedChatAppLabel === 'CRM管理'" >
                   <button
                     v-for="action in quickActions"
                     :key="action.label"

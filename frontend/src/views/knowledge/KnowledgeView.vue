@@ -56,7 +56,7 @@
           :title="sidebarCollapsed ? cat.label : ''"
           @click="handleCategoryFilter(cat.id)"
           :class="[
-            'w-full rounded-xl py-3 transition-all',
+            'w-full rounded-xl py-2 transition-all',
             sidebarCollapsed ? 'flex items-center justify-center px-0' : 'flex items-center gap-3 px-4 text-left',
             selectedCategory === cat.id
               ? 'bg-primary/5 font-bold text-primary'
@@ -91,51 +91,27 @@
     <!-- Main Content -->
     <div class="flex min-w-0 min-h-0 flex-1 flex-col">
       <!-- Search & AI Ask Header -->
-      <div class="shrink-0 border-b border-slate-100 bg-white px-6 py-8 md:p-10">
+      <div v-if="false" class="shrink-0 border-b border-slate-100 bg-white px-6 py-8 md:p-10">
         <div class="mx-auto flex max-w-5xl flex-col items-center gap-6 md:gap-8">
           <div class="flex flex-col items-center gap-2 text-center">
             <h2 class="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">语义知识中心</h2>
             <p class="text-sm text-slate-500">不再只是搜索文档，直接向 AI 提问获取业务答案。</p>
           </div>
 
-          <div class="relative w-full">
-            <div
-              class="flex items-center rounded-full border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10"
+          <div
+            v-if="!isMobile"
+            class="flex flex-wrap items-center justify-center gap-3"
+          >
+            <span class="mr-1 text-xs text-slate-400">热门搜索：</span>
+            <button
+              v-for="tag in hotSearchTags"
+              :key="'hot-' + tag"
+              type="button"
+              class="rounded-full bg-slate-50 px-4 py-1.5 text-xs text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-700"
+              @click="handleHotSearch(tag)"
             >
-              <div class="flex shrink-0 items-center justify-center pl-4 pr-2 text-slate-400">
-                <span class="material-symbols-outlined text-xl">search</span>
-              </div>
-              <input
-                v-model="queryParams.keyword"
-                type="text"
-                placeholder="检索文档或向 AI 提问..."
-                class="min-w-0 flex-1 border-none bg-transparent px-2 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0"
-                @keydown.enter="handleSearch"
-              />
-              <button
-                type="button"
-                class="shrink-0 rounded-full bg-primary px-6 py-3 text-sm font-bold text-white transition-all hover:bg-primary/90 md:px-8"
-                @click="handleSearch"
-              >
-                {{ isMobile ? '搜索' : 'AI 检索' }}
-              </button>
-            </div>
-
-            <div
-              v-if="!isMobile"
-              class="mt-5 flex flex-wrap items-center justify-center gap-3"
-            >
-              <span class="mr-1 text-xs text-slate-400">热门搜索：</span>
-              <button
-                v-for="tag in hotSearchTags"
-                :key="'hot-' + tag"
-                type="button"
-                class="rounded-full bg-slate-50 px-4 py-1.5 text-xs text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-700"
-                @click="handleHotSearch(tag)"
-              >
-                {{ tag }}
-              </button>
-            </div>
+              {{ tag }}
+            </button>
           </div>
 
           <!-- Category Pills (Mobile) -->
@@ -159,28 +135,47 @@
       </div>
 
       <!-- Content Grid -->
-      <div :class="['min-h-0 flex-1 p-6 md:p-8', isMobile ? '' : 'overflow-y-auto']">
-        <div class="mx-auto max-w-7xl">
-          <KnowledgeSearchResultPanel
-            v-if="showAiSearchResult"
-            :loading="aiSearchLoading"
-            :keyword="queryParams.keyword || ''"
-            :result="aiSearchResult"
-            @back="resetAiSearchView"
-            @open="openDetailById"
-          />
-
-          <template v-else>
+      <div :class="['min-h-0 flex-1 p-6 md:px-6', isMobile ? '' : 'overflow-y-auto']">
+        <div class="mx-auto px-[0px]">
+          <!-- max-w-7xl -->
           <!-- Section Header -->
-          <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <div class="flex flex-wrap items-center gap-3">
+          <div class="mb-6 flex flex-wrap items-center gap-3 md:gap-4">
+            <div
+              v-if="!showAiSearchResult"
+              class="flex min-w-0 flex-wrap items-center gap-3"
+            >
               <div class="flex size-6 items-center justify-center rounded bg-primary/10 text-primary">
                 <span class="material-symbols-outlined text-sm">book</span>
               </div>
               <h3 class="text-lg font-bold text-slate-900">{{ getCategoryLabel() }}</h3>
               <span class="ml-1 text-sm text-slate-400">{{ totalCount }} 项结果</span>
             </div>
-            <div class="flex w-full items-center justify-end gap-2 md:w-auto">
+            <div
+              class="flex min-w-0 w-full flex-1 items-center rounded-xl border border-slate-200 bg-white px-1 shadow-sm transition-all focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10 md:max-w-md lg:max-w-lg"
+              :class="showAiSearchResult ? 'md:ml-auto' : ''"
+            >
+              <div class="flex shrink-0 items-center justify-center pl-3 pr-1 text-slate-400">
+                <span class="material-symbols-outlined text-lg">search</span>
+              </div>
+              <input
+                v-model="queryParams.keyword"
+                type="text"
+                placeholder="检索文档或向 AI 提问..."
+                class="min-w-0 flex-1 border-none bg-transparent px-2 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 text-base md:py-2.5"
+                @keydown.enter="handleSearch"
+              />
+              <button
+                type="button"
+                class="shrink-0 rounded-full bg-primary px-4 py-2 text-xs font-bold text-white transition-all hover:bg-primary/90 md:px-5 md:py-2.5 text-base"
+                @click="handleSearch"
+              >
+                {{ isMobile ? '搜索' : 'AI 检索' }}
+              </button>
+            </div>
+            <div
+              v-if="!showAiSearchResult"
+              class="flex w-full shrink-0 items-center justify-end gap-2 md:ml-auto md:w-auto"
+            >
               <!-- Mobile Upload Button -->
               <el-upload
                 v-if="isMobile"
@@ -227,9 +222,19 @@
                   <span class="material-symbols-outlined block text-sm">list</span>
                 </button>
               </div>
-              
             </div>
           </div>
+
+          <KnowledgeSearchResultPanel
+            v-if="showAiSearchResult"
+            :loading="aiSearchLoading"
+            :keyword="queryParams.keyword || ''"
+            :result="aiSearchResult"
+            @back="resetAiSearchView"
+            @open="openDetailById"
+          />
+
+          <template v-else>
 
           <!-- Loading -->
           <div v-if="loading" class="text-center py-16">
@@ -714,13 +719,12 @@ async function fetchList() {
 
 async function handleSearch() {
   const keyword = queryParams.keyword?.trim()
-  queryParams.page = 1
-
   if (!keyword) {
-    aiSearchResult.value = null
-    fetchList()
+    ElMessage.warning('请输入检索关键词')
     return
   }
+
+  queryParams.page = 1
 
   aiSearchLoading.value = true
   aiSearchResult.value = null
