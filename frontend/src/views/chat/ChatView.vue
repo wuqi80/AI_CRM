@@ -179,27 +179,27 @@
           <!-- Messages Area -->
           <div
             ref="messagesContainer"
-            class="p-4 md:p-8"
-            :class="isChatEmpty ? 'overflow-hidden' : 'flex-1 overflow-y-auto pb-4'"
+            class="wk-chat-messages px-4 md:px-8"
+            :class="isChatEmpty ? 'overflow-hidden py-6' : 'flex-1 overflow-y-auto pb-4 pt-6 md:pt-8'"
             @scroll="handleMessagesScroll"
           >
             <!-- Welcome Section (no messages) -->
             <template v-if="chatStore.messages.length === 0">
-              <div class="max-w-3xl mx-auto flex flex-col items-center space-y-4 py-6">
+              <div class="mx-auto flex max-w-3xl flex-col items-center space-y-5 py-6 text-center">
                 <!-- <div class="size-16 bg-primary/5 rounded-2xl flex items-center justify-center text-primary mb-2 border border-primary/10">
                   <WkIcon name="ai" class="text-4xl" />
                 </div> -->
-                <div class="flex items-center gap-3">
+                <div class="flex flex-col items-center gap-4 sm:flex-row">
                   <div
                     v-if="enterpriseStore.hasLogo"
-                    class="size-8 shrink-0 overflow-hidden rounded-lg bg-transparent"
+                    class="size-10 shrink-0 overflow-hidden rounded-xl bg-transparent"
                   >
                     <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
                   </div>
-                  <div v-else class="size-8 shrink-0 overflow-hidden rounded-lg bg-transparent">
+                  <div v-else class="size-10 shrink-0 overflow-hidden rounded-xl bg-transparent">
                     <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
                   </div>
-                  <h1 class="text-2xl font-bold tracking-tight text-slate-900">
+                  <h1 class="text-[28px] font-semibold leading-tight tracking-normal text-[#0d0d0d] md:text-[32px]">
                     今天有什么可以帮您的？
                   </h1>
                 </div>
@@ -214,54 +214,47 @@
               <div
                 v-for="message in chatStore.messages"
                 :key="message.id"
-                class="mx-auto message-enter"
-                :class="isMobile ? 'w-full' : 'w-[768px] max-w-[768px]'"
+                class="wk-chat-message mx-auto message-enter"
+                :class="[
+                  isMobile ? 'w-full' : 'w-[768px] max-w-[768px]',
+                  message.role === 'user' ? 'wk-chat-message--user' : 'wk-chat-message--assistant'
+                ]"
               >
                 <div
                   v-if="getDocumentAttachments(message).length > 0"
-                  class="mb-4 flex"
+                  class="mb-2 flex"
                   :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
                 >
-                  <div class="flex flex-wrap gap-3" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
+                  <div
+                    class="flex max-w-[80%] flex-wrap gap-2"
+                    :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                  >
                     <a
                       v-for="att in getDocumentAttachments(message)"
                       :key="att.id || att.fileName"
                       :href="att.accessUrl"
                       target="_blank"
-                      class="group flex max-w-xs items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/60"
+                      class="group flex max-w-xs items-center gap-3 rounded-2xl border border-[#e5e5e5] bg-white px-3 py-2.5 transition-colors hover:bg-[#f7f7f7]"
                     >
-                      <div class="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                        <span class="material-symbols-outlined">description</span>
+                      <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#f4f4f4] text-[#5d5d5d]">
+                        <span class="material-symbols-outlined text-[20px] leading-none">description</span>
                       </div>
                       <div class="min-w-0 flex-1">
-                        <div class="truncate text-sm font-semibold text-slate-800">{{ att.fileName }}</div>
-                        <div class="mt-1 text-xs text-slate-400">{{ formatFileSize(att.fileSize) }}</div>
+                        <div class="truncate text-sm font-medium text-[#0d0d0d]">{{ att.fileName }}</div>
+                        <div class="mt-0.5 text-xs text-[#8f8f8f]">{{ formatFileSize(att.fileSize) }}</div>
                       </div>
-                      <span class="material-symbols-outlined text-slate-300 transition-colors group-hover:text-primary">open_in_new</span>
+                      <span class="material-symbols-outlined text-[18px] leading-none text-[#b4b4b4] transition-colors group-hover:text-[#0d0d0d]">open_in_new</span>
                     </a>
                   </div>
                 </div>
 
                 <!-- AI Message -->
-                <div v-if="message.role !== 'user'" class="flex gap-4 md:gap-5 mb-[60px]">
+                <div v-if="message.role !== 'user'" class="group flex w-full gap-3 pb-8 md:gap-4 md:pb-10">
                   <div v-if="false" class="size-9 rounded-xl bg-primary flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20">
                     <WkIcon name="ai" class="text-lg" />
                   </div>
-                  <div class="flex-1 space-y-3 min-w-0">
-                    <div class="relative text-[#0d0d0d] rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-left leading-relaxed text-[16px]">
-                      <div
-                        v-if="!message.isStreaming"
-                        class="absolute -bottom-7 left-0 ml-[5px] z-10 size-10 flex items-center justify-center"
-                      >
-                        <button
-                          type="button"
-                          class="size-8 rounded-lg border-slate-200 bg-white text-[#8f8f8f] transition-colors hover:bg-[#E8E8E8] hover:text-slate-900 flex items-center justify-center"
-                          aria-label="复制内容"
-                          @click="copyMessageContent(message, 'assistant')"
-                        >
-                          <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
-                        </button>
-                      </div>
+                  <div class="min-w-0 flex-1 space-y-3">
+                    <div class="max-w-full text-left text-[16px] leading-7 text-[#0d0d0d]">
                       <div
                         class="wk-markdown"
                         :class="{ 'streaming-cursor': message.isStreaming && message.content.length == 0 }"
@@ -276,26 +269,36 @@
                             :src="att.accessUrl"
                             :preview-src-list="[att.accessUrl]"
                             fit="cover"
-                            class="rounded-xl max-h-[200px] border border-slate-100"
+                            class="max-h-[220px] rounded-2xl border border-[#e5e5e5]"
                             :class="isMobile ? 'max-w-[200px]' : 'max-w-[300px]'"
                             lazy
                           />
-                          <div class="text-xs text-slate-400 mt-1">{{ att.fileName }}</div>
+                          <div class="mt-1 text-xs text-[#8f8f8f]">{{ att.fileName }}</div>
                         </template>
                         <template v-else>
                           <a
                             :href="att.accessUrl"
                             target="_blank"
-                            class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors max-w-xs"
+                            class="flex max-w-xs items-center gap-3 rounded-2xl border border-[#e5e5e5] bg-white p-3 transition-colors hover:bg-[#f7f7f7]"
                           >
-                            <span class="material-symbols-outlined text-slate-400">description</span>
-                            <div class="flex-1 min-w-0">
-                              <div class="text-sm text-slate-700 truncate">{{ att.fileName }}</div>
-                              <div class="text-xs text-slate-400">{{ formatFileSize(att.fileSize) }}</div>
+                            <span class="material-symbols-outlined text-[#8f8f8f]">description</span>
+                            <div class="min-w-0 flex-1">
+                              <div class="truncate text-sm text-[#0d0d0d]">{{ att.fileName }}</div>
+                              <div class="text-xs text-[#8f8f8f]">{{ formatFileSize(att.fileSize) }}</div>
                             </div>
                           </a>
                         </template>
                       </div>
+                    </div>
+                    <div v-if="!message.isStreaming" class="flex h-8 items-center">
+                      <button
+                        type="button"
+                        class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d]"
+                        aria-label="复制内容"
+                        @click="copyMessageContent(message, 'assistant')"
+                      >
+                        <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
+                      </button>
                     </div>
                     <!-- <div
                       class="text-xs font-medium"
@@ -307,7 +310,7 @@
                 </div>
 
                 <!-- User Message -->
-                <div v-else class="group w-full flex flex-wrap gap-x-4 gap-y-0 md:gap-x-5 flex-row-reverse">
+                <div v-else class="group flex w-full flex-wrap flex-row-reverse pb-8">
                   <div v-if="false" class="size-9 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center">
                     <img
                       v-if="showUserAvatarImage"
@@ -320,20 +323,20 @@
                       {{ userAvatarFallback }}
                     </span>
                   </div>
-                  <div class="space-y-3 min-w-0 min-w-[50px]" :class="isMobile ? 'max-w-[85%]' : 'max-w-[70%]'">
+                  <div class="min-w-[50px] space-y-3" :class="isMobile ? 'max-w-[88%]' : 'max-w-[72%]'">
                     <!-- <div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-lg shadow-primary/10 text-sm leading-relaxed"> -->
-                    <div class="bg-[#e9e9e980] text-[#0d0d0d] rounded-[22px] px-4 py-[0.6rem] text-[16px] leading-relaxed">
+                    <div class="rounded-[24px] bg-[#f4f4f4] px-4 py-2.5 text-[16px] leading-7 text-[#0d0d0d]">
                       <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
                     </div>
                     <!-- User Attachments -->
-                    <div v-if="getInlineAttachments(message).length > 0" class="space-y-2">
+                    <div v-if="getInlineAttachments(message).length > 0" class="flex flex-col items-end gap-2">
                       <div v-for="att in getInlineAttachments(message)" :key="att.id || att.fileName">
                         <template v-if="att.mimeType && att.mimeType.startsWith('image/')">
                           <el-image
                             :src="att.accessUrl"
                             :preview-src-list="[att.accessUrl]"
                             fit="cover"
-                            class="rounded-xl max-h-[200px]"
+                            class="max-h-[220px] rounded-2xl border border-[#e5e5e5]"
                             :class="isMobile ? 'max-w-[200px]' : 'max-w-[300px]'"
                             lazy
                           />
@@ -342,12 +345,12 @@
                           <a
                             :href="att.accessUrl"
                             target="_blank"
-                            class="flex items-center gap-3 p-3 rounded-xl border border-white/20 hover:bg-white/10 transition-colors max-w-xs"
+                            class="flex max-w-xs items-center gap-3 rounded-2xl border border-[#e5e5e5] bg-white p-3 transition-colors hover:bg-[#f7f7f7]"
                           >
-                            <span class="material-symbols-outlined text-white/70">description</span>
-                            <div class="flex-1 min-w-0">
-                              <div class="text-sm text-white truncate">{{ att.fileName }}</div>
-                              <div class="text-xs text-white/60">{{ formatFileSize(att.fileSize) }}</div>
+                            <span class="material-symbols-outlined text-[#8f8f8f]">description</span>
+                            <div class="min-w-0 flex-1">
+                              <div class="truncate text-sm text-[#0d0d0d]">{{ att.fileName }}</div>
+                              <div class="text-xs text-[#8f8f8f]">{{ formatFileSize(att.fileSize) }}</div>
                             </div>
                           </a>
                         </template>
@@ -356,11 +359,11 @@
                     <!-- <div class="text-xs text-slate-400 font-medium text-right">{{ formatTime(message.timestamp) }}</div> -->
                   </div>
                   <div
-                    class="w-full basis-full h-10 z-10 flex items-center justify-end"
+                    class="z-10 flex h-8 w-full basis-full items-center justify-end"
                   >
                     <button
                       type="button"
-                      class="size-8 rounded-lg border-slate-200 bg-white text-[#8f8f8f] transition-all flex items-center justify-center opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-[#E8E8E8] hover:text-slate-900"
+                      class="pointer-events-none flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] opacity-0 transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d] group-hover:pointer-events-auto group-hover:opacity-100"
                       aria-label="复制内容"
                       @click="copyMessageContent(message, 'user')"
                     >
@@ -2193,7 +2196,9 @@ function formatModelMultiplier(value?: number) {
 
 function renderAssistantMessage(content: string, isStreaming = false): string {
   const normalized = normalizeAssistantMessageContent(content, isStreaming)
-  return renderMarkdown(normalized || getAssistantMessagePlaceholder(isStreaming))
+  return renderMarkdown(normalized || getAssistantMessagePlaceholder(isStreaming), {
+    streaming: isStreaming
+  })
 }
 
 function htmlToText(html: string): string {
@@ -2538,6 +2543,96 @@ void _formatTime
   overflow: hidden;
 }
 
+.wk-chat-messages {
+  background: var(--wk-bg-surface);
+}
+
+.wk-chat-message {
+  overflow-wrap: anywhere;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown) {
+  color: var(--wk-text-primary);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown > *:first-child) {
+  margin-top: 0;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown > *:last-child) {
+  margin-bottom: 0;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown p) {
+  margin: 0 0 0.85em;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown ul),
+.wk-chat-message--assistant :deep(.wk-markdown ol) {
+  margin: 0.85em 0;
+  padding-left: 1.5em;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown li) {
+  margin: 0.25em 0;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown pre) {
+  margin: 1em 0;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: #0d0d0d;
+  padding: 14px 16px;
+  color: #f7f7f7;
+}
+
+:global(html.dark) .wk-chat-message--assistant :deep(.wk-markdown pre) {
+  background: #030712;
+  color: #e5edf8;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown code) {
+  border-radius: 6px;
+  background: var(--wk-bg-surface-muted);
+  padding: 0.15em 0.35em;
+  color: var(--wk-text-primary);
+  font-size: 0.92em;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown pre code) {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown blockquote) {
+  margin: 1em 0;
+  border-left: 3px solid var(--wk-border-strong);
+  padding-left: 1em;
+  color: var(--wk-text-secondary);
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown table) {
+  width: 100%;
+  margin: 1em 0;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown th),
+.wk-chat-message--assistant :deep(.wk-markdown td) {
+  border: 1px solid var(--wk-border-subtle);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown th) {
+  background: var(--wk-bg-surface-subtle);
+  font-weight: 600;
+}
+
 /* Message animation */
 .message-enter {
   animation: messageSlideIn 0.3s ease-out;
@@ -2562,7 +2657,7 @@ void _formatTime
   height: 14px;
   margin-left: 6px;
   border-radius: 9999px;
-  background: #0d0d0d;
+  background: var(--wk-text-primary);
   transform-origin: center;
   animation: breathingDot 1.2s ease-in-out infinite;
 }
@@ -2613,12 +2708,12 @@ void _formatTime
   gap: 10px;
   padding: 10px 10px;
   border-radius: 8px;
-  color: #0d0d0d;
+  color: var(--wk-text-primary);
   transition: background-color 150ms ease, color 150ms ease;
 }
 
 .wk-chat-upload-menu__item:hover {
-  background: #f6f6f6;
+  background: var(--wk-bg-surface-hover);
 }
 
 .wk-chat-upload-menu__item:disabled {
@@ -2629,7 +2724,7 @@ void _formatTime
 .wk-chat-upload-menu__icon {
   font-size: 18px;
   line-height: 1;
-  color: #0d0d0d;
+  color: var(--wk-text-primary);
 }
 
 .wk-chat-upload-menu__label {
@@ -2646,20 +2741,20 @@ void _formatTime
   gap: 10px;
   padding: 10px 10px;
   border-radius: 8px;
-  color: #0d0d0d;
+  color: var(--wk-text-primary);
   cursor: default;
   outline: none;
   transition: background-color 150ms ease;
 }
 
 .wk-chat-upload-menu__apps-ref:hover {
-  background: #f6f6f6;
+  background: var(--wk-bg-surface-hover);
 }
 
 .wk-chat-upload-menu__chevron {
   margin-left: auto;
   font-size: 18px;
-  color: rgba(13, 13, 13, 0.55);
+  color: var(--wk-text-muted);
 }
 
 .wk-chat-upload-submenu {
@@ -2690,8 +2785,9 @@ void _formatTime
   padding: 0 !important;
   border-radius: 16px !important;
   overflow: hidden;
-  border: unset !important;
-  box-shadow: 0 0 #0000, 0 0 #0000, 0 0 #0000, 0 0 #0000, 0px 8px 12px 0px #00000014, 0px 0px 1px 0px #0000009e !important;
+  border: 1px solid var(--wk-border-subtle) !important;
+  background: var(--wk-bg-surface) !important;
+  box-shadow: 0 12px 36px rgb(var(--wk-shadow-color) / 0.28) !important;
   /* box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14); */
 }
 
@@ -2714,8 +2810,9 @@ void _formatTime
   padding: 0 !important;
   border-radius: 14px !important;
   overflow: hidden;
-  border: unset !important;
-  box-shadow: 0 0 #0000, 0 0 #0000, 0 0 #0000, 0 0 #0000, 0px 8px 12px 0px #00000014, 0px 0px 1px 0px #0000009e !important;
+  border: 1px solid var(--wk-border-subtle) !important;
+  background: var(--wk-bg-surface) !important;
+  box-shadow: 0 12px 36px rgb(var(--wk-shadow-color) / 0.28) !important;
   z-index: 3000 !important;
 }
 
@@ -2737,7 +2834,7 @@ void _formatTime
   font-size: 12px;
   line-height: 16px;
   font-weight: 600;
-  color: #8a94a6;
+  color: var(--wk-text-muted);
 }
 
 .wk-chat-model-menu__item {
@@ -2755,7 +2852,7 @@ void _formatTime
 }
 
 .wk-chat-model-menu__item:hover {
-  background: #f5f5f5;
+  background: var(--wk-bg-surface-hover);
 }
 
 

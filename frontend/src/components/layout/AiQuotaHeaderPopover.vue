@@ -10,13 +10,13 @@
     <template #reference>
       <button
         type="button"
-        class="inline-flex max-w-[min(20rem,calc(100vw-8rem))] items-center gap-2 rounded-full bg-slate-100/80 px-3 py-1.5 text-left text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-100"
+        class="inline-flex max-w-[min(20rem,calc(100vw-8rem))] items-center gap-2 rounded-full border border-transparent bg-slate-100/80 px-3 py-1.5 text-left text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-100 dark:bg-slate-800/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:border-slate-600 dark:hover:bg-slate-700/80"
       >
         <WkIcon name="ai" :size="18" class="shrink-0 leading-none text-primary" />
         <span v-if="currentAiMode === 'gift'" class="hidden min-w-0 truncate tabular-nums md:inline">
           <span class="hidden md:inline">已使用 </span>{{ creditUsedWan }} / {{ creditTotalWan }}万<span class="hidden md:inline">，剩余 </span>{{ creditProgressPercent }}%
         </span>
-        <span v-else class="min-w-0 truncate text-slate-600">AI 积分 · 点击查看</span>
+        <span v-else class="min-w-0 truncate text-slate-600 dark:text-slate-300">AI 积分 · 点击查看</span>
       </button>
     </template>
     <AiQuotaPanel variant="popover" />
@@ -41,5 +41,9 @@ onMounted(() => {
 .ai-quota-popover {
   box-sizing: border-box;
   max-width: min(20rem, calc(100vw - 1.5rem));
+  border: 1px solid var(--wk-border-subtle) !important;
+  background: var(--wk-bg-surface) !important;
+  color: var(--wk-text-primary) !important;
+  box-shadow: 0 16px 42px rgb(var(--wk-shadow-color) / 0.24) !important;
 }
 </style>

@@ -1625,25 +1625,35 @@ async function handleImportSuccess(_result: CustomerImportResult) {
   display: none;
 }
 
+.wk-customer-table {
+  --el-table-bg-color: var(--wk-bg-surface);
+  --el-table-tr-bg-color: var(--wk-bg-surface);
+  --el-table-header-bg-color: var(--wk-bg-surface-subtle);
+  --el-table-header-text-color: var(--wk-text-muted);
+  --el-table-text-color: var(--wk-text-secondary);
+  --el-table-border-color: var(--wk-border-subtle);
+  --el-table-row-hover-bg-color: color-mix(in srgb, var(--wk-primary) 11%, var(--wk-bg-surface));
+}
+
 .wk-customer-table :deep(.el-table__border-left-patch),
 .wk-customer-table :deep(.el-table__fixed-right-patch) {
-  background: #f8fafc;
+  background: var(--wk-bg-surface-subtle);
 }
 
 .wk-customer-table :deep(th.el-table__cell) {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-text-muted);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 16px 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--wk-border-muted);
 }
 
 .wk-customer-table :deep(td.el-table__cell) {
   padding: 16px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--wk-border-subtle);
 }
 
 .wk-customer-table :deep(.el-table__row) {
@@ -1652,7 +1662,7 @@ async function handleImportSuccess(_result: CustomerImportResult) {
 
 .wk-customer-table :deep(.el-table__body tr:hover > td.el-table__cell),
 .wk-customer-table :deep(.el-table__body tr.hover-row > td.el-table__cell) {
-  background: #eff6ff;
+  background: var(--el-table-row-hover-bg-color);
 }
 
 .wk-customer-table :deep(.el-table__empty-block) {

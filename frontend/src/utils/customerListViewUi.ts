@@ -15,49 +15,49 @@ export const KANBAN_STAGE_COLUMNS: {
   {
     id: 'lead',
     label: '线索',
-    laneClass: 'bg-[#EBECF0]/50',
-    titleClass: 'text-slate-500',
-    countBadgeClass: 'bg-slate-200 text-slate-700',
+    laneClass: 'bg-[#EBECF0]/50 dark:bg-slate-800/55',
+    titleClass: 'text-slate-500 dark:text-slate-300',
+    countBadgeClass: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
     dropTone: 'neutral'
   },
   {
     id: 'qualified',
     label: '资格审查',
-    laneClass: 'bg-[#E2E8F0]/40',
-    titleClass: 'text-[#137FEC]',
-    countBadgeClass: 'bg-blue-100 text-[#137FEC]',
+    laneClass: 'bg-[#E2E8F0]/40 dark:bg-blue-950/30',
+    titleClass: 'text-[#137FEC] dark:text-blue-300',
+    countBadgeClass: 'bg-blue-100 text-[#137FEC] dark:bg-blue-500/15 dark:text-blue-200',
     dropTone: 'neutral'
   },
   {
     id: 'proposal',
     label: '方案报价',
-    laneClass: 'bg-[#E9EDFF]/40',
+    laneClass: 'bg-[#E9EDFF]/40 dark:bg-indigo-950/30',
     titleClass: 'text-primary',
-    countBadgeClass: 'bg-primary text-white',
+    countBadgeClass: 'bg-primary text-white dark:text-slate-950',
     dropTone: 'neutral'
   },
   {
     id: 'negotiation',
     label: '谈判中',
-    laneClass: 'bg-indigo-50/50',
-    titleClass: 'text-slate-600',
-    countBadgeClass: 'bg-slate-200 text-slate-700',
+    laneClass: 'bg-indigo-50/50 dark:bg-indigo-950/25',
+    titleClass: 'text-slate-600 dark:text-indigo-200',
+    countBadgeClass: 'bg-slate-200 text-slate-700 dark:bg-indigo-500/15 dark:text-indigo-200',
     dropTone: 'neutral'
   },
   {
     id: 'closed',
     label: '已成交',
-    laneClass: 'bg-green-50/50',
-    titleClass: 'text-green-600',
-    countBadgeClass: 'bg-green-100 text-green-700',
+    laneClass: 'bg-green-50/50 dark:bg-emerald-950/25',
+    titleClass: 'text-green-600 dark:text-emerald-300',
+    countBadgeClass: 'bg-green-100 text-green-700 dark:bg-emerald-500/15 dark:text-emerald-200',
     dropTone: 'success'
   },
   {
     id: 'lost',
     label: '已流失',
-    laneClass: 'bg-red-50/50',
-    titleClass: 'text-red-600',
-    countBadgeClass: 'bg-red-100 text-red-700',
+    laneClass: 'bg-red-50/50 dark:bg-red-950/25',
+    titleClass: 'text-red-600 dark:text-red-300',
+    countBadgeClass: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-200',
     dropTone: 'danger'
   }
 ]

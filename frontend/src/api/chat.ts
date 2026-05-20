@@ -121,7 +121,7 @@ export async function sendMessageStream(
         // Process any remaining buffer content
         if (buffer.trim()) {
           const parsedContent = parseSSEEvent(buffer)
-          if (parsedContent) {
+          if (parsedContent !== null) {
             onChunk(parsedContent)
           }
         }
@@ -138,7 +138,7 @@ export async function sendMessageStream(
 
       for (const event of events) {
         const parsedContent = parseSSEEvent(event)
-        if (parsedContent) {
+        if (parsedContent !== null) {
           onChunk(parsedContent)
         }
       }

@@ -82,7 +82,7 @@
       </div>
       <!-- pl-[10px] pr-[10px] py-[6px] mt-[0px] ml-[2px] mr-[6px] -->
       <!-- Chat: New session (fixed, not scroll with nav) -->
-      <div class="px-3 pt-1 mb-[4px]" :class="primarySidebarCollapsed ? '!px-2' : ''">
+      <div class="px-3 pt-1 mb-[0px]" :class="primarySidebarCollapsed ? '!px-2' : ''">
         <button
           class="flex items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors hover:bg-[#f9f9f9]"
           :class="primarySidebarCollapsed
@@ -267,6 +267,17 @@
       </div>
 
       <div class="border-t border-[#ececec] p-3" :class="primarySidebarCollapsed ? '!px-2 !py-2' : ''">
+        <button
+          type="button"
+          class="mb-1 flex w-full items-center rounded-xl text-slate-600 transition-colors hover:bg-slate-50 hover:text-primary"
+          :class="primarySidebarCollapsed ? 'justify-center p-2' : 'gap-3 p-2'"
+          :title="themeButtonLabel"
+          :aria-label="themeButtonLabel"
+          @click="toggleTheme"
+        >
+          <span class="material-symbols-outlined text-[20px] leading-none">{{ themeIcon }}</span>
+          <span v-if="!primarySidebarCollapsed" class="text-xs font-semibold">{{ themeButtonLabel }}</span>
+        </button>
         <div
           class="flex cursor-pointer items-center rounded-xl bg-[#fff] transition-colors hover:bg-[#f9f9f9]"
           :class="primarySidebarCollapsed ? 'justify-center' : 'gap-3 p-2'"
@@ -464,6 +475,14 @@
       </div>
 
       <div class="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          class="flex size-10 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-primary"
+          :aria-label="themeButtonLabel"
+          @click="toggleTheme"
+        >
+          <span class="material-symbols-outlined text-[20px] leading-none">{{ themeIcon }}</span>
+        </button>
         <AiQuotaHeaderPopover />
         <!-- <button class="flex size-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100">
           <span class="material-symbols-outlined">notifications</span>
@@ -562,6 +581,14 @@
           </nav>
 
           <div class="border-t border-slate-200 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <button
+              type="button"
+              class="mb-2 flex w-full items-center gap-3 rounded-xl bg-slate-50 p-3 text-slate-600 transition-colors hover:bg-slate-100 hover:text-primary"
+              @click="toggleTheme"
+            >
+              <span class="material-symbols-outlined text-[20px] leading-none">{{ themeIcon }}</span>
+              <span class="text-sm font-semibold">{{ themeButtonLabel }}</span>
+            </button>
             <div class="flex cursor-pointer items-center gap-3 rounded-xl bg-slate-50 p-3" @click="showUserMenu = !showUserMenu">
               <div v-if="userStore.avatar" class="size-9 overflow-hidden rounded-full">
                 <img :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
@@ -789,6 +816,15 @@
 
         <div class="flex items-center gap-3">
           <AiQuotaHeaderPopover />
+          <button
+            type="button"
+            class="flex size-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-primary"
+            :aria-label="themeButtonLabel"
+            :title="themeButtonLabel"
+            @click="toggleTheme"
+          >
+            <span class="material-symbols-outlined text-[20px] leading-none">{{ themeIcon }}</span>
+          </button>
           <button class="flex size-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100">
             <span class="material-symbols-outlined">notifications</span>
           </button>
@@ -807,6 +843,15 @@
           >
             <div class="flex shrink-0 items-center gap-3">
               <AiQuotaHeaderPopover />
+              <button
+                type="button"
+                class="flex size-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-primary"
+                :aria-label="themeButtonLabel"
+                :title="themeButtonLabel"
+                @click="toggleTheme"
+              >
+                <span class="material-symbols-outlined text-[20px] leading-none">{{ themeIcon }}</span>
+              </button>
             </div>
           </div>
         </template>
@@ -846,6 +891,7 @@ import { queryGlobalSearch, type GlobalSearchResult } from '@/api/search'
 import { useChatDrawer } from '@/composables/useChatDrawer'
 import { useEnterpriseStore } from '@/stores/enterprise'
 import { useResponsive } from '@/composables/useResponsive'
+import { useTheme } from '@/composables/useTheme'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { appEvents, APP_EVENT } from '@/utils/events'
@@ -859,6 +905,9 @@ const enterpriseStore = useEnterpriseStore()
 const chatStore = useChatStore()
 const { isMobile } = useResponsive()
 const { isOpen: chatDrawerOpen } = useChatDrawer()
+const { isDark, toggleTheme } = useTheme()
+const themeIcon = computed(() => (isDark.value ? 'light_mode' : 'dark_mode'))
+const themeButtonLabel = computed(() => (isDark.value ? '浅色模式' : '深色模式'))
 
 /**
  * 主内容列（顶栏 + router-view 所在 flex 列）在侧栏展开时的宽度小于该值且仍为 PC 时，自动收起左侧一级导航；

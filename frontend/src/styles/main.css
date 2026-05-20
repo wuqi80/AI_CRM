@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply font-sans bg-background-light text-slate-900;
+    @apply font-sans bg-background-light;
   }
 }
 
@@ -24,6 +24,23 @@ html, body, #app {
  * We scope padding to native mobile only to avoid impacting PC layout.
  */
 :root {
+  --wk-primary-rgb: 19 127 236;
+  --wk-primary: rgb(var(--wk-primary-rgb));
+  --wk-bg-page-rgb: 246 247 248;
+  --wk-bg-page: rgb(var(--wk-bg-page-rgb));
+  --wk-bg-surface: #ffffff;
+  --wk-bg-surface-subtle: #f8fafc;
+  --wk-bg-surface-muted: #f1f5f9;
+  --wk-bg-surface-hover: #f9f9f9;
+  --wk-bg-surface-active: #f3f3f3;
+  --wk-border-subtle: #ececec;
+  --wk-border-muted: #e2e8f0;
+  --wk-border-strong: #cbd5e1;
+  --wk-text-primary: #0d0d0d;
+  --wk-text-secondary: #475569;
+  --wk-text-muted: #64748b;
+  --wk-text-faint: #94a3b8;
+  --wk-shadow-color: 15 23 42;
   --el-color-primary: #137fec;
   --el-color-primary-dark-2: #0f66bd;
   --el-color-primary-light-3: #5ba5f2;
@@ -35,6 +52,56 @@ html, body, #app {
   --wk-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --wk-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   --wk-safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+}
+
+html.dark {
+  --wk-primary-rgb: 91 165 242;
+  --wk-primary: rgb(var(--wk-primary-rgb));
+  --wk-bg-page-rgb: 12 18 27;
+  --wk-bg-page: rgb(var(--wk-bg-page-rgb));
+  --wk-bg-surface: #111827;
+  --wk-bg-surface-subtle: #172033;
+  --wk-bg-surface-muted: #1f2937;
+  --wk-bg-surface-hover: #1b2638;
+  --wk-bg-surface-active: #22304a;
+  --wk-border-subtle: #263244;
+  --wk-border-muted: #334155;
+  --wk-border-strong: #475569;
+  --wk-text-primary: #f8fafc;
+  --wk-text-secondary: #cbd5e1;
+  --wk-text-muted: #94a3b8;
+  --wk-text-faint: #64748b;
+  --wk-shadow-color: 0 0 0;
+  --el-color-primary: #5ba5f2;
+  --el-color-primary-dark-2: #89bff6;
+  --el-color-primary-light-3: #137fec;
+  --el-color-primary-light-5: rgba(91, 165, 242, 0.42);
+  --el-color-primary-light-7: rgba(91, 165, 242, 0.26);
+  --el-color-primary-light-8: rgba(91, 165, 242, 0.18);
+  --el-color-primary-light-9: rgba(91, 165, 242, 0.12);
+  --el-bg-color: var(--wk-bg-surface);
+  --el-bg-color-page: var(--wk-bg-page);
+  --el-bg-color-overlay: #172033;
+  --el-border-color: var(--wk-border-muted);
+  --el-border-color-light: var(--wk-border-subtle);
+  --el-border-color-lighter: #253144;
+  --el-fill-color: var(--wk-bg-surface-muted);
+  --el-fill-color-light: var(--wk-bg-surface-subtle);
+  --el-fill-color-lighter: #111827;
+  --el-fill-color-blank: var(--wk-bg-surface);
+  --el-text-color-primary: var(--wk-text-primary);
+  --el-text-color-regular: var(--wk-text-secondary);
+  --el-text-color-secondary: var(--wk-text-muted);
+  --el-text-color-placeholder: var(--wk-text-faint);
+  --el-mask-color: rgba(0, 0, 0, 0.64);
+}
+
+body {
+  background-color: var(--wk-bg-page);
+  color: var(--wk-text-primary);
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 /* Apply safe-area to app root so inner scroll containers can reach bottom */
@@ -98,12 +165,12 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--wk-border-strong);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--wk-text-faint);
 }
 
 /*
@@ -117,11 +184,11 @@ html, body {
 /* Primary sidebar nav — thumb:hover is unreliable in WebKit; hover the scroll area instead */
 .wk-primary-nav-scroll {
   scrollbar-width: 8px;
-  scrollbar-color: #e8e8e8 transparent;
+  scrollbar-color: var(--wk-border-subtle) transparent;
 }
 
 .wk-primary-nav-scroll:hover {
-  scrollbar-color: #999999 transparent;
+  scrollbar-color: var(--wk-text-faint) transparent;
 }
 
 .wk-primary-nav-scroll::-webkit-scrollbar {
@@ -134,18 +201,18 @@ html, body {
 }
 
 .wk-primary-nav-scroll::-webkit-scrollbar-thumb {
-  background: #e8e8e8;
+  background: var(--wk-border-subtle);
   border-radius: 3px;
   transition: background-color 150ms ease;
 }
 
 .wk-primary-nav-scroll:hover::-webkit-scrollbar-thumb {
-  background: #999999;
+  background: var(--wk-text-faint);
 }
 
 /* Glass panel effect */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.95);
+  background: color-mix(in srgb, var(--wk-bg-surface) 92%, transparent);
   backdrop-filter: blur(8px);
 }
 
@@ -205,6 +272,138 @@ html, body {
   animation: fadeIn 0.3s ease-out;
 }
 
+/*
+ * Dark theme bridge.
+ * Much of the app predates semantic color tokens and uses Tailwind slate/white
+ * utilities or exact hex classes directly in templates. These overrides keep
+ * existing markup working while new screens can move toward tokens gradually.
+ */
+html.dark .bg-white,
+html.dark [class~="bg-[#fff]"],
+html.dark [class~="bg-[#ffffff]"] {
+  background-color: var(--wk-bg-surface) !important;
+}
+
+html.dark .bg-background-light,
+html.dark .bg-slate-50,
+html.dark .bg-slate-50\/30,
+html.dark .bg-slate-50\/50,
+html.dark .bg-slate-100,
+html.dark [class~="bg-[#e5e5e5]"],
+html.dark [class~="bg-[#d4d4d4]"],
+html.dark [class~="bg-[#f8fafc]"],
+html.dark [class~="bg-[#f7f7f7]"],
+html.dark [class~="bg-[#f6f7f8]"],
+html.dark [class~="bg-[#f5f5f5]"],
+html.dark [class~="bg-[#f4f4f4]"],
+html.dark [class~="bg-[#f1f1f1]"],
+html.dark [class~="bg-[#f0f0f0]"],
+html.dark [class~="bg-[#0d0d0d0d]"] {
+  background-color: var(--wk-bg-surface-subtle) !important;
+}
+
+html.dark [class~="bg-[#f9f9f9]"],
+html.dark [class~="bg-[#f3f3f3]"],
+html.dark [class~="bg-[#efefef]"],
+html.dark [class~="bg-[#ececec]"],
+html.dark [class~="bg-[#e6e6e6]"] {
+  background-color: var(--wk-bg-surface-active) !important;
+}
+
+html.dark .hover\:bg-white:hover,
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-slate-100:hover,
+html.dark .hover\:bg-slate-100\/50:hover,
+html.dark [class~="hover:bg-[#f9f9f9]"]:hover,
+html.dark [class~="hover:bg-[#f7f7f7]"]:hover,
+html.dark [class~="hover:bg-[#F1F1F1]"]:hover,
+html.dark [class~="hover:bg-[#f1f1f1]"]:hover,
+html.dark [class~="hover:bg-[#efefef]"]:hover,
+html.dark [class~="hover:bg-[#ececec]"]:hover,
+html.dark [class~="hover:bg-[#e6e6e6]"]:hover,
+html.dark [class~="hover:bg-[#d4d4d4]"]:hover {
+  background-color: var(--wk-bg-surface-hover) !important;
+}
+
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark [class~="text-[#0d0d0d]"],
+html.dark [class~="text-[#051a3e]"],
+html.dark [class~="text-[#0f172a]"] {
+  color: var(--wk-text-primary) !important;
+}
+
+html.dark .text-slate-700,
+html.dark .text-slate-600,
+html.dark [class~="text-[#334155]"],
+html.dark [class~="text-[#475569]"],
+html.dark [class~="text-[#5d5d5d]"] {
+  color: var(--wk-text-secondary) !important;
+}
+
+html.dark .text-slate-500,
+html.dark .text-slate-400,
+html.dark .text-slate-300,
+html.dark [class~="text-[#8f8f8f]"],
+html.dark [class~="text-[#909090]"],
+html.dark [class~="text-[#b4b4b4]"],
+html.dark [class~="text-[#c9c9c9]"] {
+  color: var(--wk-text-muted) !important;
+}
+
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300,
+html.dark [class~="border-[#ececec]"],
+html.dark [class~="border-[#e5e5e5]"],
+html.dark [class~="border-[#0d0d0d0d]"],
+html.dark [class~="border-[#DFE1E6]"] {
+  border-color: var(--wk-border-subtle) !important;
+}
+
+html.dark [class~="hover:border-[#E0E0E0]"]:hover {
+  border-color: var(--wk-border-muted) !important;
+}
+
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--wk-border-subtle) !important;
+}
+
+html.dark .shadow-slate-900\/10,
+html.dark .shadow-slate-200\/50,
+html.dark .shadow-slate-200\/80,
+html.dark .shadow-slate-300\/40 {
+  --tw-shadow-color: rgb(var(--wk-shadow-color) / 0.35) !important;
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select {
+  color: var(--wk-text-primary);
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: var(--wk-text-faint);
+}
+
+html.dark [class~="placeholder:text-[#0d0d0d]"]::placeholder,
+html.dark [class~="placeholder:text-[#909090]"]::placeholder {
+  color: var(--wk-text-faint) !important;
+}
+
+html.dark .from-white {
+  --tw-gradient-from: var(--wk-bg-surface) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(var(--wk-bg-page-rgb) / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+html.dark .via-white {
+  --tw-gradient-to: rgb(var(--wk-bg-page-rgb) / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--wk-bg-surface) var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
+
 /* Streaming text cursor */
 .streaming-cursor::after {
   content: '|';
@@ -237,12 +436,12 @@ html, body {
 
 .el-input__wrapper {
   border-radius: 0.5rem !important;
-  background-color: #f8fafc !important;
-  box-shadow: 0 0 0 1px #e2e8f0 inset !important;
+  background-color: var(--wk-bg-surface-subtle) !important;
+  box-shadow: 0 0 0 1px var(--wk-border-muted) inset !important;
 }
 
 .el-input__wrapper:hover {
-  box-shadow: 0 0 0 1px #cbd5e1 inset !important;
+  box-shadow: 0 0 0 1px var(--wk-border-strong) inset !important;
 }
 
 .el-input__wrapper.is-focus {
@@ -281,11 +480,11 @@ html, body {
  */
 .el-input-number {
   border-radius: var(--el-border-radius-base);
-  box-shadow: 0 0 0 1px #e2e8f0;
+  box-shadow: 0 0 0 1px var(--wk-border-muted);
 }
 
 .el-input-number:hover:not(:has(.el-input__wrapper.is-focus)) {
-  box-shadow: 0 0 0 1px #cbd5e1;
+  box-shadow: 0 0 0 1px var(--wk-border-strong);
 }
 
 .el-input-number:has(.el-input__wrapper.is-focus) {
@@ -320,7 +519,7 @@ html, body {
 }
 
 .el-dialog__header {
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--wk-border-muted);
   padding: 1.25rem 1.5rem !important;
 }
 
@@ -329,7 +528,7 @@ html, body {
 }
 
 .el-dialog__footer {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--wk-border-muted);
   padding: 1rem 1.5rem !important;
 }
 
@@ -366,14 +565,14 @@ html, body {
 }
 
 .el-button--primary {
-  background-color: #137fec !important;
-  border-color: #137fec !important;
+  background-color: var(--el-color-primary) !important;
+  border-color: var(--el-color-primary) !important;
   border-radius: 0.5rem !important;
 }
 
 .el-button--primary:hover {
-  background-color: rgba(19, 127, 236, 0.9) !important;
-  border-color: rgba(19, 127, 236, 0.9) !important;
+  background-color: color-mix(in srgb, var(--el-color-primary) 90%, transparent) !important;
+  border-color: color-mix(in srgb, var(--el-color-primary) 90%, transparent) !important;
 }
 
 .account-kickout-dialog__overlay {
@@ -415,7 +614,7 @@ html, body {
 .account-kickout-dialog__content {
   padding: 34px 32px 26px;
   text-align: center;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  background: linear-gradient(180deg, var(--wk-bg-surface) 0%, var(--wk-bg-surface-subtle) 100%);
 }
 
 .account-kickout-dialog__icon-shell {
@@ -441,7 +640,7 @@ html, body {
 
 .account-kickout-dialog__title {
   margin: 0;
-  color: #0f172a;
+  color: var(--wk-text-primary);
   font-size: 16px;
   font-weight: 800;
   line-height: 1.5;
@@ -449,7 +648,7 @@ html, body {
 
 .account-kickout-dialog__desc {
   margin: 14px 0 0;
-  color: #64748b;
+  color: var(--wk-text-muted);
   font-size: 14px;
   line-height: 1.85;
 }
@@ -457,9 +656,9 @@ html, body {
 .account-kickout-dialog__info {
   margin-top: 24px;
   padding: 16px 18px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--wk-border-subtle);
   border-radius: 18px;
-  background: #f8fbff;
+  background: var(--wk-bg-surface-subtle);
 }
 
 .account-kickout-dialog__info-row {
@@ -474,13 +673,13 @@ html, body {
 }
 
 .account-kickout-dialog__info-label {
-  color: #94a3b8;
+  color: var(--wk-text-faint);
   font-size: 14px;
   font-weight: 600;
 }
 
 .account-kickout-dialog__info-value {
-  color: #475569;
+  color: var(--wk-text-secondary);
   font-size: 14px;
   font-weight: 700;
   text-align: right;
@@ -739,7 +938,7 @@ html, body {
 }
 
 .wk-markdown li::marker {
-  color: #000;
+  color: var(--wk-text-primary);
   font-weight: 600;
 }
 
@@ -747,15 +946,15 @@ html, body {
   padding: 0.75em 1em;
   border-left: 3px solid #93c5fd;
   border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.72);
-  color: #475569;
+  background: color-mix(in srgb, var(--wk-bg-surface) 78%, transparent);
+  color: var(--wk-text-secondary);
 }
 
 .wk-markdown code {
   padding: 0.12em 0.4em;
   border-radius: 0.4rem;
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--wk-bg-surface-muted);
+  color: var(--wk-text-primary);
   font-size: 0.92em;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
@@ -766,6 +965,11 @@ html, body {
   border-radius: 0.9rem;
   background: #0f172a;
   color: #e2e8f0;
+}
+
+html.dark .wk-markdown pre {
+  background: #030712;
+  color: #e5edf8;
 }
 
 .wk-markdown pre code {
@@ -779,20 +983,20 @@ html, body {
   border-collapse: collapse;
   overflow: hidden;
   border-radius: 0.9rem;
-  border: 1px solid #dbe5f0;
-  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--wk-border-subtle);
+  background: color-mix(in srgb, var(--wk-bg-surface) 86%, transparent);
 }
 
 .wk-markdown th,
 .wk-markdown td {
   padding: 0.7em 0.85em;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--wk-border-subtle);
   text-align: left;
   vertical-align: top;
 }
 
 .wk-markdown th {
-  background: #f8fafc;
+  background: var(--wk-bg-surface-subtle);
   font-weight: 500;
 }
 
@@ -801,14 +1005,14 @@ html, body {
 }
 
 .wk-markdown a {
-  color: #137fec;
+  color: var(--wk-primary);
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
 
 .wk-markdown hr {
   border: none;
-  border-top: 1px solid #dbe5f0;
+  border-top: 1px solid var(--wk-border-subtle);
 }
 
 .wk-markdown strong {
