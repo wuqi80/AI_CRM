@@ -319,7 +319,9 @@ const generateDisabled = computed(() => {
     || !selectedCustomerId.value
 })
 
-const renderedResult = computed(() => renderMarkdown(result.value?.content || ''))
+const renderedResult = computed(() => renderMarkdown(result.value?.content || '', {
+  streaming: generating.value
+}))
 
 watch(
   () => props.modelValue,

@@ -538,7 +538,9 @@ function sendQuickMessage(text: string) {
 
 function renderAssistantMessage(content: string, isStreaming = false): string {
   const normalized = normalizeAssistantMessageContent(content, isStreaming)
-  return renderMarkdown(normalized || getAssistantMessagePlaceholder(isStreaming))
+  return renderMarkdown(normalized || getAssistantMessagePlaceholder(isStreaming), {
+    streaming: isStreaming
+  })
 }
 
 function getAssistantMessageStatus(message: { isStreaming?: boolean }): string {

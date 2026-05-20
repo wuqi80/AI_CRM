@@ -117,16 +117,16 @@ export function useAiQuota() {
 
   const aiStatusBadgeClass = computed(() => {
     if (creditRemaining.value <= 0) {
-      return 'bg-amber-50 text-amber-600'
+      return 'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-200'
     }
     if (currentAiMode.value === 'gift') {
       return giftCreditRemaining.value > 0
-        ? 'bg-emerald-50 text-emerald-600'
-        : 'bg-amber-50 text-amber-600'
+        ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-200'
+        : 'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-200'
     }
     return aiReady.value
-      ? 'bg-blue-50 text-blue-600'
-      : 'bg-slate-100 text-slate-500'
+      ? 'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-200'
+      : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'
   })
 
   const giftCreditProgressClass = computed(() => {

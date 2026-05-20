@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+import 'element-plus/theme-chalk/dark/css-vars.css'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 // 本地字体
 import '@fontsource/inter/300.css'
@@ -15,12 +16,15 @@ import '@fontsource-variable/noto-sans-sc'
 // 本地图标
 import 'material-symbols/outlined.css'
 import WkIcon from '@/components/common/WkIcon.vue'
+import { useTheme } from '@/composables/useTheme'
 
 import App from './App.vue'
 import router from './router'
 import './styles/iconfont.css'
 import './styles/main.css'
 import './styles/wk-crm-el-field-skin.css'
+
+useTheme()
 
 // Capacitor iOS safe-area: only enable for native mobile shell
 if (typeof window !== 'undefined') {
