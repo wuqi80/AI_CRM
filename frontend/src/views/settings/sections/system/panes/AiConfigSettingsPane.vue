@@ -268,35 +268,6 @@
 
     <el-card shadow="never" class="!border-slate-200">
       <template #header>
-        <div class="flex items-center justify-between gap-4">
-          <span class="font-medium">积分折算设置</span>
-          <el-tag size="small" type="success" effect="plain">全局生效</el-tag>
-        </div>
-      </template>
-
-      <el-form :model="billingForm" label-position="top" class="max-w-3xl">
-        <el-form-item label="每积分 Token 数">
-          <el-input-number
-            v-model="billingForm.tokensPerCredit"
-            :min="1"
-            :max="1000000000"
-            :step="100"
-            class="w-full md:!w-64"
-          />
-        </el-form-item>
-
-        <div class="flex flex-wrap gap-3 border-t border-slate-200 pt-4">
-          <el-button type="primary" :loading="savingBillingConfig" @click="handleSaveBillingConfig">
-            <el-icon class="mr-1"><Document /></el-icon>
-            保存折算设置
-          </el-button>
-          <el-button @click="loadBillingConfig">重置</el-button>
-        </div>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="!border-slate-200">
-      <template #header>
         <span class="font-medium">配置说明</span>
       </template>
 
@@ -321,16 +292,13 @@ import { Connection, Document, Hide, View } from '@element-plus/icons-vue'
 import TokenPurchaseDialog from '@/components/billing/TokenPurchaseDialog.vue'
 import {
   activateAiProvider,
-  getAiBillingConfig,
   getAiConfigDetail,
   testAiConnection,
-  updateAiBillingConfig,
   updateAiConfig,
   useCustomAiConfig,
   useGiftAiConfig
 } from '@/api/systemConfig'
 import type {
-  AiBillingConfigUpdateBO,
   AiConfig,
   AiConfigUpdateBO,
   AiConnectionTestResult,
@@ -352,7 +320,6 @@ const DEFAULT_PROVIDER: AiProvider = 'dashscope'
 
 const showApiKey = ref(false)
 const savingAiConfig = ref(false)
-const savingBillingConfig = ref(false)
 const testingConnection = ref(false)
 const switchingAiMode = ref(false)
 const activatingProvider = ref(false)
@@ -361,10 +328,6 @@ const providerOptions = ref<AiProviderPreset[]>(AI_PROVIDER_PRESETS)
 const providerDrafts = ref<ProviderDraftMap>({})
 const loadedConfig = ref<AiConfig | null>(null)
 const isTokenPurchaseDialogOpen = ref(false)
-
-const billingForm = reactive<AiBillingConfigUpdateBO>({
-  tokensPerCredit: 800
-})
 
 const aiConfigForm = reactive<AiConfigFormState>({
   provider: DEFAULT_PROVIDER,
@@ -430,7 +393,7 @@ const currentExtraHeadersHint = computed(() => {
 })
 
 onMounted(async () => {
-  await Promise.all([loadAiConfig(), loadBillingConfig()])
+  await loadAiConfig()
 })
 
 function createProviderDraft(preset?: AiProviderPreset | null): AiConfigFormState {
@@ -520,15 +483,6 @@ async function loadAiConfig() {
 
     providerDrafts.value = nextDrafts
     applyProviderDraft(currentProvider)
-  } catch {
-    // Error handled by interceptor
-  }
-}
-
-async function loadBillingConfig() {
-  try {
-    const config = await getAiBillingConfig()
-    billingForm.tokensPerCredit = config.tokensPerCredit || 800
   } catch {
     // Error handled by interceptor
   }
@@ -642,27 +596,6 @@ async function handleSaveAiConfig() {
     // Error handled by interceptor
   } finally {
     savingAiConfig.value = false
-  }
-}
-
-async function handleSaveBillingConfig() {
-  const tokensPerCredit = Number(billingForm.tokensPerCredit)
-  if (!Number.isFinite(tokensPerCredit) || tokensPerCredit < 1) {
-    ElMessage.warning('每积分 Token 数必须大于 0')
-    return
-  }
-
-  savingBillingConfig.value = true
-  try {
-    await updateAiBillingConfig({
-      tokensPerCredit: Math.floor(tokensPerCredit)
-    })
-    ElMessage.success('积分折算设置已保存')
-    await loadBillingConfig()
-  } catch {
-    // Error handled by interceptor
-  } finally {
-    savingBillingConfig.value = false
   }
 }
 

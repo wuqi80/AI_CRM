@@ -2,7 +2,6 @@ package com.kakarote.ai_crm.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
-import com.kakarote.ai_crm.entity.BO.AiBillingConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.entity.VO.AiBillingConfigVO;
@@ -76,11 +75,6 @@ public interface ISystemConfigService extends IService<SystemConfig> {
      * 获取 AI 积分折算配置。
      */
     AiBillingConfigVO getAiBillingConfig();
-
-    /**
-     * 更新 AI 积分折算配置。
-     */
-    void updateAiBillingConfig(AiBillingConfigUpdateBO updateBO);
 
     /**
      * 处理testAiConnection方法逻辑。

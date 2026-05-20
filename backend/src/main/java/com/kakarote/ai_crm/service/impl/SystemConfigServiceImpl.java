@@ -12,7 +12,6 @@ import com.kakarote.ai_crm.ai.provider.AiProviderRegistry;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
-import com.kakarote.ai_crm.entity.BO.AiBillingConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.PO.CrmTenant;
@@ -321,11 +320,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     @Override
     public AiBillingConfigVO getAiBillingConfig() {
         return aiBillingConfigService.getConfig();
-    }
-
-    @Override
-    public void updateAiBillingConfig(AiBillingConfigUpdateBO updateBO) {
-        aiBillingConfigService.updateConfig(updateBO);
     }
 
     /**

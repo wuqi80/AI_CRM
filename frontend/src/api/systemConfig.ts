@@ -1,7 +1,5 @@
 import { get, post } from '@/utils/request'
 import type {
-  AiBillingConfig,
-  AiBillingConfigUpdateBO,
   AiConfig,
   AiProviderActivateBO,
   AiConfigUpdateBO,
@@ -33,14 +31,6 @@ export function useGiftAiConfig(): Promise<void> {
 
 export function useCustomAiConfig(): Promise<void> {
   return post('/systemConfig/ai/useCustom')
-}
-
-export function getAiBillingConfig(): Promise<AiBillingConfig> {
-  return get('/systemConfig/ai/billing')
-}
-
-export function updateAiBillingConfig(data: AiBillingConfigUpdateBO): Promise<void> {
-  return post('/systemConfig/ai/billing/update', data)
 }
 
 export function testAiConnection(data: AiConfigUpdateBO): Promise<AiConnectionTestResult> {
