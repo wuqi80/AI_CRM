@@ -2,14 +2,17 @@
   <div class="flex wk-screen bg-background-light">
     <aside
       v-if="!isMobile"
-      class="wk-primary-sidebar relative z-[110] flex wk-screen flex-shrink-0 flex-col overflow-x-visible overflow-y-visible border-r border-[#ececec] bg-white transition-[width] duration-200 ease-in-out"
-      :class="primarySidebarCollapsed ? 'w-[52px]' : 'w-64'"
+      class="wk-primary-sidebar relative z-[110] flex wk-screen flex-shrink-0 flex-col border-r border-[#ececec] bg-white transition-[width] duration-200 ease-in-out"
+      :class="[
+        primarySidebarCollapsed ? 'w-[52px]' : 'w-64',
+        primarySidebarTransitioning ? 'overflow-hidden' : 'overflow-x-visible overflow-y-visible',
+      ]"
       @mouseenter="onCollapsedPrimarySidebarEnter"
       @mouseleave="onCollapsedPrimarySidebarLeave"
     >
       <!-- 展开：logo + 标题 + 折叠按钮；折叠：仅顶栏切换（ChatGPT 式） -->
       <div
-        v-if="!primarySidebarCollapsed"
+        v-if="!primarySidebarContentCollapsed"
         class="relative z-30 flex items-start justify-between gap-2 overflow-visible px-3 pb-1 pt-3"
       >
         <div class="flex min-w-0 flex-1 items-start gap-2.5 pl-[10px]">
@@ -82,18 +85,18 @@
       </div>
       <!-- pl-[10px] pr-[10px] py-[6px] mt-[0px] ml-[2px] mr-[6px] -->
       <!-- Chat: New session (fixed, not scroll with nav) -->
-      <div class="px-3 pt-1 mb-[0px]" :class="primarySidebarCollapsed ? '!px-2' : ''">
+      <div class="px-3 pt-1 mb-[0px]" :class="primarySidebarContentCollapsed ? '!px-2' : ''">
         <button
           class="flex items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors hover:bg-[#f9f9f9]"
-          :class="primarySidebarCollapsed
+          :class="primarySidebarContentCollapsed
             ? 'mx-auto w-[35px] shrink-0 justify-center px-0'
             : 'ml-[2px] mr-[6px] w-full gap-2 pl-[10px] pr-[10px]'"
-          :title="primarySidebarCollapsed ? '新对话' : undefined"
+          :title="primarySidebarContentCollapsed ? '新对话' : undefined"
           @click="handleNewSession"
         >
           <!-- <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">edit_square</span> -->
           <WkIcon name="new-chat" :size="18" class="shrink-0" />
-          <span style="margin-left: 2px;" v-if="!primarySidebarCollapsed">新对话</span>
+          <span style="margin-left: 2px;" v-if="!primarySidebarContentCollapsed">新对话</span>
         </button>
       </div>
 
@@ -108,35 +111,35 @@
       <nav
         ref="primaryNavRef"
         class="wk-primary-nav-scroll wk-scrollbar-gutter-stable flex-1 flex w-full overflow-y-auto pb-4"
-        :class="primarySidebarCollapsed ? '!px-2' : 'px-3'"
+        :class="primarySidebarContentCollapsed ? '!px-2' : 'px-3'"
         @scroll.passive="onPrimaryNavScroll"
       >
         <div
           class="space-y-1 w-full"
-          :class="primarySidebarCollapsed ? 'flex flex-col items-center' : ''"
+          :class="primarySidebarContentCollapsed ? 'flex flex-col items-center' : ''"
         >
 
           <template v-for="group in pcMainNavGroups" :key="group.title || 'default'">
-            <div v-if="group.title && !primarySidebarCollapsed" class="pt-[8px] pb-[3px]" style="margin-top: 8px; margin-bottom: 0px;">
+            <div v-if="group.title && !primarySidebarContentCollapsed" class="pt-[8px] pb-[3px]" style="margin-top: 8px; margin-bottom: 0px;">
               <p class="px-3 text-[14px] uppercase font-semibold tracking-tight text-[#0d0d0d]">{{ group.title }}</p>
             </div>
             <button
               v-for="item in group.items"
               :key="item.key"
-              :title="primarySidebarCollapsed ? item.label : undefined"
+              :title="primarySidebarContentCollapsed ? item.label : undefined"
               @click="handlePrimaryNavClick(item)"
               class="flex items-center rounded-lg pt-[8px] pb-[8px] transition-colors"
               :class="[
                 isPrimaryActive(item) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] hover:bg-[#f9f9f9]',
-                primarySidebarCollapsed
+                primarySidebarContentCollapsed
                   ? 'mx-auto w-[35px] shrink-0 justify-center px-0'
                   : 'ml-[2px] mr-[2px] w-full gap-2 pl-[10px] pr-[8px]',
               ]"
             >
               <WkIcon :name="item.icon" :box-size="20" class="shrink-0" />
-              <span v-if="!primarySidebarCollapsed" class="truncate text-sm font-normal">{{ item.label }}</span>
+              <span v-if="!primarySidebarContentCollapsed" class="truncate text-sm font-normal">{{ item.label }}</span>
               <span
-                v-if="item.children?.length && !primarySidebarCollapsed"
+                v-if="item.children?.length && !primarySidebarContentCollapsed"
                 class="material-symbols-outlined ml-auto inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none"
                 :class="isPrimarySelected(item) ? 'text-[#c9c9c9]' : 'text-[#c9c9c9]'"
               >
@@ -146,7 +149,7 @@
           </template>
 
           <!-- Chat: recent sessions under Knowledge menu -->
-          <template v-if="!primarySidebarCollapsed">
+          <template v-if="!primarySidebarContentCollapsed">
           <!-- <div class="pt-2" /> -->
           <!-- <div class="mx-1 h-px bg-slate-100" /> -->
           <div class="space-y-1 pt-0">
@@ -335,22 +338,22 @@
         </button>
       </div>
 
-      <div class="border-t border-[#ececec] p-3" :class="primarySidebarCollapsed ? '!px-2 !py-2' : ''">
+      <div class="border-t border-[#ececec] p-3" :class="primarySidebarContentCollapsed ? '!px-2 !py-2' : ''">
         <button
           type="button"
           class="mb-1 flex w-full items-center rounded-xl text-slate-600 transition-colors hover:bg-slate-50 hover:text-primary"
-          :class="primarySidebarCollapsed ? 'justify-center p-2' : 'gap-3 p-2'"
+          :class="primarySidebarContentCollapsed ? 'justify-center p-2' : 'gap-3 p-2'"
           :title="themeButtonLabel"
           :aria-label="themeButtonLabel"
           @click="toggleTheme"
         >
           <span class="material-symbols-outlined text-[20px] leading-none">{{ themeIcon }}</span>
-          <span v-if="!primarySidebarCollapsed" class="text-xs font-semibold">{{ themeButtonLabel }}</span>
+          <span v-if="!primarySidebarContentCollapsed" class="text-xs font-semibold">{{ themeButtonLabel }}</span>
         </button>
         <div
           class="flex cursor-pointer items-center rounded-xl bg-[#fff] transition-colors hover:bg-[#f9f9f9]"
-          :class="primarySidebarCollapsed ? 'justify-center' : 'gap-3 p-2'"
-          :title="primarySidebarCollapsed ? (userStore.realname || userStore.username || '用户') : undefined"
+          :class="primarySidebarContentCollapsed ? 'justify-center' : 'gap-3 p-2'"
+          :title="primarySidebarContentCollapsed ? (userStore.realname || userStore.username || '用户') : undefined"
           @click="showUserMenu = !showUserMenu"
         >
           <div v-if="userStore.avatar" class="size-8 overflow-hidden rounded-full">
@@ -359,7 +362,7 @@
           <div v-else class="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
             {{ userStore.realname?.charAt(0) || 'U' }}
           </div>
-          <template v-if="!primarySidebarCollapsed">
+          <template v-if="!primarySidebarContentCollapsed">
             <div class="min-w-0 flex-1">
               <p class="truncate text-xs font-semibold text-slate-900">{{ userStore.realname || userStore.username }}</p>
               <p class="truncate text-xs text-slate-500">{{ userStore.userInfo?.deptName || '用户' }}</p>
@@ -1035,6 +1038,7 @@ const PC_PRIMARY_SIDEBAR_AUTO_COLLAPSE_BELOW_PX = 780
 const PRIMARY_SIDEBAR_WIDTH_EXPANDED_PX = 256
 const PRIMARY_SIDEBAR_WIDTH_COLLAPSED_PX = 52
 const PRIMARY_SIDEBAR_WIDTH_DELTA_PX = PRIMARY_SIDEBAR_WIDTH_EXPANDED_PX - PRIMARY_SIDEBAR_WIDTH_COLLAPSED_PX
+const PRIMARY_SIDEBAR_TRANSITION_MS = 200
 
 function mainContentWidthAsIfSidebarExpanded(sidebarCollapsed: boolean, mainColumnWidth: number) {
   return sidebarCollapsed ? mainColumnWidth - PRIMARY_SIDEBAR_WIDTH_DELTA_PX : mainColumnWidth
@@ -1070,6 +1074,9 @@ function runLayoutNarrowProgrammatic(fn: () => void) {
 const drawerVisible = ref(false)
 /** PC：一级侧栏收起为图标栏 */
 const primarySidebarCollapsed = ref(false)
+const primarySidebarContentCollapsed = ref(false)
+const primarySidebarTransitioning = ref(false)
+let primarySidebarTransitionTimer: ReturnType<typeof setTimeout> | null = null
 /** 一级侧栏收起时：鼠标在整块 aside 内则顶栏 logo 区显示为折叠图标 */
 const collapsedSidebarAsideHovered = ref(false)
 
@@ -1353,6 +1360,26 @@ watch(
 )
 
 watch(primarySidebarCollapsed, collapsed => {
+  if (primarySidebarTransitionTimer) {
+    clearTimeout(primarySidebarTransitionTimer)
+    primarySidebarTransitionTimer = null
+  }
+
+  primarySidebarTransitioning.value = true
+
+  if (!collapsed) {
+    primarySidebarContentCollapsed.value = false
+  }
+
+  primarySidebarTransitionTimer = setTimeout(() => {
+    primarySidebarTransitionTimer = null
+    primarySidebarContentCollapsed.value = collapsed
+    primarySidebarTransitioning.value = false
+    queueMicrotask(() => updatePrimaryNavScrollbar())
+  }, PRIMARY_SIDEBAR_TRANSITION_MS)
+})
+
+watch(primarySidebarCollapsed, collapsed => {
   collapsedSidebarAsideHovered.value = false
   if (layoutNarrowProgrammatic.value) return
   if (isMobile.value || !layoutNarrowAutoCollapseActive.value) return
@@ -1427,6 +1454,10 @@ onBeforeUnmount(() => {
   if (primaryNavScrollEndTimer) {
     clearTimeout(primaryNavScrollEndTimer)
     primaryNavScrollEndTimer = null
+  }
+  if (primarySidebarTransitionTimer) {
+    clearTimeout(primarySidebarTransitionTimer)
+    primarySidebarTransitionTimer = null
   }
   if (globalSearchTimer) {
     clearTimeout(globalSearchTimer)
