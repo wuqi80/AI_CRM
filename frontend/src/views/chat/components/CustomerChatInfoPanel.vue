@@ -66,7 +66,7 @@
           </section>
 
           <section>
-            <h3 class="mb-2 text-sm font-semibold text-[#0d0d0d]">AI 智能分析</h3>
+            <h3 class="mb-2 text-sm font-semibold text-[#0d0d0d]">AI分析</h3>
             <div class="space-y-2 rounded-lg bg-[#f7f7f7] p-3 text-sm leading-6 text-[#333]">
               <p v-if="customer.aiStatusDetection"><span class="font-medium">状态：</span>{{ customer.aiStatusDetection }}</p>
               <p class="whitespace-pre-wrap">{{ customer.aiInsight || '暂无 AI 分析' }}</p>
@@ -144,7 +144,7 @@
         </div>
 
         <el-collapse v-else v-model="openSections" class="customer-chat-panel-collapse">
-          <el-collapse-item title="AI 智能分析" name="ai">
+          <el-collapse-item title="AI分析" name="ai">
             <div class="space-y-2 text-sm leading-6 text-[#333]">
               <p v-if="customer.aiStatusDetection"><span class="font-medium">状态：</span>{{ customer.aiStatusDetection }}</p>
               <p class="whitespace-pre-wrap">{{ customer.aiInsight || '暂无 AI 分析' }}</p>

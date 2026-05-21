@@ -161,7 +161,7 @@
               aria-controls="recent-chat-sessions-panel"
               @click="recentChatSessionsExpanded = !recentChatSessionsExpanded"
             >
-              <span class="min-w-0 text-[14px] font-semibold tracking-tight text-[#8f8f8f]">Recents</span>
+              <span class="min-w-0 text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">最近</span>
               <span
                 class="flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150 pr-[2px]"
                 :class="recentChatSessionsExpanded ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
@@ -174,11 +174,11 @@
             </button>
 
             <div id="recent-chat-sessions-panel" v-show="recentChatSessionsExpanded">
-            <div v-if="chatStore.sessionsLoading && chatStore.sessions.length === 0" class="flex justify-center py-6">
+            <div v-if="chatStore.sessionsLoading && sidebarVisibleChatSessions.length === 0" class="flex justify-center py-6">
               <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
             </div>
 
-            <div v-else-if="chatStore.sessions.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">
+            <div v-else-if="sidebarVisibleChatSessions.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">
               暂无对话记录
             </div>
 
@@ -200,58 +200,99 @@
                 />
               </button>
               <button
-                v-if="chatStore.sessions.length > RECENT_CHAT_SESSION_LIMIT"
+                v-if="sidebarVisibleChatSessions.length > RECENT_CHAT_SESSION_LIMIT"
                 type="button"
                 class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] pl-[10px] pr-[10px] py-[7px] mt-[1px] ml-[2px] mr-[6px] text-left text-[14px] text-[#6f6f6f] transition-all hover:bg-[#f9f9f9]"
                 @click="recentChatSessionsMoreVisible = true"
               >
                 <span class="material-symbols-outlined text-[20px] leading-none text-[#9a9a9a]">more_horiz</span>
-                <span>More</span>
+                <span>更多</span>
               </button>
             </template>
             </div>
           </div>
 
-          <div v-if="showSidebarCustomers" class="space-y-1 pt-3">
-            <button
-              type="button"
-              class="group flex w-full items-center justify-between gap-1 rounded-lg pb-0 pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px]"
-              :title="sidebarCustomersExpanded ? '收起客户列表' : '展开客户列表'"
-              :aria-expanded="sidebarCustomersExpanded"
-              aria-controls="sidebar-customers-panel"
-              @click="sidebarCustomersExpanded = !sidebarCustomersExpanded"
-            >
-              <span class="min-w-0 text-[14px] font-semibold tracking-tight text-[#8f8f8f]">Customers</span>
-              <span
-                class="flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150 pr-[2px]"
-                :class="sidebarCustomersExpanded ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
-                aria-hidden="true"
+          <div v-if="showSidebarCustomers" class="space-y-1 pt-1">
+            <div class="mt-[12px] mb-[10px] flex w-full items-center gap-2 rounded-lg pl-3 pr-1">
+              <button
+                type="button"
+                class="group flex shrink-0 items-center gap-1 text-left transition-colors"
+                :title="sidebarCustomersExpanded ? '收起客户列表' : '展开客户列表'"
+                :aria-expanded="sidebarCustomersExpanded"
+                aria-controls="sidebar-customers-panel"
+                @click="sidebarCustomersExpanded = !sidebarCustomersExpanded"
               >
-                <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-end self-center text-[18px] leading-none text-[#c9c9c9]">
-                  {{ sidebarCustomersExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
+                <span class="text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">客户</span>
+                <span class="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150" aria-hidden="true">
+                  <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none text-[#c9c9c9]">
+                    {{ sidebarCustomersExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
+                  </span>
                 </span>
-              </span>
-            </button>
+              </button>
+              <div class="relative min-w-0 flex-1" @click.stop>
+                <span class="material-symbols-outlined pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[16px] leading-none text-[#c9c9c9]">search</span>
+                <input
+                  v-model="sidebarCustomerKeyword"
+                  type="text"
+                  class="h-7 w-full rounded-md border border-[#ececec] bg-white py-1 pl-7 pr-7 text-[12px] text-[#0d0d0d] outline-none transition-colors placeholder:text-[#b8b8b8] focus:border-[#d9d9d9] focus:bg-[#fafafa]"
+                  placeholder="搜索客户"
+                  @input="handleSidebarCustomerSearchInput"
+                />
+                <button
+                  v-if="sidebarCustomerKeyword"
+                  type="button"
+                  class="absolute right-1 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-[#b8b8b8] transition-colors hover:bg-[#f5f5f5] hover:text-[#6f6f6f]"
+                  aria-label="清空客户搜索"
+                  title="清空客户搜索"
+                  @click.stop="clearSidebarCustomerSearch"
+                >
+                  <span class="material-symbols-outlined text-[15px] leading-none">close</span>
+                </button>
+              </div>
+            </div>
             <div id="sidebar-customers-panel" v-show="sidebarCustomersExpanded">
               <div v-if="sidebarCustomersLoading && sidebarCustomers.length === 0" class="flex justify-center py-6">
                 <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
               </div>
               <div v-else-if="sidebarCustomers.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">
-                暂无客户数据
+                {{ sidebarCustomerKeyword.trim() ? '暂无匹配客户' : '暂无客户数据' }}
               </div>
-              <button
-                v-for="customer in sidebarCustomers"
-                :key="customer.customerId"
-                type="button"
-                class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] pl-[10px] pr-[10px] py-[7px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
-                :class="isCustomerActive(customer.customerId) ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]'"
-                @click="handleSelectCustomerChat(customer)"
-              >
-                <WkIcon name="customer" :size="14" class="shrink-0 text-[#9a9a9a]" />
-                <span class="min-w-0 flex-1 truncate text-[14px] font-normal text-[#5f5f5f]" :title="customer.companyName">
-                  {{ customer.companyName }}
-                </span>
-              </button>
+              <template v-else>
+                <button
+                  v-for="customer in sidebarCustomers"
+                  :key="customer.customerId"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center gap-2 rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
+                  :class="isCustomerActive(customer.customerId) ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]'"
+                  @click="handleSelectCustomerChat(customer)"
+                >
+                  <div class="flex size-[20px] shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white">
+                    <img
+                      v-if="customer.logoUrl"
+                      :src="customer.logoUrl"
+                      :alt="customer.companyName || 'company logo'"
+                      class="size-full object-contain"
+                    />
+                    <span v-else class="flex size-full items-center justify-center bg-primary/10 text-xs font-bold text-primary">
+                      {{ customer.companyName?.charAt(0) || '?' }}
+                    </span>
+                  </div>
+                  <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="customer.companyName">
+                    {{ customer.companyName }}
+                  </span>
+                </button>
+                <div v-if="sidebarCustomersLoading" class="flex justify-center py-3">
+                  <span class="material-symbols-outlined animate-spin text-[18px] leading-none text-slate-300">progress_activity</span>
+                </div>
+                <button
+                  v-else-if="sidebarCustomersHasMore"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center justify-center rounded-[8px] py-[7px] text-left text-[13px] text-[#8f8f8f] transition-all hover:bg-[#f9f9f9] hover:text-[#5f5f5f]"
+                  @click="loadMoreSidebarCustomers"
+                >
+                  加载更多
+                </button>
+              </template>
             </div>
           </div>
           </template>
@@ -271,7 +312,7 @@
               @click="recentChatSessionsMoreVisible = false"
             >
               <span class="material-symbols-outlined text-[18px] leading-none text-[#8f8f8f]">arrow_back</span>
-              Recents
+              最近
             </button>
             <button
               type="button"
@@ -339,6 +380,7 @@
       <div class="border-t border-[#ececec] p-3" :class="primarySidebarContentCollapsed ? '!px-2 !py-2' : ''">
         <div class="space-y-1">
           <button
+            v-if="false"
             type="button"
             class="flex w-full items-center rounded-xl text-slate-600 transition-colors hover:bg-slate-50 hover:text-primary dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-primary"
             :class="primarySidebarContentCollapsed ? 'justify-center p-2' : 'gap-3 p-2'"
@@ -1015,6 +1057,7 @@ const primaryNavScrolling = ref(false)
 let primaryNavScrollEndTimer: ReturnType<typeof setTimeout> | null = null
 
 function onPrimaryNavScroll() {
+  maybeLoadMoreSidebarCustomers()
   if (!primaryNavHasScrollbar.value) return
   primaryNavScrolling.value = true
   if (primaryNavScrollEndTimer) clearTimeout(primaryNavScrollEndTimer)
@@ -1027,11 +1070,16 @@ function onPrimaryNavScroll() {
 const recentChatSessionsExpanded = ref(true)
 const recentHistoryKeyword = ref('')
 const sidebarCustomersExpanded = ref(true)
+const sidebarCustomerKeyword = ref('')
 const recentChatSessionsMoreVisible = ref(false)
 const RECENT_CHAT_SESSION_LIMIT = 5
-const SIDEBAR_CUSTOMER_LIMIT = 8
+const SIDEBAR_CUSTOMER_LIMIT = 10
+const SIDEBAR_CUSTOMER_SCROLL_THRESHOLD_PX = 120
 const sidebarCustomers = ref<CustomerListVO[]>([])
 const sidebarCustomersLoading = ref(false)
+const sidebarCustomersPage = ref(1)
+const sidebarCustomersTotal = ref(0)
+const sidebarCustomersHasMore = ref(true)
 const showUserMenu = ref(false)
 const showAccountSettingsModal = ref(false)
 const showCreateCustomer = ref(false)
@@ -1045,16 +1093,17 @@ const activeSearchResultIndex = ref(-1)
 const searchPanelRef = ref<HTMLElement | null>(null)
 
 let globalSearchTimer: ReturnType<typeof setTimeout> | null = null
+let sidebarCustomerSearchTimer: ReturnType<typeof setTimeout> | null = null
 let globalSearchRequestId = 0
 
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer'))
 
 watch(showSidebarCustomers, visible => {
   if (visible && sidebarCustomers.value.length === 0) {
-    void fetchSidebarCustomers()
+    void fetchSidebarCustomers({ reset: true })
   }
   if (!visible) {
-    sidebarCustomers.value = []
+    resetSidebarCustomers()
   }
 })
 
@@ -1330,7 +1379,7 @@ onMounted(() => {
   enterpriseStore.loadConfig()
   void chatStore.fetchSessions()
   if (showSidebarCustomers.value) {
-    void fetchSidebarCustomers()
+    void fetchSidebarCustomers({ reset: true })
   }
   document.addEventListener('click', handleDocumentClick)
 
@@ -1383,6 +1432,10 @@ onBeforeUnmount(() => {
     clearTimeout(globalSearchTimer)
     globalSearchTimer = null
   }
+  if (sidebarCustomerSearchTimer) {
+    clearTimeout(sidebarCustomerSearchTimer)
+    sidebarCustomerSearchTimer = null
+  }
 })
 
 watch(
@@ -1399,6 +1452,7 @@ watch(
   ],
   () => {
     queueMicrotask(() => updatePrimaryNavScrollbar())
+    queueMicrotask(() => maybeLoadMoreSidebarCustomers())
   },
   { flush: 'post' }
 )
@@ -1471,38 +1525,117 @@ function groupSessionsByTime(sessions: ChatSession[]): ChatSessionGroups {
   return { today, yesterday, earlier }
 }
 
-const limitedRecentChatSessions = computed(() => chatStore.sessions.slice(0, RECENT_CHAT_SESSION_LIMIT))
+function isCrmChatSession(session: ChatSession): boolean {
+  return (session.appCode || '').trim().toLowerCase() === 'crm'
+}
+
+const sidebarVisibleChatSessions = computed(() =>
+  chatStore.sessions.filter(session => !isCrmChatSession(session))
+)
+
+const limitedRecentChatSessions = computed(() =>
+  sidebarVisibleChatSessions.value.slice(0, RECENT_CHAT_SESSION_LIMIT)
+)
 
 const filteredHistorySessions = computed(() => {
   const keyword = recentHistoryKeyword.value.trim().toLowerCase()
-  if (!keyword) return chatStore.sessions
-  return chatStore.sessions.filter(session => {
+  if (!keyword) return sidebarVisibleChatSessions.value
+  return sidebarVisibleChatSessions.value.filter(session => {
     const title = (session.title || '').toLowerCase()
     const customerName = (session.customerName || '').toLowerCase()
     return title.includes(keyword) || customerName.includes(keyword)
   })
 })
 
-async function fetchSidebarCustomers() {
+function resetSidebarCustomers() {
+  sidebarCustomers.value = []
+  sidebarCustomersPage.value = 1
+  sidebarCustomersTotal.value = 0
+  sidebarCustomersHasMore.value = true
+}
+
+function shouldLoadMoreSidebarCustomers(): boolean {
+  const el = primaryNavRef.value
+  if (!el) return false
+  const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+  return distanceToBottom <= SIDEBAR_CUSTOMER_SCROLL_THRESHOLD_PX
+}
+
+function maybeLoadMoreSidebarCustomers() {
+  if (!showSidebarCustomers.value || !sidebarCustomersExpanded.value || primarySidebarContentCollapsed.value) return
+  if (sidebarCustomersLoading.value || !sidebarCustomersHasMore.value) return
+  if (!shouldLoadMoreSidebarCustomers()) return
+  void fetchSidebarCustomers()
+}
+
+function loadMoreSidebarCustomers() {
+  void fetchSidebarCustomers()
+}
+
+function handleSidebarCustomerSearchInput() {
+  if (sidebarCustomerSearchTimer) {
+    clearTimeout(sidebarCustomerSearchTimer)
+  }
+  sidebarCustomerSearchTimer = setTimeout(() => {
+    void fetchSidebarCustomers({ reset: true })
+  }, 250)
+}
+
+function clearSidebarCustomerSearch() {
+  if (!sidebarCustomerKeyword.value) return
+  sidebarCustomerKeyword.value = ''
+  if (sidebarCustomerSearchTimer) {
+    clearTimeout(sidebarCustomerSearchTimer)
+    sidebarCustomerSearchTimer = null
+  }
+  void fetchSidebarCustomers({ reset: true })
+}
+
+async function fetchSidebarCustomers(options: { reset?: boolean } = {}) {
   if (sidebarCustomersLoading.value) return
   if (!showSidebarCustomers.value) {
-    sidebarCustomers.value = []
+    resetSidebarCustomers()
     return
   }
+  if (options.reset) {
+    resetSidebarCustomers()
+  }
+  if (!sidebarCustomersHasMore.value) return
+
+  const page = sidebarCustomersPage.value
   sidebarCustomersLoading.value = true
   try {
     const result = await queryCustomerList({
-      page: 1,
+      page,
       limit: SIDEBAR_CUSTOMER_LIMIT,
+      keyword: sidebarCustomerKeyword.value.trim() || undefined,
       sortBy: 'createTime',
       sortOrder: 'desc'
     })
-    sidebarCustomers.value = result.list || []
+    const nextCustomers = result.list || []
+    if (page === 1) {
+      sidebarCustomers.value = nextCustomers
+    } else {
+      const existingIds = new Set(sidebarCustomers.value.map(customer => String(customer.customerId)))
+      sidebarCustomers.value = [
+        ...sidebarCustomers.value,
+        ...nextCustomers.filter(customer => !existingIds.has(String(customer.customerId))),
+      ]
+    }
+    sidebarCustomersTotal.value = result.totalRow || sidebarCustomers.value.length
+    sidebarCustomersPage.value = page + 1
+    sidebarCustomersHasMore.value = nextCustomers.length > 0 && sidebarCustomers.value.length < sidebarCustomersTotal.value
   } catch (error) {
     console.error('Load sidebar customers failed:', error)
-    sidebarCustomers.value = []
+    if (page === 1) {
+      sidebarCustomers.value = []
+    }
   } finally {
     sidebarCustomersLoading.value = false
+    queueMicrotask(() => {
+      updatePrimaryNavScrollbar()
+      maybeLoadMoreSidebarCustomers()
+    })
   }
 }
 
@@ -1772,7 +1905,7 @@ async function handleLogout() {
 
 function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
   appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
-  void fetchSidebarCustomers()
+  void fetchSidebarCustomers({ reset: true })
   if (payload.mode === 'create' && payload.customerId) {
     void router.push(`/customer/${payload.customerId}`)
   }

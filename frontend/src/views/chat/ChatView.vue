@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-full" :class="{ 'flex-col': isMobile }">
+  <div ref="chatViewRef" class="flex h-full" :class="{ 'flex-col': isMobile }">
     <!-- Internal Sidebar: Chat History -->
     <aside v-if="isMobile && mobilePanel === 'sessions'" class="flex flex-1 flex-col bg-slate-50/50">
       <div class="p-6 pb-2">
@@ -178,7 +178,7 @@
 
           <div
             v-if="selectedCustomer"
-            class="shrink-0 border-b border-[#ececec] bg-white px-4 py-2 md:px-8"
+            class="relative shrink-0 border-b border-[#ececec] bg-white pl-4 pr-1 py-2 md:pl-8"
           >
             <div class="mx-auto flex h-9 w-full max-w-[768px] items-center justify-between gap-3">
               <h2 class="min-w-[110px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
@@ -210,13 +210,23 @@
                 </template>
               </el-dropdown>
             </div>
+            <button
+              v-if="showCustomerPanelShell && customerPanelVisible"
+              type="button"
+              class="absolute right-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white text-[#8f8f8f] ring-1 ring-[#ececec] transition-colors hover:bg-[#f5f5f5] hover:text-[#0d0d0d] md:right-8"
+              aria-label="收起客户侧栏"
+              title="隐藏客户侧栏"
+              @click="customerPanelVisible = false"
+            >
+              <span class="material-symbols-outlined text-[18px] leading-none">dock_to_right</span>
+            </button>
           </div>
 
           <!-- Messages Area -->
           <div
             ref="messagesContainer"
             class="wk-chat-messages px-4 md:px-8"
-            :class="isChatEmpty ? 'overflow-hidden py-6' : 'flex-1 overflow-y-auto pb-4 pt-6 md:pt-8'"
+            :class="chatMessagesAreaClass"
             @scroll="handleMessagesScroll"
           >
             <!-- Welcome Section (no messages) -->
@@ -848,7 +858,7 @@
                               :key="chatStore.toModelKey(option)"
                               type="button"
                               class="wk-chat-model-menu__item"
-                              @click="selectChatModelFromPopover(chatStore.toModelKey(option))"
+                              @click="handleChatModelChange(chatStore.toModelKey(option))"
                             >
                               <span
                                 class="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg"
@@ -1105,7 +1115,7 @@
                       size="large"
                       :disabled="chatStore.currentSessionIsStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
                       :placeholder="chatStore.modelOptionsLoading ? '加载模型...' : (chatStore.modelOptions.length > 0 ? '选择模型' : '暂无可选模型')"
-                      @change="chatStore.setSelectedModelKey"
+                      @change="handleChatModelChange"
                     >
                       <el-option-group
                         v-for="group in chatModelOptionGroups"
@@ -1178,7 +1188,7 @@
                   </button>
                 </div>
               </div>
-              
+
               <p v-if="chatStore.messages.length > 0" class="text-center text-xs text-[#5d5d5d] uppercase " style="margin-top: 10px !important;">内容由AI生成，请核查重要信息</p>
             </div>
           </div>
@@ -1282,12 +1292,6 @@
       </template>
     </div>
 
-    <CustomerChatInfoPanel
-      v-if="boundCustomerId && !isMobile && currentView === 'chat'"
-      :customer-id="boundCustomerId"
-      class="shrink-0"
-    />
-
     <ChatKnowledgePickerModal
       v-model="chatKnowledgePickerVisible"
       :remaining-slots="Math.max(0, MAX_FILE_COUNT - selectedFiles.length - selectedKnowledgeItems.length)"
@@ -1307,9 +1311,9 @@
 
     <aside
       v-if="showCustomerPanelShell && customerPanelVisible"
-      class="wk-chat-customer-panel relative flex shrink-0 flex-col border-l border-[#ececec] bg-[#fafafa]"
+      class="wk-chat-customer-panel relative flex shrink-0 flex-col border-l border-[#ececec] bg-[#fff]"
       :class="{ 'select-none': customerPanelResizing }"
-      :style="{ width: `${customerPanelWidth}px` }"
+      :style="customerPanelStyle"
     >
       <div
         class="group absolute bottom-0 left-0 top-0 z-20 w-3 cursor-col-resize transition-colors hover:bg-[#0d0d0d0d]"
@@ -1319,16 +1323,7 @@
       >
         <span class="absolute left-0 top-1/2 h-10 w-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-[#cfcfcf]"></span>
       </div>
-      <button
-        type="button"
-        class="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#8f8f8f] shadow-sm ring-1 ring-[#ececec] transition-colors hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
-        aria-label="收起客户侧栏"
-        title="隐藏客户侧栏"
-        @click="customerPanelVisible = false"
-      >
-        <span class="material-symbols-outlined text-[18px] leading-none">dock_to_right</span>
-      </button>
-      <div class="min-h-0 flex-1 overflow-y-auto p-4">
+      <div class="min-h-0 flex-1 overflow-hidden py-4">
         <div v-if="selectedCustomerLoading" class="flex h-full items-center justify-center">
           <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
         </div>
@@ -1339,88 +1334,8 @@
           <p class="text-sm font-semibold text-slate-600">从左侧客户列表选择客户</p>
           <p class="mt-1 max-w-[220px] text-xs leading-relaxed text-slate-400">选择后会创建或打开该客户的 CRM 对话，并在这里展示相关资料。</p>
         </div>
-        <div v-else-if="customerPanelDetailMode" class="h-full pr-8">
-          <CustomerDetailView embedded :customer-id="selectedCustomer.customerId" />
-        </div>
-        <div v-else class="space-y-3 pr-8">
-          <section class="rounded-2xl border border-[#ececec] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-            <div class="mb-3 flex items-center justify-between">
-              <h3 class="text-[14px] font-semibold text-[#0d0d0d]">日程</h3>
-              <span class="material-symbols-outlined text-[18px] leading-none text-[#a3a3a3]">event</span>
-            </div>
-            <div class="rounded-xl bg-[#f7f7f8] p-3">
-              <p class="text-sm font-medium text-[#0d0d0d]">{{ selectedCustomer.nextFollowTime ? '下次跟进' : '暂无待办日程' }}</p>
-              <p class="mt-1 text-xs leading-relaxed text-slate-400">
-                {{ selectedCustomer.nextFollowTime ? formatCustomerDate(selectedCustomer.nextFollowTime) : '客户详情中暂未设置下次跟进时间' }}
-              </p>
-            </div>
-          </section>
-
-          <section class="rounded-2xl border border-[#ececec] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-            <div class="mb-3 flex items-center justify-between">
-              <h3 class="text-[14px] font-semibold text-[#0d0d0d]">任务</h3>
-              <span class="rounded-full bg-[#f5f5f5] px-2 py-0.5 text-xs font-medium text-[#8f8f8f]">{{ selectedCustomerTasks.length }}</span>
-            </div>
-            <div v-if="selectedCustomerTasks.length === 0" class="rounded-xl bg-[#f7f7f8] p-3 text-xs text-slate-400">
-              暂无关联任务
-            </div>
-            <div v-else class="space-y-2">
-              <div
-                v-for="task in selectedCustomerTasks.slice(0, 4)"
-                :key="task.taskId"
-                class="rounded-xl bg-[#f7f7f8] p-3"
-              >
-                <div class="flex items-start justify-between gap-2">
-                  <p class="min-w-0 flex-1 truncate text-sm font-medium text-[#0d0d0d]">{{ task.title }}</p>
-                  <span class="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">{{ formatTaskStatus(task.status) }}</span>
-                </div>
-                <p v-if="task.dueDate" class="mt-1 text-xs text-slate-400">{{ formatCustomerDate(task.dueDate) }}</p>
-              </div>
-            </div>
-          </section>
-
-          <section class="rounded-2xl border border-[#ececec] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-            <div class="mb-3 flex items-center justify-between">
-              <h3 class="text-[14px] font-semibold text-[#0d0d0d]">最近跟进</h3>
-              <span class="rounded-full bg-[#f5f5f5] px-2 py-0.5 text-xs font-medium text-[#8f8f8f]">{{ selectedCustomerFollowUps.length }}</span>
-            </div>
-            <div v-if="selectedCustomerFollowUps.length === 0" class="rounded-xl bg-[#f7f7f8] p-3 text-xs text-slate-400">
-              暂无跟进记录
-            </div>
-            <div v-else class="space-y-2">
-              <div
-                v-for="follow in selectedCustomerFollowUps.slice(0, 3)"
-                :key="follow.followUpId"
-                class="rounded-xl bg-[#f7f7f8] p-3"
-              >
-                <p class="line-clamp-2 text-sm leading-relaxed text-[#0d0d0d]">{{ follow.summary || follow.content }}</p>
-                <p class="mt-2 text-xs text-slate-400">{{ formatCustomerDate(follow.followTime || follow.createTime) }}</p>
-              </div>
-            </div>
-          </section>
-
-          <section class="rounded-2xl border border-[#ececec] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-            <div class="mb-3 flex items-center justify-between">
-              <h3 class="text-[14px] font-semibold text-[#0d0d0d]">附件</h3>
-              <span class="rounded-full bg-[#f5f5f5] px-2 py-0.5 text-xs font-medium text-[#8f8f8f]">{{ selectedCustomerAttachments.length }}</span>
-            </div>
-            <div v-if="selectedCustomerAttachments.length === 0" class="rounded-xl bg-[#f7f7f8] p-3 text-xs text-slate-400">
-              暂无附件
-            </div>
-            <div v-else class="space-y-2">
-              <div
-                v-for="attachment in selectedCustomerAttachments.slice(0, 4)"
-                :key="attachment.attachmentId"
-                class="flex min-w-0 items-center gap-3 rounded-xl bg-[#f7f7f8] p-3"
-              >
-                <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-[#8f8f8f]">attach_file</span>
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm font-medium text-[#0d0d0d]">{{ attachment.fileName }}</p>
-                  <p class="text-xs text-slate-400">{{ formatFileSize(Number(attachment.fileSize || 0)) }}</p>
-                </div>
-              </div>
-            </div>
-          </section>
+        <div v-else class="h-full pr-0">
+          <CustomerDetailView embedded :force-mobile="customerPanelForceMobile" :customer-id="selectedCustomer.customerId" />
         </div>
       </div>
     </aside>
@@ -1464,12 +1379,11 @@ import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
-import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption, Task } from '@/types/common'
-import type { CustomerDetailVO, FollowUpVO } from '@/types/customer'
+import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
+import type { CustomerDetailVO } from '@/types/customer'
 import { wkIconNames } from '@/components/common/wkIcon'
 import type { WkIconName } from '@/components/common/wkIcon'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
-import CustomerChatInfoPanel from '@/views/chat/components/CustomerChatInfoPanel.vue'
 import dashscopeBrandUrl from '@/assets/model-provider-brands/dashscope.svg?url'
 import openaiBrandUrl from '@/assets/model-provider-brands/openai.svg?url'
 import deepseekBrandUrl from '@/assets/model-provider-brands/deepseek.svg?url'
@@ -1498,6 +1412,7 @@ const boundCustomerName = computed(() =>
 )
 
 const inputText = ref('')
+const chatViewRef = ref<HTMLElement | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
 const showScrollToBottomButton = ref(false)
 const mobilePanel = ref<'sessions' | 'chat'>('sessions')
@@ -1562,11 +1477,13 @@ const selectedCustomerId = ref<string | null>(null)
 const selectedCustomer = ref<CustomerDetailVO | null>(null)
 const selectedCustomerLoading = ref(false)
 const customerPanelVisible = ref(true)
-const customerPanelWidth = ref(320)
+const customerPanelWidth = ref(480)
+const customerPanelContainerWidth = ref(0)
+const customerPanelFullWidth = ref(false)
 const customerPanelResizing = ref(false)
-const CUSTOMER_PANEL_MIN_WIDTH = 260
-const CUSTOMER_PANEL_MAX_WIDTH = 720
-const CUSTOMER_PANEL_DETAIL_WIDTH = 440
+const CUSTOMER_PANEL_MIN_WIDTH = 480
+const CUSTOMER_PANEL_PC_DETAIL_RATIO = 0.5
+const CUSTOMER_PANEL_FULL_WIDTH_RATIO = 0.7
 
 const CUSTOMER_STAGE_FLOW = [
   { value: 'lead', label: '线索' },
@@ -1577,15 +1494,6 @@ const CUSTOMER_STAGE_FLOW = [
   { value: 'lost', label: '流失' },
 ] as const
 
-const selectedCustomerDetail = computed(() => {
-  const c = selectedCustomer.value
-  return c && 'contacts' in c ? c : null
-})
-const selectedCustomerTasks = computed<Task[]>(() => selectedCustomerDetail.value?.tasks || [])
-const selectedCustomerFollowUps = computed<FollowUpVO[]>(() => selectedCustomerDetail.value?.recentFollowUps || [])
-const selectedCustomerAttachments = computed(() => {
-  return selectedCustomerFollowUps.value.flatMap(follow => follow.attachments || [])
-})
 const selectedCustomerStageText = computed(() => {
   const c = selectedCustomer.value
   if (!c) return '--'
@@ -1594,12 +1502,21 @@ const selectedCustomerStageText = computed(() => {
   return stage?.label || c.stage || '--'
 })
 const selectedCustomerStageButtonClass = computed(() => getCustomerStageButtonClass(selectedCustomer.value?.stage || 'lead'))
-const customerPanelDetailMode = computed(() => customerPanelWidth.value >= CUSTOMER_PANEL_DETAIL_WIDTH)
 const currentSessionCustomerId = computed(() => {
   const customerId = chatStore.currentSession?.customerId
   return customerId ? String(customerId) : ''
 })
 const showCustomerPanelShell = computed(() => !isMobile.value && Boolean(currentSessionCustomerId.value))
+const customerPanelForceMobile = computed(() => {
+  if (customerPanelFullWidth.value) return false
+  const containerWidth = customerPanelContainerWidth.value
+  if (containerWidth <= 0) return true
+  return customerPanelWidth.value <= containerWidth * CUSTOMER_PANEL_PC_DETAIL_RATIO
+})
+const customerPanelStyle = computed(() => ({
+  width: customerPanelFullWidth.value ? '100%' : `${customerPanelWidth.value}px`,
+  minWidth: `${CUSTOMER_PANEL_MIN_WIDTH}px`
+}))
 
 const chatModelOptionGroups = computed(() => {
   const customOptions = chatStore.modelOptions.filter(option => option.modelSource === 'custom')
@@ -1686,9 +1603,10 @@ function onChatModelImageError(ev: Event) {
   chatModelImageLoadFailed.value = { ...chatModelImageLoadFailed.value, [src]: true }
 }
 
-function selectChatModelFromPopover(modelKey: string) {
+function handleChatModelChange(modelKey: string) {
   chatStore.setSelectedModelKey(modelKey)
   chatModelPopoverVisible.value = false
+  focusChatTextarea()
 }
 
 watch(
@@ -1729,13 +1647,47 @@ function resizeChatTextarea() {
   el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
 }
 
-function clampCustomerPanelWidth(width: number): number {
-  return Math.min(CUSTOMER_PANEL_MAX_WIDTH, Math.max(CUSTOMER_PANEL_MIN_WIDTH, width))
+function getCustomerPanelContainerWidth(): number {
+  const width = chatViewRef.value?.clientWidth || 0
+  return width > 0 ? width : window.innerWidth
+}
+
+function updateCustomerPanelContainerWidth() {
+  customerPanelContainerWidth.value = getCustomerPanelContainerWidth()
+  if (customerPanelFullWidth.value && customerPanelContainerWidth.value > 0) {
+    customerPanelWidth.value = customerPanelContainerWidth.value
+  } else if (
+    customerPanelContainerWidth.value > 0 &&
+    customerPanelWidth.value > customerPanelContainerWidth.value
+  ) {
+    customerPanelWidth.value = customerPanelContainerWidth.value
+  }
+}
+
+function resolveCustomerPanelWidth(width: number): { width: number; fullWidth: boolean } {
+  const containerWidth = getCustomerPanelContainerWidth()
+  if (containerWidth <= 0) {
+    return { width: Math.max(CUSTOMER_PANEL_MIN_WIDTH, width), fullWidth: false }
+  }
+
+  const nextWidth = Math.min(containerWidth, Math.max(CUSTOMER_PANEL_MIN_WIDTH, width))
+  if (nextWidth > containerWidth * CUSTOMER_PANEL_FULL_WIDTH_RATIO) {
+    return { width: containerWidth, fullWidth: true }
+  }
+  return { width: nextWidth, fullWidth: false }
+}
+
+function applyCustomerPanelWidth(width: number) {
+  const next = resolveCustomerPanelWidth(width)
+  customerPanelWidth.value = next.width
+  customerPanelFullWidth.value = next.fullWidth
 }
 
 function handleCustomerPanelResize(event: MouseEvent) {
   if (!customerPanelResizing.value) return
-  customerPanelWidth.value = clampCustomerPanelWidth(window.innerWidth - event.clientX)
+  const rect = chatViewRef.value?.getBoundingClientRect()
+  const rawWidth = rect ? rect.right - event.clientX : window.innerWidth - event.clientX
+  applyCustomerPanelWidth(rawWidth)
 }
 
 function stopCustomerPanelResize() {
@@ -1939,7 +1891,12 @@ const currentView = ref<'chat' | 'notifications'>('chat')
 const userAvatarLoadFailed = ref(false)
 
 const isChatEmpty = computed(() => chatStore.messages.length === 0)
-const isCenteredEmptyChat = computed(() => isChatEmpty.value && !selectedCustomer.value)
+const isCustomerContextChat = computed(() => Boolean(selectedCustomerId.value || currentSessionCustomerId.value))
+const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isCustomerContextChat.value)
+const chatMessagesAreaClass = computed(() => {
+  if (!isChatEmpty.value) return 'flex-1 overflow-y-auto pb-4 pt-6 md:pt-8'
+  return isCustomerContextChat.value ? 'flex-1 overflow-hidden py-6' : 'overflow-hidden py-6'
+})
 
 const SCROLL_TO_BOTTOM_THRESHOLD_PX = 100
 /** When true, new content / streaming keeps the viewport pinned to the bottom. */
@@ -2165,10 +2122,16 @@ const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAva
 const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
 
 let abortChatViewMountSequence = false
+let customerPanelResizeObserver: ResizeObserver | null = null
 
 onMounted(async () => {
   registerAiQuotaResumeSendHandler(handleSend)
   await nextTick()
+  updateCustomerPanelContainerWidth()
+  if (chatViewRef.value) {
+    customerPanelResizeObserver = new ResizeObserver(updateCustomerPanelContainerWidth)
+    customerPanelResizeObserver.observe(chatViewRef.value)
+  }
   resizeChatTextarea()
   await Promise.all([
     chatStore.fetchSessions(),
@@ -2197,6 +2160,8 @@ onBeforeUnmount(() => {
   abortChatVoiceRecording()
   transcriptionToken += 1
   unregisterAiQuotaResumeSendHandler()
+  customerPanelResizeObserver?.disconnect()
+  customerPanelResizeObserver = null
   disconnectComposerAttachmentScrollResizeObserver()
 })
 
@@ -2769,6 +2734,9 @@ function applyKnowledgeDocPrompt(text: string) {
 
 async function handleNewSession() {
   isPinnedToBottom.value = true
+  if (route.query.customerId || route.query.sessionId) {
+    await router.replace({ path: '/chat' })
+  }
   await chatStore.startNewSessionIfNeeded('新对话')
   currentView.value = 'chat'
   if (isMobile.value) {
@@ -2870,18 +2838,6 @@ function formatSessionTime(dateStr: string): string {
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function formatCustomerDate(dateStr?: string): string {
-  if (!dateStr) return '--'
-  const date = new Date(dateStr)
-  if (Number.isNaN(date.getTime())) return '--'
-  return date.toLocaleDateString('zh-CN', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 function getCustomerStageButtonClass(stage?: string): string {
   const map: Record<string, string> = {
     lead: 'bg-sky-50 text-sky-700 hover:bg-sky-100',
@@ -2916,16 +2872,6 @@ async function handleCustomerStageCommand(stage: string) {
     console.error('Update customer stage failed:', err)
     if (!isRequestErrorHandled(err)) ElMessage.error('客户阶段更新失败')
   }
-}
-
-function formatTaskStatus(status?: string): string {
-  const map: Record<string, string> = {
-    PENDING: '待处理',
-    IN_PROGRESS: '进行中',
-    COMPLETED: '已完成',
-    CANCELLED: '已取消'
-  }
-  return status ? (map[status] || status) : '--'
 }
 
 function _formatTime(date: Date): string {

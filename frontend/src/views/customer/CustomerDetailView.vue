@@ -1,5 +1,12 @@
 <template>
-  <div class="h-full flex flex-col" :class="{ 'wk-customer-detail-embedded': embedded }">
+  <div
+    class="h-full flex flex-col"
+    :class="{
+      'wk-customer-detail-embedded': embedded,
+      'wk-customer-detail-mobile': isMobile,
+      'wk-customer-detail-embedded-mobile': isEmbeddedMobileLayout
+    }"
+  >
     <!-- Loading -->
     <div v-if="loading" class="flex-1 flex items-center justify-center">
       <span class="material-symbols-outlined text-slate-300 text-4xl animate-spin">progress_activity</span>
@@ -9,7 +16,10 @@
     <template v-else-if="customer">
       <div class="min-h-0 flex-1 overflow-auto">
         <!-- Sticky Header -->
-        <div class="static z-20 bg-background-light/90 backdrop-blur-md px-4 md:px-8 pt-4 pb-4 border-b border-slate-200/50 shrink-0 md:sticky md:top-0">
+        <div
+          v-if="!isEmbeddedMobileLayout"
+          class="static z-20 bg-background-light/90 backdrop-blur-md px-4 md:px-8 pt-4 pb-4 border-b border-slate-200/50 shrink-0 md:sticky md:top-0"
+        >
           <!-- Breadcrumb -->
           <div v-if="!embedded" class="flex items-center gap-2 text-sm text-slate-500 mb-3">
             <button @click="handleBackToCustomerList" class="hover:text-primary flex items-center gap-1 transition-colors">
@@ -365,8 +375,8 @@
       </div>
 
       <!-- 3-Column Content -->
-      <div class="wk-mobile-px-15 md:px-8 pb-8 pt-6">
-        <div class="lg:hidden mb-4">
+      <div class="wk-mobile-px-15 md:px-8 pb-8 pt-1">
+        <div v-if="!isEmbeddedMobileLayout" class="lg:hidden mb-4">
           <div class="flex items-center gap-2 p-1 rounded-xl bg-slate-100">
             <button
               type="button"
@@ -374,7 +384,7 @@
               :class="detailTab === 'ai' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'"
               @click="detailTab = 'ai'"
             >
-              AI智能分析
+              AI分析
             </button>
             <button
               v-if="canViewFollowUps"
@@ -397,8 +407,8 @@
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <!-- Left Column: Basic Info (col-span-3) -->
-          <div :class="[detailTab === 'ai' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
-            <section class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+          <div :class="[isEmbeddedMobileLayout || detailTab === 'ai' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
+            <section class="bg-white py-4 shadow-sm">
               <div class="mb-4 space-y-1">
                 <!-- 上：图标 + 标题（整行展示，可换行）+ 刷新 -->
                 <div class="flex items-center justify-between gap-2">
@@ -494,7 +504,7 @@
           <!-- Center Column: Follow-ups Timeline (col-span-6)；标题图标与时间轴节点共用 28px 轨宽以便纵轴对齐 -->
           <div
             v-if="canViewFollowUps"
-            :class="[detailTab === 'activity' ? 'block' : 'hidden', 'lg:block lg:col-span-6 space-y-4']"
+            :class="[isEmbeddedMobileLayout || detailTab === 'activity' ? 'block' : 'hidden', 'lg:block lg:col-span-6 space-y-4']"
           >
             <div class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-start gap-x-2 md:items-center">
               <span
@@ -629,7 +639,7 @@
           </div>
 
           <!-- Right Column: Related Modules (col-span-3) -->
-          <div :class="[detailTab === 'related' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
+          <div :class="[isEmbeddedMobileLayout || detailTab === 'related' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
             <div class="flex items-center justify-between px-1">
               <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedBusiness')">
@@ -1085,18 +1095,22 @@ const router = useRouter()
 const customerStore = useCustomerStore()
 const taskStore = useTaskStore()
 const userStore = useUserStore()
-const { isMobile } = useResponsive()
+const { isMobile: responsiveIsMobile } = useResponsive()
 
 const props = withDefaults(defineProps<{
   customerId?: string
   embedded?: boolean
+  forceMobile?: boolean
 }>(), {
   customerId: '',
-  embedded: false
+  embedded: false,
+  forceMobile: false
 })
 
 const activeCustomerId = computed(() => props.customerId || String(route.params.id || ''))
 const embedded = computed(() => props.embedded)
+const isMobile = computed(() => props.forceMobile || responsiveIsMobile.value)
+const isEmbeddedMobileLayout = computed(() => props.embedded && props.forceMobile)
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -2432,5 +2446,81 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
     padding-left: 15px;
     padding-right: 15px;
   }
+}
+
+.wk-customer-detail-mobile .md\:px-8 {
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+}
+
+.wk-customer-detail-mobile .md\:sticky {
+  position: static !important;
+}
+
+.wk-customer-detail-mobile .md\:flex-row {
+  flex-direction: column !important;
+}
+
+.wk-customer-detail-mobile .md\:items-center {
+  align-items: flex-start !important;
+}
+
+.wk-customer-detail-mobile .md\:justify-between {
+  justify-content: flex-start !important;
+}
+
+.wk-customer-detail-mobile .md\:gap-0 {
+  gap: 0.75rem !important;
+}
+
+.wk-customer-detail-mobile .md\:gap-3 {
+  gap: 0.5rem !important;
+}
+
+.wk-customer-detail-mobile .md\:flex-wrap {
+  flex-wrap: nowrap !important;
+}
+
+.wk-customer-detail-mobile .md\:overflow-visible {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+.wk-customer-detail-mobile .md\:w-auto {
+  width: 100% !important;
+}
+
+.wk-customer-detail-mobile .md\:text-xl {
+  font-size: 1.125rem !important;
+  line-height: 1.75rem !important;
+}
+
+.wk-customer-detail-mobile .hidden.md\:flex {
+  display: none !important;
+}
+
+.wk-customer-detail-mobile .md\:hidden {
+  display: flex !important;
+}
+
+.wk-customer-detail-mobile .lg\:hidden {
+  display: block !important;
+}
+
+.wk-customer-detail-mobile .lg\:grid-cols-12 {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.wk-customer-detail-mobile .lg\:col-span-3,
+.wk-customer-detail-mobile .lg\:col-span-6 {
+  grid-column: auto !important;
+}
+
+.wk-customer-detail-mobile .hidden.lg\:block {
+  display: none !important;
+}
+
+.wk-customer-detail-mobile .lg\:block {
+  display: block;
 }
 </style>

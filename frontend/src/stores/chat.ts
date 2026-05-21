@@ -241,6 +241,26 @@ export const useChatStore = defineStore('chat', () => {
     const normalizedAppCode = normalizeAppCode(appCode)
     const id = draftSessionId.value
     if (id) {
+      if (sessions.value.length === 0 && !sessionsLoading.value) {
+        await fetchSessions()
+      }
+      const draftSession = sessions.value.find(s => s.sessionId === id)
+      if (!draftSession) {
+        setDraftSessionId(null)
+        return await startNewSession(title, agentId, customerId, normalizedAppCode)
+      }
+      const draftCustomerId = draftSession?.customerId ? String(draftSession.customerId) : ''
+      const requestCustomerId = customerId ? String(customerId) : ''
+      const draftAgentId = draftSession?.agentId ? String(draftSession.agentId) : ''
+      const requestAgentId = agentId ? String(agentId) : ''
+      const draftAppCode = normalizeAppCode(draftSession?.appCode || sessionAppCodeBySessionId.value[id])
+      if (
+        draftSession &&
+        (draftCustomerId !== requestCustomerId || draftAgentId !== requestAgentId || draftAppCode !== normalizedAppCode)
+      ) {
+        setDraftSessionId(null)
+        return await startNewSession(title, agentId, customerId, normalizedAppCode)
+      }
       if (!streamingTasks.value[id]) {
         let msgs = messagesBySessionId.value[id] || []
         if (msgs.length === 0) {
