@@ -439,14 +439,6 @@
                       <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
                     </button>
                   </div>
-                  <div
-                    v-if="boundCustomerName"
-                    class="flex min-w-0 items-center gap-1.5 px-2 pb-1 pt-2 text-[12px] leading-5 text-[#5f6368]"
-                  >
-                    <WkIcon name="customer" :size="14" class="shrink-0 text-[#8f8f8f]" />
-                    <span class="shrink-0">当前客户：</span>
-                    <span class="min-w-0 truncate font-medium text-[#0d0d0d]">{{ boundCustomerName }}</span>
-                  </div>
                 </div>
               </div>
             </template>
@@ -1382,7 +1374,7 @@
           <p class="mt-1 max-w-[220px] text-xs leading-relaxed text-slate-400">选择后会创建或打开该客户的 CRM 对话，并在这里展示相关资料。</p>
         </div>
         <div v-else class="h-full pr-0">
-          <CustomerDetailView embedded :force-mobile="customerPanelForceMobile" :customer-id="selectedCustomer.customerId" />
+          <CustomerDetailView embedded force-mobile :customer-id="selectedCustomer.customerId" />
         </div>
       </div>
     </aside>
@@ -1526,13 +1518,10 @@ const selectedCustomerId = ref<string | null>(null)
 const selectedCustomer = ref<CustomerDetailVO | null>(null)
 const selectedCustomerLoading = ref(false)
 const customerPanelVisible = ref(true)
-const customerPanelWidth = ref(280)
-const customerPanelContainerWidth = ref(0)
-const customerPanelFullWidth = ref(false)
+const customerPanelWidth = ref(380)
 const customerPanelResizing = ref(false)
-const CUSTOMER_PANEL_MIN_WIDTH = 280
-const CUSTOMER_PANEL_PC_DETAIL_RATIO = 0.5
-const CUSTOMER_PANEL_FULL_WIDTH_RATIO = 0.7
+const CUSTOMER_PANEL_MIN_WIDTH = 380
+const CUSTOMER_PANEL_MAX_WIDTH_RATIO = 0.5
 const CHAT_COMPOSER_MIN_WIDTH_PX = 468
 
 const chatComposerShellStyle = computed(() => (
@@ -1561,15 +1550,10 @@ const currentSessionCustomerId = computed(() => {
   return customerId ? String(customerId) : ''
 })
 const showCustomerPanelShell = computed(() => !isMobile.value && Boolean(currentSessionCustomerId.value))
-const customerPanelForceMobile = computed(() => {
-  if (customerPanelFullWidth.value) return false
-  const containerWidth = customerPanelContainerWidth.value
-  if (containerWidth <= 0) return true
-  return customerPanelWidth.value <= containerWidth * CUSTOMER_PANEL_PC_DETAIL_RATIO
-})
 const customerPanelStyle = computed(() => ({
-  width: customerPanelFullWidth.value ? '100%' : `${customerPanelWidth.value}px`,
-  minWidth: `${CUSTOMER_PANEL_MIN_WIDTH}px`
+  width: `${customerPanelWidth.value}px`,
+  minWidth: `min(${CUSTOMER_PANEL_MIN_WIDTH}px, ${CUSTOMER_PANEL_MAX_WIDTH_RATIO * 100}%)`,
+  maxWidth: `${CUSTOMER_PANEL_MAX_WIDTH_RATIO * 100}%`
 }))
 
 const chatModelOptionGroups = computed(() => {
@@ -1715,34 +1699,20 @@ function getCustomerPanelContainerWidth(): number {
 }
 
 function updateCustomerPanelContainerWidth() {
-  customerPanelContainerWidth.value = getCustomerPanelContainerWidth()
-  if (customerPanelFullWidth.value && customerPanelContainerWidth.value > 0) {
-    customerPanelWidth.value = customerPanelContainerWidth.value
-  } else if (
-    customerPanelContainerWidth.value > 0 &&
-    customerPanelWidth.value > customerPanelContainerWidth.value
-  ) {
-    customerPanelWidth.value = customerPanelContainerWidth.value
-  }
+  const containerWidth = getCustomerPanelContainerWidth()
+  if (containerWidth <= 0) return
+  customerPanelWidth.value = resolveCustomerPanelWidth(customerPanelWidth.value, containerWidth)
 }
 
-function resolveCustomerPanelWidth(width: number): { width: number; fullWidth: boolean } {
-  const containerWidth = getCustomerPanelContainerWidth()
-  if (containerWidth <= 0) {
-    return { width: Math.max(CUSTOMER_PANEL_MIN_WIDTH, width), fullWidth: false }
-  }
-
-  const nextWidth = Math.min(containerWidth, Math.max(CUSTOMER_PANEL_MIN_WIDTH, width))
-  if (nextWidth > containerWidth * CUSTOMER_PANEL_FULL_WIDTH_RATIO) {
-    return { width: containerWidth, fullWidth: true }
-  }
-  return { width: nextWidth, fullWidth: false }
+function resolveCustomerPanelWidth(width: number, containerWidth = getCustomerPanelContainerWidth()): number {
+  if (containerWidth <= 0) return Math.max(CUSTOMER_PANEL_MIN_WIDTH, width)
+  const maxWidth = containerWidth * CUSTOMER_PANEL_MAX_WIDTH_RATIO
+  const minWidth = Math.min(CUSTOMER_PANEL_MIN_WIDTH, maxWidth)
+  return Math.min(maxWidth, Math.max(minWidth, width))
 }
 
 function applyCustomerPanelWidth(width: number) {
-  const next = resolveCustomerPanelWidth(width)
-  customerPanelWidth.value = next.width
-  customerPanelFullWidth.value = next.fullWidth
+  customerPanelWidth.value = resolveCustomerPanelWidth(width)
 }
 
 function handleCustomerPanelResize(event: MouseEvent) {

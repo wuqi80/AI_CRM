@@ -410,7 +410,7 @@
           <div :class="[isEmbeddedMobileLayout || detailTab === 'ai' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
             <section class="bg-white py-4" :class="[!isEmbeddedMobileLayout ? 'rounded-xl border border-slate-200 px-4 shadow-sm' : '']">
               <div class="mb-4 space-y-1">
-                <!-- 上：图标 + 标题（整行展示，可换行）+ 刷新 -->
+                <!-- 上：图标 + 标题（整行展示，可换行）+ 更新时间 + 刷新 -->
                 <div class="flex items-center justify-between gap-2">
                   <div class="flex min-w-0 flex-1 items-center gap-2">
                     <span
@@ -423,26 +423,25 @@
                       {{ savedAiAnalysisTitle }}
                     </h3>
                   </div>
-                  <button
-                    v-if="canEditCustomer"
-                    type="button"
-                    class="flex size-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="generatingAiReport"
-                    :title="generatingAiReport ? '生成中…' : '更新 AI 分析'"
-                    :aria-label="generatingAiReport ? '生成中' : '更新 AI 分析'"
-                    @click="handleGenerateReport"
-                  >
-                    <span
-                      class="material-symbols-outlined text-[20px] leading-none"
-                      :class="{ 'animate-spin': generatingAiReport }"
-                    >refresh</span>
-                  </button>
-                </div>
-                <!-- 下：更新时间 -->
-                <div class="flex justify-end">
-                  <p class="text-right text-xs leading-relaxed text-slate-400">
-                    {{ aiAnalysisDisplayTime }}更新
-                  </p>
+                  <div class="flex shrink-0 items-center justify-end gap-2">
+                    <p class="text-right text-xs leading-relaxed text-slate-400">
+                      {{ aiAnalysisDisplayTime }}更新
+                    </p>
+                    <button
+                      v-if="canEditCustomer"
+                      type="button"
+                      class="flex size-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="generatingAiReport"
+                      :title="generatingAiReport ? '生成中…' : '更新 AI 分析'"
+                      :aria-label="generatingAiReport ? '生成中' : '更新 AI 分析'"
+                      @click="handleGenerateReport"
+                    >
+                      <span
+                        class="material-symbols-outlined text-[20px] leading-none"
+                        :class="{ 'animate-spin': generatingAiReport }"
+                      >refresh</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
