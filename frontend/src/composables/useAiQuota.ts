@@ -9,7 +9,7 @@ const DEFAULT_CHAT_AI_CONFIG: AiConfigUpdateBO = {
   provider: 'dashscope',
   apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode',
   apiKey: '',
-  model: 'qwen3.5-plus',
+  model: 'qwen3.6-plus',
   temperature: 0.7,
   maxTokens: 4096,
 }

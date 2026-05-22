@@ -34,7 +34,7 @@ public class WeKnoraConfig {
 
         @Data
         public static class ChatModel {
-            private String name = "qwen3.5-plus";
+            private String name = "qwen3.6-plus";
             private String source = "remote";
             private String provider = "aliyun";
             private String apiKey;

@@ -333,7 +333,7 @@ const aiConfigForm = reactive<AiConfigFormState>({
   provider: DEFAULT_PROVIDER,
   apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode',
   apiKey: '',
-  model: 'qwen3.5-plus',
+  model: 'qwen3.6-plus',
   temperature: 0.7,
   maxTokens: 2048,
   extraHeadersJson: '',
@@ -620,7 +620,19 @@ function inferCapabilities(provider: AiProvider | undefined, model: string | und
     supportsToolCall = normalizedModel !== '' && !normalizedModel.includes('kimi-thinking-preview')
     supportsVision = normalizedModel.includes('vision') || normalizedModel.includes('vl')
   } else {
-    if (['gpt-5', '4o', '4.1', 'vision', 'omni', '3.5-plus', '1-8', '4.6v', '4.5v', '4v', 'vl'].some((keyword) => normalizedModel.includes(keyword))) {
+    if ([
+      'gpt-5',
+      '4o',
+      '4.1',
+      'vision',
+      'omni',
+      'qwen3.6-plus',
+      '1-8',
+      '4.6v',
+      '4.5v',
+      '4v',
+      'vl'
+    ].some((keyword) => normalizedModel.includes(keyword))) {
       supportsVision = true
     }
     if (['openai', 'dashscope', 'deepseek', 'ark', 'minimax', 'zhipu', 'custom'].includes(normalizedProvider)) {

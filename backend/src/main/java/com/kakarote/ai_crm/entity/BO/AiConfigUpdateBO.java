@@ -28,7 +28,7 @@ public class AiConfigUpdateBO implements Serializable {
     private String apiKey;
 
     @NotBlank(message = "模型名称不能为空")
-    @Schema(description = "模型名称", example = "qwen3.5-plus")
+    @Schema(description = "模型名称", example = "qwen3.6-plus")
     private String model;
 
     @DecimalMin(value = "0.0", message = "Temperature 最小值为 0")
