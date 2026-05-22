@@ -4,7 +4,7 @@
       v-if="!isMobile"
       class="wk-primary-sidebar relative z-[110] flex wk-screen flex-shrink-0 flex-col border-r border-[#ececec] bg-white transition-[width] duration-200 ease-in-out"
       :class="[
-        primarySidebarCollapsed ? 'w-[52px]' : 'w-64',
+        primarySidebarCollapsed ? 'w-[52px]' : 'w-72',
         primarySidebarTransitioning ? 'overflow-hidden' : 'overflow-x-visible overflow-y-visible',
       ]"
       @mouseenter="onCollapsedPrimarySidebarEnter"
@@ -25,11 +25,11 @@
           <div v-else class="size-8 shrink-0 overflow-hidden rounded-lg bg-transparent">
             <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
           </div>
-          <div v-if="false" class="min-w-0 flex-1 pr-1 pt-0.5">
-            <h1 class="line-clamp-2 text-[15px] font-semibold leading-snug text-[#0d0d0d]">
+          <div v-if="!primarySidebarContentCollapsed" class="min-w-0 flex-1 pr-1 pt-0.5">
+            <h1 class="line-clamp-2 text-[19px] font-semibold leading-snug text-[#0d0d0d]">
               {{ enterpriseStore.displayName }}
             </h1>
-            <p class="mt-0.5 line-clamp-1 text-[11px] uppercase tracking-wider text-slate-500">
+            <p class="mt-0.5 line-clamp-1 text-[11px] text-slate-500">
               {{ enterpriseStore.displayDescription }}
             </p>
           </div>
@@ -2184,6 +2184,57 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
 </script>
 
 <style scoped>
+.wk-primary-sidebar {
+  border-color: var(--wk-border-subtle) !important;
+  background: linear-gradient(180deg, #fffefa 0%, var(--wk-bg-sidebar) 100%) !important;
+  color: var(--wk-text-primary);
+}
+
+.wk-primary-sidebar :deep(button) {
+  color: var(--wk-text-primary);
+}
+
+.wk-primary-sidebar :deep(button:hover) {
+  background-color: var(--wk-bg-surface-hover) !important;
+}
+
+.wk-primary-sidebar :deep(.bg-\[\#f3f3f3\]) {
+  background-color: var(--wk-bg-surface-active) !important;
+}
+
+.wk-primary-sidebar :deep(.bg-\[\#f9f9f9\]) {
+  background-color: var(--wk-bg-surface-hover) !important;
+}
+
+.wk-primary-sidebar :deep(.border-\[\#ececec\]),
+.wk-primary-sidebar :deep(.border-slate-200),
+.wk-primary-sidebar :deep(.border-slate-100) {
+  border-color: var(--wk-border-subtle) !important;
+}
+
+.wk-primary-sidebar :deep(.text-slate-900),
+.wk-primary-sidebar :deep(.text-\[\#0d0d0d\]) {
+  color: var(--wk-text-primary) !important;
+}
+
+.wk-primary-sidebar :deep(.text-slate-500),
+.wk-primary-sidebar :deep(.text-slate-400),
+.wk-primary-sidebar :deep(.text-\[\#8f8f8f\]),
+.wk-primary-sidebar :deep(.text-\[\#c9c9c9\]) {
+  color: var(--wk-text-muted) !important;
+}
+
+.wk-primary-sidebar :deep(input) {
+  border-color: var(--wk-border-subtle) !important;
+  background-color: var(--wk-bg-surface) !important;
+  color: var(--wk-text-primary) !important;
+}
+
+.wk-primary-sidebar :deep(input:focus) {
+  border-color: var(--wk-border-muted) !important;
+  background-color: #fffefa !important;
+}
+
 .drawer-overlay-enter-active,
 .drawer-overlay-leave-active {
   transition: opacity 0.3s ease;

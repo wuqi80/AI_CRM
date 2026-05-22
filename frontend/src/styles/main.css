@@ -24,34 +24,51 @@ html, body, #app {
  * We scope padding to native mobile only to avoid impacting PC layout.
  */
 :root {
-  --wk-primary-rgb: 19 127 236;
+  --wk-primary-rgb: 31 30 28;
   --wk-primary: rgb(var(--wk-primary-rgb));
-  --wk-bg-page-rgb: 246 247 248;
+  --wk-accent-rgb: 207 116 79;
+  --wk-accent: rgb(var(--wk-accent-rgb));
+  --wk-bg-page-rgb: 248 247 244;
   --wk-bg-page: rgb(var(--wk-bg-page-rgb));
-  --wk-bg-surface: #ffffff;
-  --wk-bg-surface-subtle: #f8fafc;
-  --wk-bg-surface-muted: #f1f5f9;
-  --wk-bg-surface-hover: #f9f9f9;
-  --wk-bg-surface-active: #f3f3f3;
-  --wk-border-subtle: #ececec;
-  --wk-border-muted: #e2e8f0;
-  --wk-border-strong: #cbd5e1;
-  --wk-text-primary: #0d0d0d;
-  --wk-text-secondary: #475569;
-  --wk-text-muted: #64748b;
-  --wk-text-faint: #999;
-  --wk-shadow-color: 15 23 42;
+  --wk-bg-sidebar: #fbfaf7;
+  --wk-bg-surface: #fffefa;
+  --wk-bg-surface-subtle: #f6f4ef;
+  --wk-bg-surface-muted: #efede8;
+  --wk-bg-surface-hover: #f1efea;
+  --wk-bg-surface-active: #e9e6df;
+  --wk-border-subtle: #e7e2da;
+  --wk-border-muted: #d8d2c9;
+  --wk-border-strong: #c7c0b6;
+  --wk-text-primary: #25231f;
+  --wk-text-secondary: #514d46;
+  --wk-text-muted: #777168;
+  --wk-text-faint: #a39d93;
+  --wk-shadow-color: 48 43 35;
   --wk-scrollbar-size: 8px;
   --wk-scrollbar-radius: 3px;
   --wk-scrollbar-thumb: var(--wk-border-subtle);
   --wk-scrollbar-thumb-hover: var(--wk-text-faint);
-  --el-color-primary: #137fec;
-  --el-color-primary-dark-2: #0f66bd;
-  --el-color-primary-light-3: #5ba5f2;
-  --el-color-primary-light-5: #89bff6;
-  --el-color-primary-light-7: #b8d9fa;
-  --el-color-primary-light-8: #d0e5fc;
-  --el-color-primary-light-9: #e8f3fe;
+  --el-color-primary: #1f1e1c;
+  --el-color-primary-dark-2: #0d0d0c;
+  --el-color-primary-light-3: #68625a;
+  --el-color-primary-light-5: #a9a197;
+  --el-color-primary-light-7: #d0cac1;
+  --el-color-primary-light-8: #e2ddd5;
+  --el-color-primary-light-9: #f2eee8;
+  --el-bg-color: var(--wk-bg-surface);
+  --el-bg-color-page: var(--wk-bg-page);
+  --el-bg-color-overlay: #fffefa;
+  --el-border-color: var(--wk-border-muted);
+  --el-border-color-light: var(--wk-border-subtle);
+  --el-border-color-lighter: #eee9e1;
+  --el-fill-color: var(--wk-bg-surface-muted);
+  --el-fill-color-light: var(--wk-bg-surface-subtle);
+  --el-fill-color-lighter: #fbfaf7;
+  --el-fill-color-blank: var(--wk-bg-surface);
+  --el-text-color-primary: var(--wk-text-primary);
+  --el-text-color-regular: var(--wk-text-secondary);
+  --el-text-color-secondary: var(--wk-text-muted);
+  --el-text-color-placeholder: var(--wk-text-faint);
   --wk-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --wk-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --wk-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
@@ -106,6 +123,56 @@ body {
   transition:
     background-color 160ms ease,
     color 160ms ease;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--wk-primary);
+  --el-button-border-color: var(--wk-primary);
+  --el-button-hover-bg-color: #3d3932;
+  --el-button-hover-border-color: #3d3932;
+  --el-button-active-bg-color: #0d0d0c;
+  --el-button-active-border-color: #0d0d0c;
+}
+
+.el-input__wrapper,
+.el-textarea__inner {
+  background-color: var(--wk-bg-surface) !important;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px var(--wk-border-subtle) inset !important;
+}
+
+.el-input__wrapper:hover,
+.el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px var(--wk-border-muted) inset !important;
+}
+
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--wk-primary) inset !important;
+}
+
+.el-dialog {
+  border: 1px solid var(--wk-border-subtle);
+  border-radius: 18px !important;
+  background: var(--wk-bg-surface) !important;
+  box-shadow: 0 22px 70px rgb(var(--wk-shadow-color) / 0.18) !important;
+}
+
+.el-popper,
+.el-dropdown__popper {
+  border-color: var(--wk-border-subtle) !important;
+  background: var(--wk-bg-surface) !important;
+  box-shadow: 0 18px 50px rgb(var(--wk-shadow-color) / 0.14) !important;
+}
+
+.el-dropdown-menu {
+  background: var(--wk-bg-surface) !important;
+}
+
+.el-dropdown-menu__item:not(.is-disabled):focus,
+.el-dropdown-menu__item:not(.is-disabled):hover {
+  background: var(--wk-bg-surface-hover) !important;
+  color: var(--wk-text-primary) !important;
 }
 
 /* Apply safe-area to app root so inner scroll containers can reach bottom */

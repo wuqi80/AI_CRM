@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-5">
     <template v-if="result && unified">
-      <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div class="rounded-2xl border border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] shadow-none">
         <div
           v-if="result.score != null"
           class="relative overflow-hidden rounded-t-2xl bg-slate-900 p-4 text-white"
@@ -9,8 +9,8 @@
           <div class="relative z-10">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <h4 class="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary">
-                  <span class="material-symbols-outlined text-sm text-primary">verified</span>
+                <h4 class="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--wk-accent)]">
+                  <span class="material-symbols-outlined text-sm text-[var(--wk-accent)]">verified</span>
                   AI 潜力评分
                 </h4>
                 <p v-if="!compactScore" class="mt-1 text-xs leading-relaxed text-slate-400">{{ scoreCaption }}</p>
@@ -21,7 +21,7 @@
               </div>
             </div>
           </div>
-          <div class="absolute -bottom-10 -right-8 size-28 rounded-full bg-primary/20 blur-3xl"></div>
+          <div class="absolute -bottom-10 -right-8 size-28 rounded-full bg-[var(--wk-accent)]/20 blur-3xl"></div>
         </div>
 
         <div
@@ -31,7 +31,7 @@
         >
           <div v-if="result.summary">
             <h4 class="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-              <span class="material-symbols-outlined text-sm text-primary">analytics</span>
+              <span class="material-symbols-outlined text-sm text-[var(--wk-accent)]">analytics</span>
               AI 深度分析
             </h4>
             <ul class="space-y-1.5">
@@ -47,7 +47,7 @@
           </div>
           <div v-if="!compactScore && result.nextStep" :class="{ 'mt-4 border-t border-slate-100 pt-4': result.summary }">
             <h4 class="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-              <span class="material-symbols-outlined text-sm text-primary">rocket_launch</span>
+              <span class="material-symbols-outlined text-sm text-[var(--wk-accent)]">rocket_launch</span>
               建议下一步行动
             </h4>
             <p class="whitespace-pre-line break-words text-xs leading-relaxed text-slate-700">{{ result.nextStep }}</p>
@@ -59,7 +59,7 @@
           class="border-t border-slate-100 p-4"
         >
           <h4 class="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-            <span class="material-symbols-outlined text-sm text-primary">checklist</span>
+            <span class="material-symbols-outlined text-sm text-[var(--wk-accent)]">checklist</span>
             关键要点
           </h4>
           <ul class="space-y-2">

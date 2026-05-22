@@ -143,7 +143,7 @@
     <div
       v-if="!isMobile || mobilePanel === 'chat'"
       ref="chatMainAreaRef"
-      class="flex-1 min-w-0 flex flex-col relative bg-white overflow-hidden"
+      class="wk-chat-shell flex-1 min-w-0 flex flex-col relative overflow-hidden"
     >
       <!-- Chat View -->
       <template v-if="currentView === 'chat'">
@@ -179,7 +179,7 @@
 
           <div
             v-if="selectedCustomer"
-            class="relative shrink-0 border-b border-[#ececec] bg-white pl-4 pr-1 py-2 md:pl-8"
+            class="wk-chat-customer-header relative shrink-0 border-b pl-4 pr-1 py-2 md:pl-8"
           >
             <div class="mx-auto flex h-9 w-full items-center justify-between gap-3 pr-20">
               <div class="flex min-w-0 flex-1 items-center gap-2">
@@ -204,7 +204,7 @@
                   <span
                     v-for="tag in selectedCustomer.tags?.slice(0, 3)"
                     :key="tag.tagId"
-                    class="group/tag inline-flex h-6 max-w-[88px] shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 text-[11px] font-medium text-slate-700"
+                    class="group/tag inline-flex h-6 max-w-[88px] shrink-0 items-center gap-1 rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-secondary)]"
                     :title="tag.tagName"
                   >
                     <span class="min-w-0 truncate">{{ tag.tagName }}</span>
@@ -221,14 +221,14 @@
                   </span>
                   <span
                     v-if="(selectedCustomer.tags?.length || 0) > 3"
-                    class="inline-flex h-6 shrink-0 items-center rounded-lg bg-slate-100 px-2 text-[11px] font-medium text-slate-500"
+                    class="inline-flex h-6 shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-muted)]"
                   >
                     +{{ (selectedCustomer.tags?.length || 0) - 3 }}
                   </span>
                   <button
                     v-if="canEditSelectedCustomerTags"
                     type="button"
-                    class="inline-flex size-6 shrink-0 items-center justify-center rounded-lg border border-dashed border-primary/30 text-primary transition-colors hover:bg-primary/5"
+                    class="inline-flex size-6 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--wk-border-muted)] text-[var(--wk-text-primary)] transition-colors hover:bg-[var(--wk-bg-surface-hover)]"
                     title="添加标签"
                     aria-label="添加标签"
                     @click.stop="showSelectedCustomerTagDialog = true"
@@ -498,8 +498,8 @@
 
           <!-- Input Area -->
           <div
-            class="shrink-0 pb-2 md:pb-2 px-8"
-            :class="isCenteredEmptyChat ? 'bg-transparent pt-0' : 'bg-gradient-to-t from-white via-white to-transparent'"
+            class="wk-chat-composer-wrap shrink-0 pb-2 md:pb-2 px-8"
+            :class="isCenteredEmptyChat ? 'bg-transparent pt-0' : ''"
           >
             <div class="mx-auto space-y-8 w-[calc(100%-20px)] max-w-4xl md:w-full">
 
@@ -529,10 +529,10 @@
                 :style="chatComposerShellStyle"
               >
                 <!-- <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl group-focus-within:bg-primary/10 transition-all opacity-0 group-focus-within:opacity-100"></div> -->
-                <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl transition-all opacity-0"></div>
+                <div class="absolute inset-0 rounded-2xl opacity-0 transition-all"></div>
                 <!-- focus-within:border-primary -->
                 <div
-                  class="relative flex bg-white rounded-2xl p-2 shadow-[0_0_#0000,0_0_#0000,0_0_#0000,0_0_#0000,0px_3px_6px_0px_#0000000a,0px_4px_80px_8px_#0000000a,0px_0px_1px_0px_#0000009e]  transition-all"
+                  class="wk-chat-composer relative flex rounded-2xl p-2 transition-all"
                   :class="isMobile ? 'flex-col items-stretch gap-2' : 'min-w-0 items-center rounded-[28px] p-[6px]'"
                   @mousedown="handleInputBoxMouseDown"
                 >
@@ -782,9 +782,9 @@
                                   name="customer"
                                   :size="18"
                                   class="shrink-0"
-                                  :class="chatStore.selectedAppCode === 'crm' ? '!text-[#0169cc]' : ''"
+                                  :class="chatStore.selectedAppCode === 'crm' ? '!text-[var(--wk-text-primary)]' : ''"
                                 />
-                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'crm' ? 'text-[#0169cc]' : 'text-[#0d0d0d]'">CRM管理</span>
+                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'crm' ? 'text-[var(--wk-text-primary)]' : 'text-[#0d0d0d]'">CRM管理</span>
                                 <span
                                   v-if="chatStore.selectedAppCode === 'crm'"
                                   class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
@@ -799,9 +799,9 @@
                                   name="knowledge-1"
                                   :size="18"
                                   class="shrink-0"
-                                  :class="chatStore.selectedAppCode === 'knowledge' ? '!text-[#0169cc]' : ''"
+                                  :class="chatStore.selectedAppCode === 'knowledge' ? '!text-[var(--wk-text-primary)]' : ''"
                                 />
-                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'knowledge' ? 'text-[#0169cc]' : 'text-[#0d0d0d]'">知识库检索</span>
+                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'knowledge' ? 'text-[var(--wk-text-primary)]' : 'text-[#0d0d0d]'">知识库检索</span>
                                 <span
                                   v-if="chatStore.selectedAppCode === 'knowledge'"
                                   class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
@@ -814,7 +814,7 @@
                       <button
                         v-if="chatStore.selectedAppCode !== 'general'"
                         type="button"
-                        class="group/crm-toolbar h-[36px] rounded-full hover:bg-primary/10 pl-1 pr-3.5 text-sm text-[#0285FF] shadow-primary/10 transition-all"
+                        class="group/crm-toolbar h-[36px] rounded-full pl-1 pr-3.5 text-sm text-[var(--wk-text-primary)] transition-all hover:bg-[var(--wk-bg-surface-hover)]"
                         aria-pressed="true"
                         :title="`已启用 ${selectedChatAppLabel}，点击关闭`"
                         @click="chatStore.setSelectedAppCode('general')"
@@ -827,7 +827,7 @@
                               <WkIcon :name="selectedChatAppIcon" :size="18" class="shrink-0" />
                             </span>
                             <span
-                              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-primary/25 text-primary opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
+                              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-[var(--wk-bg-surface-active)] text-[var(--wk-text-primary)] opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
                               aria-hidden="true"
                             >
                               <span class="material-symbols-outlined text-[14px] leading-none">close</span>
@@ -1141,7 +1141,7 @@
                       <button
                         v-if="chatStore.selectedAppCode !== 'general'"
                         type="button"
-                        class="group/crm-toolbar h-[36px] self-start inline-flex hover:bg-primary/10 rounded-xl px-3.5 text-sm text-primary shadow-sm shadow-primary/10 transition-all"
+                        class="group/crm-toolbar h-[36px] self-start inline-flex rounded-xl px-3.5 text-sm text-[var(--wk-text-primary)] transition-all hover:bg-[var(--wk-bg-surface-hover)]"
                         aria-pressed="true"
                         :title="`已启用 ${selectedChatAppLabel}，点击关闭`"
                         @click="chatStore.setSelectedAppCode('general')"
@@ -1154,7 +1154,7 @@
                               <WkIcon :name="selectedChatAppIcon" :size="18" class="shrink-0" />
                             </span>
                             <span
-                              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-primary/25 text-primary opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
+                              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-[var(--wk-bg-surface-active)] text-[var(--wk-text-primary)] opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
                               aria-hidden="true"
                             >
                               <span class="material-symbols-outlined text-[14px] leading-none">close</span>
@@ -1408,7 +1408,7 @@
 
     <aside
       v-if="showCustomerPanelShell && customerPanelVisible"
-      class="wk-chat-customer-panel relative flex shrink-0 flex-col border-l border-[#ececec] bg-[#fff]"
+      class="wk-chat-customer-panel relative flex shrink-0 flex-col border-l"
       :class="{ 'select-none': customerPanelResizing }"
       :style="customerPanelStyle"
     >
@@ -3045,14 +3045,14 @@ function formatSessionTime(dateStr: string): string {
 
 function getCustomerStageButtonClass(stage?: string): string {
   const map: Record<string, string> = {
-    lead: 'bg-sky-50 text-sky-700 hover:bg-sky-100',
-    qualified: 'bg-violet-50 text-violet-700 hover:bg-violet-100',
-    proposal: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
-    negotiation: 'bg-orange-50 text-orange-700 hover:bg-orange-100',
-    closed: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-    lost: 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+    lead: 'bg-[var(--wk-bg-surface-hover)] text-[var(--wk-text-primary)] hover:bg-[var(--wk-bg-surface-active)]',
+    qualified: 'bg-[var(--wk-bg-surface-hover)] text-[var(--wk-text-primary)] hover:bg-[var(--wk-bg-surface-active)]',
+    proposal: 'bg-[#f8eadf] text-[#8d4f34] hover:bg-[#f3ddcf]',
+    negotiation: 'bg-[#f8eadf] text-[#8d4f34] hover:bg-[#f3ddcf]',
+    closed: 'bg-[#e8efe6] text-[#46643e] hover:bg-[#dfe9dc]',
+    lost: 'bg-[var(--wk-bg-surface-muted)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-active)]',
   }
-  return map[stage || ''] || 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+  return map[stage || ''] || 'bg-[var(--wk-bg-surface-muted)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-active)]'
 }
 
 function getCustomerStageIcon(stage?: string): string {
@@ -3141,8 +3141,43 @@ void _formatTime
 
 .wk-chat-messages {
   --wk-chat-messages-scrollbar-offset: 0px;
-  background: var(--wk-bg-surface);
+  background: var(--wk-bg-page);
   overflow-x: hidden;
+}
+
+.wk-chat-shell {
+  background:
+    linear-gradient(180deg, rgba(255, 254, 250, 0.92) 0%, rgba(248, 247, 244, 0.94) 62%, rgba(248, 247, 244, 1) 100%);
+}
+
+.wk-chat-customer-header {
+  border-color: var(--wk-border-subtle);
+  background: color-mix(in srgb, var(--wk-bg-surface) 92%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.wk-chat-composer-wrap {
+  background: linear-gradient(to top, var(--wk-bg-page) 72%, rgba(248, 247, 244, 0));
+}
+
+.wk-chat-composer {
+  border: 1px solid var(--wk-border-subtle);
+  background: var(--wk-bg-surface);
+  box-shadow:
+    0 20px 70px rgb(var(--wk-shadow-color) / 0.08),
+    0 2px 8px rgb(var(--wk-shadow-color) / 0.05);
+}
+
+.wk-chat-composer:focus-within {
+  border-color: var(--wk-border-muted);
+  box-shadow:
+    0 22px 78px rgb(var(--wk-shadow-color) / 0.11),
+    0 0 0 1px rgba(31, 30, 28, 0.04);
+}
+
+.wk-chat-customer-panel {
+  border-color: var(--wk-border-subtle);
+  background: var(--wk-bg-surface);
 }
 
 .wk-chat-messages__inner {
@@ -3159,6 +3194,11 @@ void _formatTime
   min-width: min(100%, 468px);
   max-width: 768px;
   overflow-wrap: anywhere;
+}
+
+.wk-chat-message--user :deep(.rounded-\[24px\]) {
+  background-color: var(--wk-bg-surface-muted) !important;
+  color: var(--wk-text-primary) !important;
 }
 
 .wk-chat-message--assistant :deep(.wk-markdown) {
@@ -3201,7 +3241,7 @@ void _formatTime
   margin: 1em 0;
   overflow-x: auto;
   border-radius: 12px;
-  background: #0d0d0d;
+  background: #1f1e1c;
   padding: 14px 16px;
   color: #f7f7f7;
 }
@@ -3275,7 +3315,7 @@ void _formatTime
   height: 14px;
   margin-left: 6px;
   border-radius: 9999px;
-  background: var(--wk-text-primary);
+  background: var(--wk-accent);
   transform-origin: center;
   animation: breathingDot 1.2s ease-in-out infinite;
 }

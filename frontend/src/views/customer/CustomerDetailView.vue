@@ -1358,14 +1358,14 @@ const transferUserList = ref<TransferUserOption[]>([])
 const sectionIconBoxClass = 'inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white shadow-[0_8px_18px_rgba(15,23,42,0.08)]'
 const sectionMaterialIconClass = 'material-symbols-outlined text-[16px] leading-none'
 const sectionIconBgColors = {
-  customerStage: '#0052CC',
-  basicInfo: '#5243AA',
-  recentActivity: '#FF991F',
-  relatedBusiness: '#00A3BF',
-  relatedContacts: '#DE350B',
-  todoTasks: '#00875A',
-  relatedSchedules: '#00A3BF',
-  documentCenter: '#0052CC',
+  customerStage: '#1f1e1c',
+  basicInfo: '#8d4f34',
+  recentActivity: '#cf744f',
+  relatedBusiness: '#5f584f',
+  relatedContacts: '#cf744f',
+  todoTasks: '#5f704a',
+  relatedSchedules: '#8d4f34',
+  documentCenter: '#1f1e1c',
 } as const
 
 const savedAiAnalysisTitle = 'AI分析'
@@ -2684,6 +2684,77 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
 </script>
 
 <style>
+.wk-customer-detail-embedded {
+  background: var(--wk-bg-surface);
+  color: var(--wk-text-primary);
+}
+
+.wk-customer-detail-embedded .bg-white,
+.wk-customer-detail-embedded-mobile .bg-white {
+  background-color: var(--wk-bg-surface) !important;
+}
+
+.wk-customer-detail-embedded .bg-slate-50,
+.wk-customer-detail-embedded .bg-slate-50\/70,
+.wk-customer-detail-embedded .bg-slate-100,
+.wk-customer-detail-embedded-mobile .bg-slate-50,
+.wk-customer-detail-embedded-mobile .bg-slate-50\/70,
+.wk-customer-detail-embedded-mobile .bg-slate-100 {
+  background-color: var(--wk-bg-surface-muted) !important;
+}
+
+.wk-customer-detail-embedded .border-slate-100,
+.wk-customer-detail-embedded .border-slate-200,
+.wk-customer-detail-embedded .border-\[\#ececec\],
+.wk-customer-detail-embedded-mobile .border-slate-100,
+.wk-customer-detail-embedded-mobile .border-slate-200,
+.wk-customer-detail-embedded-mobile .border-\[\#ececec\] {
+  border-color: var(--wk-border-subtle) !important;
+}
+
+.wk-customer-detail-embedded .shadow-sm,
+.wk-customer-detail-embedded-mobile .shadow-sm {
+  box-shadow: none !important;
+}
+
+.wk-customer-detail-embedded .text-slate-900,
+.wk-customer-detail-embedded-mobile .text-slate-900 {
+  color: var(--wk-text-primary) !important;
+}
+
+.wk-customer-detail-embedded .text-slate-700,
+.wk-customer-detail-embedded .text-slate-600,
+.wk-customer-detail-embedded-mobile .text-slate-700,
+.wk-customer-detail-embedded-mobile .text-slate-600 {
+  color: var(--wk-text-secondary) !important;
+}
+
+.wk-customer-detail-embedded .text-slate-500,
+.wk-customer-detail-embedded .text-slate-400,
+.wk-customer-detail-embedded-mobile .text-slate-500,
+.wk-customer-detail-embedded-mobile .text-slate-400 {
+  color: var(--wk-text-muted) !important;
+}
+
+.wk-customer-detail-embedded .text-primary,
+.wk-customer-detail-embedded-mobile .text-primary {
+  color: var(--wk-text-primary) !important;
+}
+
+.wk-customer-detail-embedded .bg-primary,
+.wk-customer-detail-embedded-mobile .bg-primary {
+  background-color: var(--wk-primary) !important;
+}
+
+.wk-customer-detail-embedded .bg-primary\/5,
+.wk-customer-detail-embedded .bg-primary\/10,
+.wk-customer-detail-embedded .bg-primary\/20,
+.wk-customer-detail-embedded-mobile .bg-primary\/5,
+.wk-customer-detail-embedded-mobile .bg-primary\/10,
+.wk-customer-detail-embedded-mobile .bg-primary\/20 {
+  background-color: var(--wk-bg-surface-hover) !important;
+}
+
 .wk-stage-result-popover.el-popover {
   padding: 0;
   border: 1px solid rgb(226 232 240);
