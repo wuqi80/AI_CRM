@@ -40,6 +40,7 @@ import com.kakarote.ai_crm.utils.AiMediaUtil;
 import com.kakarote.ai_crm.utils.DocumentTextExtractor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.content.Media;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -86,37 +87,32 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     );
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
     private static final int MAX_ATTACHMENT_ANALYSIS_LENGTH = 4000;
+    private static final int MAX_PARSE_ATTACHMENT_CONTEXT_LENGTH = 1600;
     private static final int MAX_FOLLOW_UP_SUMMARY_LENGTH = 22;
+    private static final int FOLLOW_UP_PARSE_MAX_COMPLETION_TOKENS = 512;
+    private static final double FOLLOW_UP_PARSE_TEMPERATURE = 0.0D;
 
     private static final String AI_PARSE_PROMPT_TEMPLATE = """
-        You are a professional CRM assistant.
-        Analyze the follow-up note and attachment context below, then return JSON only.
+        You are a CRM follow-up parser. Return strict JSON only.
 
         Customer: %s
         Current time: %s
 
         User content:
         %s
-
-        Attachment context:
         %s
 
-        Time rules:
-        1. `followTime` means the time this follow-up record is created or the actual completed follow-up time.
-        2. If the content is describing a future plan or scheduled contact such as "tomorrow at 10am call the customer", keep `followTime` as Current time.
-        3. Put planned future contact times into `nextFollowTime`.
-        4. Do not put a future planned time into `followTime` when the content has not happened yet.
-        5. Resolve relative time phrases like "明天上午10点" or "tomorrow at 10am" against Current time and output concrete timestamps.
-        6. Example: if Current time is "2026-04-13 15:00:00" and the content says "明天上午10点电话沟通", then `followTime` must be "2026-04-13 15:00:00" and `nextFollowTime` must be "2026-04-14 10:00:00".
+        Rules:
+        - `followTime` is the actual completed time or record creation time.
+        - If the content describes a future planned contact, keep `followTime` as Current time and put the resolved future time in `nextFollowTime`.
+        - Resolve relative time phrases against Current time.
+        - Keep summary, sceneType, keyPoints, and todos in the user's language.
+        - `summary` must be a short card title, preferably 8-18 Chinese characters or within 30 characters.
 
-        Keep summary, sceneType, keyPoints, and todos in the same language as the user's content.
-        The `summary` must be very concise and title-like, suitable for a card heading.
-        Prefer 8-18 Chinese characters or within 30 characters in other languages.
-        Do not write a paragraph, explanation, or multiple sentences.
-        Return strict JSON only with this exact shape:
+        JSON shape:
         {
-          "summary": "very short heading-style summary",
-          "sceneType": "brief scene label in the same language, or empty string",
+          "summary": "short card title",
+          "sceneType": "brief scene label or empty string",
           "type": "one of: call, meeting, email, visit, other",
           "followTime": "yyyy-MM-dd HH:mm:ss",
           "nextFollowTime": "yyyy-MM-dd HH:mm:ss or empty string",
@@ -250,21 +246,40 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     @Override
     public FollowUpAiParseVO aiParseFollowUp(FollowUpAiParseBO parseBO) {
         String customerName = StrUtil.blankToDefault(parseBO.getCustomerName(), "Unknown customer");
+        String content = StrUtil.blankToDefault(parseBO.getContent(), "");
         String now = LocalDateTime.now().format(AI_TIME_FORMATTER);
-        AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
-        String attachmentContext = buildAttachmentContext(parseBO.getAttachments(), capabilities);
+        List<ChatSendBO.AttachmentDTO> attachments = parseBO.getAttachments();
+        boolean hasAttachments = CollUtil.isNotEmpty(attachments);
+        DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig = chatClientProvider.getCurrentRuntimeConfigSnapshot();
+        AiModelCapabilities capabilities = hasAttachments ? runtimeConfig.capabilities() : null;
+        String attachmentContext = hasAttachments ? buildAttachmentContext(attachments, capabilities) : "";
+        String attachmentBlock = StrUtil.isNotBlank(attachmentContext)
+            ? "\n\nAttachment context:\n" + attachmentContext
+            : "";
         String prompt = String.format(
             AI_PARSE_PROMPT_TEMPLATE,
             customerName,
             now,
-            parseBO.getContent(),
-            StrUtil.blankToDefault(attachmentContext, "No usable attachment content")
+            content,
+            attachmentBlock
         );
+        long startNanos = System.nanoTime();
+        int attachmentCount = hasAttachments ? attachments.size() : 0;
 
         try {
+            log.info("AI follow-up parse started: model={}, contentLength={}, attachments={}",
+                runtimeConfig.model(), content.length(), attachmentCount);
             aiQuotaService.ensureQuotaAvailable("followup_parse", null, null, prompt);
-            List<Media> mediaList = buildMediaList(parseBO.getAttachments(), capabilities);
-            var requestSpec = chatClientProvider.getChatClient().prompt();
+            List<Media> mediaList = hasAttachments
+                ? buildMediaList(attachments, capabilities)
+                : Collections.emptyList();
+            OpenAiChatOptions parseOptions = OpenAiChatOptions.builder()
+                .model(runtimeConfig.model())
+                .temperature(FOLLOW_UP_PARSE_TEMPERATURE)
+                .maxCompletionTokens(FOLLOW_UP_PARSE_MAX_COMPLETION_TOKENS)
+                .build();
+            parseOptions.setStreamUsage(Boolean.FALSE);
+            var requestSpec = chatClientProvider.getChatClient().prompt().options(parseOptions);
 
             if (CollUtil.isNotEmpty(mediaList)) {
                 requestSpec.user(user -> user.text(prompt).media(mediaList.toArray(new Media[0])));
@@ -274,17 +289,26 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
             var chatResponse = requestSpec.call().chatResponse();
             String response = chatResponse.getResult().getOutput().getText();
+            AiQuotaService.TokenUsageSnapshot usageSnapshot =
+                aiQuotaService.resolveTokenUsage(chatResponse, null, null, prompt, response);
             aiQuotaService.consumeResolvedTokens(
                 "followup_parse",
-                aiQuotaService.resolveTokenUsage(chatResponse, null, null, prompt, response)
+                usageSnapshot
+            );
+            long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+            log.info(
+                "AI follow-up parse completed: model={}, elapsedMs={}, contentLength={}, attachments={}, totalTokens={}",
+                runtimeConfig.model(), elapsedMs, content.length(), attachmentCount, usageSnapshot.totalTokens()
             );
             log.info("AI follow-up parse raw response: {}", response);
-            return parseAiResponse(response, parseBO.getContent(), now);
+            return parseAiResponse(response, content, now);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("AI follow-up parse failed, using fallback result", e);
-            return buildFallbackResult(parseBO.getContent(), now);
+            long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+            log.error("AI follow-up parse failed, using fallback result: model={}, elapsedMs={}, contentLength={}, attachments={}",
+                runtimeConfig.model(), elapsedMs, content.length(), attachmentCount, e);
+            return buildFallbackResult(content, now);
         }
     }
 
@@ -1037,14 +1061,16 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             } else if (isTextFile(mimeType, fileName)) {
                 String textContent = extractFileText(att.getFilePath());
                 if (StrUtil.isNotBlank(textContent)) {
-                    context.append(String.format("- Text file: %s\n```\n%s\n```\n", fileName, textContent));
+                    context.append(String.format("- Text file: %s\n```\n%s\n```\n",
+                        fileName, limitText(textContent, MAX_PARSE_ATTACHMENT_CONTEXT_LENGTH)));
                 } else {
                     context.append(String.format("- Text file: %s (content could not be read)\n", fileName));
                 }
             } else if (isDocumentFile(mimeType, fileName)) {
                 String textContent = extractDocumentText(att.getFilePath());
                 if (StrUtil.isNotBlank(textContent)) {
-                    context.append(String.format("- Document: %s\n```\n%s\n```\n", fileName, textContent));
+                    context.append(String.format("- Document: %s\n```\n%s\n```\n",
+                        fileName, limitText(textContent, MAX_PARSE_ATTACHMENT_CONTEXT_LENGTH)));
                 } else {
                     context.append(String.format("- Document: %s (text could not be extracted)\n", fileName));
                 }
@@ -1053,9 +1079,12 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             } else {
                 context.append(String.format("- File: %s (type: %s)\n", fileName, mimeType));
             }
+            if (context.length() >= MAX_PARSE_ATTACHMENT_CONTEXT_LENGTH) {
+                return limitText(context.toString(), MAX_PARSE_ATTACHMENT_CONTEXT_LENGTH);
+            }
         }
 
-        return context.toString();
+        return limitText(context.toString(), MAX_PARSE_ATTACHMENT_CONTEXT_LENGTH);
     }
 
     /**

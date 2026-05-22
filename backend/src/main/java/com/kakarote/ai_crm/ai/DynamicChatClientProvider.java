@@ -412,7 +412,7 @@ public class DynamicChatClientProvider {
         return normalizedModel.startsWith("kimi-k2.5")
                 || normalizedModel.startsWith("kimi-k2.6")
                 || normalizedModel.startsWith("kimi-k2-5")
-                || normalizedModel.startsWith("kimi-k2-6");
+                || normalizedModel.startsWith("kimi-k2-6") || normalizedModel.equals("gpt-5-mini") || normalizedModel.equals("gpt-5-nano");
     }
 
     /**
