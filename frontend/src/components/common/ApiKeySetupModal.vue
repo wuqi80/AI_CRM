@@ -166,7 +166,7 @@ type ProviderDraftMap = Partial<Record<AiProvider, AiConfigUpdateBO>>
 
 const DEFAULT_PROVIDER: AiProvider = 'dashscope'
 const DEFAULT_API_URL = 'https://dashscope.aliyuncs.com/compatible-mode'
-const DEFAULT_MODEL = 'qwen3.5-plus'
+const DEFAULT_MODEL = 'qwen3.6-plus'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean

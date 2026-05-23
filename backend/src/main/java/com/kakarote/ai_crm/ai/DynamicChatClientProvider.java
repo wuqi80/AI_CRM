@@ -111,7 +111,7 @@ public class DynamicChatClientProvider {
     @Value("${spring.ai.openai.api-key:${DASHSCOPE_API_KEY:${OPENAI_API_KEY:}}}")
     private String defaultApiKey;
 
-    @Value("${spring.ai.openai.chat.options.model:qwen3.5-plus}")
+    @Value("${spring.ai.openai.chat.options.model:qwen3.6-plus}")
     private String defaultModel;
 
     @Value("${spring.ai.openai.chat.options.temperature:0.7}")
@@ -412,7 +412,7 @@ public class DynamicChatClientProvider {
         return normalizedModel.startsWith("kimi-k2.5")
                 || normalizedModel.startsWith("kimi-k2.6")
                 || normalizedModel.startsWith("kimi-k2-5")
-                || normalizedModel.startsWith("kimi-k2-6");
+                || normalizedModel.startsWith("kimi-k2-6") || normalizedModel.equals("gpt-5-mini") || normalizedModel.equals("gpt-5-nano");
     }
 
     /**
