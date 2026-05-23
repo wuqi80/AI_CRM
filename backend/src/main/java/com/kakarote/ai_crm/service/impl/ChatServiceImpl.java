@@ -12,6 +12,8 @@ import com.kakarote.ai_crm.ai.app.ChatApplicationCodes;
 import com.kakarote.ai_crm.ai.app.ChatApplicationDefinition;
 import com.kakarote.ai_crm.ai.app.ChatApplicationRegistry;
 import com.kakarote.ai_crm.ai.context.AiContextHolder;
+import com.kakarote.ai_crm.ai.memory.CrmChatMemoryAdvisor;
+import com.kakarote.ai_crm.ai.memory.CrmChatMemoryService;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.state.PendingCustomerCreationStore;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
@@ -37,10 +39,8 @@ import com.kakarote.ai_crm.utils.DocumentTextExtractor;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -71,6 +71,12 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private ChatApplicationRegistry chatApplicationRegistry;
+
+    @Autowired
+    private CrmChatMemoryAdvisor crmChatMemoryAdvisor;
+
+    @Autowired
+    private CrmChatMemoryService crmChatMemoryService;
 
     @Autowired
     private ChatSessionMapper chatSessionMapper;
@@ -463,7 +469,7 @@ public class ChatServiceImpl implements IChatService {
             return Flux.just(routedKnowledgeResponse);
         }
 
-        List<Message> history = buildMessageHistory(sessionId);
+        List<Message> history = buildMessageHistory(sessionId, messageId);
 
         String knowledgeToolPrompt = buildKnowledgeToolPrompt(application, ragEnabled);
         String attachmentContext = buildAttachmentContext(attachments);
@@ -545,15 +551,8 @@ public class ChatServiceImpl implements IChatService {
 
         final String finalSystemPrompt = enhancedSystemPrompt;
         final String finalContent = enhancedContent;
-        ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt()
-            .system(finalSystemPrompt)
-            .messages(history);
-
-        if (CollUtil.isNotEmpty(mediaList)) {
-            requestSpec.user(u -> u.text(finalContent).media(mediaList.toArray(new Media[0])));
-        } else {
-            requestSpec.user(finalContent);
-        }
+        ChatClient.ChatClientRequestSpec requestSpec = buildChatRequestSpec(
+            chatClient, finalSystemPrompt, finalContent, mediaList, sessionId, messageId);
 
         return requestSpec
             .stream()
@@ -620,7 +619,8 @@ public class ChatServiceImpl implements IChatService {
                 updateSessionTime(sessionId);
                 AiContextHolder.clear();
                 return Flux.just(CHAT_ERROR_MESSAGE);
-            });
+            })
+            .doFinally(signalType -> AiContextHolder.clear());
     }
 
     /**
@@ -672,7 +672,7 @@ public class ChatServiceImpl implements IChatService {
             return routedKnowledgeResponse;
         }
 
-        List<Message> history = buildMessageHistory(sessionId);
+        List<Message> history = buildMessageHistory(sessionId, messageId);
 
         String knowledgeToolPrompt = buildKnowledgeToolPrompt(application, ragEnabled);
         String attachmentContext = buildAttachmentContext(attachments);
@@ -746,15 +746,8 @@ public class ChatServiceImpl implements IChatService {
 
             final String finalSystemPrompt = enhancedSystemPrompt;
             final String finalContent = enhancedContent;
-            ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt()
-                .system(finalSystemPrompt)
-                .messages(history);
-
-            if (CollUtil.isNotEmpty(mediaList)) {
-                requestSpec.user(u -> u.text(finalContent).media(mediaList.toArray(new Media[0])));
-            } else {
-                requestSpec.user(finalContent);
-            }
+            ChatClient.ChatClientRequestSpec requestSpec = buildChatRequestSpec(
+                chatClient, finalSystemPrompt, finalContent, mediaList, sessionId, messageId);
 
             var chatResponse = requestSpec.call().chatResponse();
             String response = chatResponse.getResult().getOutput().getText();
@@ -899,6 +892,25 @@ public class ChatServiceImpl implements IChatService {
         return mediaList;
     }
 
+    private ChatClient.ChatClientRequestSpec buildChatRequestSpec(ChatClient chatClient,
+                                                                  String systemPrompt,
+                                                                  String content,
+                                                                  List<Media> mediaList,
+                                                                  Long sessionId,
+                                                                  Long messageId) {
+        ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt()
+            .system(systemPrompt)
+            .advisors(advisor -> advisor
+                .advisors(crmChatMemoryAdvisor)
+                .param(ChatMemory.CONVERSATION_ID, sessionId)
+                .param(CrmChatMemoryAdvisor.CURRENT_MESSAGE_ID, messageId));
+
+        if (CollUtil.isNotEmpty(mediaList)) {
+            return requestSpec.user(user -> user.text(content).media(mediaList.toArray(new Media[0])));
+        }
+        return requestSpec.user(content);
+    }
+
     /**
      * 处理containsImageAttachment方法逻辑。
      */
@@ -1009,29 +1021,8 @@ public class ChatServiceImpl implements IChatService {
     /**
      * 构建消息History。
      */
-    private List<Message> buildMessageHistory(Long sessionId) {
-        List<ChatMessage> dbMessages = chatMessageMapper.selectList(
-            new LambdaQueryWrapper<ChatMessage>()
-                .eq(ChatMessage::getSessionId, sessionId)
-                .orderByAsc(ChatMessage::getCreateTime)
-                .last("LIMIT 20")
-        );
-
-        List<Message> messages = new ArrayList<>();
-        for (ChatMessage dbMsg : dbMessages) {
-            switch (dbMsg.getRole()) {
-                case "user":
-                    messages.add(new UserMessage(dbMsg.getContent()));
-                    break;
-                case "assistant":
-                    messages.add(new AssistantMessage(dbMsg.getContent()));
-                    break;
-                case "system":
-                    messages.add(new SystemMessage(dbMsg.getContent()));
-                    break;
-            }
-        }
-        return messages;
+    private List<Message> buildMessageHistory(Long sessionId, Long currentMessageId) {
+        return crmChatMemoryService.loadRecentMessages(sessionId, currentMessageId);
     }
 
     /**

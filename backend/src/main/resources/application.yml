@@ -43,6 +43,9 @@ spring:
     # 已有数据库首次接入 Flyway 时，自动标记 baseline，跳过 V1
     baseline-on-migrate: true
     baseline-version: 1
+system-ai:
+  openai:
+    proxy-base-url: ${SYSTEM_OPENAI_PROXY_BASE_URL:http://52.198.150.151}
 logging:
   config: classpath:logback-spring.xml
 # token配置

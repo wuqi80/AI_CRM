@@ -64,7 +64,7 @@ public class DynamicChatClientProvider {
     private static final String AI_EXTRA_HEADERS_KEY = "ai_extra_headers";
     private static final String AI_PROVIDER_CONFIGS_KEY = "ai_provider_configs";
     private static final String OPENAI_PUBLIC_BASE_URL = "https://api.openai.com";
-    private static final String OPENAI_PROXY_BASE_URL = "http://52.198.150.151";
+    private static final String DEFAULT_OPENAI_PROXY_BASE_URL = "http://52.198.150.151";
     private static final double MOONSHOT_K2_FIXED_TEMPERATURE = 1.0D;
 
     private final ConcurrentHashMap<Long, ChatClient> tenantChatClients = new ConcurrentHashMap<>();
@@ -128,6 +128,9 @@ public class DynamicChatClientProvider {
 
     @Value("${weknora.init-models.chat.name:}")
     private String giftModel;
+
+    @Value("${system-ai.openai.proxy-base-url:" + DEFAULT_OPENAI_PROXY_BASE_URL + "}")
+    private String openAiProxyBaseUrl;
 
     /**
      * 获取聊天客户端。
@@ -368,14 +371,7 @@ public class DynamicChatClientProvider {
                                        String extraHeadersJson, AiModelCapabilities capabilities,
                                        boolean registerTools, String appCode) {
         OpenAiApi openAiApi = buildOpenAiApi(providerCode, baseUrl, apiKey, extraHeadersJson);
-        Double requestTemperature = resolveRequestTemperature(providerCode, model, temperature);
-
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .model(model)
-                .temperature(requestTemperature)
-                .maxCompletionTokens(maxTokens)
-                .build();
-        options.setStreamUsage(Boolean.TRUE);
+        OpenAiChatOptions options = buildChatOptions(providerCode, model, temperature, maxTokens);
 
         ObservationRegistry obsRegistry = observationRegistry != null
                 ? observationRegistry : ObservationRegistry.NOOP;
@@ -391,6 +387,25 @@ public class DynamicChatClientProvider {
             }
         }
         return builder.build();
+    }
+
+    OpenAiChatOptions buildChatOptions(String providerCode, String model, Double temperature, Integer maxTokens) {
+        Double requestTemperature = resolveRequestTemperature(providerCode, model, temperature);
+        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
+                .model(model)
+                .temperature(requestTemperature)
+                .maxCompletionTokens(maxTokens)
+                .streamUsage(true);
+
+        if (shouldDisableDashscopeThinking(providerCode)) {
+            builder.extraBody(Map.of("enable_thinking", Boolean.FALSE));
+        }
+
+        return builder.build();
+    }
+
+    private boolean shouldDisableDashscopeThinking(String providerCode) {
+        return "dashscope".equalsIgnoreCase(StrUtil.nullToEmpty(providerCode).trim());
     }
 
     private Double resolveRequestTemperature(String providerCode, String model, Double temperature) {
@@ -476,7 +491,8 @@ public class DynamicChatClientProvider {
     private OpenAiApi buildOpenAiApi(String providerCode, String baseUrl, String apiKey, String extraHeadersJson) {
         String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
         AiProviderDescriptor descriptor = AiProviderRegistry.resolve(providerCode, normalizedBaseUrl);
-        String actualRequestBaseUrl = resolveActualRequestBaseUrl(descriptor.getCode(), normalizedBaseUrl);
+        String actualRequestBaseUrl = resolveActualRequestBaseUrl(
+                descriptor.getCode(), normalizedBaseUrl, openAiProxyBaseUrl);
         OpenAiApi.Builder builder = OpenAiApi.builder()
                 .baseUrl(actualRequestBaseUrl)
                 .apiKey(apiKey);
@@ -498,13 +514,16 @@ public class DynamicChatClientProvider {
     /**
      * 解析实际请求基础地址。
      */
-    public static String resolveActualRequestBaseUrl(String providerCode, String baseUrl) {
+    public static String resolveActualRequestBaseUrl(String providerCode, String baseUrl, String openAiProxyBaseUrl) {
         String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
         if ("openai".equalsIgnoreCase(providerCode) && OPENAI_PUBLIC_BASE_URL.equalsIgnoreCase(normalizedBaseUrl)) {
-            // 外部仍保存官方地址用于识别服务商能力，真正发请求时再切到代理地址，避免影响配置展示和规则判断。
-            return OPENAI_PROXY_BASE_URL;
+            return StrUtil.blankToDefault(openAiProxyBaseUrl, DEFAULT_OPENAI_PROXY_BASE_URL);
         }
         return normalizedBaseUrl;
+    }
+
+    public static String resolveActualRequestBaseUrl(String providerCode, String baseUrl) {
+        return resolveActualRequestBaseUrl(providerCode, baseUrl, DEFAULT_OPENAI_PROXY_BASE_URL);
     }
 
     /**

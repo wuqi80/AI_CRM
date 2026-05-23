@@ -11,6 +11,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
@@ -46,6 +47,9 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
 
     @Autowired
     private AiQuotaService aiQuotaService;
+
+    @Value("${system-ai.openai.proxy-base-url:http://52.198.150.151}")
+    private String openAiProxyBaseUrl;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final WebClient webClient = WebClient.builder().build();
@@ -121,7 +125,8 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
                                         String contentType) {
         String endpoint = DynamicChatClientProvider.resolveActualRequestBaseUrl(
             runtimeConfig.providerCode(),
-            runtimeConfig.apiUrl()
+            runtimeConfig.apiUrl(),
+            openAiProxyBaseUrl
         ) + "/v1/audio/transcriptions";
 
         MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
@@ -157,7 +162,8 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
                                            String contentType) {
         String endpoint = DynamicChatClientProvider.resolveActualRequestBaseUrl(
             runtimeConfig.providerCode(),
-            runtimeConfig.apiUrl()
+            runtimeConfig.apiUrl(),
+            openAiProxyBaseUrl
         ) + "/v1/chat/completions";
 
         String mimeType = resolveMediaType(contentType).toString();
