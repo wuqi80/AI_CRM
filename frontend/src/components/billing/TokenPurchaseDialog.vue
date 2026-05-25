@@ -70,7 +70,7 @@
                   <span class="truncate text-[#8d939f]">{{ item.model }}</span>
                   <span class="material-symbols-outlined shrink-0 text-[14px] leading-none text-[#c2c7d0]">info</span>
                 </div>
-                <span class="shrink-0 font-black tabular-nums text-[#8d939f]">{{ item.messages }}</span>
+                <span class="shrink-0 tabular-nums text-[#8d939f]">{{ item.messages }}</span>
               </div>
             </div>
 

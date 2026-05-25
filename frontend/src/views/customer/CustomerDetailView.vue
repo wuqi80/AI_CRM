@@ -230,8 +230,8 @@
                 </el-popover>
                 <button v-if="canEditCustomer" class="h-8 px-4 inline-flex items-center border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors whitespace-nowrap" @click="handleEdit">编辑</button>
                 <button v-if="canCreateFollowUps" class="h-8 px-4 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors whitespace-nowrap" @click="handleAiFollowUp">
-                  <WkIcon name="ai" class="text-sm" />
-                  AI 跟进
+                  <span class="material-symbols-outlined text-base leading-none">keyboard_voice</span>
+                  语音识别
                 </button>
                 <button
                   type="button"
@@ -586,8 +586,8 @@
                   class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
                   @click="handleAiFollowUp"
                 >
-                  <WkIcon name="ai" class="text-sm" />
-                  AI 跟进
+                  <span class="material-symbols-outlined text-base leading-none">keyboard_voice</span>
+                  语音识别
                 </button>
               </div>
               <div

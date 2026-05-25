@@ -51,6 +51,7 @@
 ## Frontend Notes
 - `utils/request.ts` unwraps backend `Result` only when `code === 0`; business `302` means not logged in and `401` means no permission.
 - Use the shared `useResponsive()` singleton for mobile/tablet state; existing dialogs and drawers already follow mobile size/fullscreen patterns.
+- All tips/tooltips should match the expand/collapse sidebar tooltip style: black background, white text, 8px radius, 6px 12px padding, 13px medium text, and compact shadow. For Element Plus tooltips, prefer the shared sidebar-like popper class/pattern instead of the default light tooltip.
 - `src/vite-env.d.ts` imports `@vue-office/*/lib/v3/index.js` directly because those packages may miss `lib/index.js`; preserve those paths unless fixing that dependency.
 - `npm run build` may emit a large Element Plus chunk warning; treat it as pre-existing unless the task is bundle-size work.
 

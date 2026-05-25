@@ -662,7 +662,8 @@ async function handleSaveSchedule() {
 }
 
 .schedule-dialog--desktop.el-dialog {
-  max-height: 90vh;
+  max-height: calc(100vh - 20vh);
+  margin-bottom: 10vh;
 }
 
 .schedule-dialog--mobile.el-dialog {
@@ -672,7 +673,9 @@ async function handleSaveSchedule() {
   border-radius: 1rem !important;
 }
 
-.el-overlay:has(.schedule-dialog) {
+/* Prevent overlay from scrolling — dialog body scrolls internally */
+.el-overlay:has(.schedule-dialog),
+.el-overlay-dialog:has(.schedule-dialog) {
   overflow: hidden;
 }
 </style>

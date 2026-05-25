@@ -1,6 +1,6 @@
 <template>
   <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-    <div class="relative flex items-start gap-4" :class="{ 'justify-between': !compact }">
+    <div class="flex min-w-0 items-start gap-3" :class="compact ? 'justify-start' : 'justify-between gap-4'">
       <div class="min-w-0 flex-1 pt-1">
         <div class="flex items-start gap-3">
           <div
@@ -12,7 +12,7 @@
           <div class="min-w-0 flex-1 flex flex-col gap-1.5">
             <h4
               class="truncate font-bold text-slate-900 leading-tight"
-              :class="[compact ? 'text-sm' : 'text-base', compact && (canEdit || canDelete) ? 'pr-16' : '']"
+              :class="compact ? 'text-sm' : 'text-base'"
             >
               {{ item.summary || getFollowUpTypeLabel(item.type) }}
             </h4>
@@ -52,24 +52,38 @@
       </div>
 
       <div
+        v-if="canEdit || canDelete"
         class="flex shrink-0 items-start gap-1 self-start"
-        :class="compact ? 'absolute right-0 top-0' : ''"
       >
         <button
           v-if="canEdit"
           type="button"
-          class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-50 hover:text-primary"
+          class="group/follow-up-action relative flex size-7 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] hover:text-[#0d0d0d]"
+          aria-label="编辑跟进"
           @click="$emit('edit', item)"
         >
-          <span class="material-symbols-outlined text-[20px] leading-none">edit</span>
+          <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
+          <span
+            class="pointer-events-none absolute right-0 top-full z-[20] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/follow-up-action:opacity-100"
+            role="tooltip"
+          >
+            编辑跟进
+          </span>
         </button>
         <button
           v-if="canDelete"
           type="button"
-          class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-50 hover:text-red-500"
+          class="group/follow-up-action relative flex size-7 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] hover:text-[#0d0d0d]"
+          aria-label="删除跟进"
           @click="$emit('delete', item.followUpId)"
         >
-          <span class="material-symbols-outlined text-[20px] leading-none">delete</span>
+          <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
+          <span
+            class="pointer-events-none absolute right-0 top-full z-[20] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/follow-up-action:opacity-100"
+            role="tooltip"
+          >
+            删除跟进
+          </span>
         </button>
       </div>
     </div>
