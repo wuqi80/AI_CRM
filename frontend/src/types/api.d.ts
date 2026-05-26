@@ -56,4 +56,5 @@ export interface UserInfo {
   deptName?: string
   sex?: number
   tenantId?: string | number
+  tenantCreator?: boolean
 }

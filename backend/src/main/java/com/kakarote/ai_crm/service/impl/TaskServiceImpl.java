@@ -22,6 +22,7 @@ import com.kakarote.ai_crm.entity.VO.TaskAiParseVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.TaskMapper;
+import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.utils.UserUtil;
@@ -61,6 +62,10 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
 
     @Autowired
     private CustomerMapper customerMapper;
+
+    @Autowired
+    @Lazy
+    private ICustomerService customerService;
 
     @Autowired
     private AiQuotaService aiQuotaService;
@@ -113,6 +118,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         save(task);
         refreshValuePriority(task.getTaskId());
         globalSearchIndexService.refreshTaskIndex(task.getTaskId());
+        refreshCustomerActivity(task.getCustomerId());
         return task.getTaskId();
     }
 
@@ -125,10 +131,12 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (ObjectUtil.isNull(task)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "任务不存在");
         }
+        Long previousCustomerId = task.getCustomerId();
         BeanUtil.copyProperties(taskUpdateBO, task, "taskId", "createUserId", "createTime");
         updateById(task);
         refreshValuePriority(task.getTaskId());
         globalSearchIndexService.refreshTaskIndex(task.getTaskId());
+        refreshCustomerActivities(previousCustomerId, task.getCustomerId());
     }
 
     /**
@@ -140,8 +148,10 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (ObjectUtil.isNull(task)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "任务不存在");
         }
+        Long customerId = task.getCustomerId();
         removeById(taskId);
         globalSearchIndexService.deleteByEntity("task", taskId);
+        refreshCustomerActivity(customerId);
     }
 
     /**
@@ -176,6 +186,26 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         updateById(task);
         refreshValuePriority(taskId);
         globalSearchIndexService.refreshTaskIndex(taskId);
+        refreshCustomerActivity(task.getCustomerId());
+    }
+
+    /**
+     * Refresh one related customer when present.
+     */
+    private void refreshCustomerActivity(Long customerId) {
+        if (customerId != null) {
+            customerService.refreshCustomerActivity(customerId);
+        }
+    }
+
+    /**
+     * Refresh original and current related customers when a task is rebound.
+     */
+    private void refreshCustomerActivities(Long previousCustomerId, Long currentCustomerId) {
+        refreshCustomerActivity(previousCustomerId);
+        if (!Objects.equals(previousCustomerId, currentCustomerId)) {
+            refreshCustomerActivity(currentCustomerId);
+        }
     }
 
     /**

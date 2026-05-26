@@ -70,4 +70,7 @@ public class ManageUserVO {
 
     @Schema(description = "角色名称列表")
     private List<String> roleNames;
+
+    @Schema(description = "是否企业创建者主账号")
+    private Boolean tenantCreator;
 }

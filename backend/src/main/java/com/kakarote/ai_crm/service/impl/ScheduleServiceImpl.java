@@ -23,6 +23,7 @@ import com.kakarote.ai_crm.entity.VO.ScheduleParticipantUserVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 import com.kakarote.ai_crm.mapper.ScheduleMapper;
 import com.kakarote.ai_crm.service.DataPermissionService;
+import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.IScheduleService;
 import com.kakarote.ai_crm.service.ManageUserService;
@@ -69,6 +70,10 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
 
     @Autowired
     private AiCustomerMatcher aiCustomerMatcher;
+
+    @Autowired
+    @Lazy
+    private ICustomerService customerService;
 
     @Autowired
     private AiQuotaService aiQuotaService;
@@ -134,6 +139,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
 
         save(schedule);
         globalSearchIndexService.refreshScheduleIndex(schedule.getScheduleId());
+        refreshCustomerActivity(schedule.getCustomerId());
         return schedule.getScheduleId();
     }
 
@@ -147,6 +153,8 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "日程不存在");
         }
         dataPermissionService.assertUserDataAccessByPermission("schedule:edit", schedule.getCreateUserId());
+
+        Long previousCustomerId = schedule.getCustomerId();
 
         schedule.setTitle(StrUtil.trim(scheduleUpdateBO.getTitle()));
         schedule.setDescription(StrUtil.emptyToNull(StrUtil.trim(scheduleUpdateBO.getDescription())));
@@ -164,6 +172,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
 
         updateById(schedule);
         globalSearchIndexService.refreshScheduleIndex(schedule.getScheduleId());
+        refreshCustomerActivities(previousCustomerId, schedule.getCustomerId());
     }
 
     /**
@@ -176,8 +185,29 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "日程不存在");
         }
         dataPermissionService.assertUserDataAccessByPermission("schedule:delete", schedule.getCreateUserId());
+        Long customerId = schedule.getCustomerId();
         removeById(scheduleId);
         globalSearchIndexService.deleteByEntity("schedule", scheduleId);
+        refreshCustomerActivity(customerId);
+    }
+
+    /**
+     * Refresh one related customer when present.
+     */
+    private void refreshCustomerActivity(Long customerId) {
+        if (customerId != null) {
+            customerService.refreshCustomerActivity(customerId);
+        }
+    }
+
+    /**
+     * Refresh original and current related customers when a schedule is rebound.
+     */
+    private void refreshCustomerActivities(Long previousCustomerId, Long currentCustomerId) {
+        refreshCustomerActivity(previousCustomerId);
+        if (!Objects.equals(previousCustomerId, currentCustomerId)) {
+            refreshCustomerActivity(currentCustomerId);
+        }
     }
 
     /**

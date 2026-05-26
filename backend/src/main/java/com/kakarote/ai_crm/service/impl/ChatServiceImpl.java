@@ -235,6 +235,14 @@ public class ChatServiceImpl implements IChatService {
             weekCalendar
         ) + """
 
+        [Grounded CRM write-back rule]
+        1. When creating follow-ups, tasks, or schedules, only use facts explicitly provided by the user or returned by tools.
+        2. Do not invent a communication channel. If the user says only "今天报价/已报价/完成报价" without "电话/会议/邮件/拜访", call createFollowUp with type=other, never email.
+        3. If the user says "今天报完价之后，让做个合同，公司内部沟通确认后就可以签了", split it into:
+           - createFollowUp(type=other, content includes only that today's quotation was completed)
+           - createTask(title/description for preparing or confirming the contract)
+        4. In the final reply, do not add unsupported details such as "通过邮件" unless the user or tool result explicitly contains them.
+
         [Customer ID chaining rule]
         1. When createCustomer or confirmPendingCustomerCreation returns a customer ID, keep that exact customerId for the rest of the same user request and conversation turn.
         2. If you create a follow-up, task, schedule, or other customer-related record for that newly created customer, pass the returned customerId into the tool instead of matching by customerName again.

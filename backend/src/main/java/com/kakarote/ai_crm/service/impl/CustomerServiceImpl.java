@@ -265,7 +265,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             "createTimeEnd": "yyyy-MM-dd HH:mm:ss",
             "contactCountMin": null,
             "contactCountMax": null,
-            "sortBy": "createTime/quotation/lastContactTime/nextFollowTime/contactCount",
+            "sortBy": "updateTime/createTime/quotation/lastContactTime/nextFollowTime/contactCount",
             "sortOrder": "asc/desc"
           },
           "explanation": "一句话说明解析依据",
@@ -1116,6 +1116,53 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         } catch (Exception exception) {
             updateCustomerAiAnalysisState(customerId, analysisRequestedAt, AI_ANALYSIS_STATUS_FAILED, null);
             throw exception;
+        }
+    }
+
+    /**
+     * Refresh customer activity after a related follow-up, task, or schedule changes.
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void refreshCustomerActivity(Long customerId) {
+        if (customerId == null) {
+            return;
+        }
+
+        Customer customer = baseMapper.selectByIdIgnoreDataPermission(customerId);
+        if (customer == null || !Objects.equals(customer.getStatus(), 1)) {
+            return;
+        }
+
+        Date analysisRequestedAt = new Date();
+        Long userId = resolveCustomerActivityUserId(customer);
+        Long tenantId = ObjectUtil.defaultIfNull(customer.getTenantId(), UserUtil.getTenantId());
+
+        LambdaUpdateWrapper<Customer> updateWrapper = Wrappers.lambdaUpdate(Customer.class)
+                .eq(Customer::getCustomerId, customerId)
+                .set(Customer::getAiAnalysisStatus, AI_ANALYSIS_STATUS_PENDING)
+                .set(Customer::getAiAnalysisRequestedAt, analysisRequestedAt)
+                .set(Customer::getUpdateTime, analysisRequestedAt);
+        baseMapper.update(null, updateWrapper);
+
+        refreshCustomerSearchText(customerId);
+        globalSearchIndexService.refreshCustomerIndex(customerId);
+        globalSearchIndexService.refreshCustomerRelatedIndexes(customerId);
+        taskService.refreshValuePriorityByCustomerId(customerId);
+        scheduleCustomerAiAnalysis(customerId, userId, tenantId, analysisRequestedAt);
+    }
+
+    /**
+     * Resolve a user ID for asynchronous customer analysis.
+     */
+    private Long resolveCustomerActivityUserId(Customer customer) {
+        try {
+            return UserUtil.getUserId();
+        } catch (Exception ignored) {
+            return ObjectUtil.defaultIfNull(
+                    customer.getUpdateUserId(),
+                    ObjectUtil.defaultIfNull(customer.getOwnerId(), customer.getCreateUserId())
+            );
         }
     }
 
@@ -2195,6 +2242,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("quotationMin", "预计成交金额");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("quotationMax", "预计成交金额");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("quotation", "预计成交金额");
+        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("updateTime", "更新时间");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("createTime", "创建时间");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("contactCount", "联系人数量");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("industry", "行业");
@@ -2418,7 +2466,16 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
      */
     private void applyExportSort(LambdaQueryWrapper<Customer> wrapper, String sortBy, String sortOrder) {
         boolean asc = "asc".equalsIgnoreCase(sortOrder);
-        if (StrUtil.isBlank(sortBy) || "createTime".equals(sortBy)) {
+        if (StrUtil.isBlank(sortBy) || "updateTime".equals(sortBy)) {
+            if (asc) {
+                wrapper.orderByAsc(Customer::getUpdateTime);
+            } else {
+                wrapper.orderByDesc(Customer::getUpdateTime);
+            }
+            wrapper.orderByDesc(Customer::getCreateTime);
+            return;
+        }
+        if ("createTime".equals(sortBy)) {
             if (asc) {
                 wrapper.orderByAsc(Customer::getCreateTime);
             } else {
@@ -4092,6 +4149,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
      */
     private String buildSortLabel(String sortBy, String sortOrder) {
         String label = switch (sortBy) {
+            case "updateTime" -> "更新时间";
             case "quotation" -> "预计成交金额";
             case "lastContactTime" -> "最后跟进";
             case "nextFollowTime" -> "下次跟进";
@@ -4360,6 +4418,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             return null;
         }
         return switch (normalized) {
+            case "updateTime", "update_time", "更新时间", "最新更新", "最近更新", "最近活动" -> "updateTime";
             case "createTime", "create_time", "创建时间", "新增时间" -> "createTime";
             case "quotation", "报价", "报价金额", "预计成交", "预计成交金额" -> "quotation";
             case "lastContactTime", "last_contact_time", "最后联系", "最后跟进" -> "lastContactTime";

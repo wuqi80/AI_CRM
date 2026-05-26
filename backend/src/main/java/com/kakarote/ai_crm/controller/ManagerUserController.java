@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.controller;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
+import com.kakarote.ai_crm.entity.BO.ResetUsernameBO;
 import com.kakarote.ai_crm.entity.BO.UserAddBO;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
 import com.kakarote.ai_crm.entity.BO.UserStatusBO;
@@ -59,6 +60,17 @@ public class ManagerUserController {
     @Operation(summary = "Update user basic info")
     public Result<String> updateUser(@RequestBody UserUpdateBO updateBO) {
         manageUserService.updateUser(updateBO);
+        return Result.ok();
+    }
+
+    /**
+     * 重置用户名。
+     */
+    @PostMapping("/resetUsername")
+    @Operation(summary = "Reset username")
+    @RequirePermission("user:edit")
+    public Result<String> resetUsername(@RequestBody ResetUsernameBO resetUsernameBO) {
+        manageUserService.resetUsername(resetUsernameBO);
         return Result.ok();
     }
 

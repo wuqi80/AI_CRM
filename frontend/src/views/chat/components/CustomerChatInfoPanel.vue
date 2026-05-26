@@ -185,14 +185,21 @@ import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, watch } 
 import { getCustomerDetail } from '@/api/customer'
 import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
 import type { Contact, CustomerDetailVO } from '@/types/customer'
+import { appEvents, APP_EVENT } from '@/utils/events'
 
 const props = defineProps<{
   customerId: string
 }>()
 
+type CustomerDetailRefreshPayload = {
+  customerId?: string | number
+}
+
 const MIN_WIDTH = 320
 const DEFAULT_WIDTH = 360
 const FULL_DETAIL_WIDTH = 720
+const AI_ANALYSIS_POLL_INTERVAL_MS = 2500
+const AI_ANALYSIS_POLL_MAX_ATTEMPTS = 24
 
 const customer = ref<CustomerDetailVO | null>(null)
 const loading = ref(false)
@@ -201,6 +208,9 @@ const panelWidth = ref(DEFAULT_WIDTH)
 const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
 const basicDrawerOpen = ref(false)
 const openSections = ref(['ai', 'activities', 'modules'])
+let offCustomerDetailRefresh: (() => void) | null = null
+let aiAnalysisPollTimer: ReturnType<typeof setTimeout> | null = null
+let aiAnalysisPollAttempts = 0
 
 const maxWidth = computed(() => Math.min(960, Math.floor(viewportWidth.value * 0.6)))
 const fullDetailMode = computed(() => panelWidth.value >= FULL_DETAIL_WIDTH)
@@ -214,17 +224,74 @@ const recentActivities = computed(() => {
   }))
 })
 
-async function loadCustomer() {
+function isAiAnalysisPending() {
+  return customer.value?.aiAnalysisStatus === 'pending' || customer.value?.aiAnalysisStatus === 'running'
+}
+
+function clearAiAnalysisPolling(resetAttempts = true) {
+  if (aiAnalysisPollTimer) {
+    clearTimeout(aiAnalysisPollTimer)
+    aiAnalysisPollTimer = null
+  }
+  if (resetAttempts) {
+    aiAnalysisPollAttempts = 0
+  }
+}
+
+function scheduleAiAnalysisPolling(resetAttempts = false) {
+  if (!props.customerId) return
+  if (resetAttempts) {
+    clearAiAnalysisPolling()
+  }
+  if (!isAiAnalysisPending()) {
+    clearAiAnalysisPolling(resetAttempts)
+    return
+  }
+  if (aiAnalysisPollTimer || aiAnalysisPollAttempts >= AI_ANALYSIS_POLL_MAX_ATTEMPTS) return
+
+  const customerId = String(props.customerId)
+  aiAnalysisPollTimer = setTimeout(async () => {
+    aiAnalysisPollTimer = null
+    if (String(props.customerId) !== customerId) {
+      clearAiAnalysisPolling()
+      return
+    }
+    aiAnalysisPollAttempts += 1
+    try {
+      await loadCustomer({ schedulePolling: false })
+      appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+    } catch (error) {
+      console.error('Failed to poll customer ai analysis status:', error)
+    }
+    if (isAiAnalysisPending() && aiAnalysisPollAttempts < AI_ANALYSIS_POLL_MAX_ATTEMPTS) {
+      scheduleAiAnalysisPolling()
+      return
+    }
+    clearAiAnalysisPolling()
+  }, AI_ANALYSIS_POLL_INTERVAL_MS)
+}
+
+async function loadCustomer(options: { schedulePolling?: boolean } = {}) {
   if (!props.customerId) {
     customer.value = null
+    clearAiAnalysisPolling()
     return
   }
   loading.value = true
   try {
     customer.value = await getCustomerDetail(props.customerId)
+    if (options.schedulePolling !== false && isAiAnalysisPending()) {
+      scheduleAiAnalysisPolling(true)
+    }
   } finally {
     loading.value = false
   }
+}
+
+function handleCustomerDetailRefresh(payload?: CustomerDetailRefreshPayload) {
+  const targetCustomerId = payload?.customerId ? String(payload.customerId) : ''
+  if (!props.customerId || (targetCustomerId && targetCustomerId !== String(props.customerId))) return
+  void loadCustomer()
 }
 
 function handleContactsUpdated(contacts: Contact[]) {
@@ -295,14 +362,22 @@ const MetricItem = defineComponent({
 })
 
 watch(() => props.customerId, () => {
+  clearAiAnalysisPolling()
   void loadCustomer()
 }, { immediate: true })
 
 onMounted(() => {
   window.addEventListener('resize', updateViewportWidth)
+  offCustomerDetailRefresh = appEvents.on<CustomerDetailRefreshPayload>(
+    APP_EVENT.CUSTOMER_DETAIL_REFRESH,
+    handleCustomerDetailRefresh
+  )
 })
 
 onBeforeUnmount(() => {
+  offCustomerDetailRefresh?.()
+  offCustomerDetailRefresh = null
+  clearAiAnalysisPolling()
   window.removeEventListener('resize', updateViewportWidth)
 })
 </script>

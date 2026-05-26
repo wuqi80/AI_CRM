@@ -1234,6 +1234,10 @@ type ChatComposerNarrowPayload = {
   minWidth?: number
 }
 
+type CustomerListRefreshPayload = {
+  preserveScroll?: boolean
+}
+
 const chatComposerNarrow = ref(false)
 const chatComposerAutoCollapseActive = ref(false)
 
@@ -1579,8 +1583,8 @@ onMounted(() => {
     APP_EVENT.CHAT_COMPOSER_NARROW_CHANGE,
     handleChatComposerNarrowChange
   )
-  removeCustomerListRefreshListener = appEvents.on(APP_EVENT.CUSTOMER_LIST_REFRESH, () => {
-    void fetchSidebarCustomers({ reset: true, preserveScroll: true })
+  removeCustomerListRefreshListener = appEvents.on<CustomerListRefreshPayload>(APP_EVENT.CUSTOMER_LIST_REFRESH, (payload) => {
+    void fetchSidebarCustomers({ reset: true, preserveScroll: payload?.preserveScroll !== false })
   })
 
   if (typeof ResizeObserver !== 'undefined') {
@@ -1805,9 +1809,7 @@ async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?
     const result = await queryCustomerList({
       page,
       limit: SIDEBAR_CUSTOMER_LIMIT,
-      keyword: sidebarCustomerKeyword.value.trim() || undefined,
-      sortBy: 'createTime',
-      sortOrder: 'desc'
+      keyword: sidebarCustomerKeyword.value.trim() || undefined
     })
     const nextCustomers = result.list || []
     if (page === 1) {
@@ -1929,8 +1931,6 @@ async function fetchCustomerSearchCustomers() {
       page: 1,
       limit: CUSTOMER_SEARCH_LIMIT,
       keyword: customerSearchKeyword.value.trim() || undefined,
-      sortBy: 'createTime',
-      sortOrder: 'desc',
     })
     if (requestId !== customerSearchRequestId) return
     customerSearchCustomers.value = result.list || []

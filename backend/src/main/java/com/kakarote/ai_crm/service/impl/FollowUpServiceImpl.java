@@ -34,6 +34,7 @@ import com.kakarote.ai_crm.mapper.FollowUpAttachmentMapper;
 import com.kakarote.ai_crm.mapper.FollowUpMapper;
 import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IFollowUpService;
 import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.utils.AiMediaUtil;
@@ -108,6 +109,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         - Resolve relative time phrases against Current time.
         - Keep summary, sceneType, keyPoints, and todos in the user's language.
         - `summary` must be a short card title, preferably 8-18 Chinese characters or within 30 characters.
+        - Do not invent a communication channel: if the text only says quotation/completed quotation without phone/meeting/email/visit wording, set `type` to `other`.
 
         JSON shape:
         {
@@ -132,6 +134,9 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
     @Autowired
     private ITaskService taskService;
+
+    @Autowired
+    private ICustomerService customerService;
 
     @Lazy
     @Autowired
@@ -1246,6 +1251,6 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             .set(Customer::getLastContactTime, latestFollowUp != null ? latestFollowUp.getFollowTime() : null)
             .set(Customer::getNextFollowTime, latestFollowUp != null ? latestFollowUp.getNextFollowTime() : null);
         customerMapper.update(null, updateWrapper);
-        taskService.refreshValuePriorityByCustomerId(customerId);
+        customerService.refreshCustomerActivity(customerId);
     }
 }
