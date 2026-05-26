@@ -154,6 +154,7 @@ export interface CustomerQueryBO {
 }
 
 export type CustomerQuerySortBy =
+  | 'updateTime'
   | 'createTime'
   | 'quotation'
   | 'lastContactTime'

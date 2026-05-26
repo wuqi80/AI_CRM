@@ -136,6 +136,10 @@ const sizeClass = computed(() => `wk-file-type-icon--${props.size}`)
   --file-icon-color: #7c3aed;
 }
 
+.wk-file-type-icon--video {
+  --file-icon-color: #2563eb;
+}
+
 .wk-file-type-icon--markdown,
 .wk-file-type-icon--text,
 .wk-file-type-icon--generic {

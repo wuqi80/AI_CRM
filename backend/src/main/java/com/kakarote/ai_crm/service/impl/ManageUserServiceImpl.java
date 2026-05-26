@@ -2,6 +2,7 @@ package com.kakarote.ai_crm.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -11,6 +12,7 @@ import com.kakarote.ai_crm.common.Const;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
+import com.kakarote.ai_crm.entity.BO.ResetUsernameBO;
 import com.kakarote.ai_crm.entity.BO.UserAddBO;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
 import com.kakarote.ai_crm.entity.BO.UserStatusBO;
@@ -238,6 +240,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         BasePage<ManageUserVO> page = baseMapper.queryPageList(userQueryBO.parse(), userQueryBO);
         fillRoleInfo(page.getRecords());
         fillImgUrl(page.getRecords());
+        fillTenantCreatorFlag(page.getRecords());
         return page;
     }
 
@@ -304,6 +307,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         if (ObjectUtil.isNull(userEntity)) {
             return;
         }
+        boolean tenantCreator = isTenantCreator(userEntity, getCurrentTenant());
 
         if (ObjectUtil.isNotNull(updateBO.getImg())) {
             userEntity.setImg(updateBO.getImg());
@@ -331,7 +335,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         if (ObjectUtil.isNotNull(updateBO.getSex())) {
             userEntity.setSex(updateBO.getSex());
         }
-        if (ObjectUtil.isNotNull(updateBO.getStatus())) {
+        if (ObjectUtil.isNotNull(updateBO.getStatus()) && !tenantCreator) {
             userEntity.setStatus(updateBO.getStatus());
         }
         if (updateBO.getParentId() != null) {
@@ -341,7 +345,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         }
         updateById(userEntity);
 
-        if (updateBO.getRoleIds() != null) {
+        if (updateBO.getRoleIds() != null && !tenantCreator) {
             userRoleService.lambdaUpdate()
                     .eq(ManagerUserRole::getUserId, updateBO.getUserId())
                     .remove();
@@ -356,6 +360,69 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
                 }).collect(Collectors.toList());
                 userRoleService.saveBatch(newRoles, Const.BATCH_SAVE_SIZE);
             }
+        }
+    }
+
+    /**
+     * 重置用户名。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetUsername(ResetUsernameBO resetUsernameBO) {
+        if (resetUsernameBO == null || resetUsernameBO.getUserId() == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DOES_NOT_EXIST);
+        }
+
+        ManagerUser userEntity = baseMapper.getUserId(resetUsernameBO.getUserId());
+        if (ObjectUtil.isNull(userEntity)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DOES_NOT_EXIST);
+        }
+
+        CrmTenant currentTenant = getRequiredCurrentTenant();
+        if (!Objects.equals(userEntity.getTenantId(), currentTenant.getTenantId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DOES_NOT_EXIST);
+        }
+
+        String oldUsername = StrUtil.trim(userEntity.getUsername());
+        String newUsername = StrUtil.trim(resetUsernameBO.getUsername());
+        if (StrUtil.isBlank(newUsername)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请输入新用户名");
+        }
+
+        boolean tenantCreator = isTenantCreator(userEntity, currentTenant);
+        if (tenantCreator) {
+            newUsername = newUsername.toLowerCase();
+            if (!Validator.isEmail(newUsername, true)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "主账号用户名必须是邮箱格式");
+            }
+            validateCurrentPassword(resetUsernameBO.getCurrentPassword());
+            validateTenantContactEmailAvailable(newUsername, currentTenant.getTenantId());
+        } else if (StrUtil.equalsIgnoreCase(newUsername, currentTenant.getContactEmail())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "普通员工不能使用企业创建者邮箱作为用户名");
+        }
+
+        if (StrUtil.equals(oldUsername, newUsername)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "新用户名不能与当前用户名相同");
+        }
+
+        long duplicateCount = lambdaQuery()
+                .eq(ManagerUser::getUsername, newUsername)
+                .ne(ManagerUser::getUserId, userEntity.getUserId())
+                .count();
+        if (duplicateCount > 0) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前企业下用户名已存在");
+        }
+
+        userEntity.setUsername(newUsername);
+        if (tenantCreator && (StrUtil.isBlank(userEntity.getEmail()) || StrUtil.equalsIgnoreCase(userEntity.getEmail(), oldUsername))) {
+            userEntity.setEmail(newUsername);
+        }
+        updateById(userEntity);
+
+        if (tenantCreator) {
+            currentTenant.setContactEmail(newUsername);
+            currentTenant.setUpdateTime(new Date());
+            tenantService.updateById(currentTenant);
         }
     }
 
@@ -391,6 +458,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         }
         fillRoleInfo(Collections.singletonList(vo));
         fillImgUrl(Collections.singletonList(vo));
+        fillTenantCreatorFlag(Collections.singletonList(vo));
         return vo;
     }
 
@@ -405,6 +473,90 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
                 } catch (Exception ignored) {
                 }
             }
+        }
+    }
+
+    /**
+     * 标记当前租户企业创建者主账号。
+     */
+    private void fillTenantCreatorFlag(List<ManageUserVO> voList) {
+        if (CollUtil.isEmpty(voList)) {
+            return;
+        }
+        String tenantCreatorUsername = getCurrentTenantContactEmail();
+        for (ManageUserVO vo : voList) {
+            vo.setTenantCreator(StrUtil.isNotBlank(tenantCreatorUsername)
+                    && StrUtil.equalsIgnoreCase(tenantCreatorUsername, vo.getUsername()));
+        }
+    }
+
+    /**
+     * 获取当前租户。
+     */
+    private CrmTenant getCurrentTenant() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        if (tenantId == null) {
+            return null;
+        }
+        return tenantService.getById(tenantId);
+    }
+
+    /**
+     * 获取当前租户，失败时抛出业务异常。
+     */
+    private CrmTenant getRequiredCurrentTenant() {
+        CrmTenant tenant = getCurrentTenant();
+        if (tenant == null || tenant.getTenantId() == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前企业信息不存在");
+        }
+        return tenant;
+    }
+
+    /**
+     * 获取当前租户创建者邮箱。
+     */
+    private String getCurrentTenantContactEmail() {
+        CrmTenant tenant = getCurrentTenant();
+        return tenant == null ? null : StrUtil.trim(tenant.getContactEmail());
+    }
+
+    /**
+     * 判断员工是否当前租户企业创建者。
+     */
+    private boolean isTenantCreator(ManagerUser user, CrmTenant tenant) {
+        return user != null
+                && tenant != null
+                && StrUtil.isNotBlank(tenant.getContactEmail())
+                && StrUtil.equalsIgnoreCase(tenant.getContactEmail(), user.getUsername());
+    }
+
+    /**
+     * 验证当前登录密码。
+     */
+    private void validateCurrentPassword(String currentPassword) {
+        if (StrUtil.isBlank(currentPassword)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请输入当前登录密码");
+        }
+        ManagerUser currentUser = baseMapper.getUserId(UserUtil.getUserId());
+        if (currentUser == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DOES_NOT_EXIST);
+        }
+        BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+        if (!bCryptPasswordEncoder.matches(currentPassword, currentUser.getPassword())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_OLD_PASSWORD_ERROR);
+        }
+    }
+
+    /**
+     * 验证租户联系人邮箱未被其他租户使用。
+     */
+    private void validateTenantContactEmailAvailable(String email, Long currentTenantId) {
+        long duplicateCount = tenantService.lambdaQuery()
+                .ne(CrmTenant::getTenantId, currentTenantId)
+                .apply("LOWER(contact_email) = {0}", email)
+                .count();
+        if (duplicateCount > 0) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_EMAIL_ALREADY_REGISTERED);
         }
     }
 

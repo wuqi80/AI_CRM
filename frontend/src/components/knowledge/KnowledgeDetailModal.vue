@@ -122,6 +122,32 @@
               </div>
 
               <div
+                v-else-if="showAudioPreview"
+                class="media-preview-shell flex h-full items-center justify-center bg-slate-950 p-6"
+              >
+                <audio
+                  :src="mediaPreviewUrl || undefined"
+                  controls
+                  preload="metadata"
+                  class="w-full max-w-3xl"
+                  @error="handleMediaPreviewError"
+                />
+              </div>
+
+              <div
+                v-else-if="showVideoPreview"
+                class="media-preview-shell flex h-full items-center justify-center bg-slate-950 p-6"
+              >
+                <video
+                  :src="mediaPreviewUrl || undefined"
+                  controls
+                  preload="metadata"
+                  class="media-preview-video"
+                  @error="handleMediaPreviewError"
+                />
+              </div>
+
+              <div
                 v-else-if="showPdfPreview"
                 class="pdf-preview-shell h-full overflow-auto bg-white"
               >
@@ -386,12 +412,24 @@ import {
   downloadKnowledge,
   getKnowledgeDetail,
   getKnowledgeFileBlob,
-  getKnowledgePreviewHtml
+  getKnowledgePreviewHtml,
+  getKnowledgePreviewToken
 } from '@/api/knowledge'
 import type { Knowledge, KnowledgeAiAnalyzeVO } from '@/types/common'
 import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 
-type PreviewKind = 'image' | 'doc' | 'docx' | 'excel' | 'pdf' | 'pptx' | 'text' | 'unsupported' | 'none'
+type PreviewKind =
+  | 'image'
+  | 'audio'
+  | 'video'
+  | 'doc'
+  | 'docx'
+  | 'excel'
+  | 'pdf'
+  | 'pptx'
+  | 'text'
+  | 'unsupported'
+  | 'none'
 
 const VueOfficeDocx = defineAsyncComponent(async () => {
   await import('@vue-office/docx/lib/v3/index.css')
@@ -437,6 +475,7 @@ const analysis = ref<KnowledgeAiAnalyzeVO | null>(null)
 const previewBlob = ref<Blob | null>(null)
 const officePreviewSource = ref<Blob | ArrayBuffer | null>(null)
 const mediaPreviewUrl = ref('')
+const mediaPreviewObjectUrl = ref(false)
 const previewKind = ref<PreviewKind>('none')
 const previewNotice = ref('')
 const previewText = ref('')
@@ -469,6 +508,14 @@ const previewSource = computed(() => officePreviewSource.value ?? undefined)
 
 const showImagePreview = computed(() => {
   return previewKind.value === 'image' && Boolean(mediaPreviewUrl.value) && !previewFailed.value
+})
+
+const showAudioPreview = computed(() => {
+  return previewKind.value === 'audio' && Boolean(mediaPreviewUrl.value) && !previewFailed.value
+})
+
+const showVideoPreview = computed(() => {
+  return previewKind.value === 'video' && Boolean(mediaPreviewUrl.value) && !previewFailed.value
 })
 
 const showPdfPreview = computed(() => {
@@ -509,10 +556,11 @@ function resetPreviewState() {
   previewFailed.value = false
   docHtmlContent.value = ''
 
-  if (mediaPreviewUrl.value) {
+  if (mediaPreviewUrl.value && mediaPreviewObjectUrl.value) {
     URL.revokeObjectURL(mediaPreviewUrl.value)
-    mediaPreviewUrl.value = ''
   }
+  mediaPreviewUrl.value = ''
+  mediaPreviewObjectUrl.value = false
 }
 
 function close() {
@@ -533,12 +581,26 @@ function isImageType(extension: string, mimeType: string): boolean {
   return mimeType.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'avif'].includes(extension)
 }
 
+function isAudioType(extension: string, mimeType: string): boolean {
+  return mimeType.startsWith('audio/') || ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(extension)
+}
+
+function isVideoType(extension: string, mimeType: string): boolean {
+  return mimeType.startsWith('video/') || ['mp4', 'webm', 'mov', 'm4v', 'avi', 'mkv', 'ogv', '3gp'].includes(extension)
+}
+
 function resolvePreviewKind(filename?: string, mimeType?: string): PreviewKind {
   const extension = getFileExtension(filename)
   const normalizedType = normalizeContentType(mimeType)
 
   if (isImageType(extension, normalizedType)) {
     return 'image'
+  }
+  if (isAudioType(extension, normalizedType)) {
+    return 'audio'
+  }
+  if (isVideoType(extension, normalizedType)) {
+    return 'video'
   }
   if (extension === 'pdf' || normalizedType === 'application/pdf') {
     return 'pdf'
@@ -613,6 +675,12 @@ function handlePreviewError(error: unknown) {
   officePreviewSource.value = null
   previewFailed.value = true
   previewNotice.value = previewNotice.value || '文件渲染失败，已切换为文本内容。'
+}
+
+function handleMediaPreviewError(error: Event) {
+  console.error('Knowledge media preview failed:', error)
+  previewFailed.value = true
+  previewNotice.value = '浏览器无法播放该音视频格式，请下载后查看。'
 }
 
 onBeforeUnmount(() => {
@@ -706,6 +774,16 @@ async function loadDocument(id: string) {
       return
     }
 
+    if (kind === 'audio' || kind === 'video') {
+      const previewToken = await getKnowledgePreviewToken(id)
+      if (!previewToken.url) {
+        throw new Error('Missing knowledge media preview URL')
+      }
+      mediaPreviewUrl.value = previewToken.url
+      mediaPreviewObjectUrl.value = false
+      return
+    }
+
     const fileBlob = await getKnowledgeFileBlob(id)
     const errorPayload = await tryReadJsonBlob(fileBlob)
     if (errorPayload) {
@@ -725,6 +803,7 @@ async function loadDocument(id: string) {
 
     if (kind === 'image') {
       mediaPreviewUrl.value = URL.createObjectURL(fileBlob)
+      mediaPreviewObjectUrl.value = true
       return
     }
 
@@ -926,6 +1005,13 @@ function getTypeIconColor(type?: string): string {
   max-height: 100%;
   object-fit: contain;
   border-radius: 24px;
+}
+
+.media-preview-video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 16px;
+  background: #020617;
 }
 
 .office-preview-shell {

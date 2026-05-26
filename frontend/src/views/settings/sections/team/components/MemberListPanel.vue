@@ -198,10 +198,11 @@
                 </template>
               </el-table-column>
 
-              <el-table-column label="操作" width="112" align="right" fixed="right">
+              <el-table-column label="操作" width="152" align="right" fixed="right">
                 <template #default="{ row }">
                   <div class="wk-member-actions flex items-center justify-end gap-2 transition-opacity">
                     <button
+                      type="button"
                       class="size-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-primary transition-all"
                       title="编辑"
                       @click.stop="$emit('edit-member', row)"
@@ -209,6 +210,15 @@
                       <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
                     <button
+                      type="button"
+                      class="size-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-primary transition-all"
+                      title="重置用户名"
+                      @click.stop="$emit('reset-username', row)"
+                    >
+                      <span class="material-symbols-outlined text-sm">manage_accounts</span>
+                    </button>
+                    <button
+                      type="button"
                       class="size-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-amber-500 transition-all"
                       :title="row.status === 1 ? '停用' : '启用'"
                       @click.stop="$emit('toggle-status', row)"
@@ -302,6 +312,13 @@
                       </button>
                       <button
                         type="button"
+                        class="h-8 px-3 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors whitespace-nowrap"
+                        @click.stop="$emit('reset-username', row)"
+                      >
+                        重置用户名
+                      </button>
+                      <button
+                        type="button"
                         class="h-8 px-3 rounded-xl border text-xs font-bold whitespace-nowrap transition-colors"
                         :class="row.status === 1 ? 'border-amber-200 text-amber-600 bg-amber-50 hover:bg-amber-100' : 'border-emerald-200 text-emerald-600 bg-emerald-50 hover:bg-emerald-100'"
                         @click.stop="$emit('toggle-status', row)"
@@ -346,6 +363,7 @@ const emit = defineEmits<{
   (e: 'row-click', member: any): void
   (e: 'edit-member', member: any): void
   (e: 'toggle-status', member: any): void
+  (e: 'reset-username', member: any): void
 }>()
 
 const searchValue = computed({

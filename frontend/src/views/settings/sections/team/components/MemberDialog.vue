@@ -97,7 +97,7 @@
 
     <div class="mb-4">
       <label class="text-sm font-medium text-slate-700 mb-2 block">状态</label>
-      <el-radio-group v-model="memberForm.status">
+      <el-radio-group v-model="memberForm.status" :disabled="isEditingTenantCreator">
         <el-radio :value="1">活跃</el-radio>
         <el-radio :value="0">离职/停用</el-radio>
       </el-radio-group>
@@ -109,7 +109,7 @@
         <span class="text-xs text-primary">已选择 {{ memberForm.roleIds.length }} 个角色</span>
       </div>
       <div class="wk-member-dialog__role-scroll border border-slate-200 rounded-xl p-4 max-h-48 overflow-y-auto bg-slate-50/50">
-        <el-checkbox-group v-model="memberForm.roleIds">
+        <el-checkbox-group v-model="memberForm.roleIds" :disabled="isEditingTenantCreator">
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
             <el-checkbox
               v-for="role in allRoleOptions"
@@ -168,6 +168,8 @@ const dialogVisible = computed({
   get: () => props.visible,
   set: (value: boolean) => emit('update:visible', value)
 })
+
+const isEditingTenantCreator = computed(() => Boolean(props.editingMember?.tenantCreator))
 </script>
 
 <style>

@@ -5,6 +5,7 @@ export type FileTypeIconKind =
   | 'pdf'
   | 'image'
   | 'audio'
+  | 'video'
   | 'markdown'
   | 'text'
   | 'generic'
@@ -32,6 +33,12 @@ export function resolveFileTypeIconMeta(input: FileTypeIconInput): FileTypeIconM
   const mime = String(input.mimeType || '').toLowerCase()
   const knowledgeType = String(input.knowledgeType || '').toLowerCase()
 
+  if (mime.startsWith('audio/')) {
+    return { kind: 'audio', label: '音频', shortLabel: 'AUD' }
+  }
+  if (mime.startsWith('video/')) {
+    return { kind: 'video', label: '视频', shortLabel: 'VID' }
+  }
   if (mime.includes('pdf') || extension === 'pdf') {
     return { kind: 'pdf', label: 'PDF', shortLabel: 'PDF' }
   }
@@ -52,7 +59,10 @@ export function resolveFileTypeIconMeta(input: FileTypeIconInput): FileTypeIconM
   if (mime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(extension)) {
     return { kind: 'image', label: '图片', shortLabel: 'IMG' }
   }
-  if (mime.startsWith('audio/') || ['mp3', 'wav', 'm4a', 'aac', 'webm', 'ogg'].includes(extension) || knowledgeType === 'recording') {
+  if (['mp4', 'webm', 'mov', 'm4v', 'avi', 'mkv', 'ogv', '3gp'].includes(extension)) {
+    return { kind: 'video', label: '视频', shortLabel: 'VID' }
+  }
+  if (['mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(extension) || knowledgeType === 'recording') {
     return { kind: 'audio', label: '音频', shortLabel: 'AUD' }
   }
   if (['md', 'markdown'].includes(extension)) {

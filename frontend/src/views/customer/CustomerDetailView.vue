@@ -1989,6 +1989,7 @@ function scheduleAiAnalysisPolling(customerId?: string, resetAttempts = false) {
     aiAnalysisPollAttempts += 1
     try {
       await customerStore.fetchCustomerDetail(customerId)
+      appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
     } catch (error) {
       console.error('Failed to poll customer ai analysis status:', error)
     }
@@ -2121,10 +2122,21 @@ async function loadCustomerDetailPage() {
 }
 
 function handleCustomerDetailRefresh(payload?: CustomerDetailRefreshPayload) {
+  if (payload?.source === 'customer-detail-activity') return
   const customerId = payload?.customerId ? String(payload.customerId) : ''
   if (!customerId || customerId !== String(activeCustomerId.value)) return
 
   void refreshCustomerDetailModules(customerId, { resetRelatedPages: true })
+}
+
+function emitCustomerActivityRefresh(customerId?: string) {
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+  if (customerId) {
+    appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, {
+      customerId,
+      source: 'customer-detail-activity'
+    })
+  }
 }
 
 let offCustomerDetailRefresh: (() => void) | null = null
@@ -2534,6 +2546,7 @@ function handleAiFollowUp() {
 async function handleAiFollowUpSaved() {
   if (!customer.value) return
   await refreshFollowUpContext(customer.value.customerId, { resetFollowUps: true })
+  emitCustomerActivityRefresh(customer.value.customerId)
 }
 
 function handleEditFollowUp(followUp: FollowUp) {
@@ -2642,6 +2655,7 @@ async function handleSetPrimary(contactId: string) {
 async function refreshCustomerAfterTaskMutation() {
   if (!customer.value) return
   await refreshFollowUpContext(customer.value.customerId)
+  emitCustomerActivityRefresh(customer.value.customerId)
   const id = selectedCustomerTask.value?.taskId
   if (id && customer.value.tasks) {
     selectedCustomerTask.value = customer.value.tasks.find((t: Task) => String(t.taskId) === String(id)) || null
@@ -2799,13 +2813,17 @@ async function resolveCustomerScheduleDetail(scheduleId: string): Promise<Schedu
 async function handleCustomerScheduleCreated() {
   if (!customer.value) return
   editingCustomerSchedule.value = null
+  await customerStore.fetchCustomerDetail(customer.value.customerId)
   await fetchCustomerSchedules(customer.value.customerId, true)
+  emitCustomerActivityRefresh(customer.value.customerId)
 }
 
 async function handleCustomerScheduleUpdated(scheduleId: string) {
   if (!customer.value) return
   editingCustomerSchedule.value = null
+  await customerStore.fetchCustomerDetail(customer.value.customerId)
   await fetchCustomerSchedules(customer.value.customerId)
+  emitCustomerActivityRefresh(customer.value.customerId)
   const updatedSchedule = await resolveCustomerScheduleDetail(scheduleId)
   if (updatedSchedule) {
     selectedCustomerSchedule.value = updatedSchedule
@@ -2814,7 +2832,9 @@ async function handleCustomerScheduleUpdated(scheduleId: string) {
 
 async function handleCustomerScheduleDeleted() {
   if (!customer.value) return
+  await customerStore.fetchCustomerDetail(customer.value.customerId)
   await fetchCustomerSchedules(customer.value.customerId)
+  emitCustomerActivityRefresh(customer.value.customerId)
   selectedCustomerSchedule.value = null
 }
 
@@ -2867,6 +2887,7 @@ async function handleFollowUpDialogSubmit(payload: FollowUpUpsertSubmitPayload) 
     }
     const successMessage = isEdit ? '跟进记录已更新' : '跟进记录添加成功'
     await refreshFollowUpContext(payload.customerId, { resetFollowUps: !isEdit })
+    emitCustomerActivityRefresh(payload.customerId)
     showAddFollowUpDialog.value = false
     ElMessage.success(successMessage)
   } catch { /* Error handled */ } finally {
@@ -2896,7 +2917,10 @@ async function handleDeleteFollowUp(followUpId: string) {
       followUpPage.value -= 1
     }
     await deleteFollowUp(followUpId)
-    if (customer.value) await refreshFollowUpContext(customer.value.customerId)
+    if (customer.value) {
+      await refreshFollowUpContext(customer.value.customerId)
+      emitCustomerActivityRefresh(customer.value.customerId)
+    }
     ElMessage.success('跟进记录已删除')
   } catch { /* Error handled */ }
 }

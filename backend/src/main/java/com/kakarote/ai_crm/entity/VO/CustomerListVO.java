@@ -93,6 +93,9 @@ public class CustomerListVO {
     @Schema(description = "创建时间")
     private Date createTime;
 
+    @Schema(description = "更新时间")
+    private Date updateTime;
+
     @Schema(description = "自定义字段值")
     private Map<String, Object> customFields;
 }

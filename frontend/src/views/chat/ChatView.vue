@@ -1666,6 +1666,16 @@ const customerPanelResizing = ref(false)
 const CUSTOMER_PANEL_MIN_WIDTH = 380
 const CUSTOMER_PANEL_MAX_WIDTH_RATIO = 0.5
 const CHAT_COMPOSER_MIN_WIDTH_PX = 468
+const CHAT_CUSTOMER_AI_POLL_INTERVAL_MS = 2500
+const CHAT_CUSTOMER_AI_POLL_MAX_ATTEMPTS = 24
+let chatCustomerAiPollTimer: ReturnType<typeof setTimeout> | null = null
+let chatCustomerAiPollAttempts = 0
+let offSelectedCustomerDetailRefresh: (() => void) | null = null
+
+type CustomerDetailRefreshPayload = {
+  customerId?: string | number
+  source?: string
+}
 
 const chatComposerShellStyle = computed(() => (
   isMobile.value ? undefined : { minWidth: `${CHAT_COMPOSER_MIN_WIDTH_PX}px` }
@@ -2269,6 +2279,72 @@ async function ensureSelectedCustomerDetail(customerId: string, options: { silen
   }
 }
 
+function isCustomerAiAnalysisPending(customer: CustomerDetailVO | null) {
+  return customer?.aiAnalysisStatus === 'pending' || customer?.aiAnalysisStatus === 'running'
+}
+
+function clearChatCustomerAiPolling(resetAttempts = true) {
+  if (chatCustomerAiPollTimer) {
+    clearTimeout(chatCustomerAiPollTimer)
+    chatCustomerAiPollTimer = null
+  }
+  if (resetAttempts) {
+    chatCustomerAiPollAttempts = 0
+  }
+}
+
+function scheduleChatCustomerAiPolling(customerId?: string, resetAttempts = false) {
+  if (!customerId) return
+  if (resetAttempts) {
+    clearChatCustomerAiPolling()
+  }
+  if (!isCustomerAiAnalysisPending(selectedCustomer.value)) {
+    clearChatCustomerAiPolling(resetAttempts)
+    return
+  }
+  if (chatCustomerAiPollTimer || chatCustomerAiPollAttempts >= CHAT_CUSTOMER_AI_POLL_MAX_ATTEMPTS) {
+    return
+  }
+
+  chatCustomerAiPollTimer = setTimeout(async () => {
+    chatCustomerAiPollTimer = null
+    if (currentSessionCustomerId.value !== customerId) {
+      clearChatCustomerAiPolling()
+      return
+    }
+
+    chatCustomerAiPollAttempts += 1
+    await ensureSelectedCustomerDetail(customerId)
+    appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat-ai-poll', preserveScroll: false })
+    appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, { customerId, source: 'chat-ai-poll' })
+
+    if (currentSessionCustomerId.value !== customerId) {
+      clearChatCustomerAiPolling()
+      return
+    }
+
+    if (isCustomerAiAnalysisPending(selectedCustomer.value) && chatCustomerAiPollAttempts < CHAT_CUSTOMER_AI_POLL_MAX_ATTEMPTS) {
+      scheduleChatCustomerAiPolling(customerId)
+      return
+    }
+
+    clearChatCustomerAiPolling()
+  }, CHAT_CUSTOMER_AI_POLL_INTERVAL_MS)
+}
+
+function handleSelectedCustomerDetailRefresh(payload?: CustomerDetailRefreshPayload) {
+  if (payload?.source === 'chat' || payload?.source === 'chat-ai-poll') return
+  const currentCustomerId = currentSessionCustomerId.value
+  const targetCustomerId = payload?.customerId ? String(payload.customerId) : ''
+  if (!currentCustomerId || (targetCustomerId && targetCustomerId !== currentCustomerId)) return
+
+  void ensureSelectedCustomerDetail(currentCustomerId).then(() => {
+    if (isCustomerAiAnalysisPending(selectedCustomer.value)) {
+      scheduleChatCustomerAiPolling(currentCustomerId, true)
+    }
+  })
+}
+
 async function handleSelectCustomerById(customerId: string) {
   selectedCustomerId.value = customerId
   currentView.value = 'chat'
@@ -2332,6 +2408,10 @@ function emitChatComposerNarrowState(force = false) {
 }
 
 onMounted(async () => {
+  offSelectedCustomerDetailRefresh = appEvents.on<CustomerDetailRefreshPayload>(
+    APP_EVENT.CUSTOMER_DETAIL_REFRESH,
+    handleSelectedCustomerDetailRefresh
+  )
   registerAiQuotaResumeSendHandler(handleSend)
   await nextTick()
   updateCustomerPanelContainerWidth()
@@ -2366,6 +2446,9 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   abortChatViewMountSequence = true
   stopCustomerPanelResize()
+  clearChatCustomerAiPolling()
+  offSelectedCustomerDetailRefresh?.()
+  offSelectedCustomerDetailRefresh = null
   if (composerDraftSaveTimer != null) {
     clearTimeout(composerDraftSaveTimer)
     composerDraftSaveTimer = null
@@ -2543,6 +2626,8 @@ async function handleSend() {
   focusChatTextarea()
   const completedSessionId = await sendPromise
   await refreshCrmContextAfterSend(effectiveAppCode, completedSessionId)
+  await sendPromise
+  await loadAiConfig(true)
 }
 
 function getSessionCustomerId(sessionId?: string) {
@@ -2554,7 +2639,7 @@ function getSessionCustomerId(sessionId?: string) {
 async function refreshCrmContextAfterSend(effectiveAppCode: string, completedSessionId?: string) {
   if (effectiveAppCode !== 'crm') return
 
-  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat' })
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat', preserveScroll: false })
 
   const customerId = getSessionCustomerId(completedSessionId)
   if (!customerId) return
@@ -2563,6 +2648,9 @@ async function refreshCrmContextAfterSend(effectiveAppCode: string, completedSes
   const activeCustomerId = currentSessionCustomerId.value || selectedCustomerId.value || ''
   if (activeCustomerId === customerId) {
     await ensureSelectedCustomerDetail(customerId, { silent: Boolean(selectedCustomer.value) })
+  }
+  if (isCustomerAiAnalysisPending(selectedCustomer.value)) {
+    scheduleChatCustomerAiPolling(customerId, true)
   }
 }
 
@@ -3124,17 +3212,39 @@ watch(
   currentSessionCustomerId,
   (customerId) => {
     if (!customerId) {
+      clearChatCustomerAiPolling()
       selectedCustomerId.value = null
       selectedCustomer.value = null
       selectedCustomerLoading.value = false
       return
     }
 
+    clearChatCustomerAiPolling()
     if (selectedCustomerId.value === customerId && selectedCustomer.value) return
     selectedCustomerId.value = customerId
     void ensureSelectedCustomerDetail(customerId)
   },
   { immediate: true }
+)
+
+watch(
+  () => [currentSessionCustomerId.value, selectedCustomer.value?.aiAnalysisStatus || ''] as const,
+  ([customerId, status], previousValue) => {
+    const previousCustomerId = previousValue?.[0] || ''
+    const previousStatus = previousValue?.[1] || ''
+    if (!customerId) {
+      clearChatCustomerAiPolling()
+      return
+    }
+    if (status === 'pending' || status === 'running') {
+      scheduleChatCustomerAiPolling(
+        customerId,
+        customerId !== previousCustomerId || (previousStatus !== 'pending' && previousStatus !== 'running')
+      )
+      return
+    }
+    clearChatCustomerAiPolling()
+  }
 )
 
 function isSessionActive(sessionId: string): boolean {

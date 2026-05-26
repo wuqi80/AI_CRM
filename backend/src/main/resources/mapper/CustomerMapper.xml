@@ -102,6 +102,19 @@
     <!-- 可复用的 ORDER BY 片段 -->
     <sql id="customerQueryOrderBy">
         <choose>
+            <when test="query.sortBy == 'updateTime'">
+                ORDER BY c.update_time
+                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+                NULLS LAST
+                <if test="query.keyword != null and query.keyword != ''">, pdb.score(c.customer_id) DESC</if>
+                , c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'createTime'">
+                ORDER BY c.create_time
+                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+                <if test="query.keyword != null and query.keyword != ''">, pdb.score(c.customer_id) DESC</if>
+                , c.customer_id DESC
+            </when>
             <when test="query.sortBy == 'quotation'">
                 ORDER BY c.quotation
                 <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
@@ -133,10 +146,10 @@
             <otherwise>
                 <choose>
                     <when test="query.keyword != null and query.keyword != ''">
-                        ORDER BY pdb.score(c.customer_id) DESC, c.create_time DESC
+                        ORDER BY pdb.score(c.customer_id) DESC, c.update_time DESC NULLS LAST, c.create_time DESC
                     </when>
                     <otherwise>
-                        ORDER BY c.create_time DESC
+                        ORDER BY c.update_time DESC NULLS LAST, c.create_time DESC
                     </otherwise>
                 </choose>
             </otherwise>
@@ -163,6 +176,7 @@
             c.owner_id,
             u.realname AS owner_name,
             c.create_time,
+            c.update_time,
             c.primary_contact_name,
             c.primary_contact_phone,
             c.primary_contact_position,
@@ -195,6 +209,7 @@
             c.owner_id,
             u.realname AS owner_name,
             c.create_time,
+            c.update_time,
             c.primary_contact_name,
             c.primary_contact_phone,
             c.primary_contact_position,

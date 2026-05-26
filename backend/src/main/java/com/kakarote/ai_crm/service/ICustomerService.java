@@ -136,6 +136,11 @@ public interface ICustomerService extends IService<Customer> {
     CustomerAiReportVO generateAiReport(Long customerId);
 
     /**
+     * Refresh customer activity metadata after related CRM records change.
+     */
+    void refreshCustomerActivity(Long customerId);
+
+    /**
      * 使用 AI 解析搜索。
      */
     CustomerAiSearchParseVO aiParseSearch(CustomerAiSearchParseBO parseBO);
