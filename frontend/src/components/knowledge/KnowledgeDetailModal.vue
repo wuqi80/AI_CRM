@@ -122,6 +122,32 @@
               </div>
 
               <div
+                v-else-if="showAudioPreview"
+                class="media-preview-shell flex h-full items-center justify-center bg-slate-950 p-6"
+              >
+                <audio
+                  :src="mediaPreviewUrl || undefined"
+                  controls
+                  preload="metadata"
+                  class="w-full max-w-3xl"
+                  @error="handleMediaPreviewError"
+                />
+              </div>
+
+              <div
+                v-else-if="showVideoPreview"
+                class="media-preview-shell flex h-full items-center justify-center bg-slate-950 p-6"
+              >
+                <video
+                  :src="mediaPreviewUrl || undefined"
+                  controls
+                  preload="metadata"
+                  class="media-preview-video"
+                  @error="handleMediaPreviewError"
+                />
+              </div>
+
+              <div
                 v-else-if="showPdfPreview"
                 class="pdf-preview-shell h-full overflow-auto bg-white"
               >
@@ -391,7 +417,18 @@ import {
 import type { Knowledge, KnowledgeAiAnalyzeVO } from '@/types/common'
 import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 
-type PreviewKind = 'image' | 'doc' | 'docx' | 'excel' | 'pdf' | 'pptx' | 'text' | 'unsupported' | 'none'
+type PreviewKind =
+  | 'image'
+  | 'audio'
+  | 'video'
+  | 'doc'
+  | 'docx'
+  | 'excel'
+  | 'pdf'
+  | 'pptx'
+  | 'text'
+  | 'unsupported'
+  | 'none'
 
 const VueOfficeDocx = defineAsyncComponent(async () => {
   await import('@vue-office/docx/lib/v3/index.css')
@@ -471,6 +508,14 @@ const showImagePreview = computed(() => {
   return previewKind.value === 'image' && Boolean(mediaPreviewUrl.value) && !previewFailed.value
 })
 
+const showAudioPreview = computed(() => {
+  return previewKind.value === 'audio' && Boolean(mediaPreviewUrl.value) && !previewFailed.value
+})
+
+const showVideoPreview = computed(() => {
+  return previewKind.value === 'video' && Boolean(mediaPreviewUrl.value) && !previewFailed.value
+})
+
 const showPdfPreview = computed(() => {
   return previewKind.value === 'pdf' && Boolean(previewBlob.value) && !previewFailed.value
 })
@@ -533,12 +578,26 @@ function isImageType(extension: string, mimeType: string): boolean {
   return mimeType.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'avif'].includes(extension)
 }
 
+function isAudioType(extension: string, mimeType: string): boolean {
+  return mimeType.startsWith('audio/') || ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(extension)
+}
+
+function isVideoType(extension: string, mimeType: string): boolean {
+  return mimeType.startsWith('video/') || ['mp4', 'webm', 'mov', 'm4v', 'avi', 'mkv', 'ogv', '3gp'].includes(extension)
+}
+
 function resolvePreviewKind(filename?: string, mimeType?: string): PreviewKind {
   const extension = getFileExtension(filename)
   const normalizedType = normalizeContentType(mimeType)
 
   if (isImageType(extension, normalizedType)) {
     return 'image'
+  }
+  if (isAudioType(extension, normalizedType)) {
+    return 'audio'
+  }
+  if (isVideoType(extension, normalizedType)) {
+    return 'video'
   }
   if (extension === 'pdf' || normalizedType === 'application/pdf') {
     return 'pdf'
@@ -578,6 +637,54 @@ function resolvePreviewKind(filename?: string, mimeType?: string): PreviewKind {
   return 'unsupported'
 }
 
+function resolvePlayableMediaType(kind: PreviewKind, filename?: string, mimeType?: string, blobType?: string): string {
+  const normalizedBlobType = normalizeContentType(blobType)
+  if (
+    (kind === 'audio' && normalizedBlobType.startsWith('audio/')) ||
+    (kind === 'video' && normalizedBlobType.startsWith('video/'))
+  ) {
+    return normalizedBlobType
+  }
+
+  const normalizedMetadataType = normalizeContentType(mimeType)
+  if (
+    (kind === 'audio' && normalizedMetadataType.startsWith('audio/')) ||
+    (kind === 'video' && normalizedMetadataType.startsWith('video/'))
+  ) {
+    return normalizedMetadataType
+  }
+
+  const extension = getFileExtension(filename)
+  const fallbackTypes: Record<string, string> = {
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    m4a: 'audio/mp4',
+    aac: 'audio/aac',
+    ogg: 'audio/ogg',
+    oga: 'audio/ogg',
+    opus: 'audio/ogg',
+    flac: 'audio/flac',
+    weba: 'audio/webm',
+    mp4: 'video/mp4',
+    m4v: 'video/mp4',
+    webm: 'video/webm',
+    mov: 'video/quicktime',
+    avi: 'video/x-msvideo',
+    mkv: 'video/x-matroska',
+    ogv: 'video/ogg',
+    '3gp': 'video/3gpp'
+  }
+  return fallbackTypes[extension] || ''
+}
+
+function createPlayableMediaBlob(blob: Blob, kind: PreviewKind, filename?: string, mimeType?: string): Blob {
+  const contentType = resolvePlayableMediaType(kind, filename, mimeType, blob.type)
+  if (!contentType || normalizeContentType(blob.type) === contentType) {
+    return blob
+  }
+  return blob.slice(0, blob.size, contentType)
+}
+
 async function tryReadJsonBlob(blob: Blob): Promise<{ msg?: string } | null> {
   const contentType = normalizeContentType(blob.type)
   if (contentType !== 'application/json') {
@@ -613,6 +720,12 @@ function handlePreviewError(error: unknown) {
   officePreviewSource.value = null
   previewFailed.value = true
   previewNotice.value = previewNotice.value || '文件渲染失败，已切换为文本内容。'
+}
+
+function handleMediaPreviewError(error: Event) {
+  console.error('Knowledge media preview failed:', error)
+  previewFailed.value = true
+  previewNotice.value = '浏览器无法播放该音视频格式，请下载后查看。'
 }
 
 onBeforeUnmount(() => {
@@ -723,8 +836,11 @@ async function loadDocument(id: string) {
       return
     }
 
-    if (kind === 'image') {
-      mediaPreviewUrl.value = URL.createObjectURL(fileBlob)
+    if (kind === 'image' || kind === 'audio' || kind === 'video') {
+      const playableBlob = kind === 'image'
+        ? fileBlob
+        : createPlayableMediaBlob(fileBlob, kind, detail.name, detail.mimeType)
+      mediaPreviewUrl.value = URL.createObjectURL(playableBlob)
       return
     }
 
@@ -926,6 +1042,13 @@ function getTypeIconColor(type?: string): string {
   max-height: 100%;
   object-fit: contain;
   border-radius: 24px;
+}
+
+.media-preview-video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 16px;
+  background: #020617;
 }
 
 .office-preview-shell {

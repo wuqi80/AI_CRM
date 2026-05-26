@@ -77,14 +77,7 @@
                     class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white"
                   >
                     <span class="material-symbols-outlined text-lg">
-                      {{
-                        selectedFile.name.toLowerCase().endsWith('.pdf')
-                          ? 'picture_as_pdf'
-                          : selectedFile.name.toLowerCase().endsWith('.ppt') ||
-                              selectedFile.name.toLowerCase().endsWith('.pptx')
-                            ? 'slideshow'
-                            : 'description'
-                      }}
+                      {{ getSelectedFileIcon(selectedFile.name) }}
                     </span>
                   </div>
                   <div class="min-w-0 flex-1">
@@ -155,7 +148,7 @@ import { uploadKnowledge } from '@/api/knowledge'
 import { useResponsive } from '@/composables/useResponsive'
 
 const ACCEPT =
-  '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md'
+  '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp,audio/*,video/*'
 const typeCategories = [
   { id: 'document', label: '产品文档', icon: 'description' },
   { id: 'proposal', label: '方案资料', icon: 'lightbulb' },
@@ -194,7 +187,7 @@ const props = withDefaults(
     summaryPlaceholder: '例如：本次会议的关键结论、客户关注点、下一步行动…',
     primaryActionLabel: '开始解析',
     successMessage: '上传成功',
-    sizeHint: '支持 PDF、Word、PPT、Excel（最大 50MB）',
+    sizeHint: '支持 PDF、Word、PPT、Excel、音频、视频（最大 100MB）',
     accept: ACCEPT,
     destroyOnClose: false
   }
@@ -239,6 +232,16 @@ watch(
 function resetForm() {
   selectedFile.value = null
   form.value = { type: 'document', summary: '' }
+}
+
+function getSelectedFileIcon(fileName: string): string {
+  const normalized = fileName.toLowerCase()
+  if (normalized.endsWith('.pdf')) return 'picture_as_pdf'
+  if (normalized.endsWith('.ppt') || normalized.endsWith('.pptx')) return 'slideshow'
+  if (normalized.endsWith('.xls') || normalized.endsWith('.xlsx')) return 'table_chart'
+  if (/\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|weba)$/i.test(normalized)) return 'audio_file'
+  if (/\.(mp4|webm|mov|m4v|avi|mkv|ogv|3gp)$/i.test(normalized)) return 'video_file'
+  return 'description'
 }
 
 function onBeforeFileSelect(file: File) {
