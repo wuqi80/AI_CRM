@@ -282,11 +282,11 @@ export const useChatStore = defineStore('chat', () => {
     attachmentVOs?: ChatAttachmentVO[],
     appCodeOrUseRag?: string | boolean,
     knowledgeIds?: string[]
-  ): Promise<void> {
+  ): Promise<string> {
     const effectiveAppCode = resolveEffectiveAppCode(appCodeOrUseRag, knowledgeIds)
     const sessionId = await ensureSessionForSend(effectiveAppCode)
     // Allow other sessions to stream concurrently; only block double-send on this session.
-    if (streamingTasks.value[sessionId]) return
+    if (streamingTasks.value[sessionId]) return sessionId
 
     const userMessageId = createLocalMessageId('user')
     const assistantMessageId = createLocalMessageId('assistant')
@@ -352,6 +352,7 @@ export const useChatStore = defineStore('chat', () => {
       delete streamingTasks.value[sessionId]
       markAssistantMessageDone(sessionId, assistantMessageId)
     }
+    return sessionId
   }
 
   async function sendMessageWithSync(content: string, appCodeOrUseRag?: string | boolean): Promise<string> {

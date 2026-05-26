@@ -5,7 +5,8 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alipay.easysdk.factory.Factory;
 import com.alipay.easysdk.kernel.Config;
-import com.alipay.easysdk.payment.page.models.AlipayTradePagePayResponse;
+import com.alipay.easysdk.kernel.util.ResponseChecker;
+import com.alipay.easysdk.payment.facetoface.models.AlipayTradePrecreateResponse;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -68,9 +69,7 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
 
     private static final String CHANNEL_WECHAT = "wechat";
     private static final String CHANNEL_ALIPAY = "alipay";
-    private static final String ALIPAY_PRODUCT_CODE_FAST_INSTANT_TRADE_PAY = "FAST_INSTANT_TRADE_PAY";
     private static final String PAYMENT_MODE_QR_CODE = "qrcode";
-    private static final String PAYMENT_MODE_PAGE = "page";
 
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_PAID = "PAID";
@@ -368,28 +367,24 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
     }
 
     /**
-     * 使用支付宝 Page Pay 生成一段可直接放进 iframe 的表单页面。
-     * 这样前端无需再自己拼接支付宝网关参数。
+     * 使用支付宝当面付预创建接口生成二维码内容，前端统一按二维码图片展示。
      */
     private String createAlipayPayment(TokenPurchaseOrder order) {
         try {
             initAlipayFactory();
-            int qrCodeWidth = properties.getAlipay().getQrcodeWidth() == null
-                    ? 200
-                    : Math.max(100, properties.getAlipay().getQrcodeWidth());
-            var page = Factory.Payment.Page()
-                    .optional("qr_pay_mode", 4)
-                    .optional("qrcode_width", qrCodeWidth)
-                    .optional("integration_type", "PCWEB")
-                    .optional("product_code", ALIPAY_PRODUCT_CODE_FAST_INSTANT_TRADE_PAY)
+            var faceToFace = Factory.Payment.FaceToFace()
                     .optional("body", buildOrderBody(order));
             if (StrUtil.isNotBlank(properties.getAlipay().getSellerId())) {
-                page = page.optional("seller_id", properties.getAlipay().getSellerId().trim());
+                faceToFace = faceToFace.optional("seller_id", properties.getAlipay().getSellerId().trim());
             }
-            AlipayTradePagePayResponse pay = page
+            AlipayTradePrecreateResponse pay = faceToFace
                     .asyncNotify(resolveNotifyUrl(CHANNEL_ALIPAY))
-                    .pay(buildOrderSubject(order), order.getOrderNo(), fenToAmount(order.getAmountFen()).toPlainString(), "");
-            return pay.getBody();
+                    .preCreate(buildOrderSubject(order), order.getOrderNo(), fenToAmount(order.getAmountFen()).toPlainString());
+            if (!ResponseChecker.success(pay) || StrUtil.isBlank(pay.getQrCode())) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                        StrUtil.blankToDefault(pay.getSubMsg(), "支付宝下单失败"));
+            }
+            return pay.getQrCode();
         } catch (Exception e) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "支付宝下单失败: " + e.getMessage());
         }
@@ -489,23 +484,16 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
 
     /**
      * 将数据库订单转换成前端弹窗需要的展示结构。
-     * 微信走二维码模式，支付宝走 page pay 表单模式。
+     * 微信和支付宝都走二维码模式，前端统一渲染二维码图片。
      */
     private TokenPurchaseOrderVO toOrderVO(TokenPurchaseOrder order) {
         TokenPurchaseOrderVO vo = BeanUtil.copyProperties(order, TokenPurchaseOrderVO.class);
         vo.setAmountDisplay("¥" + fenToAmount(order.getAmountFen()).stripTrailingZeros().toPlainString());
         vo.setPaymentChannelLabel(CHANNEL_WECHAT.equals(order.getPaymentChannel()) ? "微信支付" : "支付宝");
-        if (CHANNEL_WECHAT.equals(order.getPaymentChannel())) {
-            vo.setPaymentMode(PAYMENT_MODE_QR_CODE);
-            vo.setQrCodeContent(order.getPaymentQrCode());
-            if (STATUS_PENDING.equals(order.getStatus()) && StrUtil.isNotBlank(order.getPaymentQrCode())) {
-                vo.setQrCodeImage(QrCodeUtil.toDataUri(order.getPaymentQrCode(), 280));
-            }
-        } else {
-            vo.setPaymentMode(PAYMENT_MODE_PAGE);
-            if (STATUS_PENDING.equals(order.getStatus()) && StrUtil.isNotBlank(order.getPaymentQrCode())) {
-                vo.setPaymentFormHtml(order.getPaymentQrCode());
-            }
+        vo.setPaymentMode(PAYMENT_MODE_QR_CODE);
+        vo.setQrCodeContent(order.getPaymentQrCode());
+        if (STATUS_PENDING.equals(order.getStatus()) && StrUtil.isNotBlank(order.getPaymentQrCode())) {
+            vo.setQrCodeImage(QrCodeUtil.toDataUri(order.getPaymentQrCode(), 280));
         }
         return vo;
     }
@@ -537,11 +525,22 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
      * 待支付订单如果缺少支付载荷，在查询时补一遍，避免用户刷新后必须重新下单。
      */
     private void ensurePaymentPayload(TokenPurchaseOrder order) {
-        if (order == null || !STATUS_PENDING.equals(order.getStatus()) || StrUtil.isNotBlank(order.getPaymentQrCode())) {
+        if (order == null || !STATUS_PENDING.equals(order.getStatus())) {
+            return;
+        }
+        if (StrUtil.isNotBlank(order.getPaymentQrCode()) && !isLegacyAlipayPagePayload(order)) {
             return;
         }
         order.setPaymentQrCode(createPaymentPayload(order));
         updateById(order);
+    }
+
+    /**
+     * 老版本支付宝订单保存的是 Page Pay 表单，无法稳定控制跨域 iframe 内部布局。
+     */
+    private boolean isLegacyAlipayPagePayload(TokenPurchaseOrder order) {
+        return CHANNEL_ALIPAY.equals(order.getPaymentChannel())
+                && StrUtil.containsAnyIgnoreCase(order.getPaymentQrCode(), "<form", "<html", "alipay.trade.page.pay");
     }
 
     /**

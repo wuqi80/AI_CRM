@@ -9,10 +9,37 @@
         <!-- Header -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 class="text-xl md:text-2xl font-bold text-slate-900">AI 优先行动中心</h2>
-            <p class="text-sm text-slate-500 mt-1">基于客户价值与成交概率，AI 已为您自动排序今日任务。</p>
+            <h2 class="text-xl md:text-[22px] font-bold text-slate-900">AI 优先行动中心</h2>
+            <p class="text-[13px] text-slate-500 mt-1">基于客户价值与成交概率，AI 已为您自动排序今日任务。</p>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <!-- Add task button -->
+          <button
+            class="flex items-center gap-1.5 self-start px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 md:self-auto"
+            @click="handleAddTask"
+          >
+            <span class="material-symbols-outlined wk-plus-button-icon">add</span>
+            <span>{{ isMobile ? '新建' : '新建任务' }}</span>
+          </button>
+        </div>
+
+        <!-- Status Filter Tabs and list controls -->
+        <div class="wk-task-list-toolbar flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="flex gap-2 overflow-x-auto">
+            <button
+              v-for="tab in statusTabs"
+              :key="tab.value"
+              @click="handleStatusFilter(tab.value)"
+              :class="[
+                'px-4 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap',
+                currentStatus === tab.value
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+              ]"
+            >
+              {{ tab.label }} ({{ tab.count }})
+            </button>
+          </div>
+          <div class="flex items-center justify-end gap-3 overflow-x-auto">
             <div v-if="!isMobile" class="flex bg-slate-100 p-1 rounded-lg shrink-0 border border-slate-200">
               <button
                 type="button"
@@ -34,7 +61,7 @@
               </button>
             </div>
             <!-- Segmented filter -->
-            <div class="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-w-[70vw] md:max-w-none">
+            <div class="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-w-full md:max-w-none">
               <button
                 @click="handleValueFilter('all')"
                 :class="[
@@ -54,32 +81,7 @@
                 高价值优先
               </button>
             </div>
-            <!-- Add task button -->
-            <button
-              class="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-              @click="handleAddTask"
-            >
-              <span class="material-symbols-outlined wk-plus-button-icon">add</span>
-              <span>{{ isMobile ? '新建' : '新建任务' }}</span>
-            </button>
           </div>
-        </div>
-
-        <!-- Status Filter Tabs -->
-        <div class="flex gap-2 overflow-x-auto">
-          <button
-            v-for="tab in statusTabs"
-            :key="tab.value"
-            @click="handleStatusFilter(tab.value)"
-            :class="[
-              'px-4 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap',
-              currentStatus === tab.value
-                ? 'bg-primary text-white'
-                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
-            ]"
-          >
-            {{ tab.label }} ({{ tab.count }})
-          </button>
         </div>
 
         <div
@@ -106,7 +108,7 @@
         <!-- Task List View -->
         <div v-else-if="effectiveTaskViewMode === 'list'" class="wk-task-list-table overflow-hidden rounded-2xl border shadow-sm">
           <div class="overflow-x-auto">
-            <div class="wk-task-list-table__header task-list-grid min-w-[1180px] px-5 py-3 text-xs font-bold">
+            <div class="wk-task-list-table__header task-list-grid min-w-[1180px] px-5 py-3 text-sm font-bold">
               <div>AI评分/任务标题</div>
               <div>关联客户</div>
               <div>优先级</div>
@@ -133,7 +135,7 @@
               <div class="flex min-w-0 items-center gap-3">
                 <div
                   :class="[
-                    'flex h-7 min-w-9 shrink-0 items-center justify-center rounded-lg border px-2 text-sm font-black',
+                    'flex h-7 min-w-9 shrink-0 items-center justify-center rounded-lg border px-2 text-sm',
                     task.status === 'COMPLETED'
                       ? 'border-emerald-100 bg-emerald-50 text-emerald-500'
                       : 'border-primary/10 bg-primary/5 text-primary'
@@ -145,7 +147,7 @@
                 <div class="min-w-0">
                   <h3
                     :class="[
-                      'truncate text-base font-bold leading-5 transition-colors group-hover:text-primary',
+                      'truncate text-sm font-bold leading-5 transition-colors group-hover:text-primary',
                       task.status === 'COMPLETED' ? 'text-slate-400 line-through' : 'text-slate-900'
                     ]"
                     :title="task.title"
@@ -158,13 +160,13 @@
                 </div>
               </div>
 
-              <div class="min-w-0 truncate text-sm font-semibold text-slate-900" :title="task.customerName || '-'">
+              <div class="min-w-0 truncate text-sm text-slate-900" :title="task.customerName || '-'">
                 {{ task.customerName || '-' }}
               </div>
 
               <div>
                 <span
-                  class="inline-flex h-6 items-center rounded-full px-2.5 text-xs font-bold"
+                  class="inline-flex h-6 items-center rounded-full px-2.5 text-sm"
                   :class="getPriorityBadgeClass(task.priority)"
                 >
                   {{ getPriorityLabel(task.priority) }}
@@ -173,20 +175,20 @@
 
               <div>
                 <span
-                  class="inline-flex h-6 items-center rounded-md px-2.5 text-xs font-bold"
+                  class="inline-flex h-6 items-center rounded-md px-2.5 text-sm"
                   :class="getStatusBadgeClass(task)"
                 >
                   {{ getStatusLabel(task) }}
                 </span>
               </div>
 
-              <div class="whitespace-nowrap text-sm font-medium text-slate-500">
+              <div class="whitespace-nowrap text-sm text-slate-500">
                 {{ task.dueDate ? formatDateTime(task.dueDate) : '-' }}
               </div>
 
               <div>
                 <span
-                  class="inline-flex h-6 max-w-full items-center rounded-md px-2.5 text-xs font-bold"
+                  class="inline-flex h-6 max-w-full items-center rounded-md px-2.5 text-sm"
                   :class="getTaskTypeBadgeClass(task.taskType)"
                   :title="getTaskTypeLabel(task.taskType)"
                 >
@@ -194,7 +196,7 @@
                 </span>
               </div>
 
-              <div class="min-w-0 truncate text-sm font-medium text-slate-700" :title="getTaskOwnerName(task)">
+              <div class="min-w-0 truncate text-sm text-slate-700" :title="getTaskOwnerName(task)">
                 {{ getTaskOwnerName(task) }}
               </div>
 
@@ -202,7 +204,7 @@
                 <button
                   v-if="task.status === 'PENDING'"
                   type="button"
-                  class="inline-flex h-8 items-center rounded-lg bg-blue-50 px-3 text-xs font-bold text-blue-600 transition-colors hover:bg-blue-100"
+                  class="inline-flex h-8 items-center rounded-lg bg-blue-50 px-3 text-sm text-blue-600 transition-colors hover:bg-blue-100"
                   @click="handleStartTask(task)"
                 >
                   开始处理
@@ -210,12 +212,55 @@
                 <button
                   v-if="task.status !== 'COMPLETED'"
                   type="button"
-                  class="inline-flex h-8 items-center rounded-lg bg-emerald-50 px-3 text-xs font-bold text-emerald-600 transition-colors hover:bg-emerald-100"
+                  class="inline-flex h-8 items-center rounded-lg bg-emerald-50 px-3 text-sm text-emerald-600 transition-colors hover:bg-emerald-100"
                   @click="handleToggleComplete(task)"
                 >
                   标记完成
                 </button>
-                <span v-else class="inline-flex h-8 items-center px-2 text-xs font-bold text-slate-400">已完成</span>
+                <span v-else class="inline-flex h-8 items-center px-2 text-sm text-slate-400">已完成</span>
+              </div>
+            </div>
+
+            <div
+              v-if="showPagination"
+              class="wk-task-list-table__footer flex min-w-[1180px] items-center justify-end border-t px-5 py-4"
+            >
+              <span class="text-sm text-[var(--wk-text-muted)]">
+                共 {{ taskStore.totalCount }} 个任务
+                <span class="hidden md:inline">（第 {{ currentPage }} / {{ totalPages }} 页）</span>
+              </span>
+              <div class="flex items-center gap-1">
+                <button
+                  class="flex size-8 items-center justify-center rounded border border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="currentPage <= 1"
+                  title="上一页"
+                  aria-label="上一页"
+                  @click="handlePageChange(currentPage - 1)"
+                >
+                  <span class="material-symbols-outlined text-lg leading-none">chevron_left</span>
+                </button>
+                <button
+                  v-for="p in visiblePages"
+                  :key="p"
+                  class="flex size-8 items-center justify-center rounded border text-xs font-bold"
+                  :class="p === currentPage
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)]'"
+                  :aria-current="p === currentPage ? 'page' : undefined"
+                  :aria-label="`第 ${p} 页`"
+                  @click="handlePageChange(p)"
+                >
+                  {{ p }}
+                </button>
+                <button
+                  class="flex size-8 items-center justify-center rounded border border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="currentPage >= totalPages"
+                  title="下一页"
+                  aria-label="下一页"
+                  @click="handlePageChange(currentPage + 1)"
+                >
+                  <span class="material-symbols-outlined text-lg leading-none">chevron_right</span>
+                </button>
               </div>
             </div>
           </div>
@@ -377,12 +422,12 @@
         </div>
 
         <!-- Pagination -->
-        <div v-if="taskStore.totalCount > (taskStore.queryParams.limit || 10)" class="mt-6 flex justify-center">
+        <div v-if="showPagination && effectiveTaskViewMode !== 'list'" class="mt-6 flex justify-center">
           <div class="flex items-center gap-2">
             <button
               class="size-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              :disabled="(taskStore.queryParams.page || 1) <= 1"
-              @click="handlePageChange((taskStore.queryParams.page || 1) - 1)"
+              :disabled="currentPage <= 1"
+              @click="handlePageChange(currentPage - 1)"
             >
               <span class="material-symbols-outlined text-lg">chevron_left</span>
             </button>
@@ -392,7 +437,7 @@
               @click="handlePageChange(p)"
               :class="[
                 'size-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors',
-                p === (taskStore.queryParams.page || 1)
+                p === currentPage
                   ? 'bg-primary text-white'
                   : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
               ]"
@@ -401,8 +446,8 @@
             </button>
             <button
               class="size-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              :disabled="(taskStore.queryParams.page || 1) >= totalPages"
-              @click="handlePageChange((taskStore.queryParams.page || 1) + 1)"
+              :disabled="currentPage >= totalPages"
+              @click="handlePageChange(currentPage + 1)"
             >
               <span class="material-symbols-outlined text-lg">chevron_right</span>
             </button>
@@ -452,7 +497,7 @@ const showTaskDetail = ref(false)
 const detailTask = ref<Task | null>(null)
 const selectedTask = ref<Task | null>(null)
 
-const effectiveTaskViewMode = computed(() => isMobile.value ? 'card' : taskViewMode.value)
+const effectiveTaskViewMode = computed(() => taskViewMode.value)
 
 // Computed properties
 const statusTabs = computed(() => {
@@ -467,11 +512,14 @@ const statusTabs = computed(() => {
 
 const displayedTasks = computed(() => taskStore.taskList)
 
-const totalPages = computed(() => Math.ceil(taskStore.totalCount / (taskStore.queryParams.limit || 10)))
+const currentPage = computed(() => taskStore.queryParams.page || 1)
+const pageSize = computed(() => taskStore.queryParams.limit || 10)
+const totalPages = computed(() => Math.ceil(taskStore.totalCount / pageSize.value))
+const showPagination = computed(() => taskStore.totalCount > 0)
 
 const visiblePages = computed(() => {
   const total = totalPages.value
-  const current = taskStore.queryParams.page || 1
+  const current = currentPage.value
   const pages: number[] = []
   let start = Math.max(1, current - 2)
   const end = Math.min(total, start + 4)
@@ -573,6 +621,7 @@ function handleStatusFilter(status: string) {
 }
 
 function handlePageChange(page: number) {
+  if (page < 1 || page > totalPages.value) return
   if (taskStore.queryParams.page === page) return
   taskStore.queryParams.taskId = undefined
   taskStore.queryParams.page = page
@@ -791,6 +840,11 @@ function getRelativeTime(dateStr: string): string {
 .wk-task-list-table__row {
   background: var(--wk-bg-surface);
   border-bottom: 1px solid var(--wk-border-subtle);
+}
+
+.wk-task-list-table__footer {
+  background: var(--wk-bg-surface-subtle);
+  border-color: var(--wk-border-subtle);
 }
 
 .wk-task-list-table__row:hover,

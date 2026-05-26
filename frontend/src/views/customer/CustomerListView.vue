@@ -4,8 +4,8 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <h2 class="text-2xl font-bold text-slate-900">客户列表</h2>
-          <p class="text-sm text-slate-500">管理您的客户关系并查看 AI 驱动的业务洞察。</p>
+          <h2 class="text-[22px] font-bold text-slate-900">客户列表</h2>
+          <p class="text-[13px] text-slate-500">管理您的客户关系并查看 AI 驱动的业务洞察。</p>
         </div>
 
         <button

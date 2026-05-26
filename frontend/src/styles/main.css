@@ -241,6 +241,24 @@ select.border-none,
   box-shadow: 0 18px 50px rgb(var(--wk-shadow-color) / 0.14) !important;
 }
 
+.wk-sidebar-like-tooltip.el-popper {
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #000 !important;
+  padding: 6px 12px !important;
+  color: #fff !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+}
+
+.wk-sidebar-like-tooltip.el-popper .el-popper__arrow,
+.wk-sidebar-like-tooltip.el-popper .el-popper__arrow::before {
+  display: none !important;
+}
+
 .el-dropdown-menu {
   background: var(--wk-bg-surface) !important;
 }

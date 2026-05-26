@@ -11,48 +11,54 @@
     class="schedule-detail-drawer"
   >
     <div v-if="schedule" class="h-full flex flex-col bg-white shadow-2xl">
-      <div class="flex items-center justify-between px-8 pt-8 pb-4">
-        <span
-          class="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-primary"
-        >
-          日程详情
-        </span>
-        <div class="flex items-center gap-2">
+      <div class="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-6 sm:px-8">
+        <div class="flex min-w-0 items-center gap-3">
+          <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <span class="material-symbols-outlined text-[20px] leading-none">event_note</span>
+          </div>
+          <div class="min-w-0">
+            <h3 class="truncate text-sm font-bold text-slate-900">日程详情</h3>
+            <p class="truncate text-[11px] font-bold uppercase tracking-widest text-slate-400">
+              {{ schedule.typeName || '日程' }}
+            </p>
+          </div>
+        </div>
+        <div class="flex shrink-0 items-center gap-2">
           <button
             v-if="allowEdit"
             :disabled="deleting"
-            class="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50"
+            class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-primary disabled:opacity-50"
             type="button"
             aria-label="编辑日程"
             title="编辑日程"
             @click="handleEditSchedule"
           >
-            <span class="material-symbols-outlined flex size-[18px] items-center justify-center text-[18px] leading-none">edit</span>
+            <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
           </button>
           <button
             v-if="allowDelete"
             :disabled="deleting"
-            class="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+            class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
             type="button"
             aria-label="删除日程"
             title="删除日程"
             @click="handleDeleteSchedule"
           >
-            <span class="material-symbols-outlined flex size-[18px] items-center justify-center text-[18px] leading-none">delete</span>
+            <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
           </button>
           <button
-            class="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200"
             type="button"
             aria-label="关闭日程详情"
             title="关闭"
             @click="visible = false"
           >
-            <span class="material-symbols-outlined flex size-[18px] items-center justify-center text-[18px] leading-none">close</span>
+            <span class="material-symbols-outlined text-[18px] leading-none">close</span>
           </button>
         </div>
       </div>
 
-      <div class="flex-1 min-h-0 overflow-y-auto px-8 pb-8 pt-0">
+      <div class="flex-1 min-h-0 overflow-y-auto px-8 pb-8 pt-8">
         <h2 class="mb-8 text-2xl font-bold leading-tight text-slate-900">{{ schedule.title }}</h2>
 
         <div class="mb-8 grid grid-cols-2 gap-4">
@@ -60,58 +66,82 @@
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="mb-2 flex items-center gap-2">
-              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">schedule</span>
-              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">开始时间</p>
+            <div class="flex items-center gap-4">
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-xl leading-none">schedule</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">开始时间</p>
+                <p class="text-sm text-[#0d0d0d]">{{ formatDateTime(schedule.startTime) }}</p>
+              </div>
             </div>
-            <p class="text-xs font-bold text-slate-700">{{ formatDateTime(schedule.startTime) }}</p>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="mb-2 flex items-center gap-2">
-              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">schedule</span>
-              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">结束时间</p>
+            <div class="flex items-center gap-4">
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-xl leading-none">schedule</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">结束时间</p>
+                <p class="text-sm text-[#0d0d0d]">
+                  {{ schedule.endTime ? formatEndDateTime(schedule.startTime, schedule.endTime) : '未填写' }}
+                </p>
+              </div>
             </div>
-            <p class="text-xs font-bold text-slate-700">
-              {{ schedule.endTime ? formatEndDateTime(schedule.startTime, schedule.endTime) : '未填写' }}
-            </p>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="mb-2 flex items-center gap-2">
-              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">label</span>
-              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">类型</p>
+            <div class="flex items-center gap-4">
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-xl leading-none">label</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">类型</p>
+                <p class="break-words text-sm text-[#0d0d0d]">{{ schedule.typeName || '未填写' }}</p>
+              </div>
             </div>
-            <p class="text-xs font-bold text-slate-700 break-words">{{ schedule.typeName || '未填写' }}</p>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="mb-2 flex items-center gap-2">
-              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">location_on</span>
-              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">地点</p>
+            <div class="flex items-center gap-4">
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-xl leading-none">location_on</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">地点</p>
+                <p class="break-words text-sm text-[#0d0d0d]">{{ schedule.location || '未填写' }}</p>
+              </div>
             </div>
-            <p class="text-xs font-bold text-slate-700 break-words">{{ schedule.location || '未填写' }}</p>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="mb-2 flex items-center gap-2">
-              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">person</span>
-              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">创建人</p>
+            <div class="flex items-center gap-4">
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-xl leading-none">person</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">创建人</p>
+                <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateUserName }}</p>
+              </div>
             </div>
-            <p class="text-xs font-bold text-slate-700 break-words">{{ displayCreateUserName }}</p>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="mb-2 flex items-center gap-2">
-              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">calendar_clock</span>
-              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">创建时间</p>
+            <div class="flex items-center gap-4">
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-xl leading-none">calendar_clock</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">创建时间</p>
+                <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateTime }}</p>
+              </div>
             </div>
-            <p class="text-xs font-bold text-slate-700 break-words">{{ displayCreateTime }}</p>
           </div>
         </div>
 
@@ -119,14 +149,14 @@
           <section v-if="schedule.customerName">
             <div class="mb-4 flex items-center gap-2">
               <span class="material-symbols-outlined text-[18px] text-slate-400">corporate_fare</span>
-              <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">关联客户</h3>
+              <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400">关联客户</h3>
             </div>
             <div
-              class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition-colors"
+              class="flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors"
               :class="schedule.customerId ? 'cursor-pointer hover:bg-slate-50' : ''"
               @click="handleGoToCustomerDetail"
             >
-              <div class="flex size-10 items-center justify-center rounded-xl bg-primary/10 font-bold text-primary">
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-bold text-primary shadow-sm">
                 {{ schedule.customerName.charAt(0) }}
               </div>
               <div class="min-w-0 flex-1">
@@ -137,23 +167,17 @@
             </div>
           </section>
 
-          <section v-if="participantsLine">
-            <div class="mb-2 flex items-center gap-2">
-              <span class="material-symbols-outlined text-[18px] text-slate-400">group</span>
-              <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">参与人</h3>
-            </div>
+          <section v-if="participantsLine" class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">参与人</p>
             <p class="whitespace-pre-wrap text-sm font-medium leading-relaxed text-slate-700">
               {{ participantsLine }}
             </p>
           </section>
 
           <section v-if="schedule.description">
-            <div class="mb-4 flex items-center gap-2">
-              <span class="material-symbols-outlined text-[18px] text-slate-400">notes</span>
-              <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">备注说明</h3>
-            </div>
-            <div class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
-              <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{{ schedule.description }}</p>
+            <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">备注说明</p>
+              <p class="whitespace-pre-wrap text-sm font-medium leading-relaxed text-slate-700">{{ schedule.description }}</p>
             </div>
           </section>
         </div>

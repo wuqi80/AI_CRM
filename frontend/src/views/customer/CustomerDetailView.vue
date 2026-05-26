@@ -69,7 +69,7 @@
                       </div>
                       <div class="flex items-center gap-1 shrink-0">
                         <span class="text-slate-400">手机:</span>
-                        <span class="text-slate-600 font-mono font-medium">{{ primaryContact?.phone || '-' }}</span>
+                        <span class="text-slate-600 font-medium">{{ primaryContact?.phone || '-' }}</span>
                       </div>
                       <div class="flex items-center gap-1 shrink-0">
                         <span class="text-slate-400">状态:</span>
@@ -461,9 +461,27 @@
                     >
                       <WkIcon name="ai" :size="14" />
                     </span>
-                    <h3 class="min-w-0 flex-1 text-sm font-bold leading-snug text-slate-900 break-words">
+                    <h3 class="min-w-0 text-sm font-bold leading-snug text-slate-900 break-words">
                       {{ savedAiAnalysisTitle }}
                     </h3>
+                    <button
+                      v-if="showAiAnalysisToggle"
+                      type="button"
+                      class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
+                      :aria-expanded="aiAnalysisExpanded"
+                      :aria-label="aiAnalysisExpanded ? '收起 AI分析' : '展开 AI分析'"
+                      @click="aiAnalysisExpanded = !aiAnalysisExpanded"
+                    >
+                      <span class="material-symbols-outlined text-[16px] leading-none">
+                        {{ aiAnalysisExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
+                      </span>
+                      <span
+                        class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
+                        role="tooltip"
+                      >
+                        {{ aiAnalysisExpanded ? '收起 AI分析' : '展开 AI分析' }}
+                      </span>
+                    </button>
                   </div>
                   <div class="flex shrink-0 items-center justify-end gap-2">
                     <p class="text-right text-xs leading-relaxed text-slate-400">
@@ -483,28 +501,12 @@
                         :class="{ 'animate-spin': generatingAiReport }"
                       >refresh</span>
                     </button>
-                    <button
-                      type="button"
-                      class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 opacity-0 pointer-events-none transition-[opacity,background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d] group-hover/ai-section:pointer-events-auto group-hover/ai-section:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                      :aria-expanded="aiAnalysisExpanded"
-                      :aria-label="aiAnalysisExpanded ? '收起 AI分析' : '展开 AI分析'"
-                      @click="aiAnalysisExpanded = !aiAnalysisExpanded"
-                    >
-                      <span class="material-symbols-outlined text-[16px] leading-none">
-                        {{ aiAnalysisExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
-                      </span>
-                      <span
-                        class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                        role="tooltip"
-                      >
-                        {{ aiAnalysisExpanded ? '收起 AI分析' : '展开 AI分析' }}
-                      </span>
-                    </button>
+
                   </div>
                 </div>
               </div>
 
-              <div v-show="aiAnalysisExpanded">
+              <div v-show="isAiAnalysisVisible">
                 <div
                   v-if="isAiAnalysisPending || isAiAnalysisFailed"
                   class="mb-4 rounded-2xl border px-4 py-3"
@@ -579,6 +581,7 @@
                 </span>
                 <h3 class="min-w-0 text-sm font-bold leading-snug text-slate-900 break-words">{{ isEmbeddedMobileLayout ? '活动' : '最近活动 - AI时间轴' }}</h3>
                 <button
+                  v-if="showFollowUpTimelineToggle"
                   type="button"
                   class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
                   :aria-expanded="followUpTimelineExpanded"
@@ -587,7 +590,7 @@
                   @click="followUpTimelineExpanded = !followUpTimelineExpanded"
                 >
                   <span class="material-symbols-outlined text-[16px] leading-none">
-                    {{ followUpTimelineExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+                    {{ followUpTimelineExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
                   </span>
                 </button>
                 <button
@@ -633,7 +636,7 @@
             </div>
 
             <div
-              v-if="followUpTimelineExpanded && followUps.length === 0 && !followUpLoading"
+              v-if="isFollowUpTimelineVisible && followUps.length === 0 && !followUpLoading"
               :class="isEmbeddedMobileLayout
                 ? 'rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center'
                 : 'bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm'"
@@ -646,7 +649,30 @@
               <p v-if="!isEmbeddedMobileLayout" class="text-xs text-slate-300 mt-1">点击上方按钮添加第一条跟进记录</p>
             </div>
 
-            <div v-else-if="followUpTimelineExpanded" v-loading="followUpLoading">
+            <div
+              v-else-if="isFollowUpTimelineVisible && followUpLoading"
+              class="space-y-3"
+            >
+              <div
+                v-for="index in 3"
+                :key="`follow-up-skeleton-${index}`"
+                class="rounded-xl border border-slate-200 bg-white p-3"
+              >
+                <div class="flex items-start gap-3">
+                  <div class="size-9 shrink-0 animate-pulse rounded-xl bg-slate-100" />
+                  <div class="min-w-0 flex-1 space-y-2">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="h-4 w-24 animate-pulse rounded-full bg-slate-100" />
+                      <div class="h-3 w-20 animate-pulse rounded-full bg-slate-100" />
+                    </div>
+                    <div class="h-3 w-full animate-pulse rounded-full bg-slate-100" />
+                    <div class="h-3 w-3/4 animate-pulse rounded-full bg-slate-100" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else-if="isFollowUpTimelineVisible">
               <div
                 v-for="(item, followUpIndex) in followUps"
                 :key="item.followUpId"
@@ -710,7 +736,7 @@
               </div>
             </div>
 
-            <div v-if="followUpTimelineExpanded && followUpTotal > followUpPageSize" class="flex justify-center">
+            <div v-if="isFollowUpTimelineVisible && followUpTotal > followUpPageSize" class="flex justify-center">
               <el-pagination
                 v-model:current-page="followUpPage"
                 :page-size="followUpPageSize"
@@ -738,7 +764,7 @@
             </div>
 
             <!-- Contacts Module -->
-            <section v-if="canViewContacts" class="wk-related-contacts group/contacts-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']" v-loading="contactLoading">
+            <section v-if="canViewContacts" class="wk-related-contacts group/contacts-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
               <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedContacts')">
@@ -746,6 +772,7 @@
                   </span>
                   联系人
                   <button
+                    v-if="showContactsModuleToggle"
                     type="button"
                     class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
                     :aria-expanded="contactsModuleExpanded"
@@ -753,7 +780,7 @@
                     @click="contactsModuleExpanded = !contactsModuleExpanded"
                   >
                     <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ contactsModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+                      {{ contactsModuleExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
                     </span>
                     <span
                       class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
@@ -797,8 +824,34 @@
                   </button>
                 </div>
               </div>
-              <div v-if="contactsModuleExpanded" class="space-y-4">
-                <div v-if="contacts.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+              <div v-if="isContactsModuleVisible" class="space-y-4">
+                <div v-if="contactLoading" class="space-y-3">
+                  <div
+                    v-for="index in 3"
+                    :key="`contact-skeleton-${index}`"
+                    class="rounded-2xl border border-slate-200 bg-white p-4"
+                  >
+                    <div class="flex flex-col gap-3">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0 flex flex-1 items-center gap-3">
+                          <div class="size-10 shrink-0 animate-pulse rounded-xl bg-slate-100" />
+                          <div class="min-w-0 flex-1 space-y-2">
+                            <div class="h-4 w-24 animate-pulse rounded-full bg-slate-100" />
+                            <div class="h-3 w-16 animate-pulse rounded-full bg-slate-100" />
+                          </div>
+                        </div>
+                        <div class="h-6 w-20 shrink-0 animate-pulse rounded-lg bg-slate-100" />
+                      </div>
+                      <div class="h-px w-full bg-slate-100" />
+                      <div class="space-y-2">
+                        <div class="h-3 w-2/3 animate-pulse rounded-full bg-slate-100" />
+                        <div class="h-3 w-4/5 animate-pulse rounded-full bg-slate-100" />
+                        <div class="h-3 w-1/2 animate-pulse rounded-full bg-slate-100" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else-if="contacts.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
                   <span class="material-symbols-outlined text-2xl leading-none text-slate-400">person_off</span>
                   <p class="mt-2 text-xs font-medium text-slate-400">暂无关联联系人</p>
                 </div>
@@ -915,7 +968,7 @@
             </section> -->
 
             <!-- Tasks Module -->
-            <section v-if="canViewTasks" class="group/tasks-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']" v-loading="taskLoading">
+            <section v-if="canViewTasks" class="group/tasks-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
               <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('todoTasks')">
@@ -923,6 +976,7 @@
                   </span>
                   任务
                   <button
+                    v-if="showTasksModuleToggle"
                     type="button"
                     class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
                     :aria-expanded="tasksModuleExpanded"
@@ -930,7 +984,7 @@
                     @click="tasksModuleExpanded = !tasksModuleExpanded"
                   >
                     <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ tasksModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+                      {{ tasksModuleExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
                     </span>
                     <span
                       class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
@@ -958,8 +1012,30 @@
                   </button>
                 </div>
               </div>
-              <div v-if="tasksModuleExpanded" class="space-y-4">
-                <div v-if="!customer.tasks?.length" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+              <div v-if="isTasksModuleVisible" class="space-y-4">
+                <div
+                  v-if="taskLoading"
+                  :class="embedded ? 'space-y-3' : 'ml-3 space-y-3 border-l-2 border-slate-100 pl-5'"
+                >
+                  <div
+                    v-for="index in 3"
+                    :key="`task-skeleton-${index}`"
+                    class="relative rounded-xl border border-slate-200 bg-white p-3"
+                  >
+                    <div v-if="!embedded" class="absolute -left-[27px] top-4 size-3 animate-pulse rounded-full border-2 border-slate-200 bg-white" />
+                    <div class="flex items-start gap-3">
+                      <div class="mt-0.5 size-5 shrink-0 animate-pulse rounded border border-slate-200 bg-slate-100" />
+                      <div class="min-w-0 flex-1 space-y-2">
+                        <div class="h-4 w-3/4 animate-pulse rounded-full bg-slate-100" />
+                        <div class="flex items-center gap-2">
+                          <div class="h-5 w-20 animate-pulse rounded-full bg-slate-100" />
+                          <div class="h-5 w-16 animate-pulse rounded-full bg-slate-100" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else-if="!customer.tasks?.length" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
                   <span class="material-symbols-outlined text-2xl leading-none text-slate-400">task_alt</span>
                   <p class="mt-2 text-xs font-medium text-slate-400">暂无待办任务</p>
                 </div>
@@ -1031,7 +1107,7 @@
             </section>
 
             <!-- Schedules Module -->
-            <section v-if="canViewSchedules" class="group/schedules-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']" v-loading="scheduleLoading">
+            <section v-if="canViewSchedules" class="group/schedules-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
               <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedSchedules')">
@@ -1039,6 +1115,7 @@
                   </span>
                   日程
                   <button
+                    v-if="showSchedulesModuleToggle"
                     type="button"
                     class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
                     :aria-expanded="schedulesModuleExpanded"
@@ -1046,7 +1123,7 @@
                     @click="schedulesModuleExpanded = !schedulesModuleExpanded"
                   >
                     <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ schedulesModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+                      {{ schedulesModuleExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
                     </span>
                     <span
                       class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
@@ -1075,8 +1152,31 @@
                   </button>
                 </div>
               </div>
-              <div v-if="schedulesModuleExpanded" class="space-y-4">
-                <div v-if="customerSchedules.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+              <div v-if="isSchedulesModuleVisible" class="space-y-4">
+                <div
+                  v-if="scheduleLoading"
+                  :class="embedded ? 'space-y-3' : 'ml-3 space-y-3 border-l-2 border-slate-100 pl-5'"
+                >
+                  <div
+                    v-for="index in 3"
+                    :key="`schedule-skeleton-${index}`"
+                    class="relative rounded-xl border border-slate-200 bg-white p-3"
+                  >
+                    <div v-if="!embedded" class="absolute -left-[27px] top-4 size-3 animate-pulse rounded-full border-2 border-slate-200 bg-white" />
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0 flex-1 space-y-2">
+                        <div class="h-4 w-2/3 animate-pulse rounded-full bg-slate-100" />
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="h-5 w-16 animate-pulse rounded-full bg-slate-100" />
+                          <div class="h-5 w-20 animate-pulse rounded-full bg-slate-100" />
+                        </div>
+                        <div class="h-3 w-4/5 animate-pulse rounded-full bg-slate-100" />
+                      </div>
+                      <div class="h-8 w-24 shrink-0 animate-pulse rounded-lg bg-slate-100" />
+                    </div>
+                  </div>
+                </div>
+                <div v-else-if="customerSchedules.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
                   <span class="material-symbols-outlined text-2xl leading-none text-slate-400">event_busy</span>
                   <p class="mt-2 text-xs font-medium text-slate-400">暂无关联日程</p>
                 </div>
@@ -1139,6 +1239,7 @@
                   </span>
                   文档
                   <button
+                    v-if="showDocumentsModuleToggle"
                     type="button"
                     class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
                     :aria-expanded="documentsModuleExpanded"
@@ -1146,7 +1247,7 @@
                     @click="documentsModuleExpanded = !documentsModuleExpanded"
                   >
                     <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ documentsModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+                      {{ documentsModuleExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
                     </span>
                     <span
                       class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
@@ -1174,9 +1275,26 @@
                   </button>
                 </div>
               </div>
-              <div v-if="documentsModuleExpanded">
-                <div v-if="customerKnowledgeLoading" class="py-8 text-center">
-                  <span class="material-symbols-outlined text-2xl text-slate-300 animate-spin">progress_activity</span>
+              <div v-if="isDocumentsModuleVisible">
+                <div v-if="customerKnowledgeLoading" class="space-y-2">
+                  <div
+                    v-for="index in 3"
+                    :key="`document-skeleton-${index}`"
+                    class="rounded-xl border border-slate-200 bg-white p-3"
+                  >
+                    <div class="flex items-start gap-2.5">
+                      <div class="size-8 shrink-0 animate-pulse rounded-lg bg-slate-100" />
+                      <div class="min-w-0 flex-1 space-y-2">
+                        <div class="h-4 w-3/4 animate-pulse rounded-full bg-slate-100" />
+                        <div class="flex items-center gap-2">
+                          <div class="h-3 w-12 animate-pulse rounded-full bg-slate-100" />
+                          <div class="h-3 w-16 animate-pulse rounded-full bg-slate-100" />
+                          <div class="h-3 w-20 animate-pulse rounded-full bg-slate-100" />
+                        </div>
+                      </div>
+                      <div class="size-7 shrink-0 animate-pulse rounded-full bg-slate-100" />
+                    </div>
+                  </div>
                 </div>
                 <div v-else-if="customerKnowledgeList.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
                   <span class="material-symbols-outlined text-2xl leading-none text-slate-400">folder_off</span>
@@ -1748,6 +1866,18 @@ const savedAiParseResult = computed<CustomerAiParseVO | null>(() => {
     return null
   }
 })
+const showAiAnalysisToggle = computed(() => !!savedAiParseResult.value)
+const isAiAnalysisVisible = computed(() => aiAnalysisExpanded.value || !showAiAnalysisToggle.value)
+const showFollowUpTimelineToggle = computed(() => followUpLoading.value || followUps.value.length > 0)
+const isFollowUpTimelineVisible = computed(() => followUpTimelineExpanded.value || !showFollowUpTimelineToggle.value)
+const showContactsModuleToggle = computed(() => contactLoading.value || contacts.value.length > 0)
+const isContactsModuleVisible = computed(() => contactsModuleExpanded.value || !showContactsModuleToggle.value)
+const showTasksModuleToggle = computed(() => taskLoading.value || (customer.value?.tasks?.length || 0) > 0)
+const isTasksModuleVisible = computed(() => tasksModuleExpanded.value || !showTasksModuleToggle.value)
+const showSchedulesModuleToggle = computed(() => scheduleLoading.value || customerSchedules.value.length > 0)
+const isSchedulesModuleVisible = computed(() => schedulesModuleExpanded.value || !showSchedulesModuleToggle.value)
+const showDocumentsModuleToggle = computed(() => customerKnowledgeLoading.value || customerKnowledgeList.value.length > 0)
+const isDocumentsModuleVisible = computed(() => documentsModuleExpanded.value || !showDocumentsModuleToggle.value)
 const currentAiDeepInsight = computed(() => (latestAiReport.value?.aiDeepInsight || savedAiParseResult.value?.summary || '').trim())
 const currentAiNextStep = computed(() => (latestAiReport.value?.aiNextStep || savedAiParseResult.value?.nextStep || '').trim())
 const aiReportDialogDeepInsightSegments = computed(() => splitAiInsightSegments(currentAiDeepInsight.value))
@@ -1932,9 +2062,12 @@ async function refreshCustomerDetailModules(
   options: { resetRelatedPages?: boolean } = {}
 ) {
   const resetRelatedPages = Boolean(options.resetRelatedPages)
+  taskLoading.value = true
   const fetchTasks: Promise<any>[] = [
     customerStore.fetchCustomerDetail(customerId).catch(err => {
       console.error('Failed to fetch customer detail:', err)
+    }).finally(() => {
+      taskLoading.value = false
     })
   ]
 

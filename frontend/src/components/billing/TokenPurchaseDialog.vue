@@ -122,9 +122,9 @@
                   :key="currentOrder.orderNo"
                   :srcdoc="currentOrder.paymentFormHtml"
                   title="alipay payment"
-                  class="block size-[178px] border-0 bg-white"
+                  class="token-payment-code token-payment-iframe"
                   referrerpolicy="no-referrer"
-                  scrolling="no"
+                  scrolling="auto"
                 />
                 <div v-else class="token-qr-placeholder">
                   <span class="material-symbols-outlined text-[30px] leading-none text-sky-500">open_in_new</span>
@@ -136,7 +136,7 @@
                 <img
                   :src="currentOrder.qrCodeImage"
                   alt="payment qr code"
-                  class="block size-[178px] object-contain"
+                  class="token-payment-code object-contain"
                 />
               </template>
 
@@ -644,8 +644,8 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
 
 .token-qr-frame {
   display: flex;
-  width: 214px;
-  height: 214px;
+  width: 260px;
+  height: 260px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -655,6 +655,18 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
     radial-gradient(circle, rgba(148, 163, 184, 0.18) 1px, transparent 1px) 0 0 / 10px 10px,
     #f3f4f6;
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+}
+
+.token-payment-code {
+  display: block;
+  width: 220px;
+  height: 220px;
+}
+
+.token-payment-iframe {
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
 }
 
 .token-qr-placeholder {

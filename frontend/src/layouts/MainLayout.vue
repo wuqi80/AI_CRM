@@ -1739,12 +1739,12 @@ function groupSessionsByTime(sessions: ChatSession[]): ChatSessionGroups {
   return { today, yesterday, earlier }
 }
 
-function isCrmChatSession(session: ChatSession): boolean {
-  return (session.appCode || '').trim().toLowerCase() === 'crm'
+function isUnboundChatSession(session: ChatSession): boolean {
+  return !String(session.customerId || '').trim()
 }
 
 const sidebarVisibleChatSessions = computed(() =>
-  chatStore.sessions.filter(session => !isCrmChatSession(session))
+  chatStore.sessions.filter(isUnboundChatSession)
 )
 
 const limitedRecentChatSessions = computed(() =>

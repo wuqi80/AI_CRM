@@ -98,7 +98,7 @@
               height="100%"
               row-key="userId"
               table-layout="fixed"
-              tooltip-effect="light"
+              tooltip-effect="dark"
               class="wk-member-table"
               empty-text="未找到匹配的员工"
               @row-click="$emit('row-click', $event)"
@@ -410,14 +410,4 @@ function getMemberPost(member: any) {
   vertical-align: middle;
 }
 
-:deep(.wk-sidebar-like-tooltip.el-popper) {
-  border-radius: 8px;
-  background: #000;
-  padding: 6px 12px;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.25;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-}
 </style>
