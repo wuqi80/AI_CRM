@@ -80,6 +80,7 @@ export interface Knowledge {
 }
 
 export type KnowledgeType = 'MEETING' | 'EMAIL' | 'RECORDING' | 'DOCUMENT' | 'PROPOSAL' | 'CONTRACT'
+export type KnowledgeFileType = 'image' | 'document' | 'spreadsheet' | 'presentation' | 'pdf' | 'audio' | 'video'
 
 export interface KnowledgeAddBO {
   name: string
@@ -91,6 +92,7 @@ export interface KnowledgeAddBO {
 export interface KnowledgeQueryBO {
   keyword?: string
   type?: KnowledgeType
+  fileType?: KnowledgeFileType
   customerId?: string
   page?: number
   limit?: number

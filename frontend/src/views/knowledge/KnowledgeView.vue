@@ -180,8 +180,13 @@
               <el-dropdown trigger="click">
                 <button
                   type="button"
-                  class="inline-flex size-9 items-center justify-center rounded-lg border border-[#dbe8f8] bg-[#f8fbff] text-primary transition-colors hover:border-primary/30 hover:bg-primary/5"
-                  title="文件类型"
+                  :class="[
+                    'inline-flex size-9 items-center justify-center rounded-lg border bg-[#f8fbff] transition-colors hover:border-primary/30 hover:bg-primary/5',
+                    selectedFileType === 'all'
+                      ? 'border-[#dbe8f8] text-primary'
+                      : 'border-primary/25 text-primary bg-primary/5'
+                  ]"
+                  :title="selectedFileTypeLabel"
                 >
                   <span class="material-symbols-outlined text-[21px] leading-none">filter_list</span>
                 </button>
@@ -190,11 +195,26 @@
                     <div class="px-5 pb-2 pt-3 text-xs font-bold text-[#8aa1c2]">文件类型</div>
                     <el-dropdown-item
                       v-for="item in fileTypeMenuItems"
-                      :key="item.label"
+                      :key="item.id"
+                      @click="handleFileTypeFilter(item.id)"
                     >
-                      <span class="flex min-w-[130px] items-center gap-3 py-1 text-[13px] text-[#526982]">
-                        <span class="material-symbols-outlined text-[21px] leading-none text-[#8aa1c2]">{{ item.icon }}</span>
+                      <span
+                        :class="[
+                          'flex min-w-[130px] items-center gap-3 py-1 text-[13px]',
+                          selectedFileType === item.id ? 'font-semibold text-primary' : 'text-[#526982]'
+                        ]"
+                      >
+                        <span
+                          :class="[
+                            'material-symbols-outlined text-[21px] leading-none',
+                            selectedFileType === item.id ? 'text-primary' : 'text-[#8aa1c2]'
+                          ]"
+                        >{{ item.icon }}</span>
                         {{ item.label }}
+                        <span
+                          v-if="selectedFileType === item.id"
+                          class="material-symbols-outlined ml-auto text-[18px] leading-none text-primary"
+                        >check</span>
                       </span>
                     </el-dropdown-item>
                   </el-dropdown-menu>
@@ -674,7 +694,7 @@ import {
   updateKnowledgeCustomer
 } from '@/api/knowledge'
 import { ElMessage, ElMessageBox, UploadRequestOptions } from 'element-plus'
-import type { Knowledge, KnowledgeQueryBO, KnowledgeType, KnowledgeAiSearchVO } from '@/types/common'
+import type { Knowledge, KnowledgeQueryBO, KnowledgeType, KnowledgeFileType, KnowledgeAiSearchVO } from '@/types/common'
 import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
 import KnowledgeSearchResultPanel from '@/components/knowledge/KnowledgeSearchResultPanel.vue'
@@ -701,6 +721,7 @@ const totalCount = ref(0)
 const aiSearchLoading = ref(false)
 const aiSearchResult = ref<KnowledgeAiSearchVO | null>(null)
 const selectedCategory = ref('all')
+const selectedFileType = ref<KnowledgeFileType | 'all'>('all')
 const associateSubmitting = ref(false)
 const customerSearchLoading = ref(false)
 const associateTarget = ref<Knowledge | null>(null)
@@ -718,20 +739,22 @@ const categories = [
 ]
 
 const fileTypeMenuItems = [
-  { label: '图片', icon: 'image' },
-  { label: '文档', icon: 'description' },
-  { label: '电子表格', icon: 'table_chart' },
-  { label: '演示文稿', icon: 'slideshow' },
-  { label: 'PDF', icon: 'picture_as_pdf' },
-  { label: '音频', icon: 'audio_file' },
-  { label: '视频', icon: 'video_file' }
-]
+  { id: 'all', label: '全部类型', icon: 'filter_list' },
+  { id: 'image', label: '图片', icon: 'image' },
+  { id: 'document', label: '文档', icon: 'description' },
+  { id: 'spreadsheet', label: '电子表格', icon: 'table_chart' },
+  { id: 'presentation', label: '演示文稿', icon: 'slideshow' },
+  { id: 'pdf', label: 'PDF', icon: 'picture_as_pdf' },
+  { id: 'audio', label: '音频', icon: 'audio_file' },
+  { id: 'video', label: '视频', icon: 'video_file' }
+] as const
 
 const queryParams = reactive<KnowledgeQueryBO>({
   page: 1,
   limit: DEFAULT_PAGE_SIZE,
   keyword: '',
-  type: undefined
+  type: undefined,
+  fileType: undefined
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / (queryParams.limit || DEFAULT_PAGE_SIZE))))
@@ -739,6 +762,10 @@ const currentPage = computed(() => queryParams.page || 1)
 const showAiSearchResult = computed(() => aiSearchLoading.value || aiSearchResult.value !== null)
 const canUploadKnowledge = computed(() => userStore.hasPermission('knowledge:upload'))
 const showPagination = computed(() => totalCount.value > 0)
+const selectedFileTypeLabel = computed(() => {
+  const selected = fileTypeMenuItems.find(item => item.id === selectedFileType.value)
+  return selectedFileType.value === 'all' ? '文件类型' : `文件类型：${selected?.label || '全部类型'}`
+})
 
 const visiblePages = computed(() => {
   const total = totalPages.value
@@ -842,6 +869,13 @@ function handleCategoryFilter(categoryId: string) {
     return
   }
   fetchList()
+}
+
+function handleFileTypeFilter(fileType: KnowledgeFileType | 'all') {
+  selectedFileType.value = fileType
+  queryParams.fileType = fileType === 'all' ? undefined : fileType
+  queryParams.page = 1
+  void fetchList()
 }
 
 function handlePageChange(page: number) {
