@@ -4,6 +4,7 @@ import {
   createSession,
   getSessionList,
   deleteSession,
+  setSessionPinned as setSessionPinnedRequest,
   getMessageList,
   getChatModelOptions,
   getChatAppOptions,
@@ -151,6 +152,32 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function getSessionSortTime(value?: string): number {
+    if (!value) return 0
+    const time = new Date(value).getTime()
+    return Number.isNaN(time) ? 0 : time
+  }
+
+  function sortChatSessions(nextSessions: ChatSession[]): ChatSession[] {
+    return [...nextSessions].sort((a, b) => {
+      const aPinned = Boolean(a.pinned)
+      const bPinned = Boolean(b.pinned)
+      if (aPinned !== bPinned) return aPinned ? -1 : 1
+
+      if (aPinned && bPinned) {
+        const aPinnedTime = getSessionSortTime(a.pinnedTime)
+        const bPinnedTime = getSessionSortTime(b.pinnedTime)
+        if (aPinnedTime !== bPinnedTime) return bPinnedTime - aPinnedTime
+      }
+
+      const aUpdateTime = getSessionSortTime(a.updateTime || a.createTime)
+      const bUpdateTime = getSessionSortTime(b.updateTime || b.createTime)
+      if (aUpdateTime !== bUpdateTime) return bUpdateTime - aUpdateTime
+
+      return String(b.sessionId).localeCompare(String(a.sessionId))
+    })
+  }
+
   async function fetchModelOptions() {
     modelOptionsLoading.value = true
     try {
@@ -276,6 +303,26 @@ export const useChatStore = defineStore('chat', () => {
 
     if (currentSessionId.value === sessionId) {
       currentSessionId.value = null
+    }
+  }
+
+  async function setSessionPinned(sessionId: string, pinned: boolean) {
+    const previousSessions = sessions.value.map(session => ({ ...session }))
+    const nextPinnedTime = pinned ? new Date().toISOString() : undefined
+    sessions.value = sortChatSessions(
+      sessions.value.map(session =>
+        session.sessionId === sessionId
+          ? { ...session, pinned, pinnedTime: nextPinnedTime }
+          : session
+      )
+    )
+
+    try {
+      await setSessionPinnedRequest(sessionId, pinned)
+      await fetchSessions()
+    } catch (error) {
+      sessions.value = previousSessions
+      throw error
     }
   }
 
@@ -740,6 +787,7 @@ export const useChatStore = defineStore('chat', () => {
     selectSession,
     openCustomerChat,
     removeSession,
+    setSessionPinned,
     sendMessage,
     sendMessageWithSync,
     clearMessages,

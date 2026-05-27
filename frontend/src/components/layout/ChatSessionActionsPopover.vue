@@ -1,6 +1,12 @@
 <template>
   <div class="flex min-w-0 w-full items-center gap-2" style="height: 24px !important">
     <span
+      v-if="isPinned"
+      class="material-symbols-outlined wk-chat-session-pin-indicator"
+      title="已置顶"
+      aria-label="已置顶"
+    >push_pin</span>
+    <span
       class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]"
       :title="displayTitle"
     >{{ displayTitle }}</span>
@@ -26,9 +32,14 @@
           >more_horiz</span>
         </template>
         <div class="wk-chat-session-menu">
-          <button type="button" class="wk-chat-session-menu__item" @click="onPin">
-            <span class="material-symbols-outlined wk-chat-session-menu__icon">vertical_align_top</span>
-            <span class="wk-chat-session-menu__label">置顶</span>
+          <button
+            type="button"
+            class="wk-chat-session-menu__item wk-chat-session-menu__item--pin"
+            :class="{ 'wk-chat-session-menu__item--pinned': isPinned }"
+            @click="onPin"
+          >
+            <span class="material-symbols-outlined wk-chat-session-menu__icon" :class="{ 'wk-chat-session-menu__icon--active': isPinned }">{{ pinIcon }}</span>
+            <span class="wk-chat-session-menu__label">{{ pinActionLabel }}</span>
           </button>
           <!-- <button type="button" class="wk-chat-session-menu__item" @click="menuVisible = false; emit('share', session)">
             <span class="material-symbols-outlined wk-chat-session-menu__icon">upload</span>
@@ -85,6 +96,10 @@ const emit = defineEmits<{
 const menuVisible = ref(false)
 
 const displayTitle = computed(() => props.session.title || '新对话')
+
+const isPinned = computed(() => Boolean(props.session.pinned))
+const pinActionLabel = computed(() => isPinned.value ? '取消置顶' : '置顶')
+const pinIcon = computed(() => isPinned.value ? 'vertical_align_bottom' : 'vertical_align_top')
 
 const visibilityClass = computed(() =>
   props.active
@@ -159,6 +174,22 @@ function onDelete() {
   align-items: center;
   justify-content: center;
   color: #64748b;
+}
+
+.wk-chat-session-menu__icon--active {
+  color: #0d0d0d;
+}
+
+.wk-chat-session-pin-indicator {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .wk-chat-session-menu__label {

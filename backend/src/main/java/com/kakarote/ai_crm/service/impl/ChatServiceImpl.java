@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.ai.AiMode;
@@ -333,6 +334,8 @@ public class ChatServiceImpl implements IChatService {
         List<ChatSession> sessions = chatSessionMapper.selectList(
             new LambdaQueryWrapper<ChatSession>()
                 .eq(ChatSession::getUserId, userId)
+                .orderByDesc(ChatSession::getPinned)
+                .orderByDesc(ChatSession::getPinnedTime)
                 .orderByDesc(ChatSession::getUpdateTime)
         );
         List<ChatSessionVO> voList = BeanUtil.copyToList(sessions, ChatSessionVO.class);
@@ -361,6 +364,25 @@ public class ChatServiceImpl implements IChatService {
             weKnoraClient.clearConversationSession(tenantId, sessionId);
         }
         AiContextHolder.clearSession(sessionId);
+    }
+
+    @Override
+    public void setSessionPinned(Long sessionId, Boolean pinned) {
+        Long userId = UserUtil.getUserId();
+        ChatSession session = chatSessionMapper.selectById(sessionId);
+        if (ObjectUtil.isNull(session) || !Objects.equals(session.getUserId(), userId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Session does not exist");
+        }
+
+        boolean shouldPin = Boolean.TRUE.equals(pinned);
+        chatSessionMapper.update(
+            null,
+            new LambdaUpdateWrapper<ChatSession>()
+                .eq(ChatSession::getSessionId, sessionId)
+                .eq(ChatSession::getUserId, userId)
+                .set(ChatSession::getPinned, shouldPin)
+                .set(ChatSession::getPinnedTime, shouldPin ? new Date() : null)
+        );
     }
 
     /**

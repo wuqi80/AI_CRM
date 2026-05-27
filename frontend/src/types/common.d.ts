@@ -187,6 +187,8 @@ export interface ChatSession {
   customerId?: string
   customerName?: string
   customerLogoUrl?: string
+  pinned?: boolean
+  pinnedTime?: string
   createTime: string
   updateTime: string
 }

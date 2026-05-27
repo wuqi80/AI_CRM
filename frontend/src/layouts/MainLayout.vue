@@ -1841,9 +1841,18 @@ async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?
   }
 }
 
-const groupedHistoryChatSessions = computed(() => groupSessionsByTime(filteredHistorySessions.value))
+const pinnedHistorySessions = computed(() =>
+  filteredHistorySessions.value.filter(session => Boolean(session.pinned))
+)
+
+const unpinnedHistorySessions = computed(() =>
+  filteredHistorySessions.value.filter(session => !session.pinned)
+)
+
+const groupedHistoryChatSessions = computed(() => groupSessionsByTime(unpinnedHistorySessions.value))
 
 const historySessionGroups = computed(() => [
+  { key: 'pinned', label: '置顶', sessions: pinnedHistorySessions.value },
   { key: 'today', label: '今天', sessions: groupedHistoryChatSessions.value.today },
   { key: 'yesterday', label: '昨天', sessions: groupedHistoryChatSessions.value.yesterday },
   { key: 'earlier', label: '更早', sessions: groupedHistoryChatSessions.value.earlier },
@@ -1978,8 +1987,15 @@ async function handleDeleteSession(sessionId: string) {
   }
 }
 
-function handlePinChatSession(_session: ChatSession) {
-  // Reserved for the future pin-session API.
+async function handlePinChatSession(session: ChatSession) {
+  const nextPinned = !Boolean(session.pinned)
+  try {
+    await chatStore.setSessionPinned(session.sessionId, nextPinned)
+    ElMessage.success(nextPinned ? '已置顶' : '已取消置顶')
+  } catch (error) {
+    console.error('Pin chat session failed:', error)
+    ElMessage.error(nextPinned ? '置顶失败' : '取消置顶失败')
+  }
 }
 
 async function handleShareChatSession(session: ChatSession) {
