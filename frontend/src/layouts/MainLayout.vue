@@ -1492,7 +1492,8 @@ const allMainNavItems: MainNavItem[] = [
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
-  { icon: 'import', label: '数据同步', route: '/sync', permission: ['config'] },
+  // 暂时隐藏数据同步入口，功能页面与路由先保留便于后续恢复。
+  // { icon: 'import', label: '数据同步', route: '/sync', permission: ['config'] },
   // { icon: 'set', label: '系统设置', route: '/settings', permission: ['user', 'role', 'config', 'dept', 'customField'] },
   { icon: 'set', label: '系统设置', route: '/settings/team', permission: ['user', 'role', 'config', 'dept', 'customField'], query: { scope: 'profile' } },
 ]

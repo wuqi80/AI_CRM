@@ -132,14 +132,14 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH, "当前登录信息失效，请重新登录");
         }
 
-        TokenPurchaseOrder reusableOrder = findReusablePendingOrder(tenantId);
-        if (reusableOrder != null) {
-            return toOrderVO(reusableOrder);
-        }
-
         Plan plan = findPlan(createBO.getPlanId());
         String channel = normalizeChannel(createBO.getPaymentChannel());
         validateChannelReady(channel);
+
+        TokenPurchaseOrder reusableOrder = findReusablePendingOrder(tenantId, channel);
+        if (reusableOrder != null) {
+            return toOrderVO(reusableOrder);
+        }
 
         TokenPurchaseOrder order = new TokenPurchaseOrder();
         order.setTenantId(tenantId);
@@ -160,11 +160,12 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
     }
 
     /**
-     * 购买额度归属租户；同一租户已有待支付订单时，复用原订单和原二维码，避免重复向支付平台下单。
+     * 同一租户、同一支付渠道已有待支付订单时，复用原订单和原二维码，避免重复向支付平台下单。
      */
-    private TokenPurchaseOrder findReusablePendingOrder(Long tenantId) {
+    private TokenPurchaseOrder findReusablePendingOrder(Long tenantId, String paymentChannel) {
         List<TokenPurchaseOrder> pendingOrders = lambdaQuery()
             .eq(TokenPurchaseOrder::getTenantId, tenantId)
+            .eq(TokenPurchaseOrder::getPaymentChannel, paymentChannel)
             .eq(TokenPurchaseOrder::getStatus, STATUS_PENDING)
             .orderByDesc(TokenPurchaseOrder::getCreateTime)
             .list();
