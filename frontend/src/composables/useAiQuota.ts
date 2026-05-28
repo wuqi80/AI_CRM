@@ -141,11 +141,19 @@ export function useAiQuota() {
   const creditRemainingWan = computed(() => formatWanCredit(creditRemaining.value))
   const creditTotalWan = computed(() => formatWanCredit(creditTotal.value))
   const creditUsedWan = computed(() => formatWanCredit(creditUsed.value))
+  const creditProgressClass = computed(() => {
+    if (creditRemaining.value <= 0) return 'bg-amber-400'
+    return currentAiMode.value === 'gift' ? 'bg-primary' : 'bg-blue-500'
+  })
 
-  const giftCreditRemaining = creditRemaining
-  const giftCreditProgressPercent = creditProgressPercent
-  const giftCreditRemainingWan = creditRemainingWan
-  const giftCreditTotalWan = creditTotalWan
+  const giftCreditTotal = computed(() => aiConfig.value?.giftCreditTotal ?? 0)
+  const giftCreditRemaining = computed(() => aiConfig.value?.giftCreditRemaining ?? 0)
+  const giftCreditProgressPercent = computed(() => {
+    if (giftCreditTotal.value <= 0) return 0
+    return Math.max(0, Math.min(100, Math.round((giftCreditRemaining.value / giftCreditTotal.value) * 100)))
+  })
+  const giftCreditRemainingWan = computed(() => formatWanCredit(giftCreditRemaining.value))
+  const giftCreditTotalWan = computed(() => formatWanCredit(giftCreditTotal.value))
 
   const aiStatusBadgeText = computed(() => {
     if (creditRemaining.value <= 0) {
@@ -371,6 +379,7 @@ export function useAiQuota() {
     creditRemaining,
     creditUsed,
     creditProgressPercent,
+    creditProgressClass,
     creditRemainingWan,
     creditTotalWan,
     creditUsedWan,

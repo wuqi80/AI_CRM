@@ -1666,7 +1666,8 @@ async function handleImportSuccess(_result: CustomerImportResult) {
   --el-table-header-text-color: var(--wk-text-muted);
   --el-table-text-color: var(--wk-text-secondary);
   --el-table-border-color: var(--wk-border-subtle);
-  --el-table-row-hover-bg-color: color-mix(in srgb, var(--wk-primary) 11%, var(--wk-bg-surface));
+  --el-table-row-hover-bg-color: transparent;
+  --wk-customer-table-row-hover-bg-color: color-mix(in srgb, var(--wk-primary) 11%, var(--wk-bg-surface));
 }
 
 .wk-customer-table :deep(.el-table__border-left-patch),
@@ -1694,9 +1695,8 @@ async function handleImportSuccess(_result: CustomerImportResult) {
   cursor: pointer;
 }
 
-.wk-customer-table :deep(.el-table__body tr:hover > td.el-table__cell),
-.wk-customer-table :deep(.el-table__body tr.hover-row > td.el-table__cell) {
-  background: var(--el-table-row-hover-bg-color);
+.wk-customer-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: var(--wk-customer-table-row-hover-bg-color);
 }
 
 .wk-customer-table :deep(.el-table__empty-block) {

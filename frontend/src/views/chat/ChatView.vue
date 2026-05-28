@@ -397,7 +397,7 @@
                 </div>
 
                 <!-- AI Message -->
-                <div v-if="message.role !== 'user'" class="group flex w-full gap-3 pb-4 md:gap-4 md:pb-4">
+                <div v-if="message.role !== 'user'" class="group flex w-full gap-3 pb-4 md:gap-4 md:pb-8">
                   <div v-if="false" class="size-9 rounded-xl bg-primary flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20">
                     <WkIcon name="ai" class="text-lg" />
                   </div>
@@ -3598,7 +3598,7 @@ void sendQuickMessage
 
 .wk-chat-shell {
   background:
-    linear-gradient(180deg, rgba(255, 254, 250, 0.92) 0%, rgba(248, 247, 244, 0.94) 62%, rgba(248, 247, 244, 1) 100%);
+    linear-gradient(180deg, var(--wk-bg-surface) 0%, rgb(var(--wk-bg-page-rgb) / 0.96) 62%, var(--wk-bg-page) 100%);
 }
 
 .wk-chat-customer-header {
@@ -3608,7 +3608,7 @@ void sendQuickMessage
 }
 
 .wk-chat-composer-wrap {
-  background: linear-gradient(to top, var(--wk-bg-page) 72%, rgba(248, 247, 244, 0));
+  background: linear-gradient(to top, var(--wk-bg-page) 72%, rgb(var(--wk-bg-page-rgb) / 0));
 }
 
 .wk-chat-composer {
@@ -3623,7 +3623,7 @@ void sendQuickMessage
   border-color: var(--wk-border-muted);
   box-shadow:
     0 22px 78px rgb(var(--wk-shadow-color) / 0.11),
-    0 0 0 1px rgba(31, 30, 28, 0.04);
+    0 0 0 1px rgb(var(--wk-primary-rgb) / 0.12);
 }
 
 .wk-recording-indicator {
@@ -4070,7 +4070,7 @@ void sendQuickMessage
   margin: 4px 2px 6px;
   border-radius: 8px;
   border: 0px solid var(--wk-border-subtle);
-  background: #f8fafc;
+  background: var(--wk-bg-surface-subtle);
   padding: 8px 10px;
   color: var(--wk-primary);
   font-size: 13px;

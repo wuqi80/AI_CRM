@@ -10,17 +10,17 @@
 
       <template v-if="currentAiMode === 'gift'">
         <div class="mb-1 flex flex-wrap items-baseline gap-1">
-          <span class="text-xs font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ giftCreditRemainingWan }}</span>
-          <span class="text-xs font-medium text-slate-400 dark:text-slate-500">/ {{ giftCreditTotalWan }} 积分</span>
+          <span class="text-xs font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ creditRemainingWan }}</span>
+          <span class="text-xs font-medium text-slate-400 dark:text-slate-500">/ {{ creditTotalWan }} 积分</span>
         </div>
-        <p v-if="giftCreditRemaining <= 0" class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+        <p v-if="creditRemaining <= 0" class="mb-3 text-xs text-slate-500 dark:text-slate-400">
           积分已用完，可购买套餐或配置 AI 服务后继续使用。
         </p>
         <div class="mb-4 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
           <div
             class="h-full rounded-full transition-all"
-            :class="giftCreditProgressClass"
-            :style="{ width: `${giftCreditProgressPercent}%` }"
+            :class="creditProgressClass"
+            :style="{ width: `${creditProgressPercent}%` }"
           />
         </div>
       </template>
@@ -87,8 +87,8 @@
       <div class="mb-4 h-1.5 w-full min-w-0 max-w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
         <div
           class="h-full max-w-full rounded-full transition-all"
-          :class="giftCreditProgressClass"
-          :style="{ width: `${giftCreditProgressPercent}%` }"
+          :class="creditProgressClass"
+          :style="{ width: `${creditProgressPercent}%` }"
         />
       </div>
     </template>
@@ -134,10 +134,7 @@ const {
   aiStatusBadgeText,
   aiStatusBadgeClass,
   giftCreditRemaining,
-  giftCreditRemainingWan,
-  giftCreditTotalWan,
-  giftCreditProgressPercent,
-  giftCreditProgressClass,
+  creditProgressClass,
   creditUsedWan,
   creditRemainingWan,
   creditTotalWan,

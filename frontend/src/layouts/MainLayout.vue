@@ -169,7 +169,7 @@
             <div class="space-y-1 pt-0">
               <button
                 type="button"
-                class="group flex shrink-0 items-center gap-1 rounded-lg pb-0 pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px]"
+                class="group flex shrink-0 items-center gap-1 rounded-lg pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px] w-full py-[6px]"
                 :title="recentChatSessionsExpanded ? '收起最近对话' : '展开最近对话'"
                 :aria-expanded="recentChatSessionsExpanded"
                 aria-controls="recent-chat-sessions-panel"
@@ -1443,7 +1443,7 @@ function handleChatComposerNarrowChange(payload?: ChatComposerNarrowPayload) {
   }
 }
 
-const showSidebarCustomers = computed(() => userStore.hasPermission('customer'))
+const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
 
 watch(showSidebarCustomers, visible => {
   if (visible && sidebarCustomers.value.length === 0) {
@@ -1486,7 +1486,7 @@ type SecondaryNavItem = {
 const allMainNavItems: MainNavItem[] = [
   { key: 'chat', icon: 'ai', label: 'AI 助手', route: '/chat', permission: 'chat', groupTitle: 'AI 助手' },
   { key: 'knowledge', icon: 'knowledge-1', label: '知识库', route: '/knowledge', permission: 'knowledge' },
-  { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer', action: 'customerSearch' },
+  { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer:view', action: 'customerSearch' },
   { key: 'task', icon: 'task-1', label: '任务', route: '/task', permission: 'task' },
   { key: 'calendar', icon: 'event', label: '日程', route: '/calendar', permission: 'schedule' },
 ]
@@ -2003,6 +2003,7 @@ async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?
     sidebarCustomersHasMore.value = nextCustomers.length > 0 && sidebarCustomers.value.length < sidebarCustomersTotal.value
   } catch (error) {
     console.error('Load sidebar customers failed:', error)
+    sidebarCustomersHasMore.value = false
     if (page === 1) {
       sidebarCustomers.value = []
     }
@@ -2110,6 +2111,7 @@ function openMobileCustomerSearchDialog() {
 }
 
 function openCustomerSearchDialog() {
+  if (!showSidebarCustomers.value) return
   const focusRequestId = ++customerSearchFocusRequestId
   selectedPrimaryKey.value = ''
   showUserMenu.value = false
@@ -2455,7 +2457,7 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
 
 .wk-primary-sidebar {
   border-color: var(--wk-border-subtle) !important;
-  background: linear-gradient(180deg, #fffefa 0%, var(--wk-bg-sidebar) 100%) !important;
+  background: linear-gradient(180deg, var(--wk-bg-surface) 0%, var(--wk-bg-sidebar) 100%) !important;
   color: var(--wk-text-primary);
 }
 
@@ -2501,7 +2503,7 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
 
 .wk-primary-sidebar :deep(input:focus) {
   border-color: var(--wk-border-muted) !important;
-  background-color: #fffefa !important;
+  background-color: var(--wk-bg-surface) !important;
 }
 
 .drawer-overlay-enter-active,

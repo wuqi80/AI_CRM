@@ -1008,8 +1008,8 @@ function showRequestError(error: unknown, fallback: string) {
 <style scoped>
 .sync-page {
   background:
-    radial-gradient(circle at 50% 28%, rgba(25, 118, 210, 0.08), transparent 34rem),
-    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    radial-gradient(circle at 50% 28%, rgb(var(--wk-primary-rgb) / 0.08), transparent 34rem),
+    linear-gradient(180deg, var(--wk-bg-surface) 0%, var(--wk-bg-page) 100%);
 }
 
 .verify-fade-enter-active,

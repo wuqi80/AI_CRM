@@ -923,7 +923,7 @@
                         <span
                           class="min-w-0 truncate text-xs font-medium tracking-tight"
                           :class="contact.wechat ? 'text-slate-700' : 'text-slate-400'"
-                        >{{ contact.wechat ? `WeChat: ${contact.wechat}` : '-' }}</span>
+                        >{{ contact.wechat ? `${contact.wechat}` : '-' }}</span>
                       </div>
                     </div>
                   </div>
@@ -1541,6 +1541,7 @@ const activeCustomerId = computed(() => props.customerId || String(route.params.
 const embedded = computed(() => props.embedded)
 const isMobile = computed(() => props.forceMobile || responsiveIsMobile.value)
 const isEmbeddedMobileLayout = computed(() => props.embedded && props.forceMobile)
+const CUSTOMER_DETAIL_REQUEST_LIMIT = 100
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -1563,7 +1564,7 @@ const newTagName = ref('')
 const followUps = ref<FollowUp[]>([])
 const followUpTotal = ref(0)
 const followUpPage = ref(1)
-const followUpPageSize = ref(5)
+const followUpPageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
 const followUpLoading = ref(false)
 const aiAnalysisExpanded = ref(true)
 const followUpTimelineExpanded = ref(true)
@@ -1575,14 +1576,14 @@ const selectedFollowUpType = ref('')
 const contacts = ref<Contact[]>([])
 const contactTotal = ref(0)
 const contactPage = ref(1)
-const contactPageSize = ref(5)
+const contactPageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
 const contactLoading = ref(false)
 const customerTasks = ref<Task[]>([])
 const taskLoading = ref(false)
 const customerSchedules = ref<ScheduleVO[]>([])
 const scheduleTotal = ref(0)
 const schedulePage = ref(1)
-const schedulePageSize = ref(5)
+const schedulePageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
 const scheduleLoading = ref(false)
 const customerKnowledgeList = ref<Knowledge[]>([])
 
@@ -2232,7 +2233,7 @@ async function fetchCustomerTasks(customerId: string) {
     const result = await queryTaskList({
       customerId,
       page: 1,
-      limit: 5
+      limit: CUSTOMER_DETAIL_REQUEST_LIMIT
     })
     customerTasks.value = result.list || []
   } catch (error) {
@@ -2286,7 +2287,7 @@ async function fetchCustomerKnowledge(customerId: string) {
     const result = await queryKnowledgeList({
       customerId,
       page: 1,
-      limit: 8
+      limit: CUSTOMER_DETAIL_REQUEST_LIMIT
     })
     customerKnowledgeList.value = result.list || []
   } catch (error) {

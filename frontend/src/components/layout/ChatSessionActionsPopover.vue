@@ -129,11 +129,9 @@ function onDelete() {
   max-width: min(260px, calc(100vw - 24px));
   padding: 6px !important;
   border-radius: 16px !important;
-  border:unset !important;
-  /* border: 1px solid rgba(15, 23, 42, 0.08) !important; */
-  background: #fff !important;
-  box-shadow: 0 0 #0000, 0 0 #0000, 0 0 #0000, 0 0 #0000, 0px 8px 12px 0px #00000014, 0px 0px 1px 0px #0000009e !important;
-  /* box-sizing: border-box; */
+  border: 1px solid var(--wk-border-subtle) !important;
+  background: var(--wk-bg-surface) !important;
+  box-shadow: 0 8px 22px rgb(var(--wk-shadow-color) / 0.32), 0 0 0 1px rgb(0 0 0 / 0.08) !important;
 }
 
 .wk-chat-session-menu {
@@ -155,14 +153,14 @@ function onDelete() {
   font-size: 14px;
   line-height: 1.2;
   font-weight: 400;
-  color: #0d0d0d;
+  color: var(--wk-text-primary);
   text-align: left;
   cursor: pointer;
   transition: background-color 0.12s ease;
 }
 
 .wk-chat-session-menu__item:hover {
-  background-color: #f9f9f9;
+  background-color: var(--wk-bg-surface-hover);
 }
 
 .wk-chat-session-menu__icon {
@@ -173,11 +171,11 @@ function onDelete() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--wk-text-muted);
 }
 
 .wk-chat-session-menu__icon--active {
-  color: #0d0d0d;
+  color: var(--wk-text-primary);
 }
 
 .wk-chat-session-pin-indicator {
@@ -187,7 +185,7 @@ function onDelete() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--wk-text-muted);
   font-size: 16px;
   line-height: 1;
 }
@@ -203,12 +201,12 @@ function onDelete() {
 }
 
 .wk-chat-session-menu__item--danger:hover {
-  background-color: #FFE1E0;
+  background-color: color-mix(in srgb, #c2403f 16%, var(--wk-bg-surface));
 }
 
 .wk-chat-session-menu__divider {
   height: 1px;
   margin: 4px 6px;
-  background: rgba(15, 23, 42, 0.08);
+  background: var(--wk-border-subtle);
 }
 </style>
