@@ -1783,7 +1783,7 @@ let chatCustomerAiPollTimer: ReturnType<typeof setTimeout> | null = null
 let chatCustomerAiPollAttempts = 0
 let offSelectedCustomerDetailRefresh: (() => void) | null = null
 
-type CustomerDetailRefreshModule = 'contacts' | 'followUps' | 'tasks' | 'schedules'
+type CustomerDetailRefreshModule = 'aiAnalysis' | 'contacts' | 'followUps' | 'tasks' | 'schedules'
 
 type CustomerDetailRefreshPayload = {
   customerId?: string | number
@@ -2475,18 +2475,28 @@ function scheduleChatCustomerAiPolling(customerId?: string, resetAttempts = fals
     }
 
     chatCustomerAiPollAttempts += 1
-    await ensureSelectedCustomerDetail(customerId)
-    appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat-ai-poll', preserveScroll: false })
-    appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, { customerId, source: 'chat-ai-poll' })
+    const previousStatus = selectedCustomer.value?.aiAnalysisStatus || ''
+    const wasPending = isCustomerAiAnalysisPending(selectedCustomer.value)
+    await ensureSelectedCustomerDetail(customerId, { silent: true })
+    const isPending = isCustomerAiAnalysisPending(selectedCustomer.value)
+    const nextStatus = selectedCustomer.value?.aiAnalysisStatus || ''
 
     if (currentSessionCustomerId.value !== customerId) {
       clearChatCustomerAiPolling()
       return
     }
 
-    if (isCustomerAiAnalysisPending(selectedCustomer.value) && chatCustomerAiPollAttempts < CHAT_CUSTOMER_AI_POLL_MAX_ATTEMPTS) {
+    if (isPending && chatCustomerAiPollAttempts < CHAT_CUSTOMER_AI_POLL_MAX_ATTEMPTS) {
       scheduleChatCustomerAiPolling(customerId)
       return
+    }
+
+    if (wasPending && previousStatus !== nextStatus && !isPending) {
+      appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, {
+        customerId,
+        source: 'chat-ai-poll',
+        modules: ['aiAnalysis']
+      })
     }
 
     clearChatCustomerAiPolling()
