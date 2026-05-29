@@ -1483,6 +1483,7 @@ const allMainNavItems: MainNavItem[] = [
   { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer', action: 'customerSearch' },
   { key: 'task', icon: 'task-1', label: '任务', route: '/task', permission: 'task' },
   { key: 'calendar', icon: 'event', label: '日程', route: '/calendar', permission: 'schedule' },
+  { key: 'mail', icon: 'event', materialIcon: 'mail', label: '邮箱', route: '/mail', permission: 'mail:view' },
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
