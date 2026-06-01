@@ -6,7 +6,9 @@ export interface Task {
   customerId?: string
   customerName?: string
   priority: TaskPriority
+  priorityName?: string
   status: TaskStatus
+  statusName?: string
   dueDate?: string
   overdue?: boolean
   assignedTo?: string
@@ -64,6 +66,8 @@ export interface Knowledge {
   type: KnowledgeType
   customerId?: string
   customerName?: string
+  employeeId?: string
+  employeeName?: string
   filePath?: string
   /** 文件大小，单位：字节 (B)，来自知识库列表/详情等接口 */
   fileSize?: number | string
@@ -95,6 +99,7 @@ export interface KnowledgeQueryBO {
   type?: KnowledgeType
   fileType?: KnowledgeFileType
   customerId?: string
+  employeeId?: string
   page?: number
   limit?: number
 }
@@ -188,6 +193,9 @@ export interface ChatSession {
   customerId?: string
   customerName?: string
   customerLogoUrl?: string
+  employeeId?: string
+  employeeName?: string
+  employeeAvatarUrl?: string
   pinned?: boolean
   pinnedTime?: string
   createTime: string

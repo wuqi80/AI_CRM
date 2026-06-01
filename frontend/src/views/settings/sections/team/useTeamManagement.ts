@@ -66,6 +66,7 @@ export function useTeamManagement() {
     deptId: null as number | string | null,
     parentId: null as number | string | null,
     status: 1 as number,
+    employeeStatus: 'active',
     roleIds: [] as string[]
   })
 
@@ -384,6 +385,7 @@ export function useTeamManagement() {
       deptId: selectedDept.value ? selectedDept.value.deptId : null,
       parentId: null,
       status: 1,
+      employeeStatus: 'active',
       roleIds: []
     })
   }
@@ -426,6 +428,7 @@ export function useTeamManagement() {
       deptId: member.deptId || null,
       parentId: member.parentId || null,
       status: member.status ?? 1,
+      employeeStatus: member.employeeStatus || 'active',
       roleIds: (member.roleIds || []).map(String)
     })
     showAddMemberDialog.value = true
@@ -447,6 +450,7 @@ export function useTeamManagement() {
           post: memberForm.post || undefined,
           deptId: memberForm.deptId || undefined,
           parentId: memberForm.parentId || 0,
+          employeeStatus: memberForm.employeeStatus,
           password: memberForm.password || undefined
         }
         if (!editingMember.value.tenantCreator) {
@@ -484,6 +488,7 @@ export function useTeamManagement() {
         post: memberForm.post || undefined,
         parentId: memberForm.parentId || undefined,
         status: memberForm.status,
+        employeeStatus: memberForm.employeeStatus,
         roleIds: memberForm.roleIds.length > 0 ? memberForm.roleIds : undefined
       })
       ElMessage.success('员工添加成功')

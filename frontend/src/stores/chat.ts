@@ -13,6 +13,7 @@ import {
 } from '@/api/chat'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, ChatMessage, ChatModelOption, ChatAppOption } from '@/types/common'
 import type { CustomerListVO } from '@/types/customer'
+import type { AddressBookEmployee } from '@/types/addressBook'
 
 interface LocalMessage {
   id: string
@@ -37,6 +38,7 @@ interface PendingNewSessionDraft {
   title?: string
   agentId?: string
   customerId?: string
+  employeeId?: string
   appCode: string
 }
 
@@ -49,6 +51,7 @@ export const useChatStore = defineStore('chat', () => {
   const GENERAL_APP_CODE = 'general'
   const CRM_APP_CODE = 'crm'
   const KNOWLEDGE_APP_CODE = 'knowledge'
+  const ADDRESS_BOOK_APP_CODE = 'address_book'
   const STREAM_IDLE_THINKING_DELAY_MS = 3000
 
   function loadSessionAppCodeBySessionId(): Record<string, string> {
@@ -57,7 +60,7 @@ export const useChatStore = defineStore('chat', () => {
       if (!raw) return {}
       const parsed = JSON.parse(raw) as Record<string, unknown>
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-      const allowed = new Set([GENERAL_APP_CODE, CRM_APP_CODE, KNOWLEDGE_APP_CODE])
+      const allowed = new Set([GENERAL_APP_CODE, CRM_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE])
       const out: Record<string, string> = {}
       for (const [k, v] of Object.entries(parsed)) {
         if (typeof v === 'string' && k.length > 0) {
@@ -222,10 +225,11 @@ export const useChatStore = defineStore('chat', () => {
     title?: string,
     agentId?: string,
     customerId?: string,
-    appCode: string = GENERAL_APP_CODE
+    appCode: string = GENERAL_APP_CODE,
+    employeeId?: string
   ): Promise<string> {
     const normalizedAppCode = normalizeAppCode(appCode)
-    const sessionId = await createSession({ title, agentId, customerId, appCode: normalizedAppCode })
+    const sessionId = await createSession({ title, agentId, customerId, employeeId, appCode: normalizedAppCode })
     pendingNewSessionDraft.value = null
     setSessionMessages(sessionId, [])
     await fetchSessions()
@@ -238,7 +242,8 @@ export const useChatStore = defineStore('chat', () => {
     title?: string,
     agentId?: string,
     customerId?: string,
-    appCode: string = GENERAL_APP_CODE
+    appCode: string = GENERAL_APP_CODE,
+    employeeId?: string
   ) {
     const normalizedAppCode = normalizeAppCode(appCode)
     currentSessionId.value = null
@@ -246,6 +251,7 @@ export const useChatStore = defineStore('chat', () => {
       title,
       agentId,
       customerId,
+      employeeId,
       appCode: normalizedAppCode
     }
     selectedAppCode.value = normalizedAppCode
@@ -255,9 +261,10 @@ export const useChatStore = defineStore('chat', () => {
     title?: string,
     agentId?: string,
     customerId?: string,
-    appCode: string = GENERAL_APP_CODE
+    appCode: string = GENERAL_APP_CODE,
+    employeeId?: string
   ): Promise<void> {
-    beginNewSessionDraft(title, agentId, customerId, appCode)
+    beginNewSessionDraft(title, agentId, customerId, appCode, employeeId)
   }
 
   async function selectSession(sessionId: string) {
@@ -299,6 +306,27 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const sessionId = await startNewSession(customer.companyName || '客户对话', undefined, customerId, CRM_APP_CODE)
+    requestComposerFocus()
+    return sessionId
+  }
+
+  async function openEmployeeChat(employee: Pick<AddressBookEmployee, 'userId' | 'realname'>): Promise<string> {
+    const employeeId = String(employee.userId)
+    if (sessions.value.length === 0) {
+      await fetchSessions()
+    }
+    const existingSession = sessions.value
+      .filter(session => String(session.employeeId || '') === employeeId)
+      .sort((a, b) => new Date(b.updateTime || b.createTime).getTime() - new Date(a.updateTime || a.createTime).getTime())[0]
+
+    if (existingSession) {
+      await selectSession(existingSession.sessionId)
+      setSelectedAppCode(ADDRESS_BOOK_APP_CODE)
+      requestComposerFocus()
+      return existingSession.sessionId
+    }
+
+    const sessionId = await startNewSession(`与${employee.realname || '员工'}对话`, undefined, undefined, ADDRESS_BOOK_APP_CODE, employeeId)
     requestComposerFocus()
     return sessionId
   }
@@ -734,7 +762,8 @@ export const useChatStore = defineStore('chat', () => {
         draft?.title,
         draft?.agentId,
         draft?.customerId,
-        normalizedAppCode || draft?.appCode || GENERAL_APP_CODE
+        normalizedAppCode || draft?.appCode || GENERAL_APP_CODE,
+        draft?.employeeId
       )
     }
 
@@ -747,7 +776,7 @@ export const useChatStore = defineStore('chat', () => {
     const code = (appCode || GENERAL_APP_CODE).trim().toLowerCase()
     const knownCodes = appOptions.value.map(option => option.code)
     if (knownCodes.length === 0) {
-      return [GENERAL_APP_CODE, CRM_APP_CODE, KNOWLEDGE_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
+      return [GENERAL_APP_CODE, CRM_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
     }
     return knownCodes.includes(code) ? code : GENERAL_APP_CODE
   }
@@ -797,6 +826,7 @@ export const useChatStore = defineStore('chat', () => {
     startNewSessionIfNeeded,
     selectSession,
     openCustomerChat,
+    openEmployeeChat,
     removeSession,
     setSessionPinned,
     sendMessage,

@@ -30,6 +30,9 @@
         <if test="query.customerId != null">
             AND s.customer_id = #{query.customerId}
         </if>
+        <if test="query.participantUserId != null">
+            AND (',' || COALESCE(s.participant_user_ids, '') || ',') LIKE ('%,' || CAST(#{query.participantUserId} AS TEXT) || ',%')
+        </if>
         <if test="query.keyword != null and query.keyword != ''">
             AND (
                 s.title LIKE CONCAT('%', #{query.keyword}, '%')

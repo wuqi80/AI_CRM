@@ -25,6 +25,9 @@ public class KnowledgeQueryBO extends PageEntity {
     @Schema(description = "客户ID")
     private Long customerId;
 
+    @Schema(description = "员工ID")
+    private Long employeeId;
+
     @Schema(description = "标签")
     private String tag;
 

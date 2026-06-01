@@ -111,7 +111,10 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
                     ? "((" + qualifiedColumn(table, "customer_id") + " IS NOT NULL AND "
                     + qualifiedColumn(table, "customer_id")
                     + " IN (SELECT customer_id FROM crm_customer WHERE owner_id IN (" + inClause + ")))"
+                    + " OR (" + qualifiedColumn(table, "employee_id") + " IS NOT NULL AND "
+                    + qualifiedColumn(table, "employee_id") + " IN (" + inClause + "))"
                     + " OR (" + qualifiedColumn(table, "customer_id") + " IS NULL AND "
+                    + qualifiedColumn(table, "employee_id") + " IS NULL AND "
                     + qualifiedColumn(table, "upload_user_id") + " IN (" + inClause + ")))"
                     : null;
             default -> null;

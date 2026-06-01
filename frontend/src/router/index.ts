@@ -50,6 +50,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '客户详情', hidden: true, permission: 'customer:view' }
       },
       {
+        path: 'address-book',
+        name: 'AddressBook',
+        component: () => import('@/views/addressBook/AddressBookListView.vue'),
+        meta: { title: '通讯录', icon: 'contacts', permission: 'addressBook:list' }
+      },
+      {
         path: 'task',
         name: 'TaskList',
         component: () => import('@/views/task/TaskListView.vue'),
@@ -171,7 +177,7 @@ router.beforeEach(async (to, _from, next) => {
     if (permission) {
       const hasAccess = Array.isArray(permission)
         ? permission.some(p => userStore.hasPermission(p))
-        : (permission === 'chat' || userStore.hasPermission(permission))
+        : (permission === 'chat' || permission === 'addressBook:list' || userStore.hasPermission(permission))
       if (!hasAccess) {
         // 无权限，重定向到 AI 助手
         next({ name: 'Chat' })

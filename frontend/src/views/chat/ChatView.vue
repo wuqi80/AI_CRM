@@ -324,6 +324,51 @@
             </button>
           </div>
 
+          <div
+            v-else-if="selectedEmployee"
+            class="wk-chat-customer-header relative shrink-0 border-b pl-4 pr-1 py-2 md:pl-8"
+          >
+            <div class="mx-auto flex h-9 w-full items-center justify-between gap-3 pr-20">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  <img
+                    v-if="selectedEmployee.imgUrl"
+                    :src="selectedEmployee.imgUrl"
+                    :alt="selectedEmployee.realname || 'employee avatar'"
+                    class="size-full bg-white object-cover"
+                  />
+                  <span v-else class="text-xs font-bold text-slate-400">
+                    {{ selectedEmployee.realname?.charAt(0) || '?' }}
+                  </span>
+                </div>
+                <h2 class="min-w-[80px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
+                  {{ selectedEmployee.realname || '未命名员工' }}
+                </h2>
+                <span class="inline-flex h-6 shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-secondary)]">
+                  {{ selectedEmployee.post || '员工' }}
+                </span>
+                <span class="hidden min-w-0 truncate text-xs text-slate-400 md:inline">
+                  {{ selectedEmployee.deptName || '-' }}
+                </span>
+              </div>
+            </div>
+            <button
+              v-if="showEmployeePanelShell && customerPanelVisible"
+              type="button"
+              class="group/sb-toggle absolute right-4 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] md:right-4"
+              aria-label="收起员工侧栏"
+              @click="customerPanelVisible = false"
+            >
+              <WkIcon name="fold" :size="18" class="shrink-0" />
+              <span
+                class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
+                role="tooltip"
+              >
+                收起员工侧栏
+              </span>
+            </button>
+          </div>
+
           <!-- Messages Area -->
           <div
             ref="messagesContainer"
@@ -333,7 +378,7 @@
           >
             <div class="wk-chat-messages__inner px-4 md:px-8">
             <!-- Welcome Section (no messages) -->
-            <template v-if="chatStore.messages.length === 0 && !selectedCustomer">
+            <template v-if="chatStore.messages.length === 0 && !selectedCustomer && !selectedEmployee">
               <div class="mx-auto flex max-w-3xl flex-col items-center space-y-5 py-6 text-center">
                 <!-- <div class="size-16 bg-primary/5 rounded-2xl flex items-center justify-center text-primary mb-2 border border-primary/10">
                   <WkIcon name="ai" class="text-4xl" />
@@ -850,6 +895,23 @@
                                   class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
                                 >check</span>
                               </button>
+                              <button
+                                type="button"
+                                class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                                @click="handleChatUploadMenuSelectApp('address_book')"
+                              >
+                                <WkIcon
+                                  name="customer"
+                                  :size="18"
+                                  class="shrink-0"
+                                  :class="chatStore.selectedAppCode === 'address_book' ? '!text-[var(--wk-text-primary)]' : ''"
+                                />
+                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'address_book' ? 'text-[var(--wk-text-primary)]' : 'text-[#0d0d0d]'">通讯录</span>
+                                <span
+                                  v-if="chatStore.selectedAppCode === 'address_book'"
+                                  class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                                >check</span>
+                              </button>
                             </div>
                           </el-popover>
                         </div>
@@ -1173,6 +1235,23 @@
                               <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">知识库检索</span>
                               <span
                                 v-if="chatStore.selectedAppCode === 'knowledge'"
+                                class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                              >check</span>
+                            </button>
+                            <button
+                              type="button"
+                              class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                              @click="handleChatUploadMenuSelectApp('address_book')"
+                            >
+                              <WkIcon
+                                name="customer"
+                                :size="18"
+                                class="shrink-0"
+                                :class="chatStore.selectedAppCode === 'address_book' ? 'text-primary' : ''"
+                              />
+                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">通讯录</span>
+                              <span
+                                v-if="chatStore.selectedAppCode === 'address_book'"
                                 class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
                               >check</span>
                             </button>
@@ -1563,10 +1642,10 @@
     />
 
     <button
-      v-if="showCustomerPanelShell && !customerPanelVisible"
+      v-if="showObjectPanelShell && !customerPanelVisible"
       type="button"
       class="group/sb-toggle absolute right-3 top-3 z-30 flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef]"
-      aria-label="展开客户侧栏"
+      aria-label="展开对象侧栏"
       @click="customerPanelVisible = true"
     >
       <WkIcon name="fold" :size="18" class="shrink-0" />
@@ -1574,12 +1653,12 @@
         class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
         role="tooltip"
       >
-        显示客户侧栏
+        显示对象侧栏
       </span>
     </button>
 
     <aside
-      v-if="showCustomerPanelShell && customerPanelVisible"
+      v-if="showObjectPanelShell && customerPanelVisible"
       class="wk-chat-customer-panel relative flex shrink-0 flex-col border-l"
       :class="{ 'select-none': customerPanelResizing }"
       :style="customerPanelStyle"
@@ -1593,17 +1672,17 @@
         <span class="absolute left-0 top-1/2 h-10 w-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-[#cfcfcf]"></span>
       </div>
       <div class="min-h-0 flex-1 overflow-hidden pb-4">
-        <div v-if="selectedCustomerLoading" class="flex h-full items-center justify-center">
+        <div v-if="selectedCustomerLoading || selectedEmployeeLoading" class="flex h-full items-center justify-center">
           <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
         </div>
-        <div v-else-if="!selectedCustomer" class="flex h-full flex-col items-center justify-center text-center">
+        <div v-else-if="!selectedCustomer && !selectedEmployee" class="flex h-full flex-col items-center justify-center text-center">
           <div class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-[#f5f5f5] text-slate-400">
             <WkIcon name="customer" :size="24" />
           </div>
-          <p class="text-sm font-semibold text-slate-600">从左侧客户列表选择客户</p>
-          <p class="mt-1 max-w-[220px] text-xs leading-relaxed text-slate-400">选择后会创建或打开该客户的 CRM 对话，并在这里展示相关资料。</p>
+          <p class="text-sm font-semibold text-slate-600">选择业务对象</p>
+          <p class="mt-1 max-w-[220px] text-xs leading-relaxed text-slate-400">对象资料会在这里展示。</p>
         </div>
-        <div v-else class="h-full pr-0">
+        <div v-else-if="selectedCustomer" class="h-full pr-0">
           <CustomerDetailView
             embedded
             force-mobile
@@ -1611,6 +1690,10 @@
             @quote-attachment="handleQuoteCustomerAttachment"
           />
         </div>
+        <EmployeeChatInfoPanel
+          v-else-if="selectedEmployee"
+          :employee="selectedEmployee"
+        />
       </div>
     </aside>
 
@@ -1631,9 +1714,11 @@ import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig } from '@/api/systemConfig'
 import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerStage } from '@/api/customer'
+import { getAddressBookDetail } from '@/api/addressBook'
 import CustomerDetailView from '@/views/customer/CustomerDetailView.vue'
 import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import EmployeeChatInfoPanel from '@/views/chat/components/EmployeeChatInfoPanel.vue'
 import {
   registerAiQuotaResumeSendHandler,
   unregisterAiQuotaResumeSendHandler,
@@ -1658,6 +1743,7 @@ import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFil
 import { appEvents, APP_EVENT } from '@/utils/events'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
 import type { Contact, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAttachment } from '@/types/customer'
+import type { AddressBookDetail } from '@/types/addressBook'
 import { wkIconNames } from '@/components/common/wkIcon'
 import type { WkIconName } from '@/components/common/wkIcon'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
@@ -1696,6 +1782,13 @@ const boundCustomerId = computed(() => {
 })
 const boundCustomerName = computed(() =>
   boundCustomerId.value ? (chatStore.currentSession?.customerName || chatStore.currentSession?.title || '') : ''
+)
+const boundEmployeeId = computed(() => {
+  const employeeId = chatStore.currentSession?.employeeId
+  return employeeId ? String(employeeId) : ''
+})
+const boundEmployeeName = computed(() =>
+  boundEmployeeId.value ? (chatStore.currentSession?.employeeName || chatStore.currentSession?.title || '') : ''
 )
 
 const inputText = ref('')
@@ -1766,6 +1859,9 @@ const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
 const selectedCustomerId = ref<string | null>(null)
 const selectedCustomer = ref<CustomerDetailVO | null>(null)
 const selectedCustomerLoading = ref(false)
+const selectedEmployeeId = ref<string | null>(null)
+const selectedEmployee = ref<AddressBookDetail | null>(null)
+const selectedEmployeeLoading = ref(false)
 const showSelectedCustomerTagDialog = ref(false)
 const showSelectedCustomerBasicInfoDrawer = ref(false)
 const showSelectedCustomerEditDialog = ref(false)
@@ -1820,7 +1916,13 @@ const currentSessionCustomerId = computed(() => {
   const customerId = chatStore.currentSession?.customerId
   return customerId ? String(customerId) : ''
 })
+const currentSessionEmployeeId = computed(() => {
+  const employeeId = chatStore.currentSession?.employeeId
+  return employeeId ? String(employeeId) : ''
+})
 const showCustomerPanelShell = computed(() => !isMobile.value && Boolean(currentSessionCustomerId.value))
+const showEmployeePanelShell = computed(() => !isMobile.value && Boolean(currentSessionEmployeeId.value))
+const showObjectPanelShell = computed(() => showCustomerPanelShell.value || showEmployeePanelShell.value)
 const customerPanelStyle = computed(() => ({
   width: `${customerPanelWidth.value}px`,
   minWidth: `min(${CUSTOMER_PANEL_MIN_WIDTH}px, ${CUSTOMER_PANEL_MAX_WIDTH_RATIO * 100}%)`,
@@ -1867,10 +1969,14 @@ const selectedChatAppLabel = computed(() => {
   if (chatStore.selectedAppCode === 'crm' && (selectedCustomerId.value || currentSessionCustomerId.value)) {
     return selectedCustomer.value?.companyName || boundCustomerName.value || '客户'
   }
+  if (chatStore.selectedAppCode === 'address_book' && (selectedEmployeeId.value || currentSessionEmployeeId.value)) {
+    return selectedEmployee.value?.realname || boundEmployeeName.value || '员工'
+  }
   if (chatStore.selectedApp?.label) {
     return chatStore.selectedApp.label == '知识库' ? '知识库检索' : chatStore.selectedApp.label
   }
   if (chatStore.selectedAppCode === 'crm') return 'CRM管理'
+  if (chatStore.selectedAppCode === 'address_book') return '通讯录'
   if (chatStore.selectedAppCode === 'knowledge') return '知识库检索'
   return ''
 })
@@ -1881,6 +1987,7 @@ const selectedChatAppIcon = computed<WkIconName>(() => {
     return chatStore.selectedApp.iconName
   }
   if (chatStore.selectedAppCode === 'crm') return 'customer'
+  if (chatStore.selectedAppCode === 'address_book') return 'customer'
   if (chatStore.selectedAppCode === 'knowledge') return 'knowledge-1'
   return 'application'
 })
@@ -2241,11 +2348,11 @@ const currentView = ref<'chat' | 'notifications'>('chat')
 const userAvatarLoadFailed = ref(false)
 
 const isChatEmpty = computed(() => chatStore.messages.length === 0)
-const isCustomerContextChat = computed(() => Boolean(selectedCustomerId.value || currentSessionCustomerId.value))
-const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isCustomerContextChat.value)
+const isObjectContextChat = computed(() => Boolean(selectedCustomerId.value || currentSessionCustomerId.value || selectedEmployeeId.value || currentSessionEmployeeId.value))
+const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isObjectContextChat.value)
 const chatMessagesAreaClass = computed(() => {
   if (!isChatEmpty.value) return 'wk-chat-messages--scrollable flex-1 overflow-y-auto pb-4 pt-6 md:pt-8'
-  return isCustomerContextChat.value ? 'flex-1 overflow-hidden py-6' : 'overflow-hidden py-6'
+  return isObjectContextChat.value ? 'flex-1 overflow-hidden py-6' : 'overflow-hidden py-6'
 })
 
 const SCROLL_TO_BOTTOM_THRESHOLD_PX = 100
@@ -2440,6 +2547,28 @@ async function ensureSelectedCustomerDetail(customerId: string, options: { silen
   }
 }
 
+async function ensureSelectedEmployeeDetail(employeeId: string, options: { silent?: boolean } = {}) {
+  const requestEmployeeId = String(employeeId)
+  const silent = Boolean(options.silent)
+  if (!silent) {
+    selectedEmployeeLoading.value = true
+  }
+  try {
+    const detail = await getAddressBookDetail(requestEmployeeId)
+    if (selectedEmployeeId.value && selectedEmployeeId.value !== requestEmployeeId) return
+    selectedEmployee.value = detail
+  } catch (err) {
+    console.error('Load selected employee detail failed:', err)
+    if (!isRequestErrorHandled(err)) {
+      ElMessage.warning('员工详情加载失败')
+    }
+  } finally {
+    if (!silent && (!selectedEmployeeId.value || selectedEmployeeId.value === requestEmployeeId)) {
+      selectedEmployeeLoading.value = false
+    }
+  }
+}
+
 function isCustomerAiAnalysisPending(customer: CustomerDetailVO | null) {
   return customer?.aiAnalysisStatus === 'pending' || customer?.aiAnalysisStatus === 'running'
 }
@@ -2518,6 +2647,8 @@ function handleSelectedCustomerDetailRefresh(payload?: CustomerDetailRefreshPayl
 
 async function handleSelectCustomerById(customerId: string) {
   selectedCustomerId.value = customerId
+  selectedEmployeeId.value = null
+  selectedEmployee.value = null
   currentView.value = 'chat'
   isPinnedToBottom.value = true
   chatStore.setSelectedAppCode('crm')
@@ -2537,6 +2668,31 @@ async function handleSelectCustomerById(customerId: string) {
   if (chatStore.messages.length === 0 && !inputText.value.trim()) {
     // inputText.value = `请帮我分析客户「${customerName}」的当前情况，并给出下一步建议。`
   }
+  await nextTick()
+  focusChatTextarea()
+}
+
+async function handleSelectEmployeeById(employeeId: string) {
+  selectedEmployeeId.value = employeeId
+  selectedCustomerId.value = null
+  selectedCustomer.value = null
+  currentView.value = 'chat'
+  isPinnedToBottom.value = true
+  customerPanelVisible.value = true
+  chatStore.setSelectedAppCode('address_book')
+  await ensureSelectedEmployeeDetail(employeeId)
+  const employeeName = selectedEmployee.value?.realname || '员工'
+  if (chatStore.sessions.length === 0) {
+    await chatStore.fetchSessions()
+  }
+
+  const existingSession = chatStore.sessions.find(session => String(session.employeeId) === String(employeeId))
+  if (existingSession) {
+    await chatStore.selectSession(existingSession.sessionId)
+  } else {
+    await chatStore.startNewSession(`与${employeeName}对话`, undefined, undefined, 'address_book', employeeId)
+  }
+
   await nextTick()
   focusChatTextarea()
 }
@@ -2843,7 +2999,20 @@ function getSessionCustomerId(sessionId?: string) {
   return session?.customerId ? String(session.customerId) : ''
 }
 
+function getSessionEmployeeId(sessionId?: string) {
+  if (!sessionId) return ''
+  const session = chatStore.sessions.find(item => item.sessionId === sessionId)
+  return session?.employeeId ? String(session.employeeId) : ''
+}
+
 async function refreshCrmContextAfterSend(effectiveAppCode: string, completedSessionId?: string) {
+  if (effectiveAppCode === 'address_book') {
+    const employeeId = getSessionEmployeeId(completedSessionId)
+    if (employeeId) {
+      await ensureSelectedEmployeeDetail(employeeId, { silent: Boolean(selectedEmployee.value) })
+    }
+    return
+  }
   if (effectiveAppCode !== 'crm') return
 
   appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat', preserveScroll: true })
@@ -3350,7 +3519,7 @@ function applyKnowledgeDocPrompt(text: string) {
 
 async function handleNewSession() {
   isPinnedToBottom.value = true
-  if (route.query.customerId || route.query.sessionId) {
+  if (route.query.customerId || route.query.employeeId || route.query.sessionId) {
     await router.replace({ path: '/chat' })
   }
   chatStore.beginNewSessionDraft('新对话')
@@ -3411,6 +3580,21 @@ watch(
   { immediate: true }
 )
 
+async function applyEmployeeRouteQuery() {
+  const raw = route.query.employeeId
+  const employeeId = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  if (!employeeId || selectedEmployeeId.value === employeeId) return
+  await handleSelectEmployeeById(employeeId)
+}
+
+watch(
+  () => route.query.employeeId,
+  () => {
+    void applyEmployeeRouteQuery()
+  },
+  { immediate: true }
+)
+
 watch(
   currentSessionCustomerId,
   (customerId) => {
@@ -3426,6 +3610,25 @@ watch(
     if (selectedCustomerId.value === customerId && selectedCustomer.value) return
     selectedCustomerId.value = customerId
     void ensureSelectedCustomerDetail(customerId)
+  },
+  { immediate: true }
+)
+
+watch(
+  currentSessionEmployeeId,
+  (employeeId) => {
+    if (!employeeId) {
+      selectedEmployeeId.value = null
+      selectedEmployee.value = null
+      selectedEmployeeLoading.value = false
+      return
+    }
+
+    if (selectedEmployeeId.value === employeeId && selectedEmployee.value) return
+    selectedEmployeeId.value = employeeId
+    selectedCustomerId.value = null
+    selectedCustomer.value = null
+    void ensureSelectedEmployeeDetail(employeeId)
   },
   { immediate: true }
 )

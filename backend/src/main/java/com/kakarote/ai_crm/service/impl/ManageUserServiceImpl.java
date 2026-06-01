@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.Const;
+import com.kakarote.ai_crm.common.enums.EmployeeStatusEnum;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
@@ -209,6 +210,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         ManagerUser manageUser = BeanUtil.copyProperties(userAddBO, ManagerUser.class);
         manageUser.setParentId(parentId);
         manageUser.setStatus(userAddBO.getStatus() != null ? userAddBO.getStatus() : 1);
+        manageUser.setEmployeeStatus(EmployeeStatusEnum.normalize(userAddBO.getEmployeeStatus()));
         manageUser.setCreateTime(new Date());
         save(manageUser);
 
@@ -231,6 +233,9 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
      */
     @Override
     public BasePage<ManageUserVO> queryPageList(UserQueryBO userQueryBO) {
+        if (StrUtil.isNotBlank(userQueryBO.getEmployeeStatus())) {
+            userQueryBO.setEmployeeStatus(EmployeeStatusEnum.normalize(userQueryBO.getEmployeeStatus()));
+        }
         if (userQueryBO.getDeptId() != null) {
             List<ManagerDept> allDepts = deptMapper.selectList(null);
             Set<Long> deptIds = new LinkedHashSet<>();
@@ -241,6 +246,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         fillRoleInfo(page.getRecords());
         fillImgUrl(page.getRecords());
         fillTenantCreatorFlag(page.getRecords());
+        fillEmployeeStatusName(page.getRecords());
         return page;
     }
 
@@ -337,6 +343,9 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         }
         if (ObjectUtil.isNotNull(updateBO.getStatus()) && !tenantCreator) {
             userEntity.setStatus(updateBO.getStatus());
+        }
+        if (ObjectUtil.isNotNull(updateBO.getEmployeeStatus())) {
+            userEntity.setEmployeeStatus(EmployeeStatusEnum.normalize(updateBO.getEmployeeStatus()));
         }
         if (updateBO.getParentId() != null) {
             Long parentId = normalizeParentUserId(updateBO.getParentId());
@@ -459,7 +468,22 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         fillRoleInfo(Collections.singletonList(vo));
         fillImgUrl(Collections.singletonList(vo));
         fillTenantCreatorFlag(Collections.singletonList(vo));
+        fillEmployeeStatusName(Collections.singletonList(vo));
         return vo;
+    }
+
+    /**
+     * 填充员工状态名称。
+     */
+    private void fillEmployeeStatusName(List<ManageUserVO> voList) {
+        if (CollUtil.isEmpty(voList)) {
+            return;
+        }
+        for (ManageUserVO vo : voList) {
+            String normalized = EmployeeStatusEnum.normalize(vo.getEmployeeStatus());
+            vo.setEmployeeStatus(normalized);
+            vo.setEmployeeStatusName(EmployeeStatusEnum.getName(normalized));
+        }
     }
 
     /**

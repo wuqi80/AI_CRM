@@ -59,6 +59,22 @@ public class ChatApplicationRegistry {
                 List.of(TOOL_GROUP_KNOWLEDGE),
                 List.of("总结选中文档的重点", "合同付款条款是什么？", "找出会议里的待办事项", "这些资料里提到哪些风险？")
         ));
+        register(new ChatApplicationDefinition(
+                ChatApplicationCodes.ADDRESS_BOOK,
+                "通讯录",
+                "customer",
+                "围绕企业员工做任务安排、日程记录、附件归档和知识库检索。",
+                """
+                当前应用是通讯录员工对象助手。你是在围绕当前员工做工作安排、任务记录、日程记录和附件归档，不是在给员工发送即时消息。
+                当用户说“他/她/这个员工/该员工”且当前会话绑定了员工时，默认指当前员工。
+                没有具体执行时间点、只有截止或待办语义时创建任务；出现具体执行时间点时创建日程。
+                创建任务时默认负责人是当前员工；创建日程时默认把当前员工加入参与人。
+                只有在工具结果确认成功后，才能说数据已创建、更新或关联成功。
+                """,
+                false,
+                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
+                List.of("明天下午让他完成客户资料整理", "下周一上午和他开项目复盘会", "总结这个员工最近的任务和附件")
+        ));
     }
 
     public ChatApplicationDefinition resolve(String appCode) {

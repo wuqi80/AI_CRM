@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.ai.tools;
 
 import cn.hutool.core.util.StrUtil;
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.ai.tools.support.AiToolCustomerResolver;
 import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
 import com.kakarote.ai_crm.entity.BO.TaskAddBO;
@@ -119,6 +120,10 @@ public class TaskTools {
             bo.setTitle(title);
             bo.setDescription(description);
             bo.setCustomerId(customerId);
+            Long currentEmployeeId = AiContextHolder.getCurrentEmployeeId();
+            if (currentEmployeeId != null) {
+                bo.setAssignedTo(currentEmployeeId);
+            }
             bo.setPriority(priority != null ? priority : "medium");
 
             if (hasTextValue(dueDate)) {
@@ -137,6 +142,9 @@ public class TaskTools {
             }
             if (customerId != null) {
                 result.append("\n- customerId: ").append(customerId);
+            }
+            if (currentEmployeeId != null) {
+                result.append("\n- employeeId: ").append(currentEmployeeId);
             }
             if (hasTextValue(dueDate)) {
                 result.append("\n- 截止日期: ").append(dueDate);

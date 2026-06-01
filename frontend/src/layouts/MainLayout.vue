@@ -1528,6 +1528,7 @@ const allMainNavItems: MainNavItem[] = [
   { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer:view', action: 'customerSearch' },
   { key: 'task', icon: 'task-1', label: '任务', route: '/task', permission: 'task' },
   { key: 'calendar', icon: 'event', label: '日程', route: '/calendar', permission: 'schedule' },
+  { key: 'address-book', icon: 'customer', materialIcon: 'contacts', label: '通讯录', route: '/address-book', permission: 'addressBook:list' },
   { key: 'mail', icon: 'event', materialIcon: 'mail', label: '邮箱', route: '/mail', permission: 'mail:view' },
 ]
 
@@ -1539,7 +1540,7 @@ const allConfigNavItems: ConfigNavItem[] = [
 ]
 
 const mainNavItems = computed(() =>
-  allMainNavItems.filter(item => item.permission === 'chat' || userStore.hasPermission(item.permission))
+  allMainNavItems.filter(item => item.permission === 'chat' || item.key === 'address-book' || userStore.hasPermission(item.permission))
 )
 
 const pcMainNavItems = computed(() => mainNavItems.value.filter(item => item.key !== 'chat'))
@@ -1591,6 +1592,7 @@ const userAvatarInitials = computed(() => userDisplayName.value.trim().slice(0, 
 const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/customer')) return '/customer'
+  if (path.startsWith('/address-book')) return '/address-book'
   if (path.startsWith('/sync')) return '/sync'
   if (path.startsWith('/settings')) return '/settings'
   return path
@@ -1976,7 +1978,7 @@ function groupSessionsByTime(sessions: ChatSession[]): ChatSessionGroups {
 }
 
 function isUnboundChatSession(session: ChatSession): boolean {
-  return !String(session.customerId || '').trim()
+  return !String(session.customerId || '').trim() && !String(session.employeeId || '').trim()
 }
 
 const sidebarVisibleChatSessions = computed(() =>

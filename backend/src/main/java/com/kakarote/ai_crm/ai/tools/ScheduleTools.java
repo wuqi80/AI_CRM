@@ -2,6 +2,7 @@ package com.kakarote.ai_crm.ai.tools;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.ai.tools.support.AiToolCustomerResolver;
 import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
 import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
@@ -65,6 +66,10 @@ public class ScheduleTools {
             bo.setType(hasTextValue(type) ? type : "meeting");
             bo.setDescription(description);
             bo.setLocation(location);
+            Long currentEmployeeId = AiContextHolder.getCurrentEmployeeId();
+            if (currentEmployeeId != null) {
+                bo.setParticipantUserIds(List.of(currentEmployeeId));
+            }
 
             try {
                 bo.setStartTime(dateTimeFormat.parse(startTime));
@@ -115,6 +120,9 @@ public class ScheduleTools {
             }
             if (customerId != null) {
                 result.append("\n- customerId: ").append(customerId);
+            }
+            if (currentEmployeeId != null) {
+                result.append("\n- employeeId: ").append(currentEmployeeId);
             }
             if (hasTextValue(location)) {
                 result.append(String.format("\n- 地点: %s", location));
