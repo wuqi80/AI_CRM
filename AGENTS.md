@@ -13,12 +13,13 @@
 - Frontend (`frontend/`): `npm install`, `npm run dev`, `npm run build` (`vue-tsc -b && vite build`), `npm run lint` (auto-fixes).
 - Sync service (`sync_data/`): `mvn -DskipTests package`; run with `java -jar target\sync-data-1.0.0.jar --server.port=10456`.
 - MCP server (`mcp_server/`): `npm install`, `npm run build`, `npm start`; set `AICRM_TOKEN` for authenticated calls, with `AICRM_BASE_URL` defaulting to `http://127.0.0.1:8088` and `AICRM_TOKEN_HEADER` to `Manager-Token`.
-- Docker (`docker/`): `docker-compose up -d` uses prebuilt images, not local `backend/` or `frontend/` source; it starts CRM on `8088` plus WeKnora, PostgreSQL, Redis, and MinIO.
+- For local testing, prefer starting the relevant local subproject directly (`mvn spring-boot:run`, `npm run dev`, the sync service Maven/JAR command, or MCP npm scripts). Do not use Docker for ordinary local test startup unless explicitly requested or validating the packaged Docker deployment.
+- Docker (`docker/`): `docker-compose up -d` starts CRM on `8088` plus WeKnora, PostgreSQL, Redis, and MinIO. CRM/frontend use prebuilt images and do not use local `backend/` or `frontend/` source; `docreader` has both `image` and `build` configured.
 
 ## Runtime Config
 - Backend defaults live in `backend/src/main/resources/application.yml`; Flyway is enabled and the file points at deployed/test PG/Redis/MinIO/WeKnora defaults, so use env vars or a local Spring profile override before running locally.
 - There is no `application-test.yml`; any Spring test that loads the context uses `application.yml` unless the test overrides properties.
-- Frontend dev env currently sets `VITE_API_BASE_URL=http://127.0.0.1:8088`, so CRM requests bypass the `/crmapi` Vite proxy; sync requests use `VITE_SYNC_API_BASE_URL=/syncapi` and proxy to `127.0.0.1:10456` by default.
+- Frontend dev env currently sets `VITE_API_BASE_URL=/crmapi`, so CRM requests use the `/crmapi` Vite proxy; sync requests use `VITE_SYNC_API_BASE_URL=/syncapi` and proxy to `127.0.0.1:10456` by default.
 - `frontend/vite.config.ts` and `frontend/vite.config.js` both exist; Vite finds `.js` first, so keep them in sync or remove the duplicate deliberately when changing Vite config.
 - Auth token header and localStorage key are both `Manager-Token`.
 - Use `@` for frontend imports from `frontend/src`; TypeScript is strict with unused locals/parameters, and ESLint removes unused imports.
@@ -27,7 +28,7 @@
 - Persisted IDs are Snowflake `BIGINT`; use Java `Long` and treat frontend/API IDs as strings when precision matters.
 - Tenant isolation is automatic: `TenantLineInnerInterceptor` runs before data permission and pagination, `JwtAuthenticationTokenFilter` sets/clears `TenantContextHolder`, and `MyMetaObjectHandler` fills `tenantId` on insert.
 - Code that runs without JWT request context, such as registration or async work, must set tenant context explicitly and clear it in `finally`.
-- Only use `@InterceptorIgnore(tenantLine = "true")` for deliberate cross-tenant queries. Tenant-ignored tables are `manager_menu`, `manager_role_menu`, `crm_tenant`, `crm_custom_field_pool`, and `crm_ai_model_pricing`.
+- Only use `@InterceptorIgnore(tenantLine = "true")` for deliberate cross-tenant queries. Tenant-ignored tables are `manager_menu`, `manager_role_menu`, `crm_tenant`, `crm_custom_field_pool`, `crm_ai_model_pricing`, `crm_ai_billing_config`, `crm_access_log`, `crm_error_log`, `crm_external_auth_identity`, and `crm_external_tenant_binding`.
 - Data permission SQL is centralized in `GlobalDataPermissionHandler` and currently maps only `CustomerMapper`, `ContactMapper`, `TaskMapper`, `FollowUpMapper`, and `KnowledgeMapper`; update it when adding a protected business mapper.
 - `manager_user_role` has no `del_flag`; do not add `del_flag = 0` to queries touching it.
 - MyBatis XML queries that select joined or computed columns must return a VO, not a PO, or the extra fields are dropped.
@@ -57,5 +58,5 @@
 
 ## Tests And Generated Files
 - Do not run `npm run build` as the default post-task verification step after finishing changes; only run it when the user explicitly asks or when the task specifically requires a production build check.
-- There are currently no backend or sync test files; `backend/.gitignore` ignores `src/test/*`, so adjust or verify ignore rules before adding backend tests you expect to commit.
+- There are existing backend and `sync_data` tests, but root `.gitignore` has a broad `test` rule; new backend or `sync_data` test files may need explicit unignore entries before committing.
 - Do not edit ignored/generated outputs: `frontend/dist`, `mcp_server/dist`, any `target/`, and frontend `*.tsbuildinfo`.
