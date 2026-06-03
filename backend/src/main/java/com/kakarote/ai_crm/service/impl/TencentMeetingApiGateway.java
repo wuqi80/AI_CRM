@@ -1,20 +1,18 @@
 package com.kakarote.ai_crm.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
-import com.kakarote.ai_crm.entity.PO.TencentMeetingCorpConfig;
-import com.kakarote.ai_crm.entity.PO.TencentMeetingUserMapping;
 
 import java.util.List;
 
 public interface TencentMeetingApiGateway {
 
-    List<JSONObject> listEndedMeetings(TencentMeetingCorpConfig config, TencentMeetingUserMapping mapping, int syncDays);
+    List<JSONObject> listEndedMeetings(TencentMeetingOAuthCredential credential, int syncDays);
 
-    List<JSONObject> getMeetingParticipants(TencentMeetingCorpConfig config, String meetingId, String operatorUserId);
+    List<JSONObject> getMeetingParticipants(TencentMeetingOAuthCredential credential, String meetingId);
 
-    List<JSONObject> listRecordings(TencentMeetingCorpConfig config, String operatorUserId, int syncDays);
+    List<JSONObject> listRecordings(TencentMeetingOAuthCredential credential, int syncDays);
 
-    List<JSONObject> getTranscriptSegments(TencentMeetingCorpConfig config, String meetingId, String recordFileId, String operatorUserId);
+    List<JSONObject> getTranscriptSegments(TencentMeetingOAuthCredential credential, String meetingId, String recordFileId);
 
-    JSONObject createMeeting(TencentMeetingCorpConfig config, JSONObject requestBody);
+    JSONObject createMeeting(TencentMeetingOAuthCredential credential, JSONObject requestBody);
 }

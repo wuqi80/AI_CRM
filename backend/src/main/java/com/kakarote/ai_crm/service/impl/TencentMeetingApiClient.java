@@ -5,8 +5,6 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
-import com.kakarote.ai_crm.entity.PO.TencentMeetingCorpConfig;
-import com.kakarote.ai_crm.entity.PO.TencentMeetingUserMapping;
 import com.kakarote.ai_crm.utils.SecretTextCipher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,74 +45,75 @@ public class TencentMeetingApiClient implements TencentMeetingApiGateway {
     }
 
     @Override
-    public List<JSONObject> listEndedMeetings(TencentMeetingCorpConfig config, TencentMeetingUserMapping mapping, int syncDays) {
+    public List<JSONObject> listEndedMeetings(TencentMeetingOAuthCredential credential, int syncDays) {
         long end = Instant.now().getEpochSecond();
         long start = Math.max(0L, end - Math.max(syncDays, 1) * 86400L);
-        String path = UriComponentsBuilder.fromPath("/v1/history/meetings/" + mapping.getMeetingUserId())
+        String path = UriComponentsBuilder.fromPath("/v1/history/meetings/" + credential.openId())
                 .queryParam("page_size", 20)
                 .queryParam("page", 1)
                 .queryParam("start_time", start)
                 .queryParam("end_time", end)
                 .build()
                 .toUriString();
-        JSONObject response = get(config, path, false);
+        JSONObject response = get(credential, path, false);
         return firstArray(response, "meetings", "meeting_list", "meeting_info_list");
     }
 
     @Override
-    public List<JSONObject> getMeetingParticipants(TencentMeetingCorpConfig config, String meetingId, String operatorUserId) {
-        if (StrUtil.isBlank(meetingId) || StrUtil.isBlank(operatorUserId)) {
+    public List<JSONObject> getMeetingParticipants(TencentMeetingOAuthCredential credential, String meetingId) {
+        if (StrUtil.isBlank(meetingId) || StrUtil.isBlank(credential.openId())) {
             return List.of();
         }
         String path = UriComponentsBuilder.fromPath("/v1/meetings/" + meetingId + "/participants")
-                .queryParam("userid", operatorUserId)
+                .queryParam("userid", credential.openId())
                 .queryParam("size", 50)
                 .build()
                 .toUriString();
-        JSONObject response = get(config, path, false);
+        JSONObject response = get(credential, path, false);
         return firstArray(response, "participants", "participant_list", "users");
     }
 
     @Override
-    public List<JSONObject> listRecordings(TencentMeetingCorpConfig config, String operatorUserId, int syncDays) {
-        if (StrUtil.isBlank(operatorUserId)) {
+    public List<JSONObject> listRecordings(TencentMeetingOAuthCredential credential, int syncDays) {
+        if (StrUtil.isBlank(credential.openId())) {
             return List.of();
         }
         long end = Instant.now().getEpochSecond();
         long start = Math.max(0L, end - Math.max(syncDays, 1) * 86400L);
-        String path = UriComponentsBuilder.fromPath("/v1/corp/records")
+        String path = UriComponentsBuilder.fromPath("/v1/records")
                 .queryParam("start_time", start)
                 .queryParam("end_time", end)
                 .queryParam("page_size", 20)
                 .queryParam("page", 1)
-                .queryParam("operator_id", operatorUserId)
-                .queryParam("operator_id_type", 1)
+                .queryParam("operator_id", credential.openId())
+                .queryParam("operator_id_type", 2)
+                .queryParam("userid", credential.openId())
                 .build()
                 .toUriString();
-        JSONObject response = get(config, path, false);
+        JSONObject response = get(credential, path, false);
         return flattenRecordFiles(response);
     }
 
     @Override
-    public List<JSONObject> getTranscriptSegments(TencentMeetingCorpConfig config, String meetingId, String recordFileId, String operatorUserId) {
-        if (StrUtil.isBlank(recordFileId) || StrUtil.isBlank(operatorUserId)) {
+    public List<JSONObject> getTranscriptSegments(TencentMeetingOAuthCredential credential, String meetingId, String recordFileId) {
+        if (StrUtil.isBlank(recordFileId) || StrUtil.isBlank(credential.openId())) {
             return List.of();
         }
         String path = UriComponentsBuilder.fromPath("/v1/records/transcripts/details")
                 .queryParam("meeting_id", meetingId)
                 .queryParam("record_file_id", recordFileId)
-                .queryParam("operator_id", operatorUserId)
-                .queryParam("operator_id_type", 1)
+                .queryParam("operator_id", credential.openId())
+                .queryParam("operator_id_type", 2)
                 .queryParam("limit", 200)
                 .build()
                 .toUriString();
-        JSONObject response = get(config, path, true);
+        JSONObject response = get(credential, path, true);
         return flattenTranscriptSegments(response);
     }
 
     @Override
-    public JSONObject createMeeting(TencentMeetingCorpConfig config, JSONObject requestBody) {
-        JSONObject response = exchange(config, "/v1/meetings", HttpMethod.POST, requestBody == null ? new JSONObject() : requestBody, false);
+    public JSONObject createMeeting(TencentMeetingOAuthCredential credential, JSONObject requestBody) {
+        JSONObject response = exchange(credential, "/v1/meetings", HttpMethod.POST, requestBody == null ? new JSONObject() : requestBody, false);
         JSONArray meetings = response.getJSONArray("meeting_info_list");
         if (meetings != null && !meetings.isEmpty() && meetings.get(0) instanceof JSONObject meeting) {
             return meeting;
@@ -122,30 +121,23 @@ public class TencentMeetingApiClient implements TencentMeetingApiGateway {
         return response;
     }
 
-    private JSONObject get(TencentMeetingCorpConfig config, String pathWithQuery, boolean sensitive) {
-        return exchange(config, pathWithQuery, HttpMethod.GET, null, sensitive);
+    private JSONObject get(TencentMeetingOAuthCredential credential, String pathWithQuery, boolean sensitive) {
+        return exchange(credential, pathWithQuery, HttpMethod.GET, null, sensitive);
     }
 
-    private JSONObject exchange(TencentMeetingCorpConfig config, String pathWithQuery, HttpMethod method, JSONObject body, boolean sensitive) {
-        String secretId = decryptRequired(config.getSecretIdEncrypted(), "Tencent Meeting SecretId is not configured");
-        String secretKey = decryptRequired(config.getSecretKeyEncrypted(), "Tencent Meeting SecretKey is not configured");
+    private JSONObject exchange(TencentMeetingOAuthCredential credential, String pathWithQuery, HttpMethod method, JSONObject body, boolean sensitive) {
         String nonce = String.valueOf(Math.abs(UUID.randomUUID().getMostSignificantBits()));
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String requestBody = body == null ? "" : body.toJSONString();
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("X-TC-Key", secretId);
         headers.set("X-TC-Timestamp", timestamp);
         headers.set("X-TC-Nonce", nonce);
-        headers.set("X-TC-Signature", TencentMeetingSigner.sign(secretId, secretKey, method.name(), nonce, timestamp, pathWithQuery, requestBody));
-        headers.set("AppId", StrUtil.blankToDefault(config.getAppId(), ""));
-        if (StrUtil.isNotBlank(config.getSdkId())) {
-            headers.set("SdkId", config.getSdkId());
-        }
-        headers.set("X-TC-Registered", "1");
-        if (sensitive && hasValidStsToken(config)) {
-            headers.set("STS-Token", secretTextCipher.decrypt(config.getStsTokenEncrypted()));
+        headers.set("AccessToken", credential.accessToken());
+        headers.set("OpenId", credential.openId());
+        if (sensitive && hasValidStsToken(credential)) {
+            headers.set("STS-Token", secretTextCipher.decrypt(credential.config().getStsTokenEncrypted()));
         }
 
         URI uri = URI.create(BASE_URL + pathWithQuery);
@@ -160,16 +152,9 @@ public class TencentMeetingApiClient implements TencentMeetingApiGateway {
         }
     }
 
-    private boolean hasValidStsToken(TencentMeetingCorpConfig config) {
-        return StrUtil.isNotBlank(config.getStsTokenEncrypted())
-                && (config.getStsTokenExpireTime() == null || config.getStsTokenExpireTime().after(new Date()));
-    }
-
-    private String decryptRequired(String encrypted, String message) {
-        if (StrUtil.isBlank(encrypted)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, message);
-        }
-        return secretTextCipher.decrypt(encrypted);
+    private boolean hasValidStsToken(TencentMeetingOAuthCredential credential) {
+        return StrUtil.isNotBlank(credential.config().getStsTokenEncrypted())
+                && (credential.config().getStsTokenExpireTime() == null || credential.config().getStsTokenExpireTime().after(new Date()));
     }
 
     private List<JSONObject> firstArray(JSONObject root, String... keys) {

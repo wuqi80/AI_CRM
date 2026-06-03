@@ -3,9 +3,10 @@ import type {
   TencentMeetingBindPayload,
   TencentMeetingCandidateQuery,
   TencentMeetingCandidateVO,
-  TencentMeetingConfigVO,
   TencentMeetingCreatePayload,
   TencentMeetingDetailVO,
+  TencentMeetingOAuthAuthorizeVO,
+  TencentMeetingOAuthStatusVO,
   TencentMeetingPage,
   TencentMeetingQuery,
   TencentMeetingSyncStatusVO,
@@ -13,20 +14,24 @@ import type {
   TencentMeetingVO
 } from '@/types/tencentMeeting'
 
-export function getTencentMeetingConfig(): Promise<TencentMeetingConfigVO> {
-  return get('/tencent-meeting/config')
-}
-
-export function saveTencentMeetingConfig(data: Partial<TencentMeetingConfigVO>): Promise<TencentMeetingConfigVO> {
-  return post('/tencent-meeting/config', data)
-}
-
 export function runTencentMeetingSync(data = {}): Promise<TencentMeetingSyncStatusVO> {
   return post('/tencent-meeting/sync/run', data)
 }
 
 export function getTencentMeetingSyncStatus(): Promise<TencentMeetingSyncStatusVO> {
   return get('/tencent-meeting/sync/status')
+}
+
+export function getTencentMeetingOAuthAuthorizeUrl(redirect: string): Promise<TencentMeetingOAuthAuthorizeVO> {
+  return get('/tencent-meeting/oauth/authorize', { params: { redirect } })
+}
+
+export function getTencentMeetingOAuthStatus(): Promise<TencentMeetingOAuthStatusVO> {
+  return get('/tencent-meeting/oauth/status')
+}
+
+export function unbindTencentMeetingOAuth(): Promise<void> {
+  return post('/tencent-meeting/oauth/unbind')
 }
 
 export function queryTencentMeetings(query: TencentMeetingQuery): Promise<TencentMeetingPage> {

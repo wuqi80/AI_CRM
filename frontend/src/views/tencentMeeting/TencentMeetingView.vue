@@ -12,13 +12,25 @@
         <p>{{ total }} 场会议 · {{ activeFilterSummary }}</p>
       </div>
       <div class="tm-view__actions">
-        <el-button type="primary" @click="openCreateDialog">
+        <el-button type="primary" :disabled="!oauthStatus.authorized" @click="openCreateDialog">
           <span class="material-symbols-outlined mr-1 text-[18px]">add</span>
           创建会议
         </el-button>
+        <el-button v-if="!oauthStatus.authorized" :loading="oauthLoading" @click="handleAuthorize">
+          <span class="material-symbols-outlined mr-1 text-[18px]">verified_user</span>
+          授权腾讯会议
+        </el-button>
+        <el-button v-else :loading="oauthLoading" @click="handleAuthorize">
+          <span class="material-symbols-outlined mr-1 text-[18px]">published_with_changes</span>
+          重新授权
+        </el-button>
+        <el-button v-if="oauthStatus.authorized" @click="handleOAuthUnbind">
+          <span class="material-symbols-outlined mr-1 text-[18px]">link_off</span>
+          取消授权
+        </el-button>
         <el-button :loading="syncing" @click="handleSync">
           <span class="material-symbols-outlined mr-1 text-[18px]">sync</span>
-          同步
+          同步我的会议
         </el-button>
         <el-button :loading="loading" @click="loadMeetings">
           <span class="material-symbols-outlined mr-1 text-[18px]">refresh</span>
@@ -229,19 +241,8 @@
             class="w-full"
           />
         </el-form-item>
-        <el-form-item label="主持人">
-          <el-input v-model="createForm.creatorUserId" clearable placeholder="默认使用腾讯会议配置中的用户ID" />
-        </el-form-item>
         <el-form-item label="会议密码">
           <el-input v-model="createForm.password" clearable maxlength="6" placeholder="可选，最多6位" />
-        </el-form-item>
-        <el-form-item label="邀请人">
-          <el-input
-            v-model="createForm.inviteeUserIdsText"
-            type="textarea"
-            :rows="3"
-            placeholder="可选，多个腾讯会议 userid 用逗号或换行分隔"
-          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -338,13 +339,21 @@ import {
   bindTencentMeeting,
   createTencentMeeting,
   getTencentMeetingDetail,
+  getTencentMeetingOAuthAuthorizeUrl,
+  getTencentMeetingOAuthStatus,
   getTencentMeetingSyncStatus,
   queryTencentMeetings,
   runTencentMeetingSync,
+  unbindTencentMeetingOAuth,
   unbindTencentMeeting
 } from '@/api/tencentMeeting'
 import type { CustomerListVO } from '@/types/customer'
-import type { TencentMeetingCreatePayload, TencentMeetingDetailVO, TencentMeetingVO } from '@/types/tencentMeeting'
+import type {
+  TencentMeetingCreatePayload,
+  TencentMeetingDetailVO,
+  TencentMeetingOAuthStatusVO,
+  TencentMeetingVO
+} from '@/types/tencentMeeting'
 
 const route = useRoute()
 const keyword = ref('')
@@ -359,6 +368,8 @@ const syncing = ref(false)
 const meetings = ref<TencentMeetingVO[]>([])
 const syncStatus = ref('')
 const syncError = ref('')
+const oauthLoading = ref(false)
+const oauthStatus = ref<TencentMeetingOAuthStatusVO>({ configured: false, authorized: false })
 
 const createDialogVisible = ref(false)
 const createdMeetingVisible = ref(false)
@@ -367,9 +378,7 @@ const createdMeeting = ref<TencentMeetingVO | null>(null)
 const createMeetingRange = ref<[string, string] | null>(null)
 const createForm = ref({
   subject: '',
-  creatorUserId: '',
-  password: '',
-  inviteeUserIdsText: ''
+  password: ''
 })
 
 const detailVisible = ref(false)
@@ -410,6 +419,7 @@ const activeFilterSummary = computed(() => {
 onMounted(() => {
   void loadMeetings()
   void loadSyncStatus()
+  void loadOAuthStatus()
 })
 
 async function loadMeetings() {
@@ -442,6 +452,38 @@ async function loadSyncStatus() {
   }
 }
 
+async function loadOAuthStatus() {
+  oauthLoading.value = true
+  try {
+    oauthStatus.value = await getTencentMeetingOAuthStatus()
+  } catch (err) {
+    console.error('Load Tencent Meeting OAuth status failed:', err)
+  } finally {
+    oauthLoading.value = false
+  }
+}
+
+async function handleAuthorize() {
+  oauthLoading.value = true
+  try {
+    const { authorizeUrl } = await getTencentMeetingOAuthAuthorizeUrl(window.location.href)
+    window.location.href = authorizeUrl
+  } finally {
+    oauthLoading.value = false
+  }
+}
+
+async function handleOAuthUnbind() {
+  await ElMessageBox.confirm('确认取消当前用户的腾讯会议授权？取消后将无法创建和同步你的会议。', '提示', {
+    type: 'warning',
+    confirmButtonText: '取消授权',
+    cancelButtonText: '保留'
+  })
+  await unbindTencentMeetingOAuth()
+  ElMessage.success('已取消腾讯会议授权')
+  await loadOAuthStatus()
+}
+
 async function handleSync() {
   syncing.value = true
   try {
@@ -455,16 +497,18 @@ async function handleSync() {
   }
 }
 
-function openCreateDialog() {
+async function openCreateDialog() {
+  if (!oauthStatus.value.authorized) {
+    ElMessage.warning('请先授权腾讯会议账号')
+    return
+  }
   const now = new Date()
   const start = new Date(now.getTime() + 30 * 60 * 1000)
   start.setSeconds(0, 0)
   const end = new Date(start.getTime() + 60 * 60 * 1000)
   createForm.value = {
     subject: '',
-    creatorUserId: '',
-    password: '',
-    inviteeUserIdsText: ''
+    password: ''
   }
   createMeetingRange.value = [formatDateTimeInput(start), formatDateTimeInput(end)]
   createDialogVisible.value = true
@@ -484,9 +528,7 @@ async function handleCreateMeeting() {
     subject,
     startTime: createMeetingRange.value[0],
     endTime: createMeetingRange.value[1],
-    creatorUserId: createForm.value.creatorUserId.trim() || undefined,
-    password: createForm.value.password.trim() || undefined,
-    inviteeUserIds: splitInviteeUserIds(createForm.value.inviteeUserIdsText)
+    password: createForm.value.password.trim() || undefined
   }
   creating.value = true
   try {
@@ -495,6 +537,7 @@ async function handleCreateMeeting() {
     createDialogVisible.value = false
     createdMeetingVisible.value = true
     await loadMeetings()
+    await loadOAuthStatus()
   } finally {
     creating.value = false
   }
@@ -611,13 +654,6 @@ function canCopyMeetingLink(meeting: TencentMeetingVO) {
 
 function getMeetingJoinUrl(meeting: TencentMeetingVO) {
   return meeting.joinUrl || meeting.hostJoinUrl || ''
-}
-
-function splitInviteeUserIds(value: string) {
-  return value
-    .split(/[\n,，]/)
-    .map(item => item.trim())
-    .filter(Boolean)
 }
 
 function formatDateTimeInput(date: Date) {

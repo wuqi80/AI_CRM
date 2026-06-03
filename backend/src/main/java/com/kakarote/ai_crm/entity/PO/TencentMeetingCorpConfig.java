@@ -30,17 +30,13 @@ public class TencentMeetingCorpConfig implements Serializable {
 
     private String corpName;
 
-    private String secretIdEncrypted;
-
-    private String secretKeyEncrypted;
+    private String appSecretEncrypted;
 
     private String webhookSecretEncrypted;
 
     private String stsTokenEncrypted;
 
     private Date stsTokenExpireTime;
-
-    private String operatorUserId;
 
     private Boolean syncEnabled;
 

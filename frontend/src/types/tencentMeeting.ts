@@ -3,20 +3,35 @@ import type { PageResult } from '@/types/api'
 export type TencentMeetingStatus = 'not_started' | 'ended' | 'cancelled' | string
 export type TencentMeetingBindStatus = 'BOUND' | 'UNBOUND' | string
 
-export interface TencentMeetingConfigVO {
-  id?: string
+export interface TencentMeetingOAuthAuthorizeVO {
+  authorizeUrl: string
+  state?: string
+}
+
+export interface TencentMeetingOAuthAccountVO {
+  id: string
   appId?: string
   sdkId?: string
-  corpName?: string
-  secretIdMasked?: string
-  operatorUserId?: string
-  syncEnabled?: boolean
-  transcriptEnabled?: boolean
-  archiveToKnowledge?: boolean
-  stsTokenExpireTime?: string
+  openId?: string
+  userName?: string
+  openCorpId?: string
+  openCorpName?: string
+  avatarUrl?: string
+  crmUserId?: string
+  crmUserName?: string
+  authStatus?: string
+  scopes?: string
+  tokenExpiresAt?: string
+  lastAuthTime?: string
+  lastRefreshTime?: string
   lastSyncTime?: string
-  lastSyncStatus?: string
   lastSyncError?: string
+}
+
+export interface TencentMeetingOAuthStatusVO {
+  configured?: boolean
+  authorized?: boolean
+  account?: TencentMeetingOAuthAccountVO
 }
 
 export interface TencentMeetingSyncStatusVO {
@@ -139,9 +154,7 @@ export interface TencentMeetingCreatePayload {
   subject: string
   startTime: string
   endTime: string
-  creatorUserId?: string
   password?: string
-  inviteeUserIds?: string[]
 }
 
 export interface TencentMeetingCandidateQuery {

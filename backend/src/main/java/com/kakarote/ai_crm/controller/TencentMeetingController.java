@@ -5,17 +5,18 @@ import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingBindBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingCandidateQueryBO;
-import com.kakarote.ai_crm.entity.BO.TencentMeetingConfigSaveBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingCreateBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingQueryBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingSyncRunBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingUnbindBO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingCandidateVO;
-import com.kakarote.ai_crm.entity.VO.TencentMeetingConfigVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingDetailVO;
+import com.kakarote.ai_crm.entity.VO.TencentMeetingOAuthAuthorizeVO;
+import com.kakarote.ai_crm.entity.VO.TencentMeetingOAuthStatusVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingSyncStatusVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingVO;
 import com.kakarote.ai_crm.service.impl.TencentMeetingServiceImpl;
+import com.kakarote.ai_crm.service.impl.TencentMeetingOAuthService;
 import com.kakarote.ai_crm.service.impl.TencentMeetingWebhookService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +30,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -42,19 +46,8 @@ public class TencentMeetingController {
     @Autowired
     private TencentMeetingWebhookService webhookService;
 
-    @GetMapping("/config")
-    @Operation(summary = "获取腾讯会议配置")
-    @RequirePermission("tencentMeeting:config")
-    public Result<TencentMeetingConfigVO> getConfig() {
-        return Result.ok(meetingService.getConfig());
-    }
-
-    @PostMapping("/config")
-    @Operation(summary = "保存腾讯会议配置")
-    @RequirePermission("tencentMeeting:config")
-    public Result<TencentMeetingConfigVO> saveConfig(@RequestBody TencentMeetingConfigSaveBO saveBO) {
-        return Result.ok(meetingService.saveConfig(saveBO));
-    }
+    @Autowired
+    private TencentMeetingOAuthService oauthService;
 
     @PostMapping("/sync/run")
     @Operation(summary = "运行腾讯会议同步")
@@ -68,6 +61,40 @@ public class TencentMeetingController {
     @RequirePermission("tencentMeeting:view")
     public Result<TencentMeetingSyncStatusVO> getSyncStatus() {
         return Result.ok(meetingService.getSyncStatus());
+    }
+
+    @GetMapping("/oauth/authorize")
+    @Operation(summary = "腾讯会议OAuth授权链接")
+    @RequirePermission("tencentMeeting:view")
+    public Result<TencentMeetingOAuthAuthorizeVO> oauthAuthorize(@RequestParam(required = false) String redirect,
+                                                                HttpServletRequest request) {
+        return Result.ok(oauthService.createAuthorizeUrl(redirect, request));
+    }
+
+    @GetMapping("/oauth/callback")
+    @Operation(summary = "腾讯会议OAuth回调")
+    public void oauthCallback(@RequestParam(value = "auth_code", required = false) String authCode,
+                              @RequestParam(value = "code", required = false) String code,
+                              @RequestParam(required = false) String state,
+                              @RequestParam(required = false) String error,
+                              HttpServletRequest request,
+                              HttpServletResponse response) throws IOException {
+        response.sendRedirect(oauthService.handleCallback(authCode == null ? code : authCode, state, error, request));
+    }
+
+    @GetMapping("/oauth/status")
+    @Operation(summary = "当前用户腾讯会议授权状态")
+    @RequirePermission("tencentMeeting:view")
+    public Result<TencentMeetingOAuthStatusVO> oauthStatus() {
+        return Result.ok(oauthService.getStatus());
+    }
+
+    @PostMapping("/oauth/unbind")
+    @Operation(summary = "取消当前用户腾讯会议授权")
+    @RequirePermission("tencentMeeting:view")
+    public Result<String> oauthUnbind() {
+        oauthService.unbindCurrentUser();
+        return Result.ok();
     }
 
     @PostMapping("/webhook")

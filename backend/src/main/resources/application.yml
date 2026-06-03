@@ -126,6 +126,11 @@ external-auth:
     client-secret: ${EXTERNAL_AUTH_WECOM_SECRET:}
     redirect-uri: ${EXTERNAL_AUTH_WECOM_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/auth/external/wecom/callback}
 
+tencent-meeting:
+  oauth:
+    callback-url: ${TENCENT_MEETING_OAUTH_CALLBACK_URL:https://aicrm-saas.5kcrm.cn/crmapi/tencent-meeting/oauth/callback}
+    frontend-redirect-url: ${TENCENT_MEETING_OAUTH_FRONTEND_REDIRECT_URL:https://aicrm-saas.5kcrm.cn/#/tencent-meetings}
+
 media-analysis:
   ffmpeg:
     path: "D:/software/ffmpeg/bin/ffmpeg.exe"

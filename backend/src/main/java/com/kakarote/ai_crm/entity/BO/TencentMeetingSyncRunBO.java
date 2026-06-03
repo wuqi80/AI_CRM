@@ -7,8 +7,6 @@ public class TencentMeetingSyncRunBO {
 
     private Integer syncDays;
 
-    private String operatorUserId;
-
     private Boolean syncRecordings;
 
     private Boolean syncTranscripts;

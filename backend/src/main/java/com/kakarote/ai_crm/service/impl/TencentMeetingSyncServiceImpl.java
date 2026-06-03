@@ -12,6 +12,7 @@ import com.kakarote.ai_crm.entity.PO.TencentMeetingSyncLog;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingTranscriptSegment;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingUserMapping;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingSyncStatusVO;
+import com.kakarote.ai_crm.utils.UserUtil;
 import com.kakarote.ai_crm.mapper.TencentMeetingMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingParticipantMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingRecordingMapper;
@@ -52,6 +53,9 @@ public class TencentMeetingSyncServiceImpl {
     @Autowired
     private TencentMeetingSyncLogMapper syncLogMapper;
 
+    @Autowired
+    private TencentMeetingOAuthTokenProvider tokenProvider;
+
     @Transactional(rollbackFor = Exception.class)
     public TencentMeetingSyncStatusVO runSync(TencentMeetingCorpConfig config, TencentMeetingSyncRunBO runBO) {
         TencentMeetingSyncRunBO actualRunBO = runBO == null ? new TencentMeetingSyncRunBO() : runBO;
@@ -77,64 +81,75 @@ public class TencentMeetingSyncServiceImpl {
         try {
             List<TencentMeetingUserMapping> mappings = loadMappings(config, actualRunBO);
             for (TencentMeetingUserMapping mapping : mappings) {
-                List<JSONObject> meetings = apiGateway.listEndedMeetings(config, mapping, syncDays);
-                fetched += meetings.size();
-                for (JSONObject rawMeeting : meetings) {
-                    TencentMeeting meeting = upsertMeeting(config, mapping, rawMeeting);
-                    saved++;
-                    String detailUserId = StrUtil.blankToDefault(meeting.getCreatorUserId(), mapping.getMeetingUserId());
-                    try {
-                        List<JSONObject> participants = apiGateway.getMeetingParticipants(config, meeting.getMeetingId(), detailUserId);
-                        for (JSONObject rawParticipant : participants) {
-                            saveParticipant(config, meeting, rawParticipant);
-                            saved++;
-                        }
-                    } catch (Exception detailException) {
-                        failed++;
-                        log.warn("Tencent Meeting participant sync skipped: meetingId={}, userId={}, error={}",
-                                meeting.getMeetingId(), detailUserId, detailException.getMessage());
-                    }
-                    if (syncRecordings) {
+                try {
+                    TencentMeetingOAuthCredential credential = tokenProvider.credential(config, mapping);
+                    List<JSONObject> meetings = apiGateway.listEndedMeetings(credential, syncDays);
+                    fetched += meetings.size();
+                    for (JSONObject rawMeeting : meetings) {
+                        TencentMeeting meeting = upsertMeeting(config, mapping, rawMeeting);
+                        saved++;
                         try {
-                            List<JSONObject> recordings = apiGateway.listRecordings(config, mapping.getMeetingUserId(), syncDays);
-                            for (JSONObject rawRecording : recordings) {
-                                if (!matchesMeeting(meeting, rawRecording)) {
-                                    continue;
-                                }
-                                TencentMeetingRecording recording = saveRecording(config, meeting, rawRecording);
+                            List<JSONObject> participants = apiGateway.getMeetingParticipants(credential, meeting.getMeetingId());
+                            for (JSONObject rawParticipant : participants) {
+                                saveParticipant(config, meeting, rawParticipant);
                                 saved++;
-                                List<JSONObject> segments;
-                                try {
-                                    segments = syncTranscripts && Boolean.TRUE.equals(config.getTranscriptEnabled())
-                                            ? apiGateway.getTranscriptSegments(config, meeting.getMeetingId(), recording.getRecordFileId(), detailUserId)
-                                            : List.of();
-                                } catch (Exception transcriptException) {
-                                    failed++;
-                                    log.warn("Tencent Meeting transcript sync skipped: meetingId={}, recordFileId={}, userId={}, error={}",
-                                            meeting.getMeetingId(), recording.getRecordFileId(), detailUserId, transcriptException.getMessage());
-                                    segments = List.of();
-                                }
-                                List<String> texts = new ArrayList<>();
-                                for (JSONObject rawSegment : segments) {
-                                    TencentMeetingTranscriptSegment segment = saveTranscriptSegment(recording, meeting, rawSegment);
-                                    if (StrUtil.isNotBlank(segment.getText())) {
-                                        texts.add(formatTranscriptLine(segment));
-                                    }
-                                    saved++;
-                                }
-                                if (!texts.isEmpty() || StrUtil.isNotBlank(recording.getSummary()) || StrUtil.isNotBlank(recording.getTodoText())) {
-                                    meeting.setSummary(StrUtil.blankToDefault(meeting.getSummary(), recording.getSummary()));
-                                    meeting.setTodoText(StrUtil.blankToDefault(meeting.getTodoText(), recording.getTodoText()));
-                                    meeting.setTranscriptText(String.join("\n", texts));
-                                    meetingMapper.updateById(meeting);
-                                }
                             }
-                        } catch (Exception recordingException) {
+                        } catch (Exception detailException) {
                             failed++;
-                            log.warn("Tencent Meeting recording sync skipped: meetingId={}, userId={}, error={}",
-                                    meeting.getMeetingId(), mapping.getMeetingUserId(), recordingException.getMessage());
+                            log.warn("Tencent Meeting participant sync skipped: meetingId={}, openId={}, error={}",
+                                    meeting.getMeetingId(), mapping.getMeetingUserId(), detailException.getMessage());
+                        }
+                        if (syncRecordings) {
+                            try {
+                                List<JSONObject> recordings = apiGateway.listRecordings(credential, syncDays);
+                                for (JSONObject rawRecording : recordings) {
+                                    if (!matchesMeeting(meeting, rawRecording)) {
+                                        continue;
+                                    }
+                                    TencentMeetingRecording recording = saveRecording(config, meeting, rawRecording);
+                                    saved++;
+                                    List<JSONObject> segments;
+                                    try {
+                                        segments = syncTranscripts && Boolean.TRUE.equals(config.getTranscriptEnabled())
+                                                ? apiGateway.getTranscriptSegments(credential, meeting.getMeetingId(), recording.getRecordFileId())
+                                                : List.of();
+                                    } catch (Exception transcriptException) {
+                                        failed++;
+                                        log.warn("Tencent Meeting transcript sync skipped: meetingId={}, recordFileId={}, openId={}, error={}",
+                                                meeting.getMeetingId(), recording.getRecordFileId(), mapping.getMeetingUserId(), transcriptException.getMessage());
+                                        segments = List.of();
+                                    }
+                                    List<String> texts = new ArrayList<>();
+                                    for (JSONObject rawSegment : segments) {
+                                        TencentMeetingTranscriptSegment segment = saveTranscriptSegment(recording, meeting, rawSegment);
+                                        if (StrUtil.isNotBlank(segment.getText())) {
+                                            texts.add(formatTranscriptLine(segment));
+                                        }
+                                        saved++;
+                                    }
+                                    if (!texts.isEmpty() || StrUtil.isNotBlank(recording.getSummary()) || StrUtil.isNotBlank(recording.getTodoText())) {
+                                        meeting.setSummary(StrUtil.blankToDefault(meeting.getSummary(), recording.getSummary()));
+                                        meeting.setTodoText(StrUtil.blankToDefault(meeting.getTodoText(), recording.getTodoText()));
+                                        meeting.setTranscriptText(String.join("\n", texts));
+                                        meetingMapper.updateById(meeting);
+                                    }
+                                }
+                            } catch (Exception recordingException) {
+                                failed++;
+                                log.warn("Tencent Meeting recording sync skipped: meetingId={}, openId={}, error={}",
+                                        meeting.getMeetingId(), mapping.getMeetingUserId(), recordingException.getMessage());
+                            }
                         }
                     }
+                    mapping.setLastSyncTime(new Date());
+                    mapping.setLastSyncError(null);
+                    userMappingMapper.updateById(mapping);
+                } catch (Exception accountException) {
+                    failed++;
+                    mapping.setLastSyncTime(new Date());
+                    mapping.setLastSyncError(accountException.getMessage());
+                    userMappingMapper.updateById(mapping);
+                    log.warn("Tencent Meeting account sync skipped: openId={}, error={}", mapping.getMeetingUserId(), accountException.getMessage());
                 }
             }
             syncLog.setStatus("success");
@@ -167,28 +182,23 @@ public class TencentMeetingSyncServiceImpl {
         log.info("Tencent Meeting webhook refresh requested: event={}, meetingId={}", eventName, meetingId);
     }
 
-    public JSONObject createMeeting(TencentMeetingCorpConfig config, JSONObject requestBody) {
-        return apiGateway.createMeeting(config, requestBody);
+    public JSONObject createMeeting(TencentMeetingOAuthCredential credential, JSONObject requestBody) {
+        return apiGateway.createMeeting(credential, requestBody);
     }
 
     private List<TencentMeetingUserMapping> loadMappings(TencentMeetingCorpConfig config, TencentMeetingSyncRunBO runBO) {
-        List<TencentMeetingUserMapping> mappings = userMappingMapper.selectList(
-                Wrappers.<TencentMeetingUserMapping>lambdaQuery()
-                        .eq(TencentMeetingUserMapping::getAppId, config.getAppId())
-                        .eq(TencentMeetingUserMapping::getStatus, 1));
-        if (!mappings.isEmpty()) {
-            return mappings;
-        }
-        String fallbackUserId = StrUtil.blankToDefault(runBO.getOperatorUserId(), config.getOperatorUserId());
-        if (StrUtil.isBlank(fallbackUserId)) {
+        Long userId = UserUtil.getUserIdOrNull();
+        if (userId == null) {
             return List.of();
         }
-        TencentMeetingUserMapping fallback = new TencentMeetingUserMapping();
-        fallback.setAppId(config.getAppId());
-        fallback.setMeetingUserId(fallbackUserId);
-        fallback.setUserName(fallbackUserId);
-        fallback.setStatus(1);
-        return List.of(fallback);
+        var wrapper = Wrappers.<TencentMeetingUserMapping>lambdaQuery()
+                .eq(TencentMeetingUserMapping::getAppId, config.getAppId())
+                .eq(TencentMeetingUserMapping::getStatus, 1)
+                .eq(TencentMeetingUserMapping::getAuthStatus, TencentMeetingOAuthTokenProvider.AUTH_STATUS_ACTIVE)
+                .isNotNull(TencentMeetingUserMapping::getCrmUserId)
+                .eq(TencentMeetingUserMapping::getCrmUserId, userId)
+                .orderByDesc(TencentMeetingUserMapping::getLastAuthTime);
+        return userMappingMapper.selectList(wrapper);
     }
 
     private TencentMeeting upsertMeeting(TencentMeetingCorpConfig config, TencentMeetingUserMapping mapping, JSONObject raw) {

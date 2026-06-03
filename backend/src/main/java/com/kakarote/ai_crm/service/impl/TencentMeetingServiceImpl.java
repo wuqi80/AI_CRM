@@ -12,7 +12,6 @@ import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingBindBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingCandidateQueryBO;
-import com.kakarote.ai_crm.entity.BO.TencentMeetingConfigSaveBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingCreateBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingQueryBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingSyncRunBO;
@@ -27,7 +26,6 @@ import com.kakarote.ai_crm.entity.PO.TencentMeetingSyncLog;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingTranscriptSegment;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingUserMapping;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingCandidateVO;
-import com.kakarote.ai_crm.entity.VO.TencentMeetingConfigVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingCustomerBindingVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingDetailVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingParticipantVO;
@@ -43,9 +41,7 @@ import com.kakarote.ai_crm.mapper.TencentMeetingParticipantMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingRecordingMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingSyncLogMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingTranscriptSegmentMapper;
-import com.kakarote.ai_crm.mapper.TencentMeetingUserMappingMapper;
 import com.kakarote.ai_crm.service.DataPermissionService;
-import com.kakarote.ai_crm.utils.SecretTextCipher;
 import com.kakarote.ai_crm.utils.UserUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -80,13 +76,7 @@ public class TencentMeetingServiceImpl {
     private TencentMeetingSyncLogMapper syncLogMapper;
 
     @Autowired
-    private TencentMeetingUserMappingMapper userMappingMapper;
-
-    @Autowired
     private CustomerMapper customerMapper;
-
-    @Autowired
-    private SecretTextCipher secretTextCipher;
 
     @Autowired
     private TencentMeetingSyncServiceImpl syncService;
@@ -95,35 +85,13 @@ public class TencentMeetingServiceImpl {
     private TencentMeetingCustomerBindingServiceImpl bindingService;
 
     @Autowired
+    private TencentMeetingOAuthService oauthService;
+
+    @Autowired
+    private TencentMeetingOAuthTokenProvider tokenProvider;
+
+    @Autowired
     private DataPermissionService dataPermissionService;
-
-    public TencentMeetingConfigVO getConfig() {
-        return toConfigVO(findConfig());
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public TencentMeetingConfigVO saveConfig(TencentMeetingConfigSaveBO saveBO) {
-        TencentMeetingCorpConfig config = findConfig();
-        if (config == null) {
-            config = new TencentMeetingCorpConfig();
-        }
-        config.setAppId(StrUtil.trim(saveBO.getAppId()));
-        config.setSdkId(StrUtil.trimToNull(saveBO.getSdkId()));
-        config.setCorpName(StrUtil.trimToNull(saveBO.getCorpName()));
-        config.setOperatorUserId(StrUtil.trimToNull(saveBO.getOperatorUserId()));
-        config.setSyncEnabled(Boolean.TRUE.equals(saveBO.getSyncEnabled()));
-        config.setTranscriptEnabled(Boolean.TRUE.equals(saveBO.getTranscriptEnabled()));
-        config.setArchiveToKnowledge(Boolean.TRUE.equals(saveBO.getArchiveToKnowledge()));
-        setEncryptedIfPresent(saveBO.getSecretId(), config::setSecretIdEncrypted);
-        setEncryptedIfPresent(saveBO.getSecretKey(), config::setSecretKeyEncrypted);
-        setEncryptedIfPresent(saveBO.getWebhookSecret(), config::setWebhookSecretEncrypted);
-        if (config.getId() == null) {
-            configMapper.insert(config);
-        } else {
-            configMapper.updateById(config);
-        }
-        return toConfigVO(config);
-    }
 
     @Transactional(rollbackFor = Exception.class)
     public TencentMeetingSyncStatusVO runSync(TencentMeetingSyncRunBO runBO) {
@@ -273,9 +241,10 @@ public class TencentMeetingServiceImpl {
         }
 
         TencentMeetingCorpConfig config = requireConfig();
-        TencentMeetingUserMapping mapping = resolveCreatorMapping(config, actual.getCreatorUserId());
+        TencentMeetingUserMapping mapping = oauthService.requireCurrentAuthorizedAccount(config);
+        TencentMeetingOAuthCredential credential = tokenProvider.credential(config, mapping);
         JSONObject requestBody = buildCreateMeetingBody(config, mapping, actual);
-        JSONObject rawMeeting = syncService.createMeeting(config, requestBody);
+        JSONObject rawMeeting = syncService.createMeeting(credential, requestBody);
 
         TencentMeeting meeting = new TencentMeeting();
         meeting.setAppId(config.getAppId());
@@ -364,37 +333,10 @@ public class TencentMeetingServiceImpl {
 
     private TencentMeetingCorpConfig requireConfig() {
         TencentMeetingCorpConfig config = findConfig();
-        if (config == null || StrUtil.isBlank(config.getAppId())) {
+        if (config == null || StrUtil.isBlank(config.getAppId()) || StrUtil.isBlank(config.getSdkId())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Tencent Meeting config is not configured");
         }
         return config;
-    }
-
-    private TencentMeetingUserMapping resolveCreatorMapping(TencentMeetingCorpConfig config, String requestedCreatorUserId) {
-        String meetingUserId = StrUtil.blankToDefault(requestedCreatorUserId, config.getOperatorUserId());
-        TencentMeetingUserMapping mapping = null;
-        if (StrUtil.isNotBlank(meetingUserId)) {
-            mapping = userMappingMapper.selectOne(Wrappers.<TencentMeetingUserMapping>lambdaQuery()
-                    .eq(TencentMeetingUserMapping::getAppId, config.getAppId())
-                    .eq(TencentMeetingUserMapping::getMeetingUserId, meetingUserId)
-                    .eq(TencentMeetingUserMapping::getStatus, 1)
-                    .last("LIMIT 1"));
-        }
-        if (mapping == null) {
-            mapping = new TencentMeetingUserMapping();
-            mapping.setAppId(config.getAppId());
-            mapping.setMeetingUserId(meetingUserId);
-            mapping.setUserName(meetingUserId);
-            mapping.setCrmUserId(UserUtil.getUserIdOrNull());
-            mapping.setStatus(1);
-        }
-        if (StrUtil.isBlank(mapping.getMeetingUserId())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Tencent Meeting operator user is not configured");
-        }
-        if (mapping.getCrmUserId() == null) {
-            mapping.setCrmUserId(UserUtil.getUserIdOrNull());
-        }
-        return mapping;
     }
 
     private JSONObject buildCreateMeetingBody(TencentMeetingCorpConfig config, TencentMeetingUserMapping mapping, TencentMeetingCreateBO createBO) {
@@ -431,16 +373,6 @@ public class TencentMeetingServiceImpl {
             body.put("sdk_id", config.getSdkId());
         }
         return body;
-    }
-
-    private TencentMeetingConfigVO toConfigVO(TencentMeetingCorpConfig config) {
-        TencentMeetingConfigVO vo = new TencentMeetingConfigVO();
-        if (config == null) {
-            return vo;
-        }
-        BeanUtil.copyProperties(config, vo);
-        vo.setSecretIdMasked(maskEncrypted(config.getSecretIdEncrypted()));
-        return vo;
     }
 
     private String firstText(JSONObject raw, String... keys) {
@@ -520,24 +452,4 @@ public class TencentMeetingServiceImpl {
         return vo;
     }
 
-    private String maskEncrypted(String encrypted) {
-        if (StrUtil.isBlank(encrypted)) {
-            return null;
-        }
-        try {
-            String plain = secretTextCipher.decrypt(encrypted);
-            if (plain.length() <= 6) {
-                return "******";
-            }
-            return plain.substring(0, 3) + "****" + plain.substring(plain.length() - 3);
-        } catch (Exception e) {
-            return "******";
-        }
-    }
-
-    private void setEncryptedIfPresent(String raw, java.util.function.Consumer<String> setter) {
-        if (StrUtil.isNotBlank(raw)) {
-            setter.accept(secretTextCipher.encrypt(raw));
-        }
-    }
 }

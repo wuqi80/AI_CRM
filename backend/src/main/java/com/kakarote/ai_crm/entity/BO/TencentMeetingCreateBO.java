@@ -14,8 +14,6 @@ public class TencentMeetingCreateBO {
 
     private Date endTime;
 
-    private String creatorUserId;
-
     private String password;
 
     private List<String> inviteeUserIds;

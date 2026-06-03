@@ -5,7 +5,9 @@ import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingSyncRunBO;
+import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.TencentMeeting;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingCorpConfig;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingParticipant;
@@ -20,8 +22,11 @@ import com.kakarote.ai_crm.mapper.TencentMeetingRecordingMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingSyncLogMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingTranscriptSegmentMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingUserMappingMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -35,10 +40,17 @@ import static org.mockito.Mockito.when;
 
 class TencentMeetingSyncServiceTest {
 
+    @AfterEach
+    void cleanup() {
+        SecurityContextHolder.clearContext();
+    }
+
     @Test
     void runSyncShouldSaveMeetingRecordingTranscriptAndSuccessLog() {
+        mockLoginUser();
         TencentMeetingSyncServiceImpl service = newService();
         TencentMeetingApiGateway apiGateway = mapper(service, "apiGateway");
+        TencentMeetingOAuthTokenProvider tokenProvider = mapper(service, "tokenProvider");
         TencentMeetingUserMappingMapper userMappingMapper = mapper(service, "userMappingMapper");
         TencentMeetingMapper meetingMapper = mapper(service, "meetingMapper");
         TencentMeetingParticipantMapper participantMapper = mapper(service, "participantMapper");
@@ -55,11 +67,15 @@ class TencentMeetingSyncServiceTest {
         TencentMeetingUserMapping mapping = new TencentMeetingUserMapping();
         mapping.setMeetingUserId("host-1");
         mapping.setCrmUserId(9L);
+        mapping.setAuthStatus("ACTIVE");
+        mapping.setStatus(1);
+        TencentMeetingOAuthCredential credential = new TencentMeetingOAuthCredential(config, mapping, "access-token");
         when(userMappingMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(mapping));
-        when(apiGateway.listEndedMeetings(config, mapping, 30)).thenReturn(List.of(meetingJson()));
-        when(apiGateway.getMeetingParticipants(config, "meeting-1", "host-1")).thenReturn(List.of(participantJson()));
-        when(apiGateway.listRecordings(config, "host-1", 30)).thenReturn(List.of(recordingJson()));
-        when(apiGateway.getTranscriptSegments(config, "meeting-1", "record-1", "host-1")).thenReturn(List.of(segmentJson()));
+        when(tokenProvider.credential(config, mapping)).thenReturn(credential);
+        when(apiGateway.listEndedMeetings(credential, 30)).thenReturn(List.of(meetingJson()));
+        when(apiGateway.getMeetingParticipants(credential, "meeting-1")).thenReturn(List.of(participantJson()));
+        when(apiGateway.listRecordings(credential, 30)).thenReturn(List.of(recordingJson()));
+        when(apiGateway.getTranscriptSegments(credential, "meeting-1", "record-1")).thenReturn(List.of(segmentJson()));
         when(meetingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
         doAnswer(invocation -> {
             TencentMeeting meeting = invocation.getArgument(0);
@@ -98,8 +114,10 @@ class TencentMeetingSyncServiceTest {
 
     @Test
     void runSyncShouldKeepMeetingWhenParticipantDetailHasNoPermission() {
+        mockLoginUser();
         TencentMeetingSyncServiceImpl service = newService();
         TencentMeetingApiGateway apiGateway = mapper(service, "apiGateway");
+        TencentMeetingOAuthTokenProvider tokenProvider = mapper(service, "tokenProvider");
         TencentMeetingUserMappingMapper userMappingMapper = mapper(service, "userMappingMapper");
         TencentMeetingMapper meetingMapper = mapper(service, "meetingMapper");
         TencentMeetingSyncLogMapper syncLogMapper = mapper(service, "syncLogMapper");
@@ -111,9 +129,13 @@ class TencentMeetingSyncServiceTest {
         TencentMeetingUserMapping mapping = new TencentMeetingUserMapping();
         mapping.setMeetingUserId("host-1");
         mapping.setCrmUserId(9L);
+        mapping.setAuthStatus("ACTIVE");
+        mapping.setStatus(1);
+        TencentMeetingOAuthCredential credential = new TencentMeetingOAuthCredential(config, mapping, "access-token");
         when(userMappingMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(mapping));
-        when(apiGateway.listEndedMeetings(config, mapping, 30)).thenReturn(List.of(meetingJson()));
-        when(apiGateway.getMeetingParticipants(config, "meeting-1", "host-1"))
+        when(tokenProvider.credential(config, mapping)).thenReturn(credential);
+        when(apiGateway.listEndedMeetings(credential, 30)).thenReturn(List.of(meetingJson()));
+        when(apiGateway.getMeetingParticipants(credential, "meeting-1"))
                 .thenThrow(new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Tencent Meeting API participants failed: 9042 无权限操作"));
         when(meetingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
         doAnswer(invocation -> {
@@ -153,7 +175,19 @@ class TencentMeetingSyncServiceTest {
         ReflectionTestUtils.setField(service, "recordingMapper", mock(TencentMeetingRecordingMapper.class));
         ReflectionTestUtils.setField(service, "transcriptMapper", mock(TencentMeetingTranscriptSegmentMapper.class));
         ReflectionTestUtils.setField(service, "syncLogMapper", mock(TencentMeetingSyncLogMapper.class));
+        ReflectionTestUtils.setField(service, "tokenProvider", mock(TencentMeetingOAuthTokenProvider.class));
         return service;
+    }
+
+    private static void mockLoginUser() {
+        ManagerUser user = new ManagerUser();
+        user.setUserId(9L);
+        user.setTenantId(99L);
+        user.setUsername("user@example.com");
+        user.setStatus(1);
+        LoginUser loginUser = new LoginUser();
+        loginUser.setUser(user);
+        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken(loginUser, null));
     }
 
     private static JSONObject meetingJson() {

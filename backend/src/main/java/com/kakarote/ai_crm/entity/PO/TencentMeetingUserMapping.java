@@ -30,7 +30,31 @@ public class TencentMeetingUserMapping implements Serializable {
 
     private String userName;
 
+    private String openCorpId;
+
+    private String openCorpName;
+
+    private String avatarUrl;
+
     private Long crmUserId;
+
+    private String accessTokenEncrypted;
+
+    private String refreshTokenEncrypted;
+
+    private Date tokenExpiresAt;
+
+    private String scopes;
+
+    private String authStatus;
+
+    private Date lastAuthTime;
+
+    private Date lastRefreshTime;
+
+    private Date lastSyncTime;
+
+    private String lastSyncError;
 
     private Integer status;
 
