@@ -632,12 +632,18 @@
         aria-hidden="true"
       />
       <Transition name="drawer-overlay">
-        <div v-if="isMobile && drawerVisible" class="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm" @click="closeMobileDrawer"></div>
+        <div
+          v-if="mobileDrawerRendered"
+          class="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm"
+          :style="mobileDrawerOverlayStyle"
+          @click="closeMobileDrawer"
+        ></div>
       </Transition>
       <Transition name="drawer-panel">
         <aside
-          v-if="isMobile && drawerVisible"
+          v-if="mobileDrawerRendered"
           class="fixed inset-y-0 left-0 right-0 z-[101] flex w-screen max-w-none touch-pan-y flex-col bg-white shadow-2xl"
+          :style="mobileDrawerPanelStyle"
           @touchstart.passive="handleMobileDrawerTouchStart"
           @touchend.passive="handleMobileDrawerTouchEnd"
           @touchcancel.passive="resetMobileDrawerSwipe"
@@ -652,7 +658,7 @@
               </div>
               <h1 class="min-w-0 truncate text-[22px] font-bold leading-tight text-[#0d0d0d]">{{ enterpriseStore.displayName }}</h1>
             </div>
-            <div class="flex h-10 shrink-0 items-center gap-2 rounded-full bg-white px-1.5 shadow-[0_12px_34px_rgba(15,23,42,0.12)]">
+            <div class="flex h-10 shrink-0 items-center gap-6 rounded-full bg-white px-1.5 shadow-[0_12px_34px_rgba(15,23,42,0.12)]">
               <button
                 type="button"
                 class="flex size-8 items-center justify-center rounded-full text-[#0d0d0d] transition-colors active:bg-slate-50"
@@ -758,6 +764,15 @@
                     @delete="handleDeleteSession"
                   />
                 </button>
+                <button
+                  v-if="sidebarVisibleChatSessions.length > MOBILE_RECENT_CHAT_SESSION_LIMIT"
+                  type="button"
+                  class="mt-1 flex w-full min-w-0 items-center gap-2 rounded-[8px] px-3 py-[9px] text-left text-[1rem] text-[#0d0d0d] transition-colors active:bg-slate-100"
+                  @click="recentChatSessionsMoreVisible = true"
+                >
+                  <span class="material-symbols-outlined text-[22px] leading-none text-[#0d0d0d]">more_horiz</span>
+                  <span class="min-w-0 flex-1 truncate leading-6">更多</span>
+                </button>
               </template>
             </div>
 
@@ -824,6 +839,72 @@
             </div>
 
           </nav>
+
+          <Transition name="drawer-panel">
+            <div
+              v-if="recentChatSessionsMoreVisible"
+              class="absolute inset-0 z-50 flex flex-col bg-white"
+            >
+              <div class="flex min-h-[calc(56px_+_env(safe-area-inset-top))] shrink-0 items-center justify-between border-b border-[#ececec] px-4 pt-[env(safe-area-inset-top)]">
+                <button
+                  type="button"
+                  class="flex items-center gap-2 rounded-lg px-2 py-2 text-[15px] font-semibold text-[#0d0d0d] transition-colors active:bg-[#f5f5f5]"
+                  @click="recentChatSessionsMoreVisible = false"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none text-[#8f8f8f]">arrow_back</span>
+                  最近
+                </button>
+                <button
+                  type="button"
+                  class="flex size-9 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-[#f5f5f5] active:text-[#0d0d0d]"
+                  aria-label="关闭对话历史"
+                  @click="recentChatSessionsMoreVisible = false"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">close</span>
+                </button>
+              </div>
+              <div class="shrink-0 px-4 py-3">
+                <el-input
+                  v-model="recentHistoryKeyword"
+                  clearable
+                  class="wk-mobile-recent-history-input"
+                  placeholder="搜索对话"
+                />
+              </div>
+              <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(18px_+_env(safe-area-inset-bottom))]">
+                <div v-if="filteredHistorySessions.length === 0" class="px-3 py-8 text-center text-sm text-slate-400">
+                  暂无匹配对话
+                </div>
+                <template v-else>
+                  <template v-for="group in historySessionGroups" :key="group.key">
+                    <div v-if="group.sessions.length > 0" class="mb-4">
+                      <p class="px-1 pb-1.5 text-xs font-semibold text-slate-400">{{ group.label }}</p>
+                      <button
+                        v-for="session in group.sessions"
+                        :key="session.sessionId"
+                        type="button"
+                        class="group w-full min-w-0 overflow-hidden rounded-[8px] px-3 py-[9px] text-left transition-colors"
+                        :class="isSessionActive(session.sessionId)
+                          ? 'bg-[#f3f3f3]'
+                          : 'active:bg-[#f9f9f9]'"
+                        @click="handleMobileSelectSessionFromMore(session.sessionId)"
+                      >
+                        <ChatSessionActionsPopover
+                          :session="session"
+                          :active="isSessionActive(session.sessionId)"
+                          always-visible
+                          :menu-shift-x="0"
+                          @pin="handlePinChatSession"
+                          @share="handleShareChatSession"
+                          @delete="handleDeleteSession"
+                        />
+                      </button>
+                    </div>
+                  </template>
+                </template>
+              </div>
+            </div>
+          </Transition>
 
           <FloatingActionButton
             v-if="showMobileDrawerNewChatButton"
@@ -1369,6 +1450,10 @@ function runLayoutNarrowProgrammatic(fn: () => void) {
 }
 
 const drawerVisible = ref(false)
+const mobileDrawerDragProgress = ref(0)
+const mobileDrawerDragActive = ref(false)
+const mobileDrawerDragSettling = ref(false)
+const mobileMainMenuGlobalSwipeStart = ref<SwipePoint | null>(null)
 const mobileDrawerTouchStart = ref<SwipePoint | null>(null)
 const mobileSessionActionMenuSession = ref<ChatSession | null>(null)
 const mobileSessionActionMenuPosition = ref<MobileSessionMenuPosition>({ left: 12, top: 12 })
@@ -1386,6 +1471,11 @@ const MOBILE_SESSION_LONG_PRESS_MS = 520
 const MOBILE_SESSION_LONG_PRESS_MOVE_CANCEL_PX = 12
 const MOBILE_SESSION_MENU_WIDTH_PX = 180
 const MOBILE_SESSION_MENU_HEIGHT_PX = 116
+const MOBILE_MAIN_MENU_TOUCH_WIDTH_PX = 28
+const MOBILE_MAIN_MENU_MIN_SWIPE_PX = 64
+const MOBILE_MAIN_MENU_MAX_VERTICAL_PX = 88
+const MOBILE_MAIN_MENU_DIRECTION_RATIO = 1.25
+const MOBILE_MAIN_MENU_MIN_PREVIEW_PX = 6
 
 function onCollapsedPrimarySidebarEnter() {
   if (primarySidebarCollapsed.value) collapsedSidebarAsideHovered.value = true
@@ -1397,11 +1487,168 @@ function onCollapsedPrimarySidebarLeave() {
 
 function closeMobileDrawer() {
   drawerVisible.value = false
+  recentChatSessionsMoreVisible.value = false
   showUserMenu.value = false
   showProfileEditSheet.value = false
   closeMobileSessionActionMenu()
   clearMobileSessionLongPressTimer()
   resetMobileDrawerSwipe()
+}
+
+const mobileDrawerRendered = computed(() =>
+  isMobile.value && (drawerVisible.value || mobileDrawerDragActive.value || mobileDrawerDragSettling.value)
+)
+
+const mobileDrawerResolvedProgress = computed(() =>
+  drawerVisible.value ? 1 : Math.min(Math.max(mobileDrawerDragProgress.value, 0), 1)
+)
+
+const mobileDrawerOverlayStyle = computed(() => ({
+  opacity: mobileDrawerResolvedProgress.value,
+  transition: mobileDrawerDragActive.value ? 'none' : 'opacity 0.18s ease',
+}))
+
+const mobileDrawerPanelStyle = computed(() => ({
+  transform: `translate3d(${(mobileDrawerResolvedProgress.value - 1) * 100}%, 0, 0)`,
+  transition: mobileDrawerDragActive.value ? 'none' : 'transform 0.18s ease',
+}))
+
+function clearMobileDrawerDragSettleTimer() {
+  if (mobileDrawerDragSettleTimer) {
+    clearTimeout(mobileDrawerDragSettleTimer)
+    mobileDrawerDragSettleTimer = null
+  }
+}
+
+function settleMobileDrawerDragClosed() {
+  clearMobileDrawerDragSettleTimer()
+  mobileDrawerDragActive.value = false
+  mobileDrawerDragSettling.value = true
+  mobileDrawerDragProgress.value = 0
+  mobileDrawerDragSettleTimer = setTimeout(() => {
+    mobileDrawerDragSettling.value = false
+    mobileDrawerDragSettleTimer = null
+  }, 180)
+}
+
+function resetMobileDrawerDragPreview() {
+  clearMobileDrawerDragSettleTimer()
+  mobileDrawerDragActive.value = false
+  mobileDrawerDragSettling.value = false
+  mobileDrawerDragProgress.value = 0
+}
+
+function handleMobileMainMenuDrag(payload?: MobileMainMenuDragPayload) {
+  if (!isMobile.value) return
+  const progress = Math.min(Math.max(Number(payload?.progress ?? 0), 0), 1)
+  if (payload?.phase === 'end') {
+    if (payload.open) {
+      resetMobileDrawerDragPreview()
+      drawerVisible.value = true
+      return
+    }
+    settleMobileDrawerDragClosed()
+    return
+  }
+
+  if (drawerVisible.value) return
+  clearMobileDrawerDragSettleTimer()
+  mobileDrawerDragActive.value = true
+  mobileDrawerDragSettling.value = false
+  mobileDrawerDragProgress.value = progress
+}
+
+function resetGlobalMobileMainMenuSwipe() {
+  mobileMainMenuGlobalSwipeStart.value = null
+}
+
+function canStartGlobalMobileMainMenuSwipe(target: EventTarget | null) {
+  if (!isMobile.value || drawerVisible.value || showUserMenu.value || customerSearchDialogVisible.value) return false
+  if (mobileSessionActionMenuSession.value || chatDrawerOpen.value) return false
+  if (!(target instanceof Element)) return true
+  return !target.closest('textarea, input, select, button, a, [role="button"], .el-overlay, .el-popper, .el-message, .el-message-box')
+}
+
+function getGlobalMobileMainMenuSwipeProgress(start: SwipePoint, point: SwipePoint) {
+  const deltaX = Math.max(0, point.clientX - start.clientX)
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 360
+  return Math.min(deltaX / Math.max(viewportWidth, 1), 1)
+}
+
+function shouldOpenGlobalMobileMainMenu(start: SwipePoint, end: SwipePoint) {
+  if (start.clientX > MOBILE_MAIN_MENU_TOUCH_WIDTH_PX) return false
+  const deltaX = end.clientX - start.clientX
+  const deltaY = end.clientY - start.clientY
+  const horizontalDistance = Math.abs(deltaX)
+  const verticalDistance = Math.abs(deltaY)
+
+  return deltaX >= MOBILE_MAIN_MENU_MIN_SWIPE_PX
+    && verticalDistance <= MOBILE_MAIN_MENU_MAX_VERTICAL_PX
+    && horizontalDistance >= verticalDistance * MOBILE_MAIN_MENU_DIRECTION_RATIO
+}
+
+function handleGlobalMobileMainMenuTouchStart(event: TouchEvent) {
+  const point = getTouchPoint(event.touches[0])
+  if (!point || point.clientX > MOBILE_MAIN_MENU_TOUCH_WIDTH_PX || !canStartGlobalMobileMainMenuSwipe(event.target)) {
+    resetGlobalMobileMainMenuSwipe()
+    return
+  }
+  mobileMainMenuGlobalSwipeStart.value = point
+}
+
+function handleGlobalMobileMainMenuTouchMove(event: TouchEvent) {
+  const start = mobileMainMenuGlobalSwipeStart.value
+  const point = getTouchPoint(event.touches[0])
+  if (!start || !point) return
+
+  const deltaX = point.clientX - start.clientX
+  const deltaY = point.clientY - start.clientY
+  const horizontalDistance = Math.abs(deltaX)
+  const verticalDistance = Math.abs(deltaY)
+
+  if (deltaX <= 0) {
+    handleMobileMainMenuDrag({ progress: 0, phase: 'move' })
+    return
+  }
+  if (
+    verticalDistance > MOBILE_MAIN_MENU_MAX_VERTICAL_PX
+    || (verticalDistance > MOBILE_MAIN_MENU_MIN_PREVIEW_PX && verticalDistance > horizontalDistance)
+  ) {
+    handleMobileMainMenuDrag({ progress: 0, phase: 'end' })
+    resetGlobalMobileMainMenuSwipe()
+    return
+  }
+  if (horizontalDistance < MOBILE_MAIN_MENU_MIN_PREVIEW_PX) return
+  if (horizontalDistance < verticalDistance * MOBILE_MAIN_MENU_DIRECTION_RATIO) return
+
+  if (event.cancelable) {
+    event.preventDefault()
+  }
+  handleMobileMainMenuDrag({
+    progress: getGlobalMobileMainMenuSwipeProgress(start, point),
+    phase: 'move'
+  })
+}
+
+function handleGlobalMobileMainMenuTouchEnd(event: TouchEvent) {
+  const start = mobileMainMenuGlobalSwipeStart.value
+  const end = getTouchPoint(event.changedTouches[0])
+  resetGlobalMobileMainMenuSwipe()
+  if (!start || !end) return
+
+  const shouldOpen = shouldOpenGlobalMobileMainMenu(start, end)
+  handleMobileMainMenuDrag({
+    progress: shouldOpen ? 1 : 0,
+    phase: 'end',
+    open: shouldOpen
+  })
+}
+
+function handleGlobalMobileMainMenuTouchCancel() {
+  if (mobileMainMenuGlobalSwipeStart.value) {
+    handleMobileMainMenuDrag({ progress: 0, phase: 'end' })
+  }
+  resetGlobalMobileMainMenuSwipe()
 }
 
 function getTouchPoint(touch: Touch | undefined): SwipePoint | null {
@@ -1590,7 +1837,9 @@ let customerSearchFocusRequestId = 0
 let removeChatComposerNarrowListener: (() => void) | null = null
 let removeCustomerListRefreshListener: (() => void) | null = null
 let removeMobileMainMenuOpenListener: (() => void) | null = null
+let removeMobileMainMenuDragListener: (() => void) | null = null
 let removeCustomerSidebarRefreshListener: (() => void) | null = null
+let mobileDrawerDragSettleTimer: ReturnType<typeof setTimeout> | null = null
 
 type ChatComposerNarrowPayload = {
   narrow?: boolean
@@ -1600,6 +1849,12 @@ type ChatComposerNarrowPayload = {
 
 type CustomerListRefreshPayload = {
   preserveScroll?: boolean
+}
+
+type MobileMainMenuDragPayload = {
+  progress?: number
+  phase?: 'move' | 'end'
+  open?: boolean
 }
 
 function refreshSidebarCustomersFromEvent(payload?: CustomerListRefreshPayload) {
@@ -1663,6 +1918,7 @@ function handleChatComposerNarrowChange(payload?: ChatComposerNarrowPayload) {
 
 function openMobileMainMenuFromChat() {
   if (!isMobile.value) return
+  resetMobileDrawerDragPreview()
   drawerVisible.value = true
 }
 
@@ -1875,6 +2131,10 @@ watch(
   () => drawerVisible.value,
   isOpen => {
     if (!isOpen) {
+      if (isMobile.value) {
+        recentChatSessionsMoreVisible.value = false
+      }
+      resetMobileDrawerDragPreview()
       showUserMenu.value = false
       showProfileEditSheet.value = false
       closeMobileSessionActionMenu()
@@ -2004,6 +2264,10 @@ onMounted(() => {
     void fetchSidebarCustomers({ reset: true })
   }
   document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('touchstart', handleGlobalMobileMainMenuTouchStart, { passive: true })
+  document.addEventListener('touchmove', handleGlobalMobileMainMenuTouchMove, { passive: false })
+  document.addEventListener('touchend', handleGlobalMobileMainMenuTouchEnd, { passive: true })
+  document.addEventListener('touchcancel', handleGlobalMobileMainMenuTouchCancel, { passive: true })
   removeChatComposerNarrowListener = appEvents.on<ChatComposerNarrowPayload>(
     APP_EVENT.CHAT_COMPOSER_NARROW_CHANGE,
     handleChatComposerNarrowChange
@@ -2019,6 +2283,10 @@ onMounted(() => {
   removeMobileMainMenuOpenListener = appEvents.on(
     APP_EVENT.MOBILE_MAIN_MENU_OPEN,
     openMobileMainMenuFromChat
+  )
+  removeMobileMainMenuDragListener = appEvents.on<MobileMainMenuDragPayload>(
+    APP_EVENT.MOBILE_MAIN_MENU_DRAG,
+    handleMobileMainMenuDrag
   )
 
   if (typeof ResizeObserver !== 'undefined') {
@@ -2050,6 +2318,10 @@ watch(
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('touchstart', handleGlobalMobileMainMenuTouchStart)
+  document.removeEventListener('touchmove', handleGlobalMobileMainMenuTouchMove)
+  document.removeEventListener('touchend', handleGlobalMobileMainMenuTouchEnd)
+  document.removeEventListener('touchcancel', handleGlobalMobileMainMenuTouchCancel)
   removeChatComposerNarrowListener?.()
   removeChatComposerNarrowListener = null
   removeCustomerListRefreshListener?.()
@@ -2058,6 +2330,8 @@ onBeforeUnmount(() => {
   removeCustomerSidebarRefreshListener = null
   removeMobileMainMenuOpenListener?.()
   removeMobileMainMenuOpenListener = null
+  removeMobileMainMenuDragListener?.()
+  removeMobileMainMenuDragListener = null
   if (mainContentColumnResizeObserver) {
     mainContentColumnResizeObserver.disconnect()
     mainContentColumnResizeObserver = null
@@ -2070,6 +2344,7 @@ onBeforeUnmount(() => {
     clearTimeout(primaryNavScrollEndTimer)
     primaryNavScrollEndTimer = null
   }
+  clearMobileDrawerDragSettleTimer()
   if (primarySidebarTransitionTimer) {
     clearTimeout(primarySidebarTransitionTimer)
     primarySidebarTransitionTimer = null
@@ -2318,7 +2593,9 @@ async function handleNewSession() {
   } else {
     api.clearMessages?.()
   }
-  chatStore.requestComposerFocus()
+  if (!isMobile.value) {
+    chatStore.requestComposerFocus()
+  }
 }
 
 async function handleFloatingNewChat() {
@@ -2348,6 +2625,12 @@ async function handleMobileSelectSession(sessionId: string) {
   await handleSelectSession(sessionId, { focusComposer: false })
 }
 
+async function handleMobileSelectSessionFromMore(sessionId: string) {
+  recentChatSessionsMoreVisible.value = false
+  drawerVisible.value = false
+  await handleSelectSession(sessionId, { focusComposer: false })
+}
+
 function isSessionActive(sessionId: string): boolean {
   return route.path.startsWith('/chat') && chatStore.currentSessionId === sessionId
 }
@@ -2361,7 +2644,9 @@ function isCustomerActive(customerId: string): boolean {
 async function handleSelectCustomerChat(customer: CustomerListVO) {
   selectedPrimaryKey.value = ''
   await router.push({ path: '/chat', query: { customerId: customer.customerId } })
-  chatStore.requestComposerFocus()
+  if (!isMobile.value) {
+    chatStore.requestComposerFocus()
+  }
 }
 
 async function handleMobileSelectCustomerChat(customer: CustomerListVO) {
@@ -2823,6 +3108,10 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
 .wk-primary-sidebar :deep(input:focus) {
   border-color: var(--wk-border-muted) !important;
   background-color: var(--wk-bg-surface) !important;
+}
+
+.wk-mobile-recent-history-input :deep(.el-input__wrapper) {
+  border-radius: 8px !important;
 }
 
 .drawer-overlay-enter-active,

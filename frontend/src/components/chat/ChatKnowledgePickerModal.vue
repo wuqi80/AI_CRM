@@ -521,6 +521,12 @@ function handleConfirm() {
   outline: none;
 }
 
+input.wk-chat-knowledge-picker__search-input:not(.el-input__inner):not(.el-select__input):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
+input.wk-chat-knowledge-picker__search-input:not(.el-input__inner):not(.el-select__input):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):hover,
+input.wk-chat-knowledge-picker__search-input:not(.el-input__inner):not(.el-select__input):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):focus {
+  box-shadow: none !important;
+}
+
 .wk-chat-knowledge-picker__search-input::placeholder {
   color: var(--wk-text-faint);
 }

@@ -1413,7 +1413,9 @@ onBeforeUnmount(() => {
  * 这里统一改为：细 inset 描边 + 大圆角 + focus 外环（与设计稿 rounded-2xl + ring-primary/5 一致）
  */
 .auth-form :deep(.el-input.auth-el-input .el-input__wrapper) {
+  height: 46px;
   min-height: 46px;
+  align-items: center;
   border-radius: var(--wk-input-radius) !important;
   background-color: var(--wk-input-bg) !important;
   border: none !important;
@@ -1438,6 +1440,17 @@ onBeforeUnmount(() => {
   box-shadow:
     0 0 0 1px var(--wk-input-border-focus) inset,
     var(--wk-input-focus-shadow) !important;
+}
+
+.auth-form :deep(.el-input.auth-el-input .el-input__inner) {
+  height: 46px !important;
+  line-height: 46px !important;
+}
+
+.auth-form :deep(.el-input.auth-el-input .el-input__prefix),
+.auth-form :deep(.el-input.auth-el-input .el-input__suffix) {
+  min-height: 46px;
+  align-items: center;
 }
 
 .auth-send-code-btn {

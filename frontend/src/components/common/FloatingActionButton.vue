@@ -59,7 +59,7 @@ const emit = defineEmits<{
 .wk-floating-new-chat-button--menu {
   position: absolute;
   right: max(24px, calc(18px + env(safe-area-inset-right)));
-  bottom: max(44px, calc(38px + env(safe-area-inset-bottom)));
+  bottom: max(64px, calc(58px + env(safe-area-inset-bottom)));
   z-index: 20;
   box-shadow:
     0 10px 24px rgb(15 23 42 / 0.18),
@@ -107,7 +107,7 @@ const emit = defineEmits<{
   }
 
   .wk-floating-new-chat-button--menu {
-    bottom: max(40px, calc(36px + env(safe-area-inset-bottom)));
+    bottom: max(60px, calc(56px + env(safe-area-inset-bottom)));
   }
 
   .wk-floating-new-chat-button {

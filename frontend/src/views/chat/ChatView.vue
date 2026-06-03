@@ -131,9 +131,6 @@
       v-if="!isMobile || mobilePanel === 'chat'"
       ref="chatMainAreaRef"
       class="wk-chat-shell flex-1 min-w-0 flex flex-col relative overflow-hidden"
-      @touchstart.passive="handleChatEdgeMenuTouchStart"
-      @touchend.passive="handleChatEdgeMenuTouchEnd"
-      @touchcancel.passive="resetChatEdgeMenuSwipe"
     >
       <!-- Chat View -->
       <template v-if="currentView === 'chat'">
@@ -1966,7 +1963,6 @@ const selectedCustomerTagSubmitting = ref(false)
 const customerPanelVisible = ref(true)
 const customerPanelWidth = ref(380)
 const customerPanelResizing = ref(false)
-const chatEdgeMenuTouchStart = ref<TouchPoint | null>(null)
 const CUSTOMER_PANEL_MIN_WIDTH = 380
 const CUSTOMER_PANEL_MAX_WIDTH_RATIO = 0.5
 const CHAT_COMPOSER_MIN_WIDTH_PX = 468
@@ -1974,10 +1970,6 @@ const CHAT_CUSTOMER_AI_POLL_INTERVAL_MS = 2500
 const CHAT_CUSTOMER_AI_POLL_MAX_ATTEMPTS = 24
 const CUSTOMER_SUMMARY_SHEET_LEVELS = [58, 78, 94] as const
 const CUSTOMER_SUMMARY_SHEET_MAX_HEIGHT = CUSTOMER_SUMMARY_SHEET_LEVELS[CUSTOMER_SUMMARY_SHEET_LEVELS.length - 1]
-const CHAT_EDGE_MENU_TOUCH_WIDTH_PX = 28
-const CHAT_EDGE_MENU_MIN_SWIPE_PX = 64
-const CHAT_EDGE_MENU_MAX_VERTICAL_PX = 88
-const CHAT_EDGE_MENU_DIRECTION_RATIO = 1.25
 const MOBILE_KEYBOARD_INSET_GAP_PX = 8
 const MOBILE_KEYBOARD_VISIBLE_THRESHOLD_PX = 24
 const MOBILE_KEYBOARD_TRACK_DURATION_MS = 900
@@ -1996,11 +1988,6 @@ type CustomerDetailRefreshPayload = {
   customerId?: string | number
   source?: string
   modules?: CustomerDetailRefreshModule[]
-}
-
-type TouchPoint = {
-  clientX: number
-  clientY: number
 }
 
 const chatComposerShellStyle = computed(() => (
@@ -2892,7 +2879,9 @@ async function handleSelectCustomerById(customerId: string) {
     // inputText.value = `请帮我分析客户「${customerName}」的当前情况，并给出下一步建议。`
   }
   await nextTick()
-  focusChatTextarea()
+  if (!isMobile.value) {
+    focusChatTextarea()
+  }
 }
 
 const quickActions = [
@@ -3069,7 +3058,7 @@ onMounted(async () => {
   if (abortChatViewMountSequence) return
   await nextTick()
   if (abortChatViewMountSequence) return
-  if (!isMobile.value || chatStore.isNewSessionPending) {
+  if (!isMobile.value) {
     chatStore.requestComposerFocus()
   }
 })
@@ -3092,7 +3081,6 @@ onBeforeUnmount(() => {
   transcriptionToken += 1
   closeMobileCustomerSummary()
   unregisterMobileKeyboardInsetListeners()
-  resetChatEdgeMenuSwipe()
   document.removeEventListener('touchmove', handleMobileSummaryTouchMove)
   unregisterAiQuotaResumeSendHandler()
   customerPanelResizeObserver?.disconnect()
@@ -3836,56 +3824,6 @@ function openMobileMainMenu() {
   appEvents.emit(APP_EVENT.MOBILE_MAIN_MENU_OPEN)
 }
 
-function getTouchPoint(touch: Touch | undefined): TouchPoint | null {
-  if (!touch) return null
-  return {
-    clientX: touch.clientX,
-    clientY: touch.clientY,
-  }
-}
-
-function resetChatEdgeMenuSwipe() {
-  chatEdgeMenuTouchStart.value = null
-}
-
-function canStartChatEdgeMenuSwipe(target: EventTarget | null) {
-  if (!isMobile.value || currentView.value !== 'chat' || mobilePanel.value !== 'chat') return false
-  if (mobileCustomerSummaryVisible.value || chatUploadMenuVisible.value || chatKnowledgePickerVisible.value) return false
-  if (!(target instanceof Element)) return true
-  return !target.closest('textarea, input, select, button, a, [role="button"], .el-overlay, .el-popper')
-}
-
-function shouldOpenMobileMainMenuFromEdgeSwipe(start: TouchPoint, end: TouchPoint) {
-  if (start.clientX > CHAT_EDGE_MENU_TOUCH_WIDTH_PX) return false
-  const deltaX = end.clientX - start.clientX
-  const deltaY = end.clientY - start.clientY
-  const horizontalDistance = Math.abs(deltaX)
-  const verticalDistance = Math.abs(deltaY)
-
-  return deltaX >= CHAT_EDGE_MENU_MIN_SWIPE_PX
-    && verticalDistance <= CHAT_EDGE_MENU_MAX_VERTICAL_PX
-    && horizontalDistance >= verticalDistance * CHAT_EDGE_MENU_DIRECTION_RATIO
-}
-
-function handleChatEdgeMenuTouchStart(event: TouchEvent) {
-  const point = getTouchPoint(event.touches[0])
-  if (!point || point.clientX > CHAT_EDGE_MENU_TOUCH_WIDTH_PX || !canStartChatEdgeMenuSwipe(event.target)) {
-    resetChatEdgeMenuSwipe()
-    return
-  }
-  chatEdgeMenuTouchStart.value = point
-}
-
-function handleChatEdgeMenuTouchEnd(event: TouchEvent) {
-  const start = chatEdgeMenuTouchStart.value
-  const end = getTouchPoint(event.changedTouches[0])
-  resetChatEdgeMenuSwipe()
-  if (!start || !end) return
-  if (shouldOpenMobileMainMenuFromEdgeSwipe(start, end)) {
-    openMobileMainMenu()
-  }
-}
-
 async function handleNewSession() {
   isPinnedToBottom.value = true
   closeMobileCustomerSummary()
@@ -3897,7 +3835,9 @@ async function handleNewSession() {
   if (isMobile.value) {
     mobilePanel.value = 'chat'
   }
-  chatStore.requestComposerFocus()
+  if (!isMobile.value) {
+    chatStore.requestComposerFocus()
+  }
 }
 
 async function handleSelectSession(sessionId: string) {

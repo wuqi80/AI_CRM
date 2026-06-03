@@ -71,12 +71,34 @@
           <div v-if="isMobile" class="mb-6 flex flex-wrap items-center gap-3 md:gap-4">
             <div
               v-if="!showAiSearchResult"
-              class="flex min-w-0 flex-1 items-center gap-3"
+              class="flex min-w-0 shrink-0 items-center gap-3"
             >
               <div class="flex size-6 items-center justify-center rounded bg-primary/10 text-primary">
                 <span class="material-symbols-outlined text-sm">book</span>
               </div>
-              <h3 class="min-w-0 truncate text-lg font-bold text-slate-900">知识库</h3>
+              <h3 class="shrink-0 text-lg font-bold text-slate-900">知识库</h3>
+            </div>
+            <div
+              class="wk-native-input-shell flex h-10 min-w-0 items-center rounded-xl border border-slate-200 bg-white px-1 transition-all focus-within:border-primary"
+              :class="showAiSearchResult ? 'w-full flex-1 md:ml-auto md:max-w-md lg:max-w-lg' : 'ml-auto min-w-[180px] flex-1'"
+            >
+              <div class="flex shrink-0 items-center justify-center pl-3 pr-1 text-slate-400">
+                <span class="material-symbols-outlined text-lg">search</span>
+              </div>
+              <input
+                v-model="queryParams.keyword"
+                type="text"
+                placeholder="检索文档或向 AI 提问..."
+                class="min-w-0 flex-1 border-none bg-transparent px-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0"
+                @keydown.enter="handleSearch"
+              />
+              <button
+                type="button"
+                class="shrink-0 rounded-full bg-primary px-4 py-2 text-xs font-bold text-white transition-all hover:bg-primary/90 md:px-5 md:py-2.5"
+                @click="handleSearch"
+              >
+                {{ isMobile ? '搜索' : 'AI 检索' }}
+              </button>
             </div>
             <div
               v-if="!showAiSearchResult"
@@ -102,28 +124,6 @@
                 @click="openScriptGenerator"
               >
                 AI话术
-              </button>
-            </div>
-            <div
-              class="wk-native-input-shell flex min-w-0 w-full flex-1 items-center rounded-xl border border-slate-200 bg-white px-1 transition-all focus-within:border-primary md:max-w-md lg:max-w-lg"
-              :class="showAiSearchResult ? 'md:ml-auto' : ''"
-            >
-              <div class="flex shrink-0 items-center justify-center pl-3 pr-1 text-slate-400">
-                <span class="material-symbols-outlined text-lg">search</span>
-              </div>
-              <input
-                v-model="queryParams.keyword"
-                type="text"
-                placeholder="检索文档或向 AI 提问..."
-                class="min-w-0 flex-1 border-none bg-transparent px-2 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 text-base md:py-2.5"
-                @keydown.enter="handleSearch"
-              />
-              <button
-                type="button"
-                class="shrink-0 rounded-full bg-primary px-4 py-2 text-xs font-bold text-white transition-all hover:bg-primary/90 md:px-5 md:py-2.5 text-base"
-                @click="handleSearch"
-              >
-                {{ isMobile ? '搜索' : 'AI 检索' }}
               </button>
             </div>
           </div>

@@ -292,7 +292,7 @@
               </span>
               <h3 class="text-sm font-bold text-slate-900">客户阶段</h3>
             </div> -->
-            <div class="relative overflow-visible overflow-x-auto overflow-y-visible md:overflow-visible">
+            <div class="wk-customer-stage-scroll relative overflow-visible overflow-x-auto overflow-y-visible md:overflow-visible">
               <!-- Chevron segments (mobile: no wrap + horizontal scroll; desktop: wrap) -->
               <div class="relative flex flex-nowrap md:flex-wrap items-stretch gap-x-2 md:gap-x-0 gap-y-2 min-w-max">
                 <template v-for="(stage, idx) in stageFlow" :key="stage">
@@ -3328,6 +3328,17 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
 .wk-customer-detail-mobile .md\:overflow-visible {
   overflow-x: auto !important;
   overflow-y: visible !important;
+}
+
+.wk-customer-stage-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.wk-customer-stage-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .wk-customer-detail-mobile .md\:w-auto {
