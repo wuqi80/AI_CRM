@@ -1,0 +1,204 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans bg-background-light text-slate-900;
+  }
+}
+
+/* Global styles */
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Glass panel effect */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+}
+
+/* Material Symbols configuration */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.material-symbols-outlined.fill {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.wk-plus-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.wk-plus-button-icon--compact {
+  font-size: 16px;
+}
+
+.wk-plus-button-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+/* Subtle pulse animation for AI elements */
+@keyframes pulse-subtle {
+  0%, 100% { background-color: rgba(19, 127, 236, 0.05); }
+  50% { background-color: rgba(19, 127, 236, 0.1); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Chat message animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-enter {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Streaming text cursor */
+.streaming-cursor::after {
+  content: '|';
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Page transition animations */
+.page-fade-enter-active {
+  transition: all 0.2s ease;
+}
+
+.page-fade-leave-active {
+  transition: all 0.15s ease;
+}
+
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.el-input__wrapper {
+  border-radius: 0.5rem !important;
+  background-color: #f8fafc !important;
+  box-shadow: 0 0 0 1px #e2e8f0 inset !important;
+}
+
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px #cbd5e1 inset !important;
+}
+
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 2px rgba(19, 127, 236, 0.3) inset !important;
+}
+
+.el-dialog {
+  border-radius: 1rem !important;
+}
+
+.el-dialog__header {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 1.25rem 1.5rem !important;
+}
+
+.el-dialog__body {
+  padding: 1.5rem !important;
+}
+
+.el-dialog__footer {
+  border-top: 1px solid #e2e8f0;
+  padding: 1rem 1.5rem !important;
+}
+
+/* Dialog variant: remove default paddings, let content control spacing */
+.wk-dialog--flush  {
+  padding: 0 !important;
+}
+
+.wk-dialog--flush .el-dialog__headerbtn {
+  top: 13px !important;
+  right: 4px !important;
+}
+
+.wk-dialog--flush .el-dialog__headerbtn .el-dialog__close {
+  font-weight: bold !important;
+  font-size: 1.25rem !important;
+  color: var(--el-text-color-primary);
+}
+
+.wk-dialog--flush .el-dialog__title {
+  font-weight: bold;
+}
+
+.el-tag.el-zoom-in-center-enter-active,
+.el-tag.el-zoom-in-center-leave-active {
+  transition: none !important;
+  animation: none !important;
+}
+
+.el-tag.el-zoom-in-center-enter-from,
+.el-tag.el-zoom-in-center-leave-active {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.el-button--primary {
+  background-color: #137fec !important;
+  border-color: #137fec !important;
+  border-radius: 0.5rem !important;
+}
+
+.el-button--primary:hover {
+  background-color: rgba(19, 127, 236, 0.9) !important;
+  border-color: rgba(19, 127, 236, 0.9) !important;
+}

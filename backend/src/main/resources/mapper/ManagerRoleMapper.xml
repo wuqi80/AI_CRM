@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.ManagerRoleMapper">
+    <select id="queryRoleListWithUserCount" resultType="com.kakarote.ai_crm.entity.VO.RoleVO">
+        SELECT r.role_id, r.role_name, r.realm, r.description, r.data_type, r.create_time,
+               COALESCE(uc.cnt, 0) as user_count
+        FROM manager_role r
+        LEFT JOIN (
+            SELECT role_id, COUNT(DISTINCT user_id) as cnt
+            FROM manager_user_role
+            GROUP BY role_id
+        ) uc ON r.role_id = uc.role_id
+        <where>
+            <if test="search != null and search != ''">
+                AND (r.role_name LIKE CONCAT('%', #{search}, '%')
+                 OR r.description LIKE CONCAT('%', #{search}, '%'))
+            </if>
+        </where>
+        ORDER BY r.create_time
+    </select>
+</mapper>

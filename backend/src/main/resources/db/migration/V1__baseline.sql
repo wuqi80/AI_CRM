@@ -1,0 +1,2 @@
+-- Flyway baseline: 已有表结构由 crm_init_postgres.sql 初始化
+-- 此文件作为基线版本，Flyway 首次接入时会跳过（baseline-version=1）

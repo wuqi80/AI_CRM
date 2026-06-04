@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.ManagerDeptMapper">
+    <select id="queryAllDeptWithUserCount" resultType="com.kakarote.ai_crm.entity.VO.DeptVO">
+        SELECT d.dept_id, d.dept_name, d.parent_id, d.sort_order,
+               COALESCE(COUNT(u.user_id), 0) AS user_count
+        FROM manager_dept d
+        LEFT JOIN manager_user u ON u.dept_id = d.dept_id
+        GROUP BY d.dept_id, d.dept_name, d.parent_id, d.sort_order
+        ORDER BY d.sort_order, d.dept_id
+    </select>
+</mapper>
