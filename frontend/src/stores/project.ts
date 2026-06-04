@@ -90,8 +90,8 @@ export const useProjectStore = defineStore('project', () => {
     }
   }
 
-  async function loadProject(projectId: string) {
-    const project = await getProjectDetail(projectId)
+  async function loadProject(projectId: string, taskKeyword?: string) {
+    const project = await getProjectDetail(projectId, taskKeyword)
     upsertProject(project)
     initialized.value = true
     return project

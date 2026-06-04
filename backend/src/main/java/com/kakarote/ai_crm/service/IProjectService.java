@@ -10,6 +10,8 @@ public interface IProjectService {
 
     ProjectVO getProject(Long projectId);
 
+    ProjectVO getProject(Long projectId, String taskKeyword);
+
     ProjectVO createProject(ProjectBO.Create createBO);
 
     ProjectVO updateProject(ProjectBO.Update updateBO);

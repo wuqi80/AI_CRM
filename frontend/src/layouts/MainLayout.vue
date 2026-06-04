@@ -2043,7 +2043,7 @@ const activeMenu = computed(() => {
 
 const showDesktopHeader = computed(() => {
   if (isMobile.value) return false
-  return !route.path.startsWith('/knowledge') && !route.path.startsWith('/chat')
+  return route.name !== 'ProjectDetail' && !route.path.startsWith('/knowledge') && !route.path.startsWith('/chat')
 })
 
 const selectedPrimaryKey = ref<string>('')

@@ -25,8 +25,8 @@
                   </span>
                 </template>
                 <template v-else>
-                  <h1 class="text-2xl font-black tracking-tight text-slate-900">{{ project.name }}</h1>
-                  <span class="inline-flex rounded-full px-3 py-1 text-sm font-bold" :class="projectStatusClass(project.status)">
+                  <h1 class="text-[15px] font-semibold leading-5 text-slate-900">{{ project.name }}</h1>
+                  <span class="inline-flex rounded-full px-3 py-1 text-sm font-normal" :class="projectStatusClass(project.status)">
                     {{ projectStatusLabel(project.status) }}
                   </span>
                 </template>
@@ -82,70 +82,55 @@
                 </button>
               </template>
               <template v-else>
-                <button
-                  v-if="canCreateTask"
-                  type="button"
-                  class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
-                  @click="openCreateTask()"
-                >
-                  <span class="material-symbols-outlined text-[17px]">add</span>
-                  新建任务
-                </button>
-                <el-dropdown trigger="click" @command="handleProjectMoreAction">
-                  <button
-                    type="button"
-                    class="flex size-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
-                    aria-label="更多项目操作"
-                  >
-                    <span class="material-symbols-outlined text-[20px]">more_horiz</span>
-                  </button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item
-                        v-if="canEditProject"
-                        command="edit-project"
+                <div class="flex flex-col items-start gap-2 sm:items-end">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button
+                      v-if="canCreateTask"
+                      type="button"
+                      class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+                      @click="openCreateTask()"
+                    >
+                      <span class="material-symbols-outlined text-[17px]">add</span>
+                      新建任务
+                    </button>
+                    <el-dropdown trigger="click" @command="handleProjectMoreAction">
+                      <button
+                        type="button"
+                        class="flex size-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                        aria-label="更多项目操作"
                       >
-                        <span class="inline-flex items-center gap-2">
-                          <span class="material-symbols-outlined text-[16px]">edit</span>
-                          <span>编辑项目</span>
-                        </span>
-                      </el-dropdown-item>
-                      <el-dropdown-item command="members">
-                        <span class="inline-flex items-center gap-2">
-                          <span class="material-symbols-outlined text-[16px]">group</span>
-                          <span>项目成员</span>
-                        </span>
-                      </el-dropdown-item>
-                      <el-dropdown-item
-                        v-if="canArchiveProject && project.status !== 'ARCHIVED'"
-                        command="archive-project"
-                      >
-                        <span class="inline-flex items-center gap-2">
-                          <span class="material-symbols-outlined text-[16px]">inventory_2</span>
-                          <span>归档项目</span>
-                        </span>
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-                <div class="flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
-                  <button
-                    v-for="tab in projectTabs"
-                    :key="tab.value"
-                    type="button"
-                    class="rounded-xl text-sm font-semibold transition-colors"
-                    :class="[
-                      viewMode === tab.value ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700',
-                      tab.iconOnly ? 'flex size-9 items-center justify-center p-0' : 'inline-flex items-center gap-1.5 px-4 py-2'
-                    ]"
-                    :title="tab.label"
-                    :aria-label="tab.label"
-                    @click="switchProjectView(tab.value)"
-                  >
-                    <span v-if="tab.icon" class="material-symbols-outlined text-[18px]">{{ tab.icon }}</span>
-                    <span v-if="tab.iconOnly" class="sr-only">{{ tab.label }}</span>
-                    <span v-else>{{ tab.label }}</span>
-                  </button>
+                        <span class="material-symbols-outlined text-[20px]">more_horiz</span>
+                      </button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item
+                            v-if="canEditProject"
+                            command="edit-project"
+                          >
+                            <span class="inline-flex items-center gap-2">
+                              <span class="material-symbols-outlined text-[16px]">edit</span>
+                              <span>编辑项目</span>
+                            </span>
+                          </el-dropdown-item>
+                          <el-dropdown-item command="members">
+                            <span class="inline-flex items-center gap-2">
+                              <span class="material-symbols-outlined text-[16px]">group</span>
+                              <span>项目成员</span>
+                            </span>
+                          </el-dropdown-item>
+                          <el-dropdown-item
+                            v-if="canArchiveProject && project.status !== 'ARCHIVED'"
+                            command="archive-project"
+                          >
+                            <span class="inline-flex items-center gap-2">
+                              <span class="material-symbols-outlined text-[16px]">inventory_2</span>
+                              <span>归档项目</span>
+                            </span>
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
                 </div>
               </template>
             </div>
@@ -153,7 +138,7 @@
         </div>
       </header>
 
-      <main class="flex-1 overflow-hidden">
+      <main class="flex flex-1 flex-col overflow-hidden">
         <div v-if="viewMode === 'ai'" class="mx-auto flex h-full max-w-7xl flex-col overflow-hidden px-4 py-4 md:px-6">
           <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-100 px-5 py-4">
@@ -442,9 +427,45 @@
           </aside>
         </div>
 
-        <div v-else-if="viewMode === 'board'" class="h-full overflow-hidden px-4 py-4 md:px-6">
-          <div class="mx-auto flex h-full max-w-7xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm">
-            <div class="flex-1 overflow-x-auto overflow-y-hidden px-5 py-5">
+        <div v-if="showTaskViewToolbar" class="shrink-0 px-4 pt-4 md:px-6">
+          <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="relative w-full max-w-sm">
+              <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] leading-none text-[#8aa1c2]">search</span>
+              <input
+                v-model="projectTaskSearchKeyword"
+                type="text"
+                class="h-9 w-full rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] pl-9 pr-9 text-sm text-[var(--wk-text-primary)] outline-none transition-colors placeholder:text-[var(--wk-text-faint)] focus:border-[var(--wk-input-border-hover)]"
+                placeholder="模糊搜索任务"
+              />
+              <span
+                v-if="projectTaskSearchLoading"
+                class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-[18px] leading-none text-[#8aa1c2]"
+              >
+                progress_activity
+              </span>
+            </div>
+            <div class="inline-flex h-9 shrink-0 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
+              <button
+                v-for="tab in projectTabs"
+                :key="tab.value"
+                type="button"
+                :class="[
+                  'inline-flex size-7 items-center justify-center rounded-md transition-all',
+                  viewMode === tab.value ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-[#8aa1c2] hover:text-primary'
+                ]"
+                :title="tab.label"
+                :aria-label="tab.label"
+                @click="switchProjectView(tab.value)"
+              >
+                <span class="material-symbols-outlined text-[20px] leading-none">{{ tab.icon }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="viewMode === 'board'" class="min-h-0 flex-1 overflow-hidden px-4 pb-4 pt-3 md:px-6">
+          <div class="mx-auto flex h-full max-w-7xl flex-col overflow-hidden">
+            <div class="flex-1 overflow-x-auto overflow-y-hidden py-5">
               <div class="flex h-full min-w-max gap-4">
                 <section
                   v-for="lane in orderedLanes"
@@ -580,11 +601,11 @@
           </div>
         </div>
 
-        <div v-else-if="viewMode === 'list'" class="h-full overflow-y-auto px-4 py-4 md:px-6">
+        <div v-else-if="viewMode === 'list'" class="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3 md:px-6">
           <div class="mx-auto flex max-w-7xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm">
-            <div v-if="visibleProjectTasks.length === 0" class="px-6 py-20 text-center text-slate-400">
+            <div v-if="filteredProjectTasks.length === 0" class="px-6 py-20 text-center text-slate-400">
               <span class="material-symbols-outlined text-5xl">task_alt</span>
-              <p class="mt-4 text-sm">当前项目还没有可查看的任务。</p>
+              <p class="mt-4 text-sm">{{ projectTaskSearchKeyword.trim() ? '没有匹配的任务。' : '当前项目还没有可查看的任务。' }}</p>
             </div>
 
             <div v-else class="overflow-x-auto">
@@ -602,7 +623,7 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                   <tr
-                    v-for="task in visibleProjectTasks"
+                    v-for="task in filteredProjectTasks"
                     :key="task.taskId"
                     class="cursor-pointer transition-colors hover:bg-slate-50"
                     @click="enterTaskConversation(task)"
@@ -640,16 +661,16 @@
           </div>
         </div>
 
-        <div v-else-if="viewMode === 'cards'" class="h-full overflow-y-auto px-4 py-4 md:px-6">
+        <div v-else-if="viewMode === 'cards'" class="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3 md:px-6">
           <div class="mx-auto flex max-w-7xl flex-col gap-4">
-            <div v-if="visibleProjectTasks.length === 0" class="rounded-[30px] border border-slate-200 bg-white px-6 py-20 text-center text-slate-400 shadow-sm">
+            <div v-if="filteredProjectTasks.length === 0" class="rounded-[30px] border border-slate-200 bg-white px-6 py-20 text-center text-slate-400 shadow-sm">
               <span class="material-symbols-outlined text-5xl">view_cozy</span>
-              <p class="mt-4 text-sm">当前项目还没有可查看的任务。</p>
+              <p class="mt-4 text-sm">{{ projectTaskSearchKeyword.trim() ? '没有匹配的任务。' : '当前项目还没有可查看的任务。' }}</p>
             </div>
 
             <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               <article
-                v-for="task in visibleProjectTasks"
+                v-for="task in filteredProjectTasks"
                 :key="task.taskId"
                 class="group cursor-pointer rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/60"
                 @click="enterTaskConversation(task)"
@@ -878,7 +899,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
@@ -912,18 +933,15 @@ const { isMobile } = useResponsive()
 const projectStore = useProjectStore()
 
 type ProjectTab = {
-  value: Exclude<ProjectViewMode, 'task_ai'>
+  value: 'board' | 'list' | 'cards'
   label: string
-  icon?: string
-  iconOnly?: boolean
+  icon: string
 }
 
 const projectTabs: ProjectTab[] = [
-  { value: 'board', label: '泳道视图', icon: 'view_kanban', iconOnly: true },
-  { value: 'list', label: '列表视图', icon: 'view_list', iconOnly: true },
-  { value: 'cards', label: '卡片视图', icon: 'view_module', iconOnly: true },
-  { value: 'ai', label: 'AI 对话' },
-  { value: 'members', label: '项目成员' }
+  { value: 'board', label: '泳道视图', icon: 'view_kanban' },
+  { value: 'list', label: '列表视图', icon: 'list' },
+  { value: 'cards', label: '卡片视图', icon: 'grid_view' }
 ]
 
 const viewMode = ref<ProjectViewMode>('board')
@@ -942,6 +960,9 @@ const editingTask = ref<ProjectTask | null>(null)
 const editingMember = ref<ProjectMember | null>(null)
 const taskConversationId = ref('')
 const taskInfoPanelCollapsed = ref(false)
+const projectTaskSearchKeyword = ref('')
+const projectTaskSearchLoading = ref(false)
+let projectTaskSearchTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const projectViewValues = new Set<Exclude<ProjectViewMode, 'task_ai'>>(['board', 'list', 'cards', 'ai', 'members'])
 
@@ -967,6 +988,22 @@ watch(() => [route.query.taskId, route.query.view], () => {
 
 const projectId = computed(() => String(route.params.id || ''))
 const project = computed(() => projectStore.getProjectById(projectId.value))
+
+watch(projectTaskSearchKeyword, keyword => {
+  if (projectTaskSearchTimer) {
+    window.clearTimeout(projectTaskSearchTimer)
+  }
+  projectTaskSearchTimer = window.setTimeout(() => {
+    void reloadProjectWithTaskSearch(keyword)
+  }, 300)
+})
+
+onBeforeUnmount(() => {
+  if (projectTaskSearchTimer) {
+    window.clearTimeout(projectTaskSearchTimer)
+  }
+})
+
 const projectAttachments = computed(() => project.value?.attachments || [])
 const projectSchedules = computed(() => project.value?.schedules || [])
 const canViewProject = computed(() => projectStore.getUserProjectPermission(projectId.value, 'VIEW_PROJECT'))
@@ -982,6 +1019,30 @@ const visibleProjectTasks = computed(() =>
     .filter(task => projectStore.canCurrentUserViewTask(projectId.value, task))
     .sort((a, b) => new Date(b.updateTime).getTime() - new Date(a.updateTime).getTime())
 )
+const filteredProjectTasks = computed(() => {
+  const keyword = projectTaskSearchKeyword.value.trim().toLowerCase()
+  if (!keyword) return visibleProjectTasks.value
+
+  return visibleProjectTasks.value.filter(task => {
+    const searchText = [
+      task.title,
+      task.description,
+      laneName(task.laneId),
+      task.status,
+      task.priority,
+      projectTaskPriorityLabel(task.priority),
+      task.ownerName,
+      task.customerName,
+      project.value?.customerName,
+      ...(task.participantNames || [])
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+
+    return searchText.includes(keyword)
+  })
+})
 
 const canEditProject = computed(() => projectStore.getUserProjectPermission(projectId.value, 'EDIT_PROJECT'))
 const canArchiveProject = computed(() => projectStore.getUserProjectPermission(projectId.value, 'ARCHIVE_PROJECT'))
@@ -1002,6 +1063,7 @@ const currentTaskConversation = computed(() =>
   project.value?.tasks.find(task => task.taskId === taskConversationId.value) || null
 )
 const isTaskConversation = computed(() => viewMode.value === 'task_ai')
+const showTaskViewToolbar = computed(() => viewMode.value === 'board' || viewMode.value === 'list' || viewMode.value === 'cards')
 const canUseCurrentTaskAi = computed(() =>
   currentTaskConversation.value ? projectStore.canCurrentUserUseTaskAi(projectId.value, currentTaskConversation.value) : false
 )
@@ -1067,8 +1129,19 @@ function backToProject() {
   router.replace({ query: { ...route.query, taskId: undefined, view: lastProjectViewMode.value } })
 }
 
+async function reloadProjectWithTaskSearch(keyword = projectTaskSearchKeyword.value) {
+  if (!projectId.value) return
+  const normalizedKeyword = keyword.trim()
+  projectTaskSearchLoading.value = true
+  try {
+    await projectStore.loadProject(projectId.value, normalizedKeyword || undefined)
+  } finally {
+    projectTaskSearchLoading.value = false
+  }
+}
+
 function tasksByLane(laneId: string) {
-  return visibleProjectTasks.value
+  return filteredProjectTasks.value
     .filter(task => task.laneId === laneId)
     .sort((a, b) => new Date(b.updateTime).getTime() - new Date(a.updateTime).getTime())
 }
