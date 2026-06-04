@@ -90,6 +90,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '邮箱', icon: 'mail', permission: 'mail:view' }
       },
       {
+        path: 'scrm',
+        name: 'WecomScrm',
+        component: () => import('@/views/wecom/WecomScrmView.vue'),
+        meta: { title: '企业微信', icon: 'forum', permission: 'wecomCustomerSession:view' }
+      },
+      {
+        path: 'tencent-meetings',
+        name: 'TencentMeetings',
+        component: () => import('@/views/tencentMeeting/TencentMeetingView.vue'),
+        meta: { title: '腾讯会议', icon: 'video_camera_front', permission: 'tencentMeeting:view' }
+      },
+      {
         path: 'knowledge',
         name: 'Knowledge',
         component: () => import('@/views/knowledge/KnowledgeView.vue'),

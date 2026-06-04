@@ -10,6 +10,8 @@ import com.kakarote.ai_crm.common.redis.Redis;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
+import com.kakarote.ai_crm.entity.BO.ExternalTenantMemberRegisterBO;
+import com.kakarote.ai_crm.entity.BO.ExternalTenantRegisterBO;
 import com.kakarote.ai_crm.entity.BO.RegisterBO;
 import com.kakarote.ai_crm.entity.BO.ResetPasswordBO;
 import com.kakarote.ai_crm.entity.PO.CrmTenant;
@@ -63,7 +65,17 @@ public class RegistrationServiceImpl implements RegistrationService {
             "user", "dept", "role", "config", "customField", "agent"
     );
     private static final Set<String> DATA_SCOPE_MODULES = Set.of(
-            "customer", "contact", "task", "followup", "schedule", "knowledge"
+            "customer",
+            "contact",
+            "task",
+            "followup",
+            "schedule",
+            "knowledge",
+            "wecomEmployeeSession",
+            "wecomCustomerSession",
+            "wecomGroupSession",
+            "wecomCustomer",
+            "tencentMeeting"
     );
 
     @Autowired
@@ -195,6 +207,204 @@ public class RegistrationServiceImpl implements RegistrationService {
      * 发送邮箱。
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ManagerUser registerExternalTenant(ExternalTenantRegisterBO registerBO) {
+        String email = normalizeOptionalEmail(registerBO.getEmail());
+        String mobile = normalizeText(registerBO.getMobile());
+        String username = normalizeText(registerBO.getUsername());
+        if (StrUtil.isBlank(username)) {
+            username = firstNotBlank(email, mobile);
+        }
+        String realname = normalizeText(registerBO.getRealname());
+        String companyName = StrUtil.trim(registerBO.getCompanyName());
+        String password = registerBO.getPassword();
+        if (StrUtil.isBlank(username)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Username is required");
+        }
+        if (StrUtil.isNotBlank(email) && !Validator.isEmail(email, true)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Invalid email");
+        }
+        if (StrUtil.isBlank(companyName)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Company name is required");
+        }
+        if (StrUtil.isNotBlank(password)) {
+            validatePassword(password);
+        }
+        if (Boolean.TRUE.equals(registerBO.getEmailVerificationRequired())) {
+            if (StrUtil.isBlank(email)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Email is required");
+            }
+            verifyEmailCode(email, registerBO.getVerificationCode());
+        }
+        if (StrUtil.isNotBlank(email)) {
+            ensureEmailNotRegistered(email);
+        }
+
+        CrmTenant tenant = new CrmTenant();
+        tenant.setTenantName(companyName);
+        tenant.setContactEmail(email);
+        tenant.setContactPhone(mobile);
+        tenant.setContactName(StrUtil.isNotBlank(realname) ? realname : username);
+        tenant.setStatus(1);
+        tenant.setMaxUsers(50);
+        tenant.setGiftCreditTotal(ICrmTenantService.DEFAULT_GIFT_CREDIT_TOTAL);
+        tenant.setGiftCreditUsed(0L);
+        tenant.setCreateTime(new Date());
+        tenant.setUpdateTime(new Date());
+        tenantService.save(tenant);
+
+        Long newTenantId = tenant.getTenantId();
+        TenantContextHolder.setTenantId(newTenantId);
+
+        try {
+            customFieldService.initializeSystemFields("customer");
+            customFieldService.initializeSystemFields("contact");
+            initializeEnterpriseConfig(companyName);
+
+            ManagerDept dept = new ManagerDept();
+            dept.setDeptName(companyName);
+            dept.setParentId(0L);
+            dept.setSortOrder(1);
+            dept.setCreateTime(new Date());
+            deptMapper.insert(dept);
+
+            ManagerRole adminRole = ManagerRole.builder()
+                    .roleName("super admin")
+                    .realm(SUPER_ADMIN_REALM)
+                    .description("Created by external auth registration")
+                    .dataType(5)
+                    .createTime(LocalDateTime.now())
+                    .build();
+            roleService.save(adminRole);
+            initializeDefaultRole();
+
+            ManagerUser user = new ManagerUser();
+            user.setUsername(username);
+            user.setPassword(StrUtil.isBlank(password) ? null : passwordEncoder.encode(password));
+            user.setEmail(email);
+            user.setMobile(mobile);
+            user.setRealname(StrUtil.isNotBlank(realname) ? realname : username);
+            user.setDeptId(dept.getDeptId());
+            user.setStatus(1);
+            user.setCreateTime(new Date());
+            manageUserService.save(user);
+
+            ManagerUserRole userRole = new ManagerUserRole();
+            userRole.setUserId(user.getUserId());
+            userRole.setRoleId(adminRole.getRoleId());
+            userRole.setCreateTime(LocalDateTime.now());
+            userRoleService.save(userRole);
+
+            if (StrUtil.isNotBlank(email)) {
+                redis.del(getEmailCodeCacheKey(email));
+            }
+            log.info("External auth tenant registration succeeded: tenantId={}, username={}", newTenantId, username);
+
+            if (weKnoraClient.isEnabled()) {
+                try {
+                    weKnoraClient.getOrCreateTenantContext(newTenantId);
+                } catch (Exception e) {
+                    log.warn("WeKnora tenant initialization failed after external registration: tenantId={}, error={}",
+                            newTenantId, e.getMessage());
+                }
+            }
+            return user;
+        } finally {
+            TenantContextHolder.clear();
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ManagerUser registerExternalTenantMember(ExternalTenantMemberRegisterBO registerBO) {
+        if (registerBO.getTenantId() == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Tenant is required");
+        }
+        String email = normalizeEmail(registerBO.getEmail());
+        String mobile = normalizeText(registerBO.getMobile());
+        String realname = normalizeText(registerBO.getRealname());
+        String password = registerBO.getPassword();
+        if (!Validator.isEmail(email, true)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Invalid email");
+        }
+        validatePassword(password);
+
+        Long previousTenantId = TenantContextHolder.getTenantId();
+        TenantContextHolder.setTenantId(registerBO.getTenantId());
+        try {
+            long duplicateCount = manageUserService.lambdaQuery()
+                    .eq(ManagerUser::getUsername, email)
+                    .count();
+            if (duplicateCount > 0) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                        "This email already exists in the enterprise. Please sign in and bind it manually.");
+            }
+            if (StrUtil.isNotBlank(mobile)) {
+                long duplicateMobileCount = manageUserService.lambdaQuery()
+                        .eq(ManagerUser::getMobile, mobile)
+                        .count();
+                if (duplicateMobileCount > 0) {
+                    throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                            "This mobile already exists in the enterprise. Please sign in and bind it manually.");
+                }
+            }
+
+            CrmTenant tenant = tenantService.getById(registerBO.getTenantId());
+            if (tenant == null) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_DATA_DOES_NOT_EXIST);
+            }
+
+            ManagerRole defaultRole = roleService.lambdaQuery()
+                    .eq(ManagerRole::getRealm, DEFAULT_ROLE_REALM)
+                    .last("LIMIT 1")
+                    .one();
+            if (defaultRole == null) {
+                initializeDefaultRole();
+                defaultRole = roleService.lambdaQuery()
+                        .eq(ManagerRole::getRealm, DEFAULT_ROLE_REALM)
+                        .last("LIMIT 1")
+                        .one();
+            }
+
+            ManagerDept rootDept = deptMapper.selectList(Wrappers.<ManagerDept>lambdaQuery()
+                            .eq(ManagerDept::getParentId, 0L)
+                            .last("LIMIT 1"))
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+
+            ManagerUser user = new ManagerUser();
+            user.setUsername(email);
+            user.setPassword(passwordEncoder.encode(password));
+            user.setEmail(email);
+            user.setMobile(mobile);
+            user.setRealname(StrUtil.isNotBlank(realname) ? realname : email);
+            user.setDeptId(rootDept == null ? null : rootDept.getDeptId());
+            user.setStatus(1);
+            user.setCreateTime(new Date());
+            manageUserService.save(user);
+
+            if (defaultRole != null) {
+                ManagerUserRole userRole = new ManagerUserRole();
+                userRole.setUserId(user.getUserId());
+                userRole.setRoleId(defaultRole.getRoleId());
+                userRole.setCreateTime(LocalDateTime.now());
+                userRoleService.save(userRole);
+            }
+
+            log.info("External auth tenant member registration succeeded: tenantId={}, email={}",
+                    registerBO.getTenantId(), email);
+            return user;
+        } finally {
+            if (previousTenantId != null) {
+                TenantContextHolder.setTenantId(previousTenantId);
+            } else {
+                TenantContextHolder.clear();
+            }
+        }
+    }
+
+    @Override
     public void sendEmail(String email, Integer type) {
         String normalizedEmail = normalizeEmail(email);
         if (!Validator.isEmail(normalizedEmail, true)) {
@@ -299,6 +509,12 @@ public class RegistrationServiceImpl implements RegistrationService {
         }
     }
 
+    private void validatePassword(String password) {
+        if (StrUtil.length(password) < 6 || StrUtil.length(password) > 20) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "密码长度6-20位");
+        }
+    }
+
     /**
      * 确保邮箱编号TRegistered。
      */
@@ -325,12 +541,29 @@ public class RegistrationServiceImpl implements RegistrationService {
         return StrUtil.trim(email).toLowerCase();
     }
 
+    private String normalizeOptionalEmail(String email) {
+        String normalized = StrUtil.trim(email);
+        return StrUtil.isBlank(normalized) ? null : normalized.toLowerCase();
+    }
+
     /**
      * 标准化文本。
      */
     private String normalizeText(String value) {
         String normalized = StrUtil.trim(value);
         return StrUtil.isBlank(normalized) ? null : normalized;
+    }
+
+    private String firstNotBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value)) {
+                return value;
+            }
+        }
+        return null;
     }
 
     /**

@@ -84,10 +84,13 @@ public class SecurityConfig {
                         // 允许异步 dispatch（流式响应需要）
                         .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers("/login", "/auth/login", "/auth/register", "/auth/reset-password").anonymous() // 允许匿名访问
+                        .requestMatchers("/auth/external/providers", "/auth/external/*/authorize", "/auth/external/*/callback").anonymous()
+                        .requestMatchers("/auth/external/login-ticket", "/auth/external/register").anonymous()
+                        .requestMatchers("/wecom/open/callback", "/wecom/open/auth/callback").permitAll()
                         .requestMatchers("/", "/index", "/static/**", "/assets/**").anonymous()
                         .requestMatchers("/index.html", "/doc.html", "/swagger-resources/**", "/webjars/**", "/v3/api-docs/**", "/instrument/callback").anonymous()
                         .requestMatchers("/tokenPurchase/notify/**").permitAll()
-                        .requestMatchers("/mail/oauth/*/callback", "/email/oauth/*/callback").permitAll()
+                        .requestMatchers("/mail/oauth/*/callback", "/email/oauth/*/callback", "/tencent-meeting/oauth/callback", "/tencent-meeting/webhook").permitAll()
                         .requestMatchers("/api/enum/**").permitAll() // 枚举值接口允许访问
                         .requestMatchers("/cloud/**").permitAll() // saas版本接口
                         .requestMatchers("/knowledge/preview-range/**").permitAll()

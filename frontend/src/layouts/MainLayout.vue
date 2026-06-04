@@ -2031,6 +2031,8 @@ const userAvatarInitials = computed(() => userDisplayName.value.trim().slice(0, 
 const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/customer')) return '/customer'
+  if (path.startsWith('/scrm')) return '/scrm'
+  if (path.startsWith('/tencent-meetings')) return '/tencent-meetings'
   if (path.startsWith('/address-book')) return '/address-book'
   if (path.startsWith('/project')) return '/project'
   if (path.startsWith('/relation')) return '/relation'

@@ -2,16 +2,6 @@
   <div ref="chatViewRef" class="flex h-full" :class="{ 'flex-col': isMobile }">
     <!-- Internal Sidebar: Chat History -->
     <aside v-if="isMobile && mobilePanel === 'sessions'" class="flex flex-1 flex-col bg-slate-50/50">
-      <div class="p-6 pb-2">
-        <button
-          class="w-full flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all"
-          @click="handleNewSession"
-        >
-          <span class="material-symbols-outlined wk-plus-button-icon">add</span>
-          开启新对话
-        </button>
-      </div>
-
       <!-- System Notifications Menu Item -->
       <!-- <div class="px-3 py-4">
         <button
@@ -30,11 +20,8 @@
         </button>
       </div> -->
 
-      <!-- Divider -->
-      <div class="mx-6 h-px bg-slate-100 mb-4"></div>
-
       <!-- Session List -->
-      <div class="flex-1 overflow-y-auto px-3 space-y-1">
+      <div class="flex-1 overflow-y-auto px-3 pt-4 space-y-1">
         <p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">最近对话</p>
 
         <div v-if="chatStore.sessionsLoading && chatStore.sessions.length === 0" class="flex justify-center py-8">
@@ -149,56 +136,93 @@
       <template v-if="currentView === 'chat'">
         <!-- Mobile top bar (chat detail) -->
         <div
-          v-if="isMobile"
-          class="shrink-0 sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-100 px-4 py-3"
+          v-if="showMobileFloatingBar"
+          class="wk-mobile-chat-floating-bar pointer-events-none absolute inset-x-0 z-30 px-4 py-3"
+          :style="{ top: mobileChatFloatingBarTop }"
         >
-          <div class="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-primary transition-colors"
-              @click="mobilePanel = 'sessions'"
-            >
-              <span class="material-symbols-outlined text-[18px] leading-none">arrow_back</span>
-              历史对话
-            </button>
-
-            <button
-              type="button"
-              class="h-9 px-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all inline-flex items-center gap-1.5"
-              @click="handleNewSession"
-            >
-              <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">add</span>
-              开启新对话
-            </button>
+          <button
+            type="button"
+            class="wk-mobile-chat-menu-fab pointer-events-auto"
+            aria-label="打开菜单"
+            title="打开菜单"
+            @click="openMobileMainMenu"
+          >
+            <span class="material-symbols-outlined text-[22px] leading-none">menu</span>
+          </button>
+          <div v-if="showMobileChatFloatingActions" class="pointer-events-auto flex items-center justify-end gap-3">
+            <div class="wk-mobile-chat-actions" :class="{ 'wk-mobile-chat-actions--single': mobileChatFloatingActionCount === 1 }">
+              <button
+                v-if="showMobileNewSessionAction"
+                type="button"
+                class="wk-mobile-chat-actions__btn"
+                aria-label="新建会话"
+                title="新建会话"
+                @click="handleNewSession"
+              >
+                <span class="material-symbols-outlined text-[20px] leading-none">edit_square</span>
+              </button>
+              <span v-if="showMobileNewSessionAction && showMobileCustomerSummaryAction" class="wk-mobile-chat-actions__divider" aria-hidden="true"></span>
+              <button
+                v-if="showMobileCustomerSummaryAction"
+                type="button"
+                class="wk-mobile-chat-actions__btn"
+                aria-label="客户详情"
+                title="客户详情"
+                @click="openMobileCustomerSummary"
+              >
+                <span class="material-symbols-outlined text-[24px] leading-none">more_horiz</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <div
-          class="flex-1 flex flex-col overflow-hidden relative"
-          :class="isCenteredEmptyChat ? 'justify-center -translate-y-[100px]' : ''"
-        >
           <div
-            v-if="selectedCustomer"
-            class="wk-chat-customer-header relative shrink-0 border-b pl-4 pr-1 py-2 md:pl-8"
+            class="flex-1 flex flex-col overflow-hidden relative"
+            :class="isCenteredEmptyChat && !isMobile ? 'justify-center -translate-y-[100px]' : ''"
           >
-            <div class="mx-auto flex h-9 w-full items-center justify-between gap-3 pr-20">
+          <div
+            v-if="selectedCustomer || (isMobile && isCustomerContextChat)"
+            class="wk-chat-customer-header sticky top-0 z-20 shrink-0 border-b py-2"
+            :class="isMobile ? 'px-3' : 'pl-4 pr-1 md:pl-8'"
+            :style="chatCustomerHeaderStyle"
+          >
+            <div class="mx-auto flex h-9 w-full items-center justify-between gap-2" :class="isMobile ? '' : 'pr-20'">
+              <button
+                v-if="isMobile"
+                type="button"
+                class="wk-mobile-customer-header-menu flex size-9 shrink-0 items-center justify-center rounded-full text-[#0d0d0d] transition-colors active:bg-[#f1f1f1]"
+                aria-label="打开菜单"
+                title="打开菜单"
+                @click="openMobileMainMenu"
+              >
+                <span class="material-symbols-outlined text-[22px] leading-none">menu</span>
+              </button>
               <div class="flex min-w-0 flex-1 items-center gap-2">
                 <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                   <img
-                    v-if="selectedCustomer.logoUrl"
+                    v-if="selectedCustomer?.logoUrl"
                     :src="selectedCustomer.logoUrl"
-                    :alt="selectedCustomer.companyName || 'company logo'"
+                    :alt="mobileCustomerHeaderName || 'company logo'"
                     class="size-full bg-white object-contain"
                   />
                   <span v-else class="text-xs font-bold text-slate-400">
-                    {{ selectedCustomer.companyName?.charAt(0) || '?' }}
+                    {{ mobileCustomerHeaderName.charAt(0) || '?' }}
                   </span>
                 </div>
-                <h2 class="min-w-[80px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
-                  {{ selectedCustomer.companyName }}
+                <button
+                  v-if="isMobile"
+                  type="button"
+                  class="min-w-[80px] max-w-[190px] truncate text-left text-[15px] font-semibold leading-5 text-[#0d0d0d]"
+                  :title="mobileCustomerHeaderName"
+                  @click="openSelectedCustomerBasicInfo"
+                >
+                  {{ mobileCustomerHeaderName }}
+                </button>
+                <h2 v-else class="min-w-[80px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
+                  {{ selectedCustomer?.companyName }}
                 </h2>
                 <div
-                  v-if="selectedCustomer.tags?.length || canEditSelectedCustomerTags"
+                  v-if="selectedCustomer && !isMobile && (selectedCustomer.tags?.length || canEditSelectedCustomerTags)"
                   class="flex min-w-0 shrink items-center gap-1.5 overflow-hidden"
                 >
                   <span
@@ -266,7 +290,17 @@
                   </button>
                 </div>
               </div>
-              <div class="flex shrink-0 items-center gap-2">
+              <button
+                v-if="isMobile"
+                type="button"
+                class="wk-mobile-customer-header-detail flex size-9 shrink-0 items-center justify-center rounded-full text-[#0d0d0d] transition-colors active:bg-[#f1f1f1]"
+                aria-label="客户详情"
+                title="客户详情"
+                @click="openMobileCustomerSummary"
+              >
+                <span class="material-symbols-outlined text-[24px] leading-none">more_horiz</span>
+              </button>
+              <div v-else-if="selectedCustomer" class="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] bg-primary px-2.5 text-[12px] font-semibold text-white shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90"
@@ -322,6 +356,37 @@
                 收起客户侧栏
               </span>
             </button>
+          </div>
+          <div
+            v-if="isMobile && (selectedCustomer || isCustomerContextChat)"
+            class="wk-chat-customer-header-spacer shrink-0"
+            aria-hidden="true"
+          ></div>
+
+          <div v-if="selectedCustomer" class="wk-chat-customer-tabs">
+            <button
+              type="button"
+              class="wk-chat-customer-tabs__item"
+              :class="{ 'is-active': activeCustomerConversationTab === 'ai' }"
+              @click="handleCustomerConversationTabClick('ai')"
+            >
+              <span class="material-symbols-outlined">smart_toy</span>
+              <span>AI 对话</span>
+            </button>
+            <button
+              v-for="tab in customerWecomTabs"
+              :key="tab.tabKey"
+              type="button"
+              class="wk-chat-customer-tabs__item"
+              :class="{ 'is-active': activeCustomerConversationTab === tab.tabKey }"
+              @click="handleCustomerConversationTabClick(tab.tabKey)"
+            >
+              <span class="material-symbols-outlined">forum</span>
+              <span>{{ tab.employeeName || tab.employeeUserId || tab.title }}</span>
+            </button>
+            <span v-if="customerWecomTabsLoading" class="wk-chat-customer-tabs__loading">
+              <span class="material-symbols-outlined animate-spin">progress_activity</span>
+            </span>
           </div>
 
           <div
@@ -416,15 +481,16 @@
 
           <!-- Messages Area -->
           <div
+            v-if="activeCustomerConversationTab === 'ai'"
             ref="messagesContainer"
             class="wk-chat-messages"
-            :class="chatMessagesAreaClass"
+            :class="[chatMessagesAreaClass, { 'wk-chat-messages--empty-chat': isCenteredEmptyChat }]"
             @scroll="handleMessagesScroll"
           >
             <div class="wk-chat-messages__inner px-4 md:px-8">
             <!-- Welcome Section (no messages) -->
             <template v-if="chatStore.messages.length === 0 && !selectedCustomer && !selectedEmployee && !selectedRelation">
-              <div class="mx-auto flex max-w-3xl flex-col items-center space-y-5 py-6 text-center">
+              <div class="wk-chat-empty-welcome mx-auto flex max-w-3xl flex-col items-center space-y-5 py-6 text-center">
                 <!-- <div class="size-16 bg-primary/5 rounded-2xl flex items-center justify-center text-primary mb-2 border border-primary/10">
                   <WkIcon name="ai" class="text-4xl" />
                 </div> -->
@@ -617,22 +683,37 @@
             </div>
           </div>
 
+          <div v-else class="wk-chat-wecom-pane">
+            <div class="wk-chat-wecom-pane__notice">
+              <span class="material-symbols-outlined">visibility</span>
+              <span>仅支持查看</span>
+            </div>
+            <WecomMessageList
+              class="wk-chat-wecom-pane__messages"
+              :messages="customerWecomMessages"
+              :loading="customerWecomMessagesLoading"
+            />
+          </div>
+
           <Transition name="scroll-to-bottom">
             <button
-              v-if="showScrollToBottomButton"
+              v-if="showScrollToBottomButton && activeCustomerConversationTab === 'ai'"
               type="button"
-              class="absolute left-1/2 -translate-x-1/2 bottom-[140px] md:bottom-[220px] z-20 size-8 rounded-full border border-slate-200 bg-white shadow-lg shadow-slate-200/60 text-slate-600 transition-all flex items-center justify-center hover:bg-slate-50 hover:text-slate-900"
+              class="wk-scroll-to-bottom-button absolute left-1/2 -translate-x-1/2 bottom-[140px] md:bottom-[220px] z-20 flex items-center justify-center rounded-full border bg-white text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900"
               aria-label="回到底部"
               @click="scrollToBottomSmooth"
             >
-              <span class="material-symbols-outlined text-[18px] leading-none">arrow_downward</span>
+              <span class="material-symbols-outlined text-[22px] leading-none">arrow_downward</span>
             </button>
           </Transition>
 
           <!-- Input Area -->
           <div
+            v-if="activeCustomerConversationTab === 'ai'"
+            ref="chatComposerWrapRef"
             class="wk-chat-composer-wrap shrink-0 pb-2 md:pb-2 px-2"
             :class="isCenteredEmptyChat ? 'bg-transparent pt-0' : ''"
+            :style="chatComposerWrapStyle"
           >
             <div class="mx-auto space-y-8 w-[calc(100%-20px)] max-w-4xl md:w-full">
 
@@ -1195,29 +1276,31 @@
                     </div>
                   </div>
 
-                  <!-- Mobile: upload + multiline input -->
-                  <div v-else class="flex items-center w-full">
+                  <!-- Mobile: controls + input in one row -->
+                  <div v-else class="wk-mobile-composer-row flex w-full items-end gap-2">
                     <el-popover
                       v-model:visible="chatUploadMenuVisible"
                       trigger="click"
                       placement="top-start"
-                      width="240"
+                      width="calc(100vw - 32px)"
                       :show-arrow="false"
                       :disabled="isUploading"
                       :teleported="true"
-                      popper-class="wk-chat-upload-menu-popper"
+                      transition="wk-chat-mobile-sheet"
+                      popper-class="wk-chat-upload-menu-popper wk-chat-upload-menu-popper--mobile"
                     >
                       <template #reference>
                         <button
                           type="button"
-                          class="w-[20px] h-full flex items-center justify-center text-[#0d0d0d] hover:text-primary transition-colors shrink-0"
+                          class="wk-mobile-composer-icon-button"
                           :disabled="isUploading"
+                          aria-label="添加文件等"
                         >
-                          <span class="material-symbols-outlined text-[0.875rem] leading-none">add</span>
+                          <WkIcon name="add-1" :box-size="16" class="shrink-0" />
                         </button>
                       </template>
                       <div
-                        class="wk-chat-upload-menu"
+                        class="wk-chat-upload-menu wk-chat-upload-menu--mobile"
                         @mouseenter="clearChatUploadMenuLeaveTimer"
                         @mouseleave="handleChatUploadMenuMouseLeave"
                       >
@@ -1239,16 +1322,11 @@
                           <span class="wk-chat-upload-menu__icon material-symbols-outlined">menu_book</span>
                           <span class="wk-chat-upload-menu__label">选择知识库文件</span>
                         </button>
-                        <el-popover
-                          :trigger="isMobile ? 'click' : 'hover'"
-                          placement="right-end"
-                          :show-arrow="false"
+                        <button
+                          type="button"
+                          class="wk-chat-upload-menu__item"
                           :disabled="isUploading"
-                          :teleported="true"
-                          :offset="8"
-                          :hide-after="isMobile ? 0 : 220"
-                          width="200"
-                          popper-class="wk-chat-upload-menu-popper wk-chat-upload-submenu-popper"
+                          @click="handleChatUploadMenuSelectApp('crm')"
                         >
                           <template #reference>
                             <div
@@ -1321,109 +1399,146 @@
                         </el-popover>
                       </div>
                     </el-popover>
+
                     <textarea
                       ref="mobileChatInputRef"
                       v-model="inputText"
                       rows="1"
-                      class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none pl-1 pr-3 py-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#0d0d0d] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
+                      class="wk-mobile-composer-textarea min-w-0 flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-1 py-2 text-[#0d0d0d] text-[16px] leading-[24px] placeholder:text-[#909090] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto"
                       :placeholder="chatInputPlaceholder"
                       :disabled="isUploading"
                       @input="resizeChatTextarea"
+                      @focus="scheduleMobileKeyboardInsetUpdate(true)"
+                      @blur="scheduleMobileKeyboardInsetUpdate"
                       @keydown.enter.exact.prevent="handleSend"
                       @paste="handlePaste"
                     />
-                  </div>
-                  </div>
 
-                  <div v-if="isMobile" class="flex items-center justify-between gap-2">
-                    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                      <button
-                        v-if="chatStore.selectedAppCode !== 'general'"
-                        type="button"
-                        class="group/crm-toolbar h-[36px] self-start inline-flex rounded-xl px-3.5 text-sm text-[var(--wk-text-primary)] transition-all hover:bg-[var(--wk-bg-surface-hover)]"
-                        aria-pressed="true"
-                        :title="`已启用 ${selectedChatAppLabel}，点击关闭`"
-                        @click="chatStore.setSelectedAppCode('general')"
-                      >
-                        <span class="flex items-center justify-center gap-1.5">
-                          <span class="relative flex size-[22px] shrink-0 items-center justify-center">
+                    <el-popover
+                      v-model:visible="chatModelPopoverVisible"
+                      trigger="click"
+                      placement="top-start"
+                      :width="300"
+                      :show-arrow="false"
+                      :teleported="true"
+                      :disabled="chatModelPickerDisabled || showAiQuotaEmptyCta"
+                      transition="el-zoom-in-bottom"
+                      popper-class="wk-chat-model-popper wk-chat-model-popper--mobile"
+                    >
+                      <template #reference>
+                        <button
+                          type="button"
+                          class="wk-mobile-composer-icon-button wk-mobile-model-trigger--icon"
+                          :class="chatModelTriggerClass"
+                          :disabled="chatModelPickerDisabled"
+                          :title="`当前模型：${chatComposerModelLabel}`"
+                          aria-label="切换模型"
+                          @click="handleChatModelTriggerClick"
+                        >
+                          <span
+                            class="relative flex size-[22px] shrink-0 items-center justify-center overflow-hidden rounded-md"
+                            :class="showAiQuotaEmptyCta ? 'bg-red-50' : 'bg-[#ececec]'"
+                            aria-hidden="true"
+                          >
                             <span
-                              class="flex size-full items-center justify-center transition-opacity duration-150 max-sm:pointer-events-none max-sm:opacity-0 group-hover/crm-toolbar:pointer-events-none group-hover/crm-toolbar:opacity-0"
+                              v-if="showAiQuotaEmptyCta"
+                              class="material-symbols-outlined text-[17px] leading-none text-[#8d4f34]"
+                            >bolt</span>
+                            <template v-else-if="chatStore.selectedModel">
+                              <img
+                                v-if="chatModelShowImage(chatStore.selectedModel)"
+                                :src="chatModelIconSrc(chatStore.selectedModel)"
+                                alt=""
+                                class="size-full object-fill"
+                                @error="onChatModelImageError($event)"
+                              />
+                              <span
+                                v-else
+                                class="flex size-full items-center justify-center text-[11px] font-semibold text-[#909090]"
+                              >
+                                {{ modelOptionLabel(chatStore.selectedModel).slice(0, 1) }}
+                              </span>
+                            </template>
+                            <span
+                              v-else
+                              class="flex size-full items-center justify-center text-[11px] font-semibold text-[#909090]"
                             >
-                              <WkIcon :name="selectedChatAppIcon" :size="18" class="shrink-0" />
+                              ?
                             </span>
+                          </span>
+                        </button>
+                      </template>
+                      <div class="wk-chat-model-menu">
+                        <template v-for="group in chatModelOptionGroups" :key="group.source">
+                          <div
+                            v-if="chatModelOptionGroups.length > 1"
+                            class="wk-chat-model-menu__group-label"
+                          >
+                            {{ group.label }}
+                          </div>
+                          <button
+                            v-for="option in group.options"
+                            :key="chatStore.toModelKey(option)"
+                            type="button"
+                            class="wk-chat-model-menu__item"
+                            @click="handleChatModelChange(chatStore.toModelKey(option))"
+                          >
                             <span
-                              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-[var(--wk-bg-surface-active)] text-[var(--wk-text-primary)] opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
+                              class="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg"
                               aria-hidden="true"
                             >
-                              <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                              <img
+                                v-if="chatModelShowImage(option)"
+                                :src="chatModelIconSrc(option)"
+                                alt=""
+                                class="size-5 object-fill"
+                                @error="onChatModelImageError($event)"
+                              />
+                              <span
+                                v-else
+                                class="flex size-full items-center justify-center text-[12px] font-semibold text-[#909090]"
+                              >
+                                {{ modelOptionLabel(option).slice(0, 1) }}
+                              </span>
                             </span>
-                          </span>
-                          <span>{{ selectedChatAppLabel }}</span>
-                        </span>
-                      </button>
-                      <!-- <button
-                        type="button"
-                        class="h-10 self-start inline-flex rounded-xl border px-3.5 text-sm shadow-sm transition-all"
-                        :class="chatStore.ragEnabled
-                          ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
-                          : 'border-slate-200 bg-white text-[#0d0d0d] hover:border-slate-300 hover:text-slate-700'"
-                        :aria-pressed="chatStore.ragEnabled"
-                        :title="chatStore.ragEnabled ? '已启用 知识库 检索' : '点击启用 知识库 检索'"
-                        @click="chatStore.setRagEnabled(!chatStore.ragEnabled)"
-                      >
-                        <span class="flex items-center justify-center gap-1.5">
-                          <span class="material-symbols-outlined text-[18px] leading-none">
-                            menu_book
-                          </span>
-                          <span>知识库检索</span>
-                        </span>
-                      </button> -->
-                    </div>
-
-                    <button
-                      v-if="showAiQuotaEmptyCta"
-                      type="button"
-                      class="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#ead8cc] bg-[#fbf7f4] px-3 py-2 text-sm font-semibold text-[#8d4f34] shadow-sm shadow-slate-100 transition-colors hover:border-[#dec4b5] hover:bg-[#f7eee8]"
-                      @click="openAiQuotaChoiceDialog()"
-                    >
-                      <span class="material-symbols-outlined shrink-0 text-[17px] leading-none text-[#8d4f34]">bolt</span>
-                      <span class="min-w-0 truncate">额度已用完，续费/接入模型</span>
-                      <span class="material-symbols-outlined shrink-0 text-[16px] leading-none text-[#8d4f34]">expand_more</span>
-                    </button>
-
-                    <el-select
-                      v-else
-                      v-model="chatStore.selectedModelKey"
-                      class="min-w-0 flex-1"
-                      size="large"
-                      :disabled="chatStore.currentSessionIsStreaming || isUploading || chatStore.modelOptionsLoading"
-                      :placeholder="chatStore.modelOptionsLoading ? '加载模型...' : (chatStore.modelOptions.length > 0 ? '选择模型' : '暂无可选模型')"
-                      @change="handleChatModelChange"
-                    >
-                      <el-option-group
-                        v-for="group in chatModelOptionGroups"
-                        :key="group.source"
-                        :label="group.label"
-                      >
-                        <el-option
-                          v-for="option in group.options"
-                          :key="chatStore.toModelKey(option)"
-                          :label="option.displayName || option.modelName"
-                          :value="chatStore.toModelKey(option)"
-                        >
-                          <div class="flex items-center justify-between gap-4">
-                            <span class="truncate">{{ option.displayName || option.modelName }}</span>
+                            <div class="min-w-0 flex-1">
+                              <div class="flex items-center justify-start gap-2">
+                                <div class="min-w-0 text-[14px] leading-tight text-[#0d0d0d]">
+                                  {{ modelOptionLabel(option) }}
+                                </div>
+                                <span
+                                  v-if="shouldShowModelMultiplier(option)"
+                                  class="shrink-0 text-xs text-slate-400"
+                                >
+                                  {{ formatModelMultiplier(option.creditMultiplier) }}
+                                </span>
+                              </div>
+                            </div>
                             <span
-                              v-if="shouldShowModelMultiplier(option)"
-                              class="shrink-0 text-xs text-slate-400"
+                              class="material-symbols-outlined flex size-5 shrink-0 items-center justify-center text-[20px] leading-none"
+                              :class="chatStore.selectedModelKey === chatStore.toModelKey(option) ? 'text-primary' : 'invisible'"
+                              aria-hidden="true"
                             >
-                              {{ formatModelMultiplier(option.creditMultiplier) }}
+                              check
                             </span>
-                          </div>
-                        </el-option>
-                      </el-option-group>
-                    </el-select>
+                          </button>
+                          <button
+                            v-if="group.source === 'custom' && canManageAiConfig"
+                            type="button"
+                            class="wk-chat-model-menu__more"
+                            @click="handleOpenMoreModels"
+                          >
+                            <span class="material-symbols-outlined text-[18px] leading-none" aria-hidden="true">
+                              add_circle
+                            </span>
+                            <span class="min-w-0 flex-1 truncate">更多模型</span>
+                            <span class="material-symbols-outlined text-[18px] leading-none text-[#8f8f8f]" aria-hidden="true">
+                              chevron_right
+                            </span>
+                          </button>
+                        </template>
+                      </div>
+                    </el-popover>
 
                     <button
                       type="button"
@@ -1461,6 +1576,34 @@
                         role="tooltip"
                       >
                         {{ sendBarActionTitle }}
+                      </span>
+                    </button>
+                  </div>
+                  </div>
+
+                  <div v-if="isMobile && chatStore.selectedAppCode !== 'general'" class="wk-mobile-selected-app-row flex min-w-0 items-center justify-start">
+                    <button
+                      type="button"
+                      class="group/crm-toolbar inline-flex h-[34px] max-w-full rounded-xl pr-3.5 text-sm text-[var(--wk-text-primary)] transition-all hover:bg-[var(--wk-bg-surface-hover)]"
+                      aria-pressed="true"
+                      :title="`已启用 ${selectedChatAppLabel}，点击关闭`"
+                      @click="chatStore.setSelectedAppCode('general')"
+                    >
+                      <span class="flex min-w-0 items-center justify-center gap-1.5">
+                        <span class="relative flex size-[22px] shrink-0 items-center justify-center">
+                          <span
+                            class="flex size-full items-center justify-center transition-opacity duration-150 max-sm:pointer-events-none max-sm:opacity-0 group-hover/crm-toolbar:pointer-events-none group-hover/crm-toolbar:opacity-0"
+                          >
+                            <WkIcon :name="selectedChatAppIcon" :size="18" class="shrink-0" />
+                          </span>
+                          <span
+                            class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-[var(--wk-bg-surface-active)] text-[var(--wk-text-primary)] opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
+                            aria-hidden="true"
+                          >
+                            <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                          </span>
+                        </span>
+                        <span class="min-w-0 truncate">{{ selectedChatAppLabel }}</span>
                       </span>
                     </button>
                   </div>
@@ -1592,6 +1735,51 @@
     />
 
     <el-dialog
+      v-model="tencentMeetingPromptVisible"
+      title="关联腾讯会议"
+      :width="isMobile ? '92%' : '560px'"
+      class="wk-dialog--flush"
+      align-center
+    >
+      <div class="px-1 pb-3">
+        <p class="mb-4 text-sm leading-6 text-slate-500">
+          检测到你提到了会议，可先把已有腾讯会议记录关联到当前客户，AI 随后就能读取会议摘要和转写。
+        </p>
+        <div v-if="tencentMeetingCandidatesLoading" class="space-y-2">
+          <div v-for="index in 3" :key="`tm-candidate-${index}`" class="h-16 animate-pulse rounded-xl bg-slate-100" />
+        </div>
+        <el-radio-group v-else v-model="selectedTencentMeetingCandidateId" class="wk-tm-candidate-list">
+          <label
+            v-for="candidate in tencentMeetingCandidates"
+            :key="candidate.id"
+            class="wk-tm-candidate"
+            :class="{ 'is-selected': selectedTencentMeetingCandidateId === candidate.id }"
+          >
+            <el-radio :value="candidate.id" />
+            <span class="min-w-0 flex-1">
+              <strong class="truncate">{{ candidate.subject || '腾讯会议' }}</strong>
+              <small class="truncate">{{ formatChatDate(candidate.startTime) || '未记录时间' }} · {{ candidate.matchReason || '候选会议' }}</small>
+              <span v-if="candidate.summary" class="line-clamp-2">{{ candidate.summary }}</span>
+            </span>
+          </label>
+        </el-radio-group>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <el-button @click="skipTencentMeetingPromptAndSend">跳过并发送</el-button>
+          <el-button
+            type="primary"
+            :loading="tencentMeetingBinding"
+            :disabled="!selectedTencentMeetingCandidateId"
+            @click="bindTencentMeetingCandidateAndSend"
+          >
+            关联并发送
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="showSelectedCustomerTagDialog"
       title="添加标签"
       width="400px"
@@ -1703,6 +1891,99 @@
       @success="handleSelectedCustomerEditSuccess"
     />
 
+    <Transition name="wk-mobile-customer-summary-fade">
+      <div
+        v-if="mobileCustomerSummaryVisible && isMobile && isCustomerContextChat"
+        class="wk-mobile-customer-summary"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wk-mobile-customer-summary-title"
+      >
+        <button
+          type="button"
+          class="wk-mobile-customer-summary__backdrop"
+          aria-label="关闭客户详情"
+          @click="closeMobileCustomerSummary"
+        ></button>
+        <section
+          class="wk-mobile-customer-summary__sheet"
+          :class="{
+            'is-dragging': customerSummarySheetDragging,
+            'has-voice-action': showMobileSummaryVoiceAction
+          }"
+          :style="mobileCustomerSummarySheetStyle"
+        >
+          <header
+            class="wk-mobile-customer-summary__header"
+            @pointerdown="handleCustomerSummaryDragStart"
+          >
+            <span class="wk-mobile-customer-summary__handle" aria-hidden="true"></span>
+            <div class="wk-mobile-customer-summary__title-row">
+              <div class="min-w-0 flex-1">
+                <p id="wk-mobile-customer-summary-title" class="wk-mobile-customer-summary__title">
+                  {{ mobileCustomerSummaryName }}
+                </p>
+              </div>
+              <div class="wk-mobile-customer-summary__actions">
+                <button
+                  type="button"
+                  class="wk-mobile-customer-summary__info"
+                  aria-label="基本信息"
+                  @pointerdown.stop
+                  @click.stop="openSelectedCustomerBasicInfo"
+                >
+                  <span class="material-symbols-outlined text-[17px] leading-none">description</span>
+                  <span>基本信息</span>
+                </button>
+                <button
+                  type="button"
+                  class="wk-mobile-customer-summary__close"
+                  aria-label="关闭客户详情"
+                  @pointerdown.stop
+                  @click.stop="closeMobileCustomerSummary"
+                >
+                  <span class="material-symbols-outlined text-[24px] leading-none">close</span>
+                </button>
+              </div>
+            </div>
+          </header>
+          <div class="wk-mobile-customer-summary__body">
+            <div v-if="selectedCustomerLoading" class="flex h-full items-center justify-center">
+              <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+            </div>
+            <div v-else-if="!selectedCustomer" class="flex h-full flex-col items-center justify-center px-6 text-center">
+              <div class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-[#f5f5f5] text-slate-400">
+                <WkIcon name="customer" :size="24" />
+              </div>
+              <p class="text-sm font-semibold text-slate-700">暂无客户详情</p>
+              <p class="mt-1 text-xs leading-relaxed text-slate-400">客户资料加载后会在这里展示。</p>
+            </div>
+            <CustomerDetailView
+              v-else
+              ref="customerSummaryDetailRef"
+              embedded
+              force-mobile
+              hide-embedded-follow-up-action
+              :customer-id="selectedCustomer.customerId"
+              @quote-attachment="handleQuoteCustomerAttachment"
+            />
+          </div>
+          <Transition name="wk-mobile-summary-voice">
+            <button
+              v-if="showMobileSummaryVoiceAction"
+              type="button"
+              class="wk-mobile-customer-summary__voice"
+              aria-label="语音录入"
+              @click="openMobileSummaryVoiceInput"
+            >
+              <span class="material-symbols-outlined text-[20px] leading-none">keyboard_voice</span>
+              <span>语音录入</span>
+            </button>
+          </Transition>
+        </section>
+      </div>
+    </Transition>
+
     <button
       v-if="showObjectPanelShell && !customerPanelVisible"
       type="button"
@@ -1780,11 +2061,14 @@ import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig } from '@/api/systemConfig'
 import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerStage } from '@/api/customer'
-import { getAddressBookDetail } from '@/api/addressBook'
-import { getRelationDetail } from '@/api/relation'
+import { getCustomerWecomConversationMessages, getCustomerWecomConversationTabs } from '@/api/wecom'
+import { bindTencentMeeting, getCustomerTencentMeetingCandidates } from '@/api/tencentMeeting'
 import CustomerDetailView from '@/views/customer/CustomerDetailView.vue'
 import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import WecomMessageList from '@/views/wecom/components/WecomMessageList.vue'
+import { getAddressBookDetail } from '@/api/addressBook'
+import { getRelationDetail } from '@/api/relation'
 import EmployeeChatInfoPanel from '@/views/chat/components/EmployeeChatInfoPanel.vue'
 import RelationChatInfoPanel from '@/views/chat/components/RelationChatInfoPanel.vue'
 import {
@@ -1809,8 +2093,17 @@ import { isRequestErrorHandled } from '@/utils/requestError'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { shouldShowMobileCustomerSummaryAction } from '@/utils/chatMobileActions'
+import {
+  canCaptureMobileAudioFile,
+  captureMobileAudioFile,
+  hasMobileAudioInputSupport,
+  requestMobileAudioStream
+} from '@/utils/mobileAudioRecording'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
 import type { Contact, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAttachment } from '@/types/customer'
+import type { WecomConversationTabVO, WecomMessageVO } from '@/types/wecom'
+import type { TencentMeetingCandidateVO } from '@/types/tencentMeeting'
 import type { AddressBookDetail } from '@/types/addressBook'
 import type { RelationDetailVO } from '@/types/relation'
 import { wkIconNames } from '@/components/common/wkIcon'
@@ -1868,11 +2161,21 @@ const boundRelationName = computed(() =>
 )
 
 const inputText = ref('')
+const tencentMeetingPromptVisible = ref(false)
+const tencentMeetingCandidatesLoading = ref(false)
+const tencentMeetingBinding = ref(false)
+const tencentMeetingCandidates = ref<TencentMeetingCandidateVO[]>([])
+const selectedTencentMeetingCandidateId = ref('')
+const pendingTencentMeetingPromptText = ref('')
+const tencentMeetingPromptBypassText = ref('')
 const chatViewRef = ref<HTMLElement | null>(null)
 const chatMainAreaRef = ref<HTMLElement | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
+const chatComposerWrapRef = ref<HTMLElement | null>(null)
 const showScrollToBottomButton = ref(false)
-const mobilePanel = ref<'sessions' | 'chat'>('sessions')
+const mobileKeyboardInset = ref(0)
+const mobileVisualViewportTopOffset = ref(0)
+const mobilePanel = ref<'sessions' | 'chat'>('chat')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 /** 桌面端多行输入（模板中 v-if="!isMobile" 的 textarea） */
 const pcChatInputRef = ref<HTMLTextAreaElement | null>(null)
@@ -1924,6 +2227,7 @@ watch(chatUploadMenuVisible, (visible) => {
     }
   }
 })
+
 const chatKnowledgePickerVisible = ref(false)
 const showKnowledgeFollowUpChips = ref(false)
 const chatModelPopoverVisible = ref(false)
@@ -1935,6 +2239,15 @@ const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
 const selectedCustomerId = ref<string | null>(null)
 const selectedCustomer = ref<CustomerDetailVO | null>(null)
 const selectedCustomerLoading = ref(false)
+const activeCustomerConversationTab = ref('ai')
+const customerWecomTabs = ref<WecomConversationTabVO[]>([])
+const customerWecomMessages = ref<WecomMessageVO[]>([])
+const customerWecomTabsLoading = ref(false)
+const customerWecomMessagesLoading = ref(false)
+const mobileCustomerSummaryVisible = ref(false)
+const customerSummaryDetailRef = ref<InstanceType<typeof CustomerDetailView> | null>(null)
+const customerSummarySheetHeight = ref(58)
+const customerSummarySheetDragging = ref(false)
 const selectedEmployeeId = ref<string | null>(null)
 const selectedEmployee = ref<AddressBookDetail | null>(null)
 const selectedEmployeeLoading = ref(false)
@@ -1955,9 +2268,19 @@ const CUSTOMER_PANEL_MAX_WIDTH_RATIO = 0.5
 const CHAT_COMPOSER_MIN_WIDTH_PX = 468
 const CHAT_CUSTOMER_AI_POLL_INTERVAL_MS = 2500
 const CHAT_CUSTOMER_AI_POLL_MAX_ATTEMPTS = 24
+const CUSTOMER_SUMMARY_SHEET_LEVELS = [58, 78, 94] as const
+const CUSTOMER_SUMMARY_SHEET_MAX_HEIGHT = CUSTOMER_SUMMARY_SHEET_LEVELS[CUSTOMER_SUMMARY_SHEET_LEVELS.length - 1]
+const MOBILE_KEYBOARD_INSET_GAP_PX = 8
+const MOBILE_KEYBOARD_VISIBLE_THRESHOLD_PX = 24
+const MOBILE_KEYBOARD_TRACK_DURATION_MS = 900
+const MOBILE_KEYBOARD_TRACK_INTERVAL_MS = 80
 let chatCustomerAiPollTimer: ReturnType<typeof setTimeout> | null = null
+let mobileKeyboardInsetTimer: ReturnType<typeof setTimeout> | null = null
+let mobileKeyboardInsetTrackTimer: ReturnType<typeof setTimeout> | null = null
 let chatCustomerAiPollAttempts = 0
 let offSelectedCustomerDetailRefresh: (() => void) | null = null
+let customerSummaryDragStartY = 0
+let customerSummaryDragStartHeight = 58
 
 type CustomerDetailRefreshModule = 'aiAnalysis' | 'contacts' | 'followUps' | 'tasks' | 'schedules'
 
@@ -1969,6 +2292,16 @@ type CustomerDetailRefreshPayload = {
 
 const chatComposerShellStyle = computed(() => (
   isMobile.value ? undefined : { minWidth: `${CHAT_COMPOSER_MIN_WIDTH_PX}px` }
+))
+const chatComposerWrapStyle = computed(() => (
+  isMobile.value && mobileKeyboardInset.value > 0
+    ? { transform: `translate3d(0, -${mobileKeyboardInset.value}px, 0)` }
+    : undefined
+))
+const chatCustomerHeaderStyle = computed(() => (
+  isMobile.value && mobileVisualViewportTopOffset.value > 0
+    ? { transform: `translate3d(0, ${mobileVisualViewportTopOffset.value}px, 0)` }
+    : undefined
 ))
 
 const CUSTOMER_STAGE_FLOW = [
@@ -2205,7 +2538,8 @@ function resizeChatTextarea() {
   if (!el) return
   el.style.height = 'auto'
   const maxH = getChatTextareaMaxHeightPx(el)
-  el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
+  const minH = isMobile.value ? 40 : 0
+  el.style.height = `${Math.max(minH, Math.min(el.scrollHeight, maxH))}px`
 }
 
 function getCustomerPanelContainerWidth(): number {
@@ -2438,16 +2772,72 @@ const currentView = ref<'chat' | 'notifications'>('chat')
 const userAvatarLoadFailed = ref(false)
 
 const isChatEmpty = computed(() => chatStore.messages.length === 0)
+const isCustomerContextChat = computed(() => Boolean(selectedCustomerId.value || currentSessionCustomerId.value))
 const isObjectContextChat = computed(() => Boolean(
   selectedCustomerId.value || currentSessionCustomerId.value
   || selectedEmployeeId.value || currentSessionEmployeeId.value
   || selectedRelationId.value || currentSessionRelationId.value
 ))
-const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isObjectContextChat.value)
+const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isCustomerContextChat.value)
+const mobileChatFloatingBarTop = computed(() => '0px')
+const showMobileFloatingBar = computed(() =>
+  isMobile.value
+  && currentView.value === 'chat'
+  && mobilePanel.value === 'chat'
+  && !isCustomerContextChat.value
+)
+const showMobileCustomerSummaryAction = computed(() =>
+  shouldShowMobileCustomerSummaryAction({
+    isMobile: isMobile.value,
+    currentView: currentView.value,
+    mobilePanel: mobilePanel.value,
+    hasCustomerContext: isCustomerContextChat.value,
+  })
+)
+const showMobileNewSessionAction = computed(() =>
+  isMobile.value
+  && currentView.value === 'chat'
+  && mobilePanel.value === 'chat'
+  && !isCustomerContextChat.value
+  && Boolean(chatStore.currentSessionId)
+  && !chatStore.isNewSessionPending
+)
+const mobileChatFloatingActionCount = computed(() =>
+  (showMobileNewSessionAction.value ? 1 : 0)
+  + (showMobileCustomerSummaryAction.value ? 1 : 0)
+)
+const showMobileChatFloatingActions = computed(() => mobileChatFloatingActionCount.value > 0)
+const mobileCustomerSummaryName = computed(() =>
+  selectedCustomer.value?.companyName || boundCustomerName.value || '客户'
+)
+const mobileCustomerHeaderName = computed(() =>
+  selectedCustomer.value?.companyName || boundCustomerName.value || chatStore.currentSession?.title || '客户'
+)
+const showMobileSummaryVoiceAction = computed(() =>
+  mobileCustomerSummaryVisible.value
+    && isMobile.value
+    && isCustomerContextChat.value
+    && customerSummarySheetHeight.value >= CUSTOMER_SUMMARY_SHEET_MAX_HEIGHT - 1
+)
+const mobileCustomerSummarySheetStyle = computed(() => ({
+  height: `${customerSummarySheetHeight.value}vh`,
+  maxHeight: 'calc(100dvh - max(12px, env(safe-area-inset-top)))',
+}))
 const chatMessagesAreaClass = computed(() => {
   if (!isChatEmpty.value) return 'wk-chat-messages--scrollable flex-1 overflow-y-auto pb-4 pt-6 md:pt-8'
+  if (isMobile.value) return 'flex-1 overflow-hidden py-6'
   return isObjectContextChat.value ? 'flex-1 overflow-hidden py-6' : 'overflow-hidden py-6'
 })
+
+
+watch(
+  () => [isMobile.value, isCustomerContextChat.value, currentSessionCustomerId.value, selectedCustomerId.value] as const,
+  ([mobile, hasCustomer]) => {
+    if (!mobile || !hasCustomer) {
+      closeMobileCustomerSummary()
+    }
+  }
+)
 
 const SCROLL_TO_BOTTOM_THRESHOLD_PX = 100
 /** When true, new content / streaming keeps the viewport pinned to the bottom. */
@@ -2509,7 +2899,7 @@ function revokeAllSelectedFilePreviewUrls() {
   for (const file of selectedFiles.value) revokeSelectedFilePreviewUrl(file)
 }
 
-/** 侧栏切换会话时移动端默认停在「历史」列表，输入区未挂载，需先切到聊天主区才能 focus。 */
+/** Ensure the composer is mounted before focusing on mobile. */
 function prepareComposerForFocus() {
   currentView.value = 'chat'
   if (isMobile.value) {
@@ -2528,7 +2918,10 @@ function focusChatTextarea() {
       } catch {
         el.focus()
       }
-      if (document.activeElement === el) return
+      if (document.activeElement === el) {
+        scheduleMobileKeyboardInsetUpdate(true)
+        return
+      }
     }
     if (attempt + 1 >= maxAttempts) return
     void nextTick(() => {
@@ -2540,6 +2933,77 @@ function focusChatTextarea() {
   void nextTick(() => {
     requestAnimationFrame(() => tryFocus(0))
   })
+}
+
+function clampCustomerSummaryHeight(value: number) {
+  return Math.min(CUSTOMER_SUMMARY_SHEET_MAX_HEIGHT, Math.max(CUSTOMER_SUMMARY_SHEET_LEVELS[0], value))
+}
+
+function snapCustomerSummaryHeight(value: number) {
+  return CUSTOMER_SUMMARY_SHEET_LEVELS.reduce((best, level) => (
+    Math.abs(level - value) < Math.abs(best - value) ? level : best
+  ), CUSTOMER_SUMMARY_SHEET_LEVELS[0])
+}
+
+function openMobileCustomerSummary() {
+  const customerId = currentSessionCustomerId.value || selectedCustomerId.value
+  if (!customerId) return
+  customerSummarySheetHeight.value = CUSTOMER_SUMMARY_SHEET_LEVELS[0]
+  mobileCustomerSummaryVisible.value = true
+  void ensureSelectedCustomerDetail(customerId, { silent: Boolean(selectedCustomer.value) })
+}
+
+function openSelectedCustomerBasicInfo() {
+  const customerId = currentSessionCustomerId.value || selectedCustomerId.value
+  if (!customerId) return
+  showSelectedCustomerBasicInfoDrawer.value = true
+  void ensureSelectedCustomerDetail(customerId, { silent: Boolean(selectedCustomer.value) })
+}
+
+function closeMobileCustomerSummary() {
+  mobileCustomerSummaryVisible.value = false
+  customerSummarySheetDragging.value = false
+  window.removeEventListener('pointermove', handleCustomerSummaryDragMove)
+  window.removeEventListener('pointerup', handleCustomerSummaryDragEnd)
+  window.removeEventListener('pointercancel', handleCustomerSummaryDragEnd)
+}
+
+function handleCustomerSummaryDragStart(event: PointerEvent) {
+  if (!mobileCustomerSummaryVisible.value) return
+  customerSummarySheetDragging.value = true
+  customerSummaryDragStartY = event.clientY
+  customerSummaryDragStartHeight = customerSummarySheetHeight.value
+  window.addEventListener('pointermove', handleCustomerSummaryDragMove)
+  window.addEventListener('pointerup', handleCustomerSummaryDragEnd)
+  window.addEventListener('pointercancel', handleCustomerSummaryDragEnd)
+}
+
+function handleCustomerSummaryDragMove(event: PointerEvent) {
+  if (!customerSummarySheetDragging.value) return
+  event.preventDefault()
+  const viewportHeight = Math.max(1, window.innerHeight)
+  const deltaY = customerSummaryDragStartY - event.clientY
+  const nextHeight = customerSummaryDragStartHeight + (deltaY / viewportHeight) * 100
+  customerSummarySheetHeight.value = clampCustomerSummaryHeight(nextHeight)
+}
+
+function handleCustomerSummaryDragEnd() {
+  if (!customerSummarySheetDragging.value) return
+  customerSummarySheetDragging.value = false
+  customerSummarySheetHeight.value = snapCustomerSummaryHeight(customerSummarySheetHeight.value)
+  window.removeEventListener('pointermove', handleCustomerSummaryDragMove)
+  window.removeEventListener('pointerup', handleCustomerSummaryDragEnd)
+  window.removeEventListener('pointercancel', handleCustomerSummaryDragEnd)
+}
+
+function openMobileSummaryVoiceInput() {
+  customerSummaryDetailRef.value?.openAiFollowUp?.()
+}
+
+function handleMobileSummaryTouchMove(event: TouchEvent) {
+  if (customerSummarySheetDragging.value) {
+    event.preventDefault()
+  }
 }
 
 watch(composerFocusNonce, () => {
@@ -2629,6 +3093,7 @@ async function ensureSelectedCustomerDetail(customerId: string, options: { silen
     const detail = await getCustomerDetail(requestCustomerId)
     if (selectedCustomerId.value && selectedCustomerId.value !== requestCustomerId) return
     selectedCustomer.value = detail
+    void loadCustomerWecomTabs(requestCustomerId)
   } catch (err) {
     console.error('Load selected customer detail failed:', err)
     if (!isRequestErrorHandled(err)) {
@@ -2638,6 +3103,45 @@ async function ensureSelectedCustomerDetail(customerId: string, options: { silen
     if (!silent && (!selectedCustomerId.value || selectedCustomerId.value === requestCustomerId)) {
       selectedCustomerLoading.value = false
     }
+  }
+}
+
+async function loadCustomerWecomTabs(customerId: string) {
+  customerWecomTabsLoading.value = true
+  try {
+    const tabs = await getCustomerWecomConversationTabs(customerId)
+    if (currentSessionCustomerId.value && currentSessionCustomerId.value !== customerId) return
+    customerWecomTabs.value = tabs || []
+    if (activeCustomerConversationTab.value !== 'ai') {
+      const activeExists = customerWecomTabs.value.some(tab => tab.tabKey === activeCustomerConversationTab.value)
+      if (!activeExists) {
+        activeCustomerConversationTab.value = 'ai'
+        customerWecomMessages.value = []
+      }
+    }
+  } catch (err) {
+    console.error('Load customer WeCom tabs failed:', err)
+    customerWecomTabs.value = []
+  } finally {
+    customerWecomTabsLoading.value = false
+  }
+}
+
+async function handleCustomerConversationTabClick(tabKey: string) {
+  activeCustomerConversationTab.value = tabKey
+  if (tabKey === 'ai') {
+    customerWecomMessages.value = []
+    return
+  }
+  const customerId = currentSessionCustomerId.value || selectedCustomerId.value
+  const tab = customerWecomTabs.value.find(item => item.tabKey === tabKey)
+  if (!customerId || !tab) return
+  customerWecomMessagesLoading.value = true
+  try {
+    const data = await getCustomerWecomConversationMessages(customerId, tab.conversationId, 1, 100)
+    customerWecomMessages.value = data.list || []
+  } finally {
+    customerWecomMessagesLoading.value = false
   }
 }
 
@@ -2768,6 +3272,9 @@ async function handleSelectCustomerById(customerId: string) {
   selectedRelationId.value = null
   selectedRelationDetail.value = null
   currentView.value = 'chat'
+  if (isMobile.value) {
+    mobilePanel.value = 'chat'
+  }
   isPinnedToBottom.value = true
   chatStore.setSelectedAppCode('crm')
   await ensureSelectedCustomerDetail(customerId)
@@ -2787,7 +3294,9 @@ async function handleSelectCustomerById(customerId: string) {
     // inputText.value = `请帮我分析客户「${customerName}」的当前情况，并给出下一步建议。`
   }
   await nextTick()
-  focusChatTextarea()
+  if (!isMobile.value) {
+    focusChatTextarea()
+  }
 }
 
 async function handleSelectEmployeeById(employeeId: string) {
@@ -2881,6 +3390,108 @@ function emitChatComposerNarrowState(force = false) {
   })
 }
 
+function isMobileComposerFocused(): boolean {
+  if (typeof document === 'undefined') return false
+  const activeElement = document.activeElement
+  if (!activeElement) return false
+  return activeElement === mobileChatInputRef.value || Boolean(chatComposerWrapRef.value?.contains(activeElement))
+}
+
+function updateMobileVisualViewportTopOffset() {
+  if (!isMobile.value || typeof window === 'undefined') {
+    mobileVisualViewportTopOffset.value = 0
+    return
+  }
+  const offsetTop = window.visualViewport?.offsetTop ?? 0
+  mobileVisualViewportTopOffset.value = offsetTop > 1 ? Math.round(offsetTop) : 0
+}
+
+function updateMobileKeyboardInset() {
+  updateMobileVisualViewportTopOffset()
+  if (!isMobile.value || typeof window === 'undefined' || !isMobileComposerFocused()) {
+    mobileKeyboardInset.value = 0
+    return
+  }
+
+  const visualViewport = window.visualViewport
+  if (!visualViewport) {
+    mobileKeyboardInset.value = 0
+    return
+  }
+
+  const coveredHeight = Math.max(0, window.innerHeight - visualViewport.height - visualViewport.offsetTop)
+  mobileKeyboardInset.value = coveredHeight > MOBILE_KEYBOARD_VISIBLE_THRESHOLD_PX
+    ? Math.round(coveredHeight + MOBILE_KEYBOARD_INSET_GAP_PX)
+    : 0
+}
+
+function clearMobileKeyboardInsetTracking() {
+  if (mobileKeyboardInsetTrackTimer != null) {
+    clearTimeout(mobileKeyboardInsetTrackTimer)
+    mobileKeyboardInsetTrackTimer = null
+  }
+}
+
+function startMobileKeyboardInsetTracking() {
+  if (!isMobile.value) return
+  clearMobileKeyboardInsetTracking()
+  const stopAt = Date.now() + MOBILE_KEYBOARD_TRACK_DURATION_MS
+
+  const tick = () => {
+    updateMobileKeyboardInset()
+    if (!isMobile.value || !isMobileComposerFocused() || Date.now() >= stopAt) {
+      mobileKeyboardInsetTrackTimer = null
+      return
+    }
+    mobileKeyboardInsetTrackTimer = setTimeout(tick, MOBILE_KEYBOARD_TRACK_INTERVAL_MS)
+  }
+
+  mobileKeyboardInsetTrackTimer = setTimeout(tick, MOBILE_KEYBOARD_TRACK_INTERVAL_MS)
+}
+
+function scheduleMobileKeyboardInsetUpdate(trackKeyboardOpening: boolean | Event = false) {
+  updateMobileKeyboardInset()
+  if (!isMobileComposerFocused()) {
+    clearMobileKeyboardInsetTracking()
+  }
+  if (mobileKeyboardInsetTimer != null) {
+    clearTimeout(mobileKeyboardInsetTimer)
+  }
+  mobileKeyboardInsetTimer = setTimeout(() => {
+    mobileKeyboardInsetTimer = null
+    updateMobileKeyboardInset()
+  }, 260)
+  if (trackKeyboardOpening === true) {
+    startMobileKeyboardInsetTracking()
+  }
+}
+
+function registerMobileKeyboardInsetListeners() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return
+  window.visualViewport?.addEventListener('resize', scheduleMobileKeyboardInsetUpdate)
+  window.visualViewport?.addEventListener('scroll', scheduleMobileKeyboardInsetUpdate)
+  window.addEventListener('orientationchange', scheduleMobileKeyboardInsetUpdate)
+  document.addEventListener('focusin', scheduleMobileKeyboardInsetUpdate, true)
+  document.addEventListener('focusout', scheduleMobileKeyboardInsetUpdate, true)
+}
+
+function unregisterMobileKeyboardInsetListeners() {
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    window.visualViewport?.removeEventListener('resize', scheduleMobileKeyboardInsetUpdate)
+    window.visualViewport?.removeEventListener('scroll', scheduleMobileKeyboardInsetUpdate)
+    window.removeEventListener('orientationchange', scheduleMobileKeyboardInsetUpdate)
+    document.removeEventListener('focusin', scheduleMobileKeyboardInsetUpdate, true)
+    document.removeEventListener('focusout', scheduleMobileKeyboardInsetUpdate, true)
+  }
+  if (mobileKeyboardInsetTimer != null) {
+    clearTimeout(mobileKeyboardInsetTimer)
+    mobileKeyboardInsetTimer = null
+  }
+  clearMobileKeyboardInsetTracking()
+  mobileKeyboardInset.value = 0
+  mobileVisualViewportTopOffset.value = 0
+}
+
 onMounted(async () => {
   offSelectedCustomerDetailRefresh = appEvents.on<CustomerDetailRefreshPayload>(
     APP_EVENT.CUSTOMER_DETAIL_REFRESH,
@@ -2902,6 +3513,8 @@ onMounted(async () => {
     chatMessagesResizeObserver = new ResizeObserver(updateMessagesScrollbarOffset)
     chatMessagesResizeObserver.observe(messagesContainer.value)
   }
+  registerMobileKeyboardInsetListeners()
+  document.addEventListener('touchmove', handleMobileSummaryTouchMove, { passive: false })
   emitChatComposerNarrowState(true)
   resizeChatTextarea()
   await Promise.all([
@@ -2914,7 +3527,9 @@ onMounted(async () => {
   if (abortChatViewMountSequence) return
   await nextTick()
   if (abortChatViewMountSequence) return
-  chatStore.requestComposerFocus()
+  if (!isMobile.value) {
+    chatStore.requestComposerFocus()
+  }
 })
 
 onBeforeUnmount(() => {
@@ -2933,6 +3548,9 @@ onBeforeUnmount(() => {
   }
   abortChatVoiceRecording()
   transcriptionToken += 1
+  closeMobileCustomerSummary()
+  unregisterMobileKeyboardInsetListeners()
+  document.removeEventListener('touchmove', handleMobileSummaryTouchMove)
   unregisterAiQuotaResumeSendHandler()
   customerPanelResizeObserver?.disconnect()
   customerPanelResizeObserver = null
@@ -2952,6 +3570,7 @@ watch(isMobile, () => {
   void nextTick(() => {
     emitChatComposerNarrowState(true)
     updateMessagesScrollbarOffset()
+    scheduleMobileKeyboardInsetUpdate()
   })
 })
 
@@ -3041,11 +3660,89 @@ async function ensureChatAiAvailableForSend(): Promise<boolean> {
   return ensureAiAvailableForSend()
 }
 
+function shouldDetectTencentMeetingIntent(text: string) {
+  if (!text || !userStore.hasPermission('tencentMeeting:view')) return false
+  if (!isCustomerContextChat.value) return false
+  return ['开会', '会议', '腾讯会议', '会议纪要', '录音', '参会', '转写'].some(keyword => text.includes(keyword))
+}
+
+async function maybeOpenTencentMeetingPrompt(text: string): Promise<boolean> {
+  const customerId = currentSessionCustomerId.value || selectedCustomerId.value
+  if (!customerId || !shouldDetectTencentMeetingIntent(text)) return false
+  if (tencentMeetingPromptBypassText.value === text) return false
+
+  tencentMeetingCandidatesLoading.value = true
+  pendingTencentMeetingPromptText.value = text
+  tencentMeetingPromptVisible.value = true
+  try {
+    const candidates = await getCustomerTencentMeetingCandidates(customerId, {
+      inputText: text,
+      limit: 8
+    })
+    tencentMeetingCandidates.value = candidates
+    selectedTencentMeetingCandidateId.value = candidates[0]?.id || ''
+    if (candidates.length === 0) {
+      tencentMeetingPromptVisible.value = false
+      return false
+    }
+    return true
+  } catch (error) {
+    console.error('Load Tencent Meeting candidates failed:', error)
+    tencentMeetingPromptVisible.value = false
+    return false
+  } finally {
+    tencentMeetingCandidatesLoading.value = false
+  }
+}
+
+function skipTencentMeetingPromptAndSend() {
+  tencentMeetingPromptBypassText.value = pendingTencentMeetingPromptText.value
+  tencentMeetingPromptVisible.value = false
+  void handleSend()
+}
+
+async function bindTencentMeetingCandidateAndSend() {
+  const customerId = currentSessionCustomerId.value || selectedCustomerId.value
+  if (!customerId || !selectedTencentMeetingCandidateId.value) return
+  tencentMeetingBinding.value = true
+  try {
+    await bindTencentMeeting({
+      customerId,
+      meetingId: selectedTencentMeetingCandidateId.value
+    })
+    ElMessage.success('腾讯会议已关联')
+    appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, {
+      customerId,
+      source: 'chat',
+      modules: ['tencentMeetings']
+    })
+    tencentMeetingPromptBypassText.value = pendingTencentMeetingPromptText.value
+    tencentMeetingPromptVisible.value = false
+    void handleSend()
+  } finally {
+    tencentMeetingBinding.value = false
+  }
+}
+
+function formatChatDate(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
   const hasKnowledge = selectedKnowledgeItems.value.length > 0
   if ((!text && !hasFiles && !hasKnowledge) || chatStore.currentSessionIsStreaming || isUploading.value) return
+  if (text && await maybeOpenTencentMeetingPrompt(text)) return
   if (!(await ensureChatAiAvailableForSend())) return
 
   isPinnedToBottom.value = true
@@ -3180,7 +3877,7 @@ async function refreshCrmContextAfterSend(effectiveAppCode: string, completedSes
   appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, {
     customerId,
     source: 'chat',
-    modules: ['contacts', 'followUps', 'tasks', 'schedules']
+    modules: ['contacts', 'followUps', 'tasks', 'schedules', 'tencentMeetings']
   })
 }
 
@@ -3304,8 +4001,25 @@ async function handleChatRecordedAudioStop() {
 
 async function handleStartChatAudioRecording() {
   if (isRecording.value || isTranscribing.value) return
+  const useMobileAudioApi = isMobile.value
+  const hasAudioInput = useMobileAudioApi
+    ? hasMobileAudioInputSupport()
+    : Boolean(navigator.mediaDevices?.getUserMedia)
+  const useMobileAudioFileCapture = useMobileAudioApi
+    && canCaptureMobileAudioFile()
+    && (!hasAudioInput || typeof MediaRecorder === 'undefined')
+
+  if (useMobileAudioFileCapture) {
+    speechInputBase = inputText.value.trim()
+    const capturedFile = await captureMobileAudioFile()
+    if (!capturedFile) return
+    if (!(await ensureChatAudioTranscriptionSupported())) return
+    await transcribeChatRecordedAudio(capturedFile)
+    return
+  }
+
   if (!(await ensureChatAudioTranscriptionSupported())) return
-  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+  if (!hasAudioInput || typeof MediaRecorder === 'undefined') {
     ElMessage.warning('当前浏览器不支持录音，请改用文字输入')
     return
   }
@@ -3313,7 +4027,9 @@ async function handleStartChatAudioRecording() {
     speechInputBase = inputText.value.trim()
     skipNextTranscription = false
     recordedChunks = []
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaStream = useMobileAudioApi
+      ? await requestMobileAudioStream({ audio: true })
+      : await navigator.mediaDevices.getUserMedia({ audio: true })
     const mimeType = resolveChatRecordingMimeType()
     mediaRecorder = mimeType
       ? new MediaRecorder(mediaStream, { mimeType })
@@ -3675,8 +4391,13 @@ function applyKnowledgeDocPrompt(text: string) {
   chatStore.requestComposerFocus()
 }
 
+function openMobileMainMenu() {
+  appEvents.emit(APP_EVENT.MOBILE_MAIN_MENU_OPEN)
+}
+
 async function handleNewSession() {
   isPinnedToBottom.value = true
+  closeMobileCustomerSummary()
   if (route.query.customerId || route.query.employeeId || route.query.relationId || route.query.sessionId) {
     await router.replace({ path: '/chat' })
   }
@@ -3685,18 +4406,23 @@ async function handleNewSession() {
   if (isMobile.value) {
     mobilePanel.value = 'chat'
   }
-  chatStore.requestComposerFocus()
+  if (!isMobile.value) {
+    chatStore.requestComposerFocus()
+  }
 }
 
 async function handleSelectSession(sessionId: string) {
   // if (chatStore.currentSessionId === sessionId && currentView.value === 'chat') return
   isPinnedToBottom.value = true
+  closeMobileCustomerSummary()
   currentView.value = 'chat'
-  await chatStore.selectSession(sessionId)
   if (isMobile.value) {
     mobilePanel.value = 'chat'
   }
-  chatStore.requestComposerFocus()
+  await chatStore.selectSession(sessionId)
+  if (!isMobile.value) {
+    chatStore.requestComposerFocus()
+  }
 }
 
 async function applyChatSessionRouteQuery() {
@@ -3776,17 +4502,20 @@ watch(
       selectedCustomerId.value = null
       selectedCustomer.value = null
       selectedCustomerLoading.value = false
+      activeCustomerConversationTab.value = 'ai'
+      customerWecomTabs.value = []
+      customerWecomMessages.value = []
       return
     }
 
-    clearChatCustomerAiPolling()
-    if (selectedCustomerId.value === customerId && selectedCustomer.value) return
-    selectedCustomerId.value = customerId
-    selectedEmployeeId.value = null
-    selectedEmployee.value = null
-    selectedRelationId.value = null
-    selectedRelationDetail.value = null
-    void ensureSelectedCustomerDetail(customerId)
+  clearChatCustomerAiPolling()
+  if (selectedCustomerId.value === customerId && selectedCustomer.value) return
+  selectedCustomerId.value = customerId
+  selectedEmployeeId.value = null
+  selectedEmployee.value = null
+  selectedRelationId.value = null
+  selectedRelationDetail.value = null
+  void ensureSelectedCustomerDetail(customerId)
   },
   { immediate: true }
 )
@@ -4020,8 +4749,121 @@ void sendQuickMessage
   backdrop-filter: blur(14px);
 }
 
+.wk-chat-customer-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--wk-border-subtle);
+  background: #ffffff;
+  padding: 8px 16px;
+}
+
+.wk-chat-customer-tabs__item {
+  display: inline-flex;
+  height: 32px;
+  max-width: 180px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0 10px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.wk-chat-customer-tabs__item span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wk-chat-customer-tabs__item .material-symbols-outlined {
+  flex: 0 0 auto;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.wk-chat-customer-tabs__item:hover,
+.wk-chat-customer-tabs__item.is-active {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.wk-chat-customer-tabs__loading {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: #94a3b8;
+}
+
+.wk-chat-wecom-pane {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  background: #f8fafc;
+}
+
+.wk-chat-wecom-pane__notice {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 8px 12px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wk-chat-wecom-pane__notice .material-symbols-outlined {
+  font-size: 17px;
+}
+
+.wk-chat-wecom-pane__messages {
+  flex: 1;
+}
+
+@media (max-width: 767px) {
+  .wk-chat-customer-header {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 40;
+    padding-top: max(8px, env(safe-area-inset-top));
+    transition: transform 160ms cubic-bezier(0.2, 0, 0, 1);
+    will-change: transform;
+  }
+
+  .wk-chat-customer-header-spacer {
+    display: block;
+    height: calc(45px + max(8px, env(safe-area-inset-top)));
+  }
+}
+
+.wk-scroll-to-bottom-button {
+  width: 44px;
+  height: 44px;
+  border-color: #d4d4d8;
+  box-shadow:
+    0 12px 34px rgb(15 23 42 / 0.11),
+    0 0 18px 8px rgb(203 213 225 / 0.12);
+}
+
 .wk-chat-composer-wrap {
   background: linear-gradient(to top, var(--wk-bg-page) 72%, rgb(var(--wk-bg-page-rgb) / 0));
+  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform;
 }
 
 .wk-chat-composer {
@@ -4037,6 +4879,320 @@ void sendQuickMessage
   box-shadow:
     0 22px 78px rgb(var(--wk-shadow-color) / 0.11),
     0 0 0 1px rgb(var(--wk-primary-rgb) / 0.12);
+}
+
+.wk-mobile-chat-floating-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wk-mobile-chat-menu-fab {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 255 255 / 0.78);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.72);
+  color: #0d0d0d;
+  box-shadow:
+    0 16px 42px rgb(15 23 42 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.92);
+  backdrop-filter: blur(18px);
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-chat-menu-fab:active {
+  transform: scale(0.94);
+}
+
+.wk-mobile-chat-menu-fab:hover {
+  background: rgb(255 255 255 / 0.88);
+}
+
+.wk-mobile-chat-actions {
+  display: inline-flex;
+  height: 42px;
+  min-width: 116px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.75);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.5);
+  box-shadow:
+    0 18px 50px rgb(15 23 42 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.9);
+  backdrop-filter: blur(18px);
+}
+
+.wk-mobile-chat-actions--single {
+  min-width: 58px;
+}
+
+.wk-mobile-chat-actions__btn {
+  display: inline-flex;
+  width: 56px;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: #0d0d0d;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-chat-actions__btn:active {
+  transform: scale(0.94);
+}
+
+.wk-mobile-chat-actions__btn:hover {
+  background: rgb(13 13 13 / 0.05);
+}
+
+.wk-mobile-chat-actions__divider {
+  width: 1px;
+  height: 22px;
+  background: rgb(13 13 13 / 0.08);
+}
+
+.wk-mobile-composer-row {
+  min-height: 40px;
+  align-items: center;
+}
+
+.wk-mobile-composer-icon-button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: #0d0d0d;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-composer-icon-button:hover {
+  background: var(--wk-bg-surface-hover);
+}
+
+.wk-mobile-composer-icon-button:active {
+  transform: scale(0.94);
+}
+
+.wk-mobile-composer-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.wk-mobile-model-trigger--icon {
+  border-width: 1px;
+  border-style: solid;
+  padding: 0;
+}
+
+.wk-mobile-composer-textarea {
+  box-sizing: border-box;
+  min-height: 40px;
+  max-height: 184px;
+  line-height: 24px;
+  scrollbar-gutter: stable;
+}
+
+.wk-mobile-composer-textarea::placeholder {
+  line-height: 24px;
+}
+
+.wk-mobile-selected-app-row {
+  padding: 0 2px 2px;
+}
+
+.wk-mobile-customer-summary {
+  position: fixed;
+  inset: 0;
+  z-index: 3400;
+  pointer-events: auto;
+}
+
+.wk-mobile-customer-summary__backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgb(0 0 0 / 0.18);
+  backdrop-filter: blur(1px);
+}
+
+.wk-mobile-customer-summary__sheet {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 28px 28px 0 0;
+  background: var(--wk-bg-surface);
+  box-shadow: 0 -18px 55px rgb(15 23 42 / 0.18);
+  transition: height 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wk-mobile-customer-summary__sheet.is-dragging {
+  transition: none;
+}
+
+.wk-mobile-customer-summary__header {
+  flex-shrink: 0;
+  padding: 12px 16px 14px;
+  border-bottom: 1px solid var(--wk-border-subtle);
+  background: color-mix(in srgb, var(--wk-bg-surface) 96%, transparent);
+  touch-action: none;
+  user-select: none;
+}
+
+.wk-mobile-customer-summary__handle {
+  display: block;
+  width: 44px;
+  height: 5px;
+  margin: 0 auto 10px;
+  border-radius: 9999px;
+  background: #d1d5db;
+}
+
+.wk-mobile-customer-summary__title-row {
+  display: flex;
+  min-height: 44px;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.wk-mobile-customer-summary__title {
+  display: -webkit-box;
+  min-width: 0;
+  max-height: 44px;
+  overflow: hidden;
+  color: var(--wk-text-primary);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.wk-mobile-customer-summary__actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.wk-mobile-customer-summary__info {
+  display: inline-flex;
+  height: 38px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 9999px;
+  background: #f1f1f1;
+  color: #0d0d0d;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 12px;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-customer-summary__close {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #f1f1f1;
+  color: #0d0d0d;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-customer-summary__info:active,
+.wk-mobile-customer-summary__close:active {
+  transform: scale(0.94);
+}
+
+.wk-mobile-customer-summary__body {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+.wk-mobile-customer-summary__sheet.has-voice-action .wk-mobile-customer-summary__body {
+  padding-bottom: max(92px, calc(env(safe-area-inset-bottom) + 92px));
+}
+
+.wk-mobile-customer-summary__voice {
+  position: absolute;
+  right: 18px;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: inline-flex;
+  height: 52px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.92);
+  padding: 0 18px;
+  color: #0d0d0d;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 16px 42px rgb(15 23 42 / 0.18);
+  backdrop-filter: blur(14px);
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.wk-mobile-customer-summary__voice:active {
+  transform: scale(0.96);
+}
+
+.wk-mobile-customer-summary-fade-enter-active,
+.wk-mobile-customer-summary-fade-leave-active {
+  transition: opacity 180ms ease;
+}
+
+.wk-mobile-customer-summary-fade-enter-from,
+.wk-mobile-customer-summary-fade-leave-to {
+  opacity: 0;
+}
+
+.wk-mobile-customer-summary-fade-enter-active .wk-mobile-customer-summary__sheet,
+.wk-mobile-customer-summary-fade-leave-active .wk-mobile-customer-summary__sheet {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wk-mobile-customer-summary-fade-enter-from .wk-mobile-customer-summary__sheet,
+.wk-mobile-customer-summary-fade-leave-to .wk-mobile-customer-summary__sheet {
+  transform: translateY(100%);
+}
+
+.wk-mobile-summary-voice-enter-active,
+.wk-mobile-summary-voice-leave-active {
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.wk-mobile-summary-voice-enter-from,
+.wk-mobile-summary-voice-leave-to {
+  opacity: 0;
+  transform: translateY(10px) scale(0.96);
 }
 
 .wk-recording-indicator {
@@ -4135,6 +5291,13 @@ void sendQuickMessage
 
 .wk-chat-messages--scrollable .wk-chat-messages__inner {
   width: calc(100% + var(--wk-chat-messages-scrollbar-offset));
+}
+
+.wk-chat-messages--empty-chat .wk-chat-messages__inner {
+  display: flex;
+  min-height: 100%;
+  align-items: center;
+  justify-content: center;
 }
 
 .wk-chat-message {
@@ -4304,6 +5467,18 @@ void sendQuickMessage
   padding: 10px;
 }
 
+.wk-chat-upload-menu--mobile {
+  padding: 12px 8px max(12px, env(safe-area-inset-bottom));
+}
+
+.wk-chat-upload-menu__mobile-handle {
+  width: 44px;
+  height: 5px;
+  margin: 0 auto 10px;
+  border-radius: 999px;
+  background: #d1d5db;
+}
+
 .wk-chat-upload-menu__item {
   width: 100%;
   display: flex;
@@ -4325,16 +5500,38 @@ void sendQuickMessage
   cursor: not-allowed;
 }
 
+.wk-chat-upload-menu--mobile .wk-chat-upload-menu__item {
+  height: 52px;
+  gap: 14px;
+  padding: 8px 12px;
+  border-radius: 14px;
+}
+
 .wk-chat-upload-menu__icon {
   font-size: 18px;
   line-height: 1;
   color: var(--wk-text-primary);
 }
 
+.wk-chat-upload-menu--mobile .wk-chat-upload-menu__icon {
+  font-size: 22px;
+}
+
 .wk-chat-upload-menu__label {
   font-size: 14px;
   line-height: 1.2;
   font-weight: 400;
+}
+
+.wk-chat-upload-menu--mobile .wk-chat-upload-menu__label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wk-chat-upload-menu__label--grow {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
 }
 
 .wk-chat-upload-menu__apps-ref {
@@ -4381,6 +5578,55 @@ void sendQuickMessage
   line-height: 1;
 }
 
+.wk-tm-candidate-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.wk-tm-candidate {
+  width: 100%;
+  min-height: 64px;
+  align-items: flex-start;
+  margin-right: 0;
+  border: 1px solid var(--wk-border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--wk-bg-surface);
+  transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.wk-tm-candidate:hover,
+.wk-tm-candidate.is-selected {
+  border-color: color-mix(in srgb, var(--wk-primary) 45%, var(--wk-border-subtle));
+  background: color-mix(in srgb, var(--wk-primary) 5%, var(--wk-bg-surface));
+}
+
+.wk-tm-candidate :deep(.el-radio__label) {
+  flex: 1;
+  min-width: 0;
+  color: var(--wk-text-primary);
+}
+
+.wk-tm-candidate strong,
+.wk-tm-candidate small {
+  display: block;
+  min-width: 0;
+}
+
+.wk-tm-candidate strong {
+  color: var(--wk-text-primary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.wk-tm-candidate small {
+  margin-top: 3px;
+  color: var(--wk-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
 </style>
 
 <style>
@@ -4417,6 +5663,39 @@ void sendQuickMessage
   overflow: visible !important;
 }
 
+.wk-chat-upload-menu-popper--mobile.el-popper {
+  position: fixed !important;
+  left: 16px !important;
+  right: 16px !important;
+  bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  top: auto !important;
+  width: auto !important;
+  max-width: none !important;
+  transform: none !important;
+  border-radius: 24px !important;
+  box-shadow: 0 18px 48px rgb(var(--wk-shadow-color) / 0.32) !important;
+}
+
+.wk-chat-mobile-sheet-enter-active,
+.wk-chat-mobile-sheet-leave-active {
+  transform-origin: center bottom;
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease;
+}
+
+.wk-chat-mobile-sheet-enter-from,
+.wk-chat-mobile-sheet-leave-to {
+  opacity: 0;
+  transform: translateY(calc(100% + 24px)) !important;
+}
+
+.wk-chat-mobile-sheet-enter-to,
+.wk-chat-mobile-sheet-leave-from {
+  opacity: 1;
+  transform: translateY(0) !important;
+}
+
 .wk-chat-upload-menu-popper .el-popper__arrow,
 .wk-chat-upload-menu-popper .el-popper__arrow::before {
   display: none !important;
@@ -4428,7 +5707,7 @@ void sendQuickMessage
 
 .wk-chat-model-popper.el-popper {
   padding: 0 !important;
-  border-radius: 14px !important;
+  border-radius: 8px !important;
   overflow: hidden;
   border: 1px solid var(--wk-border-subtle) !important;
   background: var(--wk-bg-surface) !important;
@@ -4496,6 +5775,31 @@ void sendQuickMessage
 .wk-chat-model-menu__more:hover {
   border-color: color-mix(in srgb, var(--wk-primary) 24%, var(--wk-border-subtle));
   background: color-mix(in srgb, var(--wk-primary) 8%, var(--wk-bg-surface));
+}
+
+@media (max-width: 767px) {
+  :global(.wk-chat-model-select-popper.el-popper) {
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+  }
+
+  :global(.wk-chat-model-select-popper .el-select-dropdown) {
+    max-width: 100%;
+    border-radius: 8px;
+  }
+
+  :global(.wk-chat-model-select-popper .el-select-dropdown__item) {
+    padding-right: 12px;
+  }
+
+  :global(.wk-chat-model-select-popper .el-popper__arrow) {
+    display: none !important;
+  }
 }
 
 

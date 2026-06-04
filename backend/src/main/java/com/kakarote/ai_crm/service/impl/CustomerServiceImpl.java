@@ -676,6 +676,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         vo.setStage(toStr(row.get("stage")));
         vo.setLevel(toStr(row.get("level")));
         vo.setSource(toStr(row.get("source")));
+        vo.setWecomCustomer(toBoolean(row.get("wecom_customer")));
+        vo.setWecomCorpId(toStr(row.get("wecom_corp_id")));
+        vo.setWecomExternalUserId(toStr(row.get("wecom_external_user_id")));
+        vo.setWecomSyncedAt(toDate(row.get("wecom_synced_at")));
         vo.setWebsite(toStr(row.get("website")));
         vo.setLogo(toStr(row.get("logo")));
         vo.setLogoUrl(customerLogoService.resolveLogoUrl(vo.getLogo()));
@@ -740,6 +744,18 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (val == null) return null;
         if (val instanceof Number n) return n.intValue();
         try { return Integer.valueOf(val.toString()); } catch (NumberFormatException e) { return null; }
+    }
+
+    /**
+     * 转换为Boolean。
+     */
+    private Boolean toBoolean(Object val) {
+        if (val == null) return null;
+        if (val instanceof Boolean bool) return bool;
+        if (val instanceof Number n) return n.intValue() != 0;
+        String text = val.toString().trim();
+        if (StrUtil.isBlank(text)) return null;
+        return Boolean.parseBoolean(text) || "1".equals(text);
     }
 
     /**

@@ -73,9 +73,18 @@
                 <span v-else class="text-xs font-bold text-slate-400">{{ row.companyName?.charAt(0) || '?' }}</span>
               </div>
               <div class="min-w-0 flex-1">
-                <h4 class="truncate text-sm font-semibold leading-tight text-[#051a3e] transition-colors group-hover:text-primary">
-                  {{ row.companyName || '-' }}
-                </h4>
+                <div class="flex min-w-0 items-center gap-1.5">
+                  <h4 class="min-w-0 truncate text-sm font-semibold leading-tight text-[#051a3e] transition-colors group-hover:text-primary">
+                    {{ row.companyName || '-' }}
+                  </h4>
+                  <span
+                    v-if="row.wecomCustomer"
+                    class="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold leading-none text-emerald-700"
+                    title="企业微信客户"
+                  >
+                    企微
+                  </span>
+                </div>
                 <p class="mt-0.5 text-[10px] font-medium text-slate-400">
                   {{ industryLabel(row) || '通用行业' }}
                 </p>

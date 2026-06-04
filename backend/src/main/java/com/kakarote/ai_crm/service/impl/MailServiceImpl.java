@@ -54,6 +54,7 @@ import com.kakarote.ai_crm.service.IMailService;
 import com.kakarote.ai_crm.utils.MailMimeParser;
 import com.kakarote.ai_crm.utils.SecretTextCipher;
 import com.kakarote.ai_crm.utils.UserUtil;
+import jakarta.annotation.PostConstruct;
 import jakarta.mail.FetchProfile;
 import jakarta.mail.Folder;
 import jakarta.mail.Message;
@@ -73,6 +74,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -85,6 +87,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -194,6 +199,32 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private final RestTemplate restTemplate = new RestTemplate();
     private final ConcurrentHashMap<Long, ReentrantLock> accountSyncLocks = new ConcurrentHashMap<>();
 
+    @PostConstruct
+    void configureRestTemplateProxy() {
+        MailIntegrationProperties.ProxyConfig proxyConfig = properties.getProxy();
+        if (proxyConfig == null || !proxyConfig.isUsable()) {
+            return;
+        }
+        URI proxyUri;
+        try {
+            proxyUri = parseProxyUri(proxyConfig.getUrl());
+        } catch (IllegalArgumentException e) {
+            log.warn("Mail HTTP proxy is ignored because url is invalid: {}", proxyConfig.getUrl());
+            return;
+        }
+        String host = proxyUri.getHost();
+        int port = proxyUri.getPort();
+        if (StrUtil.isBlank(host) || port < 0) {
+            log.warn("Mail HTTP proxy is ignored because url is invalid: {}", proxyConfig.getUrl());
+            return;
+        }
+
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setProxy(new Proxy(resolveProxyType(proxyUri.getScheme()), new InetSocketAddress(host, port)));
+        restTemplate.setRequestFactory(requestFactory);
+        log.info("Mail HTTP proxy enabled: {}://{}:{}", StrUtil.blankToDefault(proxyUri.getScheme(), "http"), host, port);
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MailAccountVO bindImapAccount(MailImapBindBO bindBO) {
@@ -269,7 +300,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                     .build(true)
                     .toUriString();
         } else {
-            authorizeUrl = UriComponentsBuilder.fromUriString("https://login.microsoftonline.com/common/oauth2/v2.0/authorize")
+            authorizeUrl = UriComponentsBuilder.fromUriString(outlookOAuthUrl(oauthProvider, "authorize"))
                     .queryParam("client_id", oauthProvider.getClientId())
                     .queryParam("redirect_uri", oauthProvider.getRedirectUri())
                     .queryParam("response_type", "code")
@@ -1137,7 +1168,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                                       SyncedMail syncedMail, int processedCount, int totalCount) {
         boolean processed = true;
         try {
-            if (saveSyncedMail(account, syncedMail)) {
+            if (saveSyncedMail(account, syncLog, syncedMail, processedCount, totalCount)) {
                 result.setSavedCount(result.getSavedCount() + 1);
             } else {
                 result.setSkippedCount(result.getSkippedCount() + 1);
@@ -1159,14 +1190,19 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         return processed;
     }
 
-    private boolean saveSyncedMail(MailAccount account, SyncedMail syncedMail) {
+    private boolean saveSyncedMail(MailAccount account, MailSyncLog syncLog, SyncedMail syncedMail,
+                                   int processedCount, int totalCount) {
+        String messageRef = buildMessageLogRef(syncedMail, processedCount, totalCount);
+        logSyncStage(syncLog, account, "save.start", messageRef);
         Long existing = mailMessageMapper.selectCount(new LambdaQueryWrapper<MailMessage>()
                 .eq(MailMessage::getAccountId, account.getAccountId())
                 .eq(MailMessage::getProviderMessageId, syncedMail.providerMessageId()));
         if (existing != null && existing > 0) {
+            logSyncStage(syncLog, account, "save.duplicate", messageRef);
             return false;
         }
 
+        logSyncStage(syncLog, account, "save.extract", messageRef);
         MatchResult match = matchContactAndCustomer(account.getTenantId(), syncedMail.fromAddress());
         String bodySyncMode = resolveBodySyncMode(account.getBodySyncMode());
         String attachmentSyncMode = resolveAttachmentSyncMode(account.getAttachmentSyncMode());
@@ -1175,6 +1211,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         boolean retainRaw = BODY_SYNC_FULL.equals(bodySyncMode) || ATTACHMENT_SYNC_FULL.equals(attachmentSyncMode);
         String rawPath = null;
         if (retainRaw && rawBytes != null && rawBytes.length > 0) {
+            logSyncStage(syncLog, account, "save.raw.upload", messageRef + ", bytes=" + rawBytes.length);
             rawPath = "mail/" + account.getTenantId() + "/" + account.getAccountId() + "/" + IdUtil.fastSimpleUUID() + ".eml";
             fileStorageService.upload(new ByteArrayInputStream(rawBytes), rawBytes.length, rawPath, "message/rfc822");
         }
@@ -1224,23 +1261,55 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         message.setCustomerId(match.customerId());
         message.setContactId(match.contactId());
         message.setSyncStatus("success");
+        logSyncStage(syncLog, account, "save.message.insert", messageRef);
         mailMessageMapper.insert(message);
+        logSyncStage(syncLog, account, "save.message.insert.done", messageRef + ", messageId=" + message.getMessageId());
 
+        logSyncStage(syncLog, account, "save.attachments", messageRef + ", attachments=" + syncedMail.attachments().size());
         saveAttachments(account, message, syncedMail.attachments());
+        logSyncStage(syncLog, account, "save.attachments.done", messageRef + ", messageId=" + message.getMessageId());
 
         String knowledgeText = buildKnowledgeText(message);
         if (StrUtil.isNotBlank(knowledgeText)) {
-            Long knowledgeId = knowledgeService.archiveText(
-                    buildKnowledgeFileName(message),
-                    knowledgeText,
-                    "email",
-                    message.getCustomerId(),
-                    StrUtil.maxLength(message.getSubject(), 500)
-            );
-            message.setKnowledgeId(knowledgeId);
-            mailMessageMapper.updateById(message);
+            logSyncStage(syncLog, account, "save.knowledge.enqueue", messageRef + ", messageId=" + message.getMessageId());
+            archiveMailKnowledgeAsync(account, message, knowledgeText);
         }
+        logSyncStage(syncLog, account, "save.done", messageRef + ", messageId=" + message.getMessageId());
         return true;
+    }
+
+    private String buildMessageLogRef(SyncedMail syncedMail, int processedCount, int totalCount) {
+        return "index=" + processedCount + "/" + totalCount
+                + ", providerMessageId=" + syncedMail.providerMessageId()
+                + ", subject=" + StrUtil.maxLength(StrUtil.blankToDefault(syncedMail.subject(), ""), 120);
+    }
+
+    private void archiveMailKnowledgeAsync(MailAccount account, MailMessage message, String knowledgeText) {
+        Long messageId = message.getMessageId();
+        String fileName = buildKnowledgeFileName(message);
+        String subject = StrUtil.maxLength(message.getSubject(), 500);
+        Long customerId = message.getCustomerId();
+        Thread.ofVirtual().name("mail-knowledge-archive-" + messageId).start(() -> {
+            TenantContextHolder.setTenantId(account.getTenantId());
+            AiContextHolder.bindThreadContext(account.getUserId(), account.getTenantId());
+            try {
+                log.info("mail knowledge archive start: accountId={}, messageId={}, subject={}",
+                        account.getAccountId(), messageId, subject);
+                Long knowledgeId = knowledgeService.archiveText(fileName, knowledgeText, "email", customerId, subject);
+                MailMessage update = new MailMessage();
+                update.setMessageId(messageId);
+                update.setKnowledgeId(knowledgeId);
+                mailMessageMapper.updateById(update);
+                log.info("mail knowledge archive finished: accountId={}, messageId={}, knowledgeId={}",
+                        account.getAccountId(), messageId, knowledgeId);
+            } catch (Exception e) {
+                log.warn("mail knowledge archive failed: accountId={}, messageId={}, error={}",
+                        account.getAccountId(), messageId, e.getMessage(), e);
+            } finally {
+                AiContextHolder.clearThreadContext();
+                TenantContextHolder.clear();
+            }
+        });
     }
 
     private void saveAttachments(MailAccount account, MailMessage message, List<SyncedAttachment> attachments) {
@@ -1337,7 +1406,13 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                                                 + ", uid=" + uid);
                             }
                             try {
+                                logSyncStage(syncLog, account, "imap.message.parse.start",
+                                        "Parsing folder=" + folderName + ", index=" + parsedCount + "/" + messages.length
+                                                + ", uid=" + uid);
                                 SyncedMail syncedMail = toSyncedMail(folderName, uid, mimeMessage);
+                                logSyncStage(syncLog, account, "imap.message.parse.done",
+                                        "Parsed folder=" + folderName + ", index=" + parsedCount + "/" + messages.length
+                                                + ", uid=" + uid);
                                 result.setFetchedCount(result.getFetchedCount() + 1);
                                 if (!processSyncedMail(account, syncLog, result, syncedMail, parsedCount, messages.length)) {
                                     folderHadFailure = true;
@@ -1635,7 +1710,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private OAuthToken postToken(String provider, MultiValueMap<String, String> form) {
         String tokenUrl = PROVIDER_GMAIL.equals(provider)
                 ? "https://oauth2.googleapis.com/token"
-                : "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+                : outlookOAuthUrl(oauthProvider(provider), "token");
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
         ResponseEntity<Map> response = restTemplate.postForEntity(tokenUrl, new HttpEntity<>(form, headers), Map.class);
@@ -1649,6 +1724,26 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                 asString(body.get("refresh_token")),
                 Instant.now().plusSeconds(Math.max(60, expiresIn)).toEpochMilli()
         );
+    }
+
+    private String outlookOAuthUrl(MailIntegrationProperties.OAuthProvider oauthProvider, String action) {
+        String tenant = StrUtil.blankToDefault(oauthProvider.getTenant(), "common");
+        return "https://login.microsoftonline.com/" + tenant + "/oauth2/v2.0/" + action;
+    }
+
+    private URI parseProxyUri(String proxyUrl) {
+        String trimmed = StrUtil.trim(proxyUrl);
+        if (!trimmed.contains("://")) {
+            trimmed = "http://" + trimmed;
+        }
+        return URI.create(trimmed);
+    }
+
+    private Proxy.Type resolveProxyType(String scheme) {
+        if (StrUtil.equalsAnyIgnoreCase(scheme, "socks", "socks5")) {
+            return Proxy.Type.SOCKS;
+        }
+        return Proxy.Type.HTTP;
     }
 
     private OAuthProfile fetchOAuthProfile(String provider, String accessToken) throws Exception {

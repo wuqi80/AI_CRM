@@ -26,6 +26,10 @@ CREATE TABLE crm_customer (
     owner_id BIGINT NOT NULL,
     level CHAR(1),
     source VARCHAR(100),
+    wecom_customer BOOLEAN DEFAULT FALSE,
+    wecom_corp_id VARCHAR(128),
+    wecom_external_user_id VARCHAR(255),
+    wecom_synced_at TIMESTAMP(3),
     address VARCHAR(500),
     website VARCHAR(255),
     quotation DECIMAL(15,2) DEFAULT 0,
@@ -46,6 +50,9 @@ CREATE INDEX idx_customer_owner_id ON crm_customer (owner_id);
 CREATE INDEX idx_customer_stage ON crm_customer (stage);
 CREATE INDEX idx_customer_level ON crm_customer (level);
 CREATE INDEX idx_customer_create_time ON crm_customer (create_time);
+CREATE UNIQUE INDEX uk_customer_wecom_external ON crm_customer (wecom_corp_id, wecom_external_user_id)
+    WHERE wecom_customer = TRUE AND wecom_corp_id IS NOT NULL AND wecom_external_user_id IS NOT NULL AND status = 1;
+CREATE INDEX idx_customer_wecom_customer ON crm_customer (wecom_customer, update_time DESC);
 
 CREATE TRIGGER trg_customer_update_time
     BEFORE UPDATE ON crm_customer
@@ -59,6 +66,10 @@ COMMENT ON COLUMN crm_customer.stage IS '阶段: lead, qualified, proposal, nego
 COMMENT ON COLUMN crm_customer.owner_id IS '负责人ID';
 COMMENT ON COLUMN crm_customer.level IS '客户等级: A, B, C';
 COMMENT ON COLUMN crm_customer.source IS '客户来源';
+COMMENT ON COLUMN crm_customer.wecom_customer IS '是否企业微信客户';
+COMMENT ON COLUMN crm_customer.wecom_corp_id IS '企业微信企业ID';
+COMMENT ON COLUMN crm_customer.wecom_external_user_id IS '企业微信外部客户ID';
+COMMENT ON COLUMN crm_customer.wecom_synced_at IS '企业微信同步时间';
 COMMENT ON COLUMN crm_customer.status IS '状态: 0-禁用, 1-正常';
 
 -- ============================================
@@ -577,6 +588,241 @@ INSERT INTO crm_chat_session (session_id, user_id, agent_id, customer_id, title,
 (6002, 1, 3, 1001, '北京科技客户分析', 1, NOW());
 
 -- 插入示例聊天消息
+-- WeCom/SCRM schema
+CREATE TABLE IF NOT EXISTS crm_wecom_corp_config (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    corp_name VARCHAR(255),
+    agent_id VARCHAR(64),
+    suite_id VARCHAR(128),
+    permanent_code_encrypted TEXT,
+    auth_info_json TEXT,
+    auth_corp_info_json TEXT,
+    auth_status VARCHAR(32),
+    authorized_at TIMESTAMP(3),
+    unauthorized_at TIMESTAMP(3),
+    auth_user_id VARCHAR(255),
+    auth_user_name VARCHAR(255),
+    archive_secret_encrypted TEXT,
+    archive_private_key_encrypted TEXT,
+    archive_public_key_version VARCHAR(128),
+    archive_enabled BOOLEAN DEFAULT FALSE,
+    customer_contact_enabled BOOLEAN DEFAULT TRUE,
+    sync_enabled BOOLEAN DEFAULT TRUE,
+    last_sync_time TIMESTAMP(3),
+    last_sync_status VARCHAR(32),
+    last_sync_error TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_employee (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    user_id VARCHAR(255) NOT NULL,
+    crm_user_id BIGINT,
+    name VARCHAR(255),
+    alias VARCHAR(255),
+    department_list TEXT,
+    mobile VARCHAR(64),
+    email VARCHAR(255),
+    avatar VARCHAR(500),
+    qr_code VARCHAR(500),
+    position VARCHAR(255),
+    status INTEGER DEFAULT 1,
+    synced_at TIMESTAMP(3),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_external_customer (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    external_user_id VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    avatar VARCHAR(500),
+    type INTEGER,
+    gender INTEGER,
+    union_id VARCHAR(255),
+    position VARCHAR(255),
+    corp_name VARCHAR(255),
+    corp_full_name VARCHAR(500),
+    external_profile TEXT,
+    bind_status VARCHAR(32) DEFAULT 'UNBOUND',
+    customer_id BIGINT,
+    synced_at TIMESTAMP(3),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_external_customer_follow (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    external_customer_id BIGINT NOT NULL,
+    external_user_id VARCHAR(255) NOT NULL,
+    employee_id BIGINT,
+    employee_user_id VARCHAR(255) NOT NULL,
+    remark VARCHAR(500),
+    description TEXT,
+    add_way INTEGER,
+    state VARCHAR(255),
+    tags_json TEXT,
+    relation_create_time TIMESTAMP(3),
+    status INTEGER DEFAULT 1,
+    synced_at TIMESTAMP(3),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_group_chat (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    chat_id VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    owner_user_id VARCHAR(255),
+    member_list TEXT,
+    customer_list TEXT,
+    status INTEGER DEFAULT 1,
+    notice TEXT,
+    external_create_time TIMESTAMP(3),
+    synced_at TIMESTAMP(3),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_conversation (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    conversation_type VARCHAR(32) NOT NULL,
+    employee_id BIGINT,
+    employee_user_id VARCHAR(255),
+    external_customer_id BIGINT,
+    external_user_id VARCHAR(255),
+    group_chat_id BIGINT,
+    chat_id VARCHAR(255),
+    title VARCHAR(500),
+    peer_name VARCHAR(255),
+    peer_avatar VARCHAR(500),
+    customer_id BIGINT,
+    owner_user_id BIGINT,
+    last_msg_id VARCHAR(255),
+    last_msg_time TIMESTAMP(3),
+    last_msg_preview TEXT,
+    message_count INTEGER DEFAULT 0,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_message (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    conversation_id BIGINT NOT NULL,
+    corp_id VARCHAR(128),
+    msg_id VARCHAR(255) NOT NULL,
+    seq BIGINT,
+    action VARCHAR(32),
+    msg_type VARCHAR(64),
+    sender_id VARCHAR(255),
+    sender_type VARCHAR(32),
+    receiver_list TEXT,
+    msg_time TIMESTAMP(3),
+    content_text TEXT,
+    content_json TEXT,
+    media_id BIGINT,
+    sdk_file_id VARCHAR(500),
+    file_name VARCHAR(500),
+    file_size BIGINT,
+    file_url VARCHAR(500),
+    recalled BOOLEAN DEFAULT FALSE,
+    raw_json TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_media (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128),
+    msg_id VARCHAR(255),
+    sdk_file_id VARCHAR(500),
+    media_type VARCHAR(64),
+    file_name VARCHAR(500),
+    content_type VARCHAR(255),
+    file_size BIGINT,
+    file_path VARCHAR(500),
+    download_status VARCHAR(32) DEFAULT 'pending',
+    download_error TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_customer_binding (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    customer_id BIGINT NOT NULL,
+    external_customer_id BIGINT NOT NULL,
+    external_user_id VARCHAR(255),
+    corp_id VARCHAR(128),
+    bind_user_id BIGINT,
+    bind_time TIMESTAMP(3),
+    unbind_time TIMESTAMP(3),
+    status INTEGER DEFAULT 1,
+    remark VARCHAR(500),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_sync_cursor (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    cursor_type VARCHAR(64) NOT NULL,
+    cursor_key VARCHAR(255) NOT NULL,
+    cursor_value TEXT,
+    seq BIGINT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_sync_log (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128),
+    sync_type VARCHAR(64) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    fetched_count INTEGER DEFAULT 0,
+    saved_count INTEGER DEFAULT 0,
+    failed_count INTEGER DEFAULT 0,
+    started_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP(3),
+    error_message TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO manager_menu (menu_id, parent_id, realm, realm_name, type)
+VALUES
+    (2400, 0, 'wecomEmployeeSession', '企微员工会话', 3),
+    (2401, 2400, 'wecomEmployeeSession:view', '查看列表', 5),
+    (2402, 2400, 'wecomEmployeeSession:detail', '查看详情', 5),
+    (2410, 0, 'wecomCustomerSession', '企微客户会话', 3),
+    (2411, 2410, 'wecomCustomerSession:view', '查看列表', 5),
+    (2412, 2410, 'wecomCustomerSession:detail', '查看详情', 5),
+    (2420, 0, 'wecomGroupSession', '企微信群会话', 3),
+    (2421, 2420, 'wecomGroupSession:view', '查看列表', 5),
+    (2422, 2420, 'wecomGroupSession:detail', '查看详情', 5),
+    (2430, 0, 'wecomCustomer', '企微客户', 3),
+    (2431, 2430, 'wecomCustomer:view', '查看列表', 5),
+    (2432, 2430, 'wecomCustomer:detail', '查看详情', 5),
+    (2433, 2430, 'wecomCustomer:bind', '绑定客户', 5),
+    (2434, 2430, 'wecomCustomer:unbind', '解绑客户', 5)
+ON CONFLICT (menu_id) DO NOTHING;
+
 INSERT INTO crm_chat_message (message_id, session_id, role, content, tokens_used, model_name, create_time) VALUES
 (7001, 6001, 'user', '我想创建一个新客户', 10, NULL, NOW()),
 (7002, 6001, 'assistant', '好的，我来帮您创建新客户。请告诉我以下信息：
@@ -609,3 +855,293 @@ INSERT INTO crm_chat_message (message_id, session_id, role, content, tokens_used
 3. 保持与技术决策人的沟通频率
 
 需要我帮您做什么进一步的操作吗？', 280, 'gpt-3.5-turbo', NOW());
+
+-- Tencent Meeting schema
+CREATE TABLE IF NOT EXISTS crm_tencent_meeting_corp_config (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    app_id VARCHAR(128) NOT NULL,
+    sdk_id VARCHAR(128),
+    corp_name VARCHAR(255),
+    app_secret_encrypted TEXT,
+    webhook_secret_encrypted TEXT,
+    webhook_token_encrypted TEXT,
+    sts_token_encrypted TEXT,
+    sts_token_expire_time TIMESTAMP(3),
+    sync_enabled BOOLEAN DEFAULT TRUE,
+    transcript_enabled BOOLEAN DEFAULT TRUE,
+    archive_to_knowledge BOOLEAN DEFAULT TRUE,
+    last_sync_time TIMESTAMP(3),
+    last_sync_status VARCHAR(32),
+    last_sync_error TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_config_tenant_app
+    ON crm_tencent_meeting_corp_config (tenant_id, app_id);
+
+CREATE TRIGGER trg_tencent_meeting_config_update_time
+    BEFORE UPDATE ON crm_tencent_meeting_corp_config
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE IF NOT EXISTS crm_tencent_meeting_user_mapping (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    app_id VARCHAR(128) NOT NULL,
+    meeting_user_id VARCHAR(255) NOT NULL,
+    user_name VARCHAR(255),
+    open_corp_id VARCHAR(255),
+    open_corp_name VARCHAR(255),
+    avatar_url TEXT,
+    crm_user_id BIGINT,
+    access_token_encrypted TEXT,
+    refresh_token_encrypted TEXT,
+    token_expires_at TIMESTAMP(3),
+    scopes TEXT,
+    auth_status VARCHAR(32) DEFAULT 'ACTIVE',
+    last_auth_time TIMESTAMP(3),
+    last_refresh_time TIMESTAMP(3),
+    last_sync_time TIMESTAMP(3),
+    last_sync_error TEXT,
+    status INTEGER DEFAULT 1,
+    synced_at TIMESTAMP(3),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_user_mapping
+    ON crm_tencent_meeting_user_mapping (tenant_id, app_id, meeting_user_id);
+CREATE INDEX IF NOT EXISTS idx_tencent_meeting_user_crm
+    ON crm_tencent_meeting_user_mapping (tenant_id, crm_user_id);
+
+CREATE TRIGGER trg_tencent_meeting_user_mapping_update_time
+    BEFORE UPDATE ON crm_tencent_meeting_user_mapping
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE IF NOT EXISTS crm_tencent_meeting (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    app_id VARCHAR(128) NOT NULL,
+    meeting_id VARCHAR(255) NOT NULL,
+    meeting_code VARCHAR(255),
+    subject VARCHAR(500),
+    status VARCHAR(32),
+    creator_user_id VARCHAR(255),
+    creator_name VARCHAR(255),
+    crm_creator_user_id BIGINT,
+    participant_names TEXT,
+    participant_count INTEGER,
+    start_time TIMESTAMP(3),
+    end_time TIMESTAMP(3),
+    duration_seconds BIGINT,
+    bind_status VARCHAR(32) DEFAULT 'UNBOUND',
+    customer_id BIGINT,
+    customer_name VARCHAR(255),
+    summary TEXT,
+    todo_text TEXT,
+    transcript_text TEXT,
+    raw_json TEXT,
+    knowledge_id BIGINT,
+    synced_at TIMESTAMP(3),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_external
+    ON crm_tencent_meeting (tenant_id, app_id, meeting_id);
+CREATE INDEX IF NOT EXISTS idx_tencent_meeting_time
+    ON crm_tencent_meeting (tenant_id, start_time DESC);
+CREATE INDEX IF NOT EXISTS idx_tencent_meeting_customer
+    ON crm_tencent_meeting (tenant_id, customer_id, start_time DESC);
+CREATE INDEX IF NOT EXISTS idx_tencent_meeting_creator
+    ON crm_tencent_meeting (tenant_id, crm_creator_user_id);
+
+CREATE TRIGGER trg_tencent_meeting_update_time
+    BEFORE UPDATE ON crm_tencent_meeting
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE IF NOT EXISTS crm_tencent_meeting_participant (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    app_id VARCHAR(128),
+    meeting_db_id BIGINT NOT NULL,
+    meeting_id VARCHAR(255) NOT NULL,
+    user_id VARCHAR(255),
+    user_name VARCHAR(255),
+    role VARCHAR(64),
+    join_time TIMESTAMP(3),
+    leave_time TIMESTAMP(3),
+    duration_seconds BIGINT,
+    raw_json TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tencent_meeting_participant_meeting
+    ON crm_tencent_meeting_participant (tenant_id, meeting_db_id);
+
+CREATE TRIGGER trg_tencent_meeting_participant_update_time
+    BEFORE UPDATE ON crm_tencent_meeting_participant
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE IF NOT EXISTS crm_tencent_meeting_recording (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    app_id VARCHAR(128),
+    meeting_db_id BIGINT NOT NULL,
+    meeting_id VARCHAR(255) NOT NULL,
+    record_file_id VARCHAR(255) NOT NULL,
+    file_name VARCHAR(500),
+    download_url TEXT,
+    play_url TEXT,
+    file_size BIGINT,
+    duration_seconds BIGINT,
+    transcript_status VARCHAR(64),
+    summary TEXT,
+    todo_text TEXT,
+    raw_json TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_recording
+    ON crm_tencent_meeting_recording (tenant_id, record_file_id);
+CREATE INDEX IF NOT EXISTS idx_tencent_meeting_recording_meeting
+    ON crm_tencent_meeting_recording (tenant_id, meeting_db_id);
+
+CREATE TRIGGER trg_tencent_meeting_recording_update_time
+    BEFORE UPDATE ON crm_tencent_meeting_recording
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE IF NOT EXISTS crm_tencent_meeting_transcript_segment (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    recording_id BIGINT,
+    meeting_db_id BIGINT NOT NULL,
+    meeting_id VARCHAR(255) NOT NULL,
+    record_file_id VARCHAR(255),
+    pid VARCHAR(255),
+    speaker_user_id VARCHAR(255),
+    speaker_name VARCHAR(255),
+    start_time_ms BIGINT,
+    end_time_ms BIGINT,
+    text TEXT,
+    raw_json TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tencent_meeting_transcript_meeting
+    ON crm_tencent_meeting_transcript_segment (tenant_id, meeting_db_id, start_time_ms);
+
+CREATE TRIGGER trg_tencent_meeting_transcript_update_time
+    BEFORE UPDATE ON crm_tencent_meeting_transcript_segment
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE IF NOT EXISTS crm_tencent_meeting_customer_binding (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    meeting_id BIGINT NOT NULL,
+    meeting_external_id VARCHAR(255),
+    customer_id BIGINT NOT NULL,
+    bind_user_id BIGINT,
+    bind_time TIMESTAMP(3),
+    unbind_time TIMESTAMP(3),
+    status INTEGER DEFAULT 1,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_active_binding
+    ON crm_tencent_meeting_customer_binding (tenant_id, meeting_id)
+    WHERE status = 1;
+CREATE INDEX IF NOT EXISTS idx_tencent_meeting_binding_customer
+    ON crm_tencent_meeting_customer_binding (tenant_id, customer_id);
+
+CREATE TRIGGER trg_tencent_meeting_binding_update_time
+    BEFORE UPDATE ON crm_tencent_meeting_customer_binding
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE IF NOT EXISTS crm_tencent_meeting_sync_cursor (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    app_id VARCHAR(128) NOT NULL,
+    cursor_type VARCHAR(64) NOT NULL,
+    cursor_value VARCHAR(500),
+    synced_at TIMESTAMP(3),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_sync_cursor
+    ON crm_tencent_meeting_sync_cursor (tenant_id, app_id, cursor_type);
+
+CREATE TRIGGER trg_tencent_meeting_sync_cursor_update_time
+    BEFORE UPDATE ON crm_tencent_meeting_sync_cursor
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE IF NOT EXISTS crm_tencent_meeting_sync_log (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    app_id VARCHAR(128),
+    sync_type VARCHAR(64),
+    status VARCHAR(32),
+    fetched_count INTEGER DEFAULT 0,
+    saved_count INTEGER DEFAULT 0,
+    failed_count INTEGER DEFAULT 0,
+    started_at TIMESTAMP(3),
+    finished_at TIMESTAMP(3),
+    error_message TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tencent_meeting_sync_log_time
+    ON crm_tencent_meeting_sync_log (tenant_id, started_at DESC);
+
+CREATE TRIGGER trg_tencent_meeting_sync_log_update_time
+    BEFORE UPDATE ON crm_tencent_meeting_sync_log
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE IF NOT EXISTS crm_tencent_meeting_webhook_event (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT,
+    app_id VARCHAR(128),
+    event_name VARCHAR(128),
+    trace_id VARCHAR(255),
+    raw_json TEXT,
+    process_status VARCHAR(32),
+    process_error TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_webhook_trace
+    ON crm_tencent_meeting_webhook_event (trace_id)
+    WHERE trace_id IS NOT NULL;
+
+CREATE TRIGGER trg_tencent_meeting_webhook_update_time
+    BEFORE UPDATE ON crm_tencent_meeting_webhook_event
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+INSERT INTO manager_menu (menu_id, parent_id, realm, realm_name, type)
+VALUES
+    (2440, 0, 'tencentMeeting', '腾讯会议', 3),
+    (2441, 2440, 'tencentMeeting:view', '查看列表', 5),
+    (2442, 2440, 'tencentMeeting:detail', '查看详情', 5),
+    (2443, 2440, 'tencentMeeting:bind', '关联客户', 5),
+    (2444, 2440, 'tencentMeeting:unbind', '取消关联', 5),
+    (2445, 2440, 'tencentMeeting:sync', '同步会议', 5),
+    (2446, 2440, 'tencentMeeting:config', '配置腾讯会议', 5)
+ON CONFLICT (menu_id) DO NOTHING;

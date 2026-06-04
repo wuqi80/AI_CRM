@@ -23,13 +23,21 @@ import java.util.stream.Collectors;
 @Component
 public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
 
-    private static final Map<String, String> MODULE_BY_MAPPER = Map.of(
-            "CustomerMapper", "customer",
-            "ContactMapper", "contact",
-            "RelationMapper", "relation",
-            "TaskMapper", "task",
-            "FollowUpMapper", "followup",
-            "KnowledgeMapper", "knowledge"
+    private static final Map<String, String> MODULE_BY_MAPPER = Map.ofEntries(
+            Map.entry("CustomerMapper", "customer"),
+            Map.entry("ContactMapper", "contact"),
+            Map.entry("TaskMapper", "task"),
+            Map.entry("FollowUpMapper", "followup"),
+            Map.entry("KnowledgeMapper", "knowledge"),
+            Map.entry("RelationMapper", "relation"),
+            Map.entry("WecomEmployeeMapper", "wecomEmployeeSession"),
+            Map.entry("WecomExternalCustomerMapper", "wecomCustomer"),
+            Map.entry("WecomCustomerBindingMapper", "wecomCustomer"),
+            Map.entry("TencentMeetingMapper", "tencentMeeting"),
+            Map.entry("TencentMeetingParticipantMapper", "tencentMeeting"),
+            Map.entry("TencentMeetingRecordingMapper", "tencentMeeting"),
+            Map.entry("TencentMeetingTranscriptSegmentMapper", "tencentMeeting"),
+            Map.entry("TencentMeetingCustomerBindingMapper", "tencentMeeting")
     );
 
     @Autowired
@@ -135,6 +143,32 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
                     + qualifiedColumn(table, "employee_id") + " IS NULL AND "
                     + qualifiedColumn(table, "upload_user_id") + " IN (" + inClause + ")))"
                     : null;
+            case "wecomEmployeeSession" -> "crm_wecom_employee".equals(tableName)
+                    ? qualifiedColumn(table, "crm_user_id") + " IN (" + inClause + ")"
+                    : null;
+            case "wecomCustomer" -> switch (tableName) {
+                case "crm_wecom_external_customer", "crm_wecom_customer_binding" ->
+                        qualifiedColumn(table, "customer_id")
+                                + " IN (SELECT customer_id FROM crm_customer WHERE owner_id IN (" + inClause + "))";
+                default -> null;
+            };
+            case "tencentMeeting" -> switch (tableName) {
+                case "crm_tencent_meeting" ->
+                        "((" + qualifiedColumn(table, "customer_id") + " IS NOT NULL AND "
+                                + qualifiedColumn(table, "customer_id")
+                                + " IN (SELECT customer_id FROM crm_customer WHERE owner_id IN (" + inClause + ")))"
+                                + " OR (" + qualifiedColumn(table, "customer_id") + " IS NULL AND "
+                                + qualifiedColumn(table, "crm_creator_user_id") + " IN (" + inClause + ")))";
+                case "crm_tencent_meeting_customer_binding" ->
+                        qualifiedColumn(table, "customer_id")
+                                + " IN (SELECT customer_id FROM crm_customer WHERE owner_id IN (" + inClause + "))";
+                case "crm_tencent_meeting_participant", "crm_tencent_meeting_recording", "crm_tencent_meeting_transcript_segment" ->
+                        qualifiedColumn(table, "meeting_db_id")
+                                + " IN (SELECT id FROM crm_tencent_meeting WHERE "
+                                + "((customer_id IS NOT NULL AND customer_id IN (SELECT customer_id FROM crm_customer WHERE owner_id IN (" + inClause + ")))"
+                                + " OR (customer_id IS NULL AND crm_creator_user_id IN (" + inClause + "))))";
+                default -> null;
+            };
             default -> null;
         };
     }

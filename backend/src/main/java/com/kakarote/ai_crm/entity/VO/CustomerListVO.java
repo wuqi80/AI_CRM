@@ -37,6 +37,18 @@ public class CustomerListVO {
     @Schema(description = "客户来源")
     private String source;
 
+    @Schema(description = "是否企业微信客户")
+    private Boolean wecomCustomer;
+
+    @Schema(description = "企业微信企业ID")
+    private String wecomCorpId;
+
+    @Schema(description = "企业微信外部客户ID")
+    private String wecomExternalUserId;
+
+    @Schema(description = "企业微信同步时间")
+    private Date wecomSyncedAt;
+
     private String website;
 
     private String logo;

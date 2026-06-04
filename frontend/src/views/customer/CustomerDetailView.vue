@@ -48,6 +48,14 @@
                     <h2 class="text-lg md:text-xl font-bold text-slate-900 truncate min-w-0 w-full md:w-auto">
                       {{ customer.companyName }}
                     </h2>
+                    <span
+                      v-if="customer.wecomCustomer"
+                      class="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700"
+                      title="企业微信客户"
+                    >
+                      <span class="material-symbols-outlined text-[14px] leading-none">forum</span>
+                      企微
+                    </span>
                     <!-- <span
                       class="px-2 py-0.5 text-xs font-bold rounded uppercase"
                       :class="getStageBadgeClass(customer.stage)"
@@ -292,7 +300,7 @@
               </span>
               <h3 class="text-sm font-bold text-slate-900">客户阶段</h3>
             </div> -->
-            <div class="relative overflow-visible overflow-x-auto overflow-y-visible md:overflow-visible">
+            <div class="wk-customer-stage-scroll relative overflow-visible overflow-x-auto overflow-y-visible md:overflow-visible">
               <!-- Chevron segments (mobile: no wrap + horizontal scroll; desktop: wrap) -->
               <div class="relative flex flex-nowrap md:flex-wrap items-stretch gap-x-2 md:gap-x-0 gap-y-2 min-w-max">
                 <template v-for="(stage, idx) in stageFlow" :key="stage">
@@ -594,7 +602,7 @@
                   </span>
                 </button>
                 <button
-                  v-if="isEmbeddedMobileLayout && canCreateFollowUps"
+                  v-if="isEmbeddedMobileLayout && canCreateFollowUps && !hideEmbeddedFollowUpAction"
                   type="button"
                   class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
                   @click="handleAiFollowUp"
@@ -762,6 +770,95 @@
               </h3>
               <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">{{ visibleRelatedModuleCount }}个模块</span>
             </div>
+
+            <section class="group/wecom-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
+              <div class="mb-4 flex items-center justify-between">
+                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span :class="sectionIconBoxClass" :style="{ background: '#dcfce7', color: '#166534' }">
+                    <span :class="sectionMaterialIconClass">forum</span>
+                  </span>
+                  企业微信关联
+                </h4>
+              </div>
+              <div v-if="wecomBindingsLoading" class="space-y-2">
+                <div v-for="index in 2" :key="`wecom-binding-skeleton-${index}`" class="h-12 animate-pulse rounded-xl bg-slate-100" />
+              </div>
+              <div v-else-if="wecomBindings.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+                <span class="material-symbols-outlined text-2xl leading-none text-slate-400">link_off</span>
+                <p class="mt-2 text-xs font-medium text-slate-400">暂无企微关联</p>
+              </div>
+              <div v-else class="space-y-2">
+                <div
+                  v-for="binding in wecomBindings"
+                  :key="binding.id"
+                  class="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2"
+                >
+                  <img
+                    v-if="binding.externalCustomerAvatar"
+                    :src="binding.externalCustomerAvatar"
+                    alt=""
+                    class="size-8 shrink-0 rounded-lg object-cover"
+                  />
+                  <span v-else class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-xs font-bold text-emerald-700">
+                    {{ (binding.externalCustomerName || binding.externalUserId || '?').slice(0, 1) }}
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-semibold text-slate-800">{{ binding.externalCustomerName || binding.externalUserId }}</p>
+                    <p class="truncate text-xs text-slate-400">{{ binding.bindTime ? formatDateTime(binding.bindTime) : '已关联' }}</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section v-if="canViewTencentMeetings" class="group/tencent-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
+              <div class="mb-4 flex items-center justify-between">
+                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span :class="sectionIconBoxClass" :style="{ background: '#e0f2fe', color: '#075985' }">
+                    <span :class="sectionMaterialIconClass">video_camera_front</span>
+                  </span>
+                  会议记录
+                </h4>
+                <button
+                  type="button"
+                  class="group/module-action relative flex size-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-primary/30 hover:bg-[#efefef] hover:text-primary"
+                  aria-label="关联腾讯会议"
+                  @click="openTencentMeetingBindingPage"
+                >
+                  <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add_link</span>
+                  <span
+                    class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
+                    role="tooltip"
+                  >
+                    关联会议
+                  </span>
+                </button>
+              </div>
+              <div v-if="tencentMeetingsLoading" class="space-y-2">
+                <div v-for="index in 2" :key="`tencent-meeting-skeleton-${index}`" class="h-14 animate-pulse rounded-xl bg-slate-100" />
+              </div>
+              <div v-else-if="customerTencentMeetings.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+                <span class="material-symbols-outlined text-2xl leading-none text-slate-400">videocam_off</span>
+                <p class="mt-2 text-xs font-medium text-slate-400">暂无会议记录</p>
+              </div>
+              <div v-else class="space-y-2">
+                <button
+                  v-for="meeting in customerTencentMeetings.slice(0, 5)"
+                  :key="meeting.id"
+                  type="button"
+                  class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left transition-colors hover:bg-slate-50"
+                  @click="openTencentMeetingDetail(meeting.id)"
+                >
+                  <div class="flex min-w-0 items-start gap-2">
+                    <span class="material-symbols-outlined mt-0.5 text-[18px] text-sky-600">videocam</span>
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-semibold text-slate-800">{{ meeting.subject || '腾讯会议' }}</p>
+                      <p class="mt-1 truncate text-xs text-slate-400">{{ formatDateTime(meeting.startTime) || '未记录时间' }} · {{ formatMeetingDuration(meeting.durationSeconds) }}</p>
+                      <p v-if="meeting.summary" class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{{ meeting.summary }}</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </section>
 
             <!-- Contacts Module -->
             <section v-if="canViewContacts" class="wk-related-contacts group/contacts-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
@@ -1487,6 +1584,8 @@ import { useTaskStore } from '@/stores/task'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, generateCustomerAiReport, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
+import { getCustomerWecomBindings } from '@/api/wecom'
+import { getCustomerTencentMeetings } from '@/api/tencentMeeting'
 import { queryTaskList } from '@/api/task'
 import { queryScheduleList, type ScheduleVO } from '@/api/schedule'
 import type { CustomerAiParseVO } from '@/api/customer'
@@ -1499,6 +1598,8 @@ import { downloadKnowledge, queryKnowledgeList } from '@/api/knowledge'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Knowledge, Task, TaskStatus } from '@/types/common'
 import type { Contact, CustomerAiReportVO, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
+import type { WecomCustomerBindingVO } from '@/types/wecom'
+import type { TencentMeetingVO } from '@/types/tencentMeeting'
 import type { CustomField } from '@/types/customField'
 import { compactCustomerAiInsight } from '@/utils/customerAi'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
@@ -1536,17 +1637,19 @@ const props = withDefaults(defineProps<{
   customerId?: string
   embedded?: boolean
   forceMobile?: boolean
+  hideEmbeddedFollowUpAction?: boolean
 }>(), {
   customerId: '',
   embedded: false,
-  forceMobile: false
+  forceMobile: false,
+  hideEmbeddedFollowUpAction: false
 })
 
 const emit = defineEmits<{
   (e: 'quote-attachment', value: { followUp: FollowUp; attachment: FollowUpAttachment }): void
 }>()
 
-type CustomerDetailRefreshModule = 'aiAnalysis' | 'contacts' | 'followUps' | 'tasks' | 'schedules'
+type CustomerDetailRefreshModule = 'aiAnalysis' | 'contacts' | 'followUps' | 'tasks' | 'schedules' | 'tencentMeetings'
 
 type CustomerDetailRefreshPayload = {
   customerId?: string | number
@@ -1558,6 +1661,7 @@ const activeCustomerId = computed(() => props.customerId || String(route.params.
 const embedded = computed(() => props.embedded)
 const isMobile = computed(() => props.forceMobile || responsiveIsMobile.value)
 const isEmbeddedMobileLayout = computed(() => props.embedded && props.forceMobile)
+const hideEmbeddedFollowUpAction = computed(() => props.hideEmbeddedFollowUpAction)
 const CUSTOMER_DETAIL_REQUEST_LIMIT = 100
 
 const loading = ref(false)
@@ -1603,6 +1707,10 @@ const schedulePage = ref(1)
 const schedulePageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
 const scheduleLoading = ref(false)
 const customerKnowledgeList = ref<Knowledge[]>([])
+const wecomBindings = ref<WecomCustomerBindingVO[]>([])
+const wecomBindingsLoading = ref(false)
+const customerTencentMeetings = ref<TencentMeetingVO[]>([])
+const tencentMeetingsLoading = ref(false)
 
 function parsePositivePageQuery(value: unknown): number | null {
   if (typeof value !== 'string') return null
@@ -1984,7 +2092,9 @@ const canEditSchedules = computed(() => userStore.hasPermission('schedule:edit')
 const canDeleteSchedules = computed(() => userStore.hasPermission('schedule:delete'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
 const canUploadKnowledge = computed(() => userStore.hasPermission('knowledge:upload'))
+const canViewTencentMeetings = computed(() => userStore.hasPermission('tencentMeeting:view'))
 const visibleRelatedModuleCount = computed(() => [
+  canViewTencentMeetings.value,
   canViewContacts.value,
   canViewTasks.value,
   canViewSchedules.value,
@@ -2049,6 +2159,14 @@ async function refreshCustomerDetailModules(
     fetchTasks.push(fetchCustomerKnowledge(customerId))
   } else {
     customerKnowledgeList.value = []
+  }
+
+  fetchTasks.push(fetchWecomBindings(customerId))
+
+  if (canViewTencentMeetings.value) {
+    fetchTasks.push(fetchCustomerTencentMeetings(customerId))
+  } else {
+    customerTencentMeetings.value = []
   }
 
   if (canViewSchedules.value) {
@@ -2129,6 +2247,10 @@ async function refreshCustomerScopedModules(
 
   if (uniqueModules.has('schedules')) {
     requests.push(fetchCustomerSchedules(customerId, true))
+  }
+
+  if (uniqueModules.has('tencentMeetings')) {
+    requests.push(fetchCustomerTencentMeetings(customerId))
   }
 
   await Promise.all(requests)
@@ -2325,6 +2447,61 @@ async function fetchCustomerKnowledge(customerId: string) {
   } finally {
     customerKnowledgeLoading.value = false
   }
+}
+
+async function fetchWecomBindings(customerId: string) {
+  wecomBindingsLoading.value = true
+  try {
+    wecomBindings.value = await getCustomerWecomBindings(customerId)
+  } catch (error) {
+    console.error('Failed to fetch WeCom bindings:', error)
+    wecomBindings.value = []
+  } finally {
+    wecomBindingsLoading.value = false
+  }
+}
+
+async function fetchCustomerTencentMeetings(customerId: string) {
+  if (!canViewTencentMeetings.value) {
+    customerTencentMeetings.value = []
+    return
+  }
+  tencentMeetingsLoading.value = true
+  try {
+    customerTencentMeetings.value = await getCustomerTencentMeetings(customerId)
+  } catch (error) {
+    console.error('Failed to fetch Tencent meetings:', error)
+    customerTencentMeetings.value = []
+  } finally {
+    tencentMeetingsLoading.value = false
+  }
+}
+
+function openTencentMeetingBindingPage() {
+  if (!customer.value) return
+  router.push({
+    path: '/tencent-meetings',
+    query: { customerId: customer.value.customerId }
+  })
+}
+
+function openTencentMeetingDetail(meetingId: string | number) {
+  router.push({
+    path: '/tencent-meetings',
+    query: {
+      customerId: customer.value?.customerId || '',
+      meetingId: String(meetingId)
+    }
+  })
+}
+
+function formatMeetingDuration(seconds?: number) {
+  if (!seconds) return '未记录时长'
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (hours > 0) return `${hours}小时${rest}分`
+  return `${Math.max(minutes, 1)}分钟`
 }
 
 function openCustomerKnowledgeUpload() {
@@ -2568,6 +2745,10 @@ function handleAiFollowUp() {
   if (!canCreateFollowUps.value) return
   showAiFollowUpDrawer.value = true
 }
+
+defineExpose({
+  openAiFollowUp: handleAiFollowUp
+})
 
 async function handleAiFollowUpSaved() {
   if (!customer.value) return
@@ -3351,6 +3532,17 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
 .wk-customer-detail-mobile .md\:overflow-visible {
   overflow-x: auto !important;
   overflow-y: visible !important;
+}
+
+.wk-customer-stage-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.wk-customer-stage-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .wk-customer-detail-mobile .md\:w-auto {

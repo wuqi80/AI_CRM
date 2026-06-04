@@ -82,7 +82,7 @@
                   alt="悟空AI CRM"
                   class="size-10 rounded-xl bg-white object-contain p-1 shadow-lg shadow-slate-300/40 ring-1 ring-slate-200/80"
                 />
-                <span class="text-lg font-bold text-slate-900">悟空AI CRM</span>
+                <span class="text-[1.5rem] font-bold text-slate-900">悟空AI CRM</span>
               </div>
 
               <!-- 双层叠放 + 高度过渡；WebKit 上高度改为瞬时更新，避免布局动画卡顿 -->
@@ -149,7 +149,7 @@
                       <div class="flex justify-end">
                         <button
                           type="button"
-                          class="text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
+                          class="text-[1rem] font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
                           @click="openForgotPasswordDialog"
                         >
                           忘记密码？
@@ -159,12 +159,12 @@
                       <el-form-item class="!mb-0">
                         <button
                           type="submit"
-                          class="group flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                          class="auth-login-submit group flex w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[1rem] font-bold text-white transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                           :disabled="loading"
                         >
                           <span
                             v-if="loading"
-                            class="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                            class="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
                           />
                           <template v-else>
                             立即登录
@@ -173,6 +173,29 @@
                         </button>
                       </el-form-item>
                     </el-form>
+
+                    <div v-if="enabledExternalProviders.length" class="external-auth-panel">
+                      <div class="external-auth-divider">
+                        <span>External login</span>
+                      </div>
+                      <div class="external-auth-grid">
+                        <button
+                          v-for="provider in enabledExternalProviders"
+                          :key="provider.provider"
+                          type="button"
+                          class="external-auth-btn"
+                          :disabled="externalLoadingProvider === provider.provider"
+                          @click="startExternalLogin(provider.provider)"
+                        >
+                          <span class="external-auth-btn__mark">{{ providerMark(provider.provider) }}</span>
+                          <span>{{ provider.name }}</span>
+                          <span
+                            v-if="externalLoadingProvider === provider.provider"
+                            class="ml-auto size-4 animate-spin rounded-full border-2 border-slate-300 border-t-primary"
+                          />
+                        </button>
+                      </div>
+                    </div>
                   </template>
 
                   <div v-else class="tenant-selection">
@@ -395,7 +418,7 @@
                     返回登录
                   </button>
                 </p>
-                <p v-else class="text-sm text-slate-500">
+                <p v-else class="text-[1rem] text-slate-500">
                   {{ isLogin ? '还没有账号？' : '已经有账号了？' }}
                   <button
                     type="button"
@@ -523,6 +546,56 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="showExternalRegisterDialog"
+      title="完善第三方登录信息"
+      width="480px"
+      destroy-on-close
+      align-center
+      @closed="handleExternalRegisterDialogClosed"
+    >
+      <div class="space-y-5">
+        <el-form
+          ref="externalRegisterFormRef"
+          :model="externalRegisterForm"
+          :rules="externalRegisterRules"
+          label-position="top"
+          hide-required-asterisk
+          @submit.prevent="handleExternalRegister"
+        >
+          <el-form-item prop="companyName" label="公司名称">
+            <el-input v-model="externalRegisterForm.companyName" size="large" />
+          </el-form-item>
+          <el-form-item prop="password" label="密码">
+            <el-input
+              v-model="externalRegisterForm.password"
+              type="password"
+              size="large"
+              show-password
+            />
+          </el-form-item>
+          <el-form-item prop="confirmPassword" label="确认密码">
+            <el-input
+              v-model="externalRegisterForm.confirmPassword"
+              type="password"
+              size="large"
+              show-password
+              @keyup.enter="handleExternalRegister"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <el-button @click="showExternalRegisterDialog = false">取消</el-button>
+          <el-button type="primary" :loading="externalRegisterLoading" @click="handleExternalRegister">
+            完成登录
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <SliderCaptchaDialog v-model="showCaptchaDialog" @verified="handleCaptchaVerified" />
   </div>
 </template>
@@ -543,9 +616,18 @@ import {
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import logoImg from '@/assets/images/logo.png'
-import { getOidcSessionToken, register, resetPassword, sendEmailCode } from '@/api/auth'
+import {
+  completeExternalRegister,
+  exchangeExternalLoginTicket,
+  getExternalAuthAuthorizeUrl,
+  getExternalAuthProviders,
+  getOidcSessionToken,
+  register,
+  resetPassword,
+  sendEmailCode
+} from '@/api/auth'
 import SliderCaptchaDialog from '@/components/auth/SliderCaptchaDialog.vue'
-import type { LoginTenantOption, LoginType } from '@/types/api'
+import type { ExternalAuthProvider, ExternalAuthProviderCode, LoginTenantOption, LoginType } from '@/types/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -557,13 +639,16 @@ type EmailCodeScene = 'register' | 'reset-password'
 const loginFormRef = ref<FormInstance>()
 const registerFormRef = ref<FormInstance>()
 const forgotPasswordFormRef = ref<FormInstance>()
+const externalRegisterFormRef = ref<FormInstance>()
 const loading = ref(false)
 const registerLoading = ref(false)
 const forgotPasswordLoading = ref(false)
+const externalRegisterLoading = ref(false)
 const sendingCode = ref(false)
 const forgotSendingCode = ref(false)
 const showCaptchaDialog = ref(false)
 const showForgotPasswordDialog = ref(false)
+const showExternalRegisterDialog = ref(false)
 const formScrollRef = ref<HTMLElement>()
 const stageRef = ref<HTMLElement>()
 const loginLayerRef = ref<HTMLElement>()
@@ -571,11 +656,35 @@ const registerLayerRef = ref<HTMLElement>()
 const countdown = ref(0)
 const forgotCountdown = ref(0)
 const tenantOptions = ref<LoginTenantOption[]>([])
+const externalProviders = ref<ExternalAuthProvider[]>([])
 const loginStep = ref<'credentials' | 'tenant-selection'>('credentials')
 const pendingTenantId = ref('')
 const pendingEmailCodeScene = ref<EmailCodeScene | ''>('')
+const externalLoadingProvider = ref<ExternalAuthProviderCode | ''>('')
+const externalRegisterTicket = ref('')
 let countdownTimer: number | undefined
 let forgotCountdownTimer: number | undefined
+
+const LAST_LOGIN_USERNAME_STORAGE_KEY = 'wk_ai_crm:last_login_username:v1'
+
+function readLastLoginUsername(): string {
+  if (typeof window === 'undefined') return ''
+  try {
+    return window.localStorage.getItem(LAST_LOGIN_USERNAME_STORAGE_KEY)?.trim() || ''
+  } catch {
+    return ''
+  }
+}
+
+function rememberSuccessfulLoginUsername() {
+  const username = loginForm.username.trim()
+  if (!username || typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(LAST_LOGIN_USERNAME_STORAGE_KEY, username)
+  } catch {
+    // Ignore storage failures.
+  }
+}
 
 const reduceMotion =
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -636,7 +745,7 @@ function snapStageHeightForResize() {
 }
 
 const loginForm = reactive({
-  username: '',
+  username: readLastLoginUsername(),
   password: ''
 })
 
@@ -649,12 +758,20 @@ const registerForm = reactive({
   verificationCode: ''
 })
 
+const externalRegisterForm = reactive({
+  companyName: '',
+  password: '',
+  confirmPassword: ''
+})
+
 const forgotPasswordForm = reactive({
   email: '',
   password: '',
   confirmPassword: '',
   verificationCode: ''
 })
+
+const enabledExternalProviders = computed(() => externalProviders.value.filter((provider) => provider.enabled))
 
 const loginRules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
@@ -675,6 +792,14 @@ const validateConfirmPassword = (_rule: unknown, value: string, callback: (e?: E
 const validateForgotConfirmPassword = (_rule: unknown, value: string, callback: (e?: Error) => void) => {
   if (value !== forgotPasswordForm.password) {
     callback(new Error('两次输入的新密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+const validateExternalConfirmPassword = (_rule: unknown, value: string, callback: (e?: Error) => void) => {
+  if (value !== externalRegisterForm.password) {
+    callback(new Error('两次输入的密码不一致'))
   } else {
     callback()
   }
@@ -711,6 +836,18 @@ const forgotPasswordRules: FormRules = {
     { validator: validateForgotConfirmPassword, trigger: 'blur' }
   ],
   verificationCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
+}
+
+const externalRegisterRules: FormRules = {
+  companyName: [{ required: true, message: '请输入公司名称', trigger: 'blur' }],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, max: 20, message: '密码长度6-20位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入密码', trigger: 'blur' },
+    { validator: validateExternalConfirmPassword, trigger: 'blur' }
+  ]
 }
 
 const sendCodeText = computed(() => {
@@ -758,6 +895,124 @@ watch(
     resetTenantSelection()
   }
 )
+
+function providerMark(provider: ExternalAuthProviderCode): string {
+  if (provider === 'google') return 'G'
+  if (provider === 'outlook') return 'O'
+  if (provider === 'wechat') return '微'
+  return '企'
+}
+
+async function loadExternalProviders() {
+  try {
+    externalProviders.value = await getExternalAuthProviders()
+  } catch (error) {
+    console.error('Load external auth providers failed:', error)
+    externalProviders.value = []
+  }
+}
+
+function buildExternalAuthRedirect(): string {
+  const query: Record<string, string> = {}
+  if (typeof route.query.redirect === 'string') {
+    query.redirect = route.query.redirect
+  }
+  const resolved = router.resolve({ name: 'Login', query })
+  return `${window.location.origin}${window.location.pathname}${window.location.search}${resolved.href}`
+}
+
+async function startExternalLogin(provider: ExternalAuthProviderCode) {
+  externalLoadingProvider.value = provider
+  try {
+    const { authorizeUrl } = await getExternalAuthAuthorizeUrl(provider, buildExternalAuthRedirect())
+    window.location.href = authorizeUrl
+  } catch (error) {
+    console.error('Start external login failed:', error)
+  } finally {
+    externalLoadingProvider.value = ''
+  }
+}
+
+async function handleExternalAuthQuery() {
+  const externalError = typeof route.query.externalAuthError === 'string' ? route.query.externalAuthError : ''
+  if (externalError) {
+    ElMessage.error('External login failed')
+    clearExternalAuthQuery()
+    return
+  }
+
+  const loginTicket = typeof route.query.externalLoginTicket === 'string' ? route.query.externalLoginTicket : ''
+  if (loginTicket) {
+    loading.value = true
+    try {
+      const result = await exchangeExternalLoginTicket({
+        ticket: loginTicket,
+        loginType: resolveLoginType()
+      })
+      await userStore.applyLoginResult(result)
+      clearExternalAuthQuery()
+      await completeLoginRedirect()
+    } catch (error) {
+      console.error('External login ticket exchange failed:', error)
+    } finally {
+      loading.value = false
+    }
+    return
+  }
+
+  const registerTicket = typeof route.query.externalRegisterTicket === 'string' ? route.query.externalRegisterTicket : ''
+  if (registerTicket) {
+    externalRegisterTicket.value = registerTicket
+    Object.assign(externalRegisterForm, {
+      companyName: '',
+      password: '',
+      confirmPassword: ''
+    })
+    showExternalRegisterDialog.value = true
+    clearExternalAuthQuery()
+  }
+}
+
+function clearExternalAuthQuery() {
+  const query = { ...route.query }
+  delete query.externalAuthError
+  delete query.externalLoginTicket
+  delete query.externalRegisterTicket
+  delete query.provider
+  router.replace({ name: route.name || 'Login', query })
+}
+
+function handleExternalRegisterDialogClosed() {
+  externalRegisterTicket.value = ''
+  Object.assign(externalRegisterForm, {
+    companyName: '',
+    password: '',
+    confirmPassword: ''
+  })
+  externalRegisterFormRef.value?.clearValidate()
+}
+
+async function handleExternalRegister() {
+  if (!externalRegisterFormRef.value || !externalRegisterTicket.value) return
+
+  try {
+    await externalRegisterFormRef.value.validate()
+    externalRegisterLoading.value = true
+    const result = await completeExternalRegister({
+      ticket: externalRegisterTicket.value,
+      companyName: externalRegisterForm.companyName.trim(),
+      password: externalRegisterForm.password,
+      loginType: resolveLoginType()
+    })
+    await userStore.applyLoginResult(result)
+    showExternalRegisterDialog.value = false
+    await completeLoginRedirect()
+  } catch (error) {
+    console.error('External register failed:', error)
+  } finally {
+    externalRegisterLoading.value = false
+  }
+}
 
 function toggleMode() {
   resetTenantSelection()
@@ -858,6 +1113,7 @@ async function handleTenantLogin(option: LoginTenantOption) {
 }
 
 async function completeLoginRedirect() {
+  rememberSuccessfulLoginUsername()
   ElMessage.success('登录成功')
 
   let redirect = (route.query.redirect as string) || '/'
@@ -1000,12 +1256,11 @@ async function handleForgotPasswordReset() {
 }
 
 function startCountdown(scene: EmailCodeScene) {
-  const isRegisterScene = scene === 'register'
-  const countdownRef = isRegisterScene ? countdown : forgotCountdown
+  const countdownRef = scene === 'reset-password' ? forgotCountdown : countdown
 
   countdownRef.value = 60
 
-  if (isRegisterScene) {
+  if (scene === 'register') {
     if (countdownTimer) {
       window.clearInterval(countdownTimer)
     }
@@ -1032,6 +1287,8 @@ function startCountdown(scene: EmailCodeScene) {
 }
 
 onMounted(async () => {
+  await loadExternalProviders()
+  await handleExternalAuthQuery()
   await syncStageHeight(false)
   window.addEventListener('resize', snapStageHeightForResize)
 })
@@ -1178,7 +1435,7 @@ onBeforeUnmount(() => {
 }
 
 .label-upper {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1192,6 +1449,14 @@ onBeforeUnmount(() => {
 .auth-form :deep(.el-form-item__label) {
   margin-bottom: 4px;
   line-height: 1.2;
+}
+
+.auth-login-submit {
+  box-sizing: border-box;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  line-height: 1;
 }
 
 .tenant-selection {
@@ -1383,7 +1648,9 @@ onBeforeUnmount(() => {
  * 这里统一改为：细 inset 描边 + 大圆角 + focus 外环（与设计稿 rounded-2xl + ring-primary/5 一致）
  */
 .auth-form :deep(.el-input.auth-el-input .el-input__wrapper) {
+  height: 46px;
   min-height: 46px;
+  align-items: center;
   border-radius: var(--wk-input-radius) !important;
   background-color: var(--wk-input-bg) !important;
   border: none !important;
@@ -1410,6 +1677,17 @@ onBeforeUnmount(() => {
     var(--wk-input-focus-shadow) !important;
 }
 
+.auth-form :deep(.el-input.auth-el-input .el-input__inner) {
+  height: 46px !important;
+  line-height: 46px !important;
+}
+
+.auth-form :deep(.el-input.auth-el-input .el-input__prefix),
+.auth-form :deep(.el-input.auth-el-input .el-input__suffix) {
+  min-height: 46px;
+  align-items: center;
+}
+
 .auth-send-code-btn {
   box-sizing: border-box;
   display: inline-flex;
@@ -1430,6 +1708,77 @@ onBeforeUnmount(() => {
 
 .auth-send-code-btn:hover:not(:disabled) {
   background-color: #f8fafc;
+}
+
+.external-auth-panel {
+  margin-top: 1.25rem;
+}
+
+.external-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.external-auth-divider::before,
+.external-auth-divider::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.external-auth-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.external-auth-btn {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 700;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
+}
+
+.external-auth-btn:hover:not(:disabled) {
+  border-color: rgba(19, 127, 236, 0.45);
+  color: #137fec;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.external-auth-btn:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.external-auth-btn__mark {
+  display: inline-flex;
+  width: 1.45rem;
+  height: 1.45rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #137fec;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 @media (min-width: 1024px) {

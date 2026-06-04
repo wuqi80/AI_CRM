@@ -91,6 +91,55 @@ mail:
     # Stable secret used to encrypt mailbox passwords and OAuth tokens stored in crm_mail_account.
     encryption-key: ${MAIL_CREDENTIAL_ENCRYPTION_KEY:Gr73nKSHNpwKsD9367}
     max-concurrent-sync: ${MAIL_MAX_CONCURRENT_SYNC:20}
+    proxy:
+      enabled: ${MAIL_HTTP_PROXY_ENABLED:${EXTERNAL_AUTH_PROXY_ENABLED:true}}
+      url: ${MAIL_HTTP_PROXY_URL:${EXTERNAL_AUTH_PROXY_URL:http://192.168.1.116:7890}}
+    gmail:
+      client-id: ${MAIL_GMAIL_CLIENT_ID:}
+      client-secret: ${MAIL_GMAIL_CLIENT_SECRET:}
+      redirect-uri: ${MAIL_GMAIL_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/email/oauth/gmail/callback}
+    outlook:
+      client-id: ${MAIL_OUTLOOK_CLIENT_ID:}
+      client-secret: ${MAIL_OUTLOOK_CLIENT_SECRET:}
+      tenant: ${MAIL_OUTLOOK_TENANT:common}
+      redirect-uri: ${MAIL_OUTLOOK_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/email/oauth/outlook/callback}
+
+external-auth:
+  proxy:
+    enabled: ${EXTERNAL_AUTH_PROXY_ENABLED:true}
+    url: ${EXTERNAL_AUTH_PROXY_URL:http://192.168.1.116:7890}
+  google:
+    enabled: ${EXTERNAL_AUTH_GOOGLE_ENABLED:true}
+    client-id: ${EXTERNAL_AUTH_GOOGLE_CLIENT_ID:}
+    client-secret: ${EXTERNAL_AUTH_GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${EXTERNAL_AUTH_GOOGLE_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/auth/external/google/callback}
+  outlook:
+    enabled: ${EXTERNAL_AUTH_OUTLOOK_ENABLED:true}
+    client-id: ${EXTERNAL_AUTH_OUTLOOK_CLIENT_ID:${MAIL_OUTLOOK_CLIENT_ID:}}
+    client-secret: ${EXTERNAL_AUTH_OUTLOOK_CLIENT_SECRET:${MAIL_OUTLOOK_CLIENT_SECRET:}}
+    tenant: ${EXTERNAL_AUTH_OUTLOOK_TENANT:${MAIL_OUTLOOK_TENANT:common}}
+    redirect-uri: ${EXTERNAL_AUTH_OUTLOOK_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/auth/external/outlook/callback}
+wecom:
+  open-platform:
+    enabled: ${WECOM_OPEN_PLATFORM_ENABLED:true}
+    suite-id: ${WECOM_OPEN_PLATFORM_SUITE_ID:wwc241ee78c24021e7}
+    suite-secret: ${WECOM_OPEN_PLATFORM_SUITE_SECRET:aqz6mm29b7OcjxdW7-11wbmS_7DLN7RQubN3qArF6d0}
+    provider-corp-id: ${WECOM_OPEN_PLATFORM_PROVIDER_CORP_ID:wwbc43295670db368a}
+    provider-secret: ${WECOM_OPEN_PLATFORM_PROVIDER_SECRET:${WECOM_OPEN_PLATFORM_SUITE_SECRET:aqz6mm29b7OcjxdW7-11wbmS_7DLN7RQubN3qArF6d0}}
+    token: ${WECOM_OPEN_PLATFORM_TOKEN:5nTAZePlAZ5EPfOP8zEemj}
+    encoding-aes-key: ${WECOM_OPEN_PLATFORM_ENCODING_AES_KEY:gGal1ShzR4QSiZoAAJlyurMGZSC70bsPwJdhqcuTq7F}
+    callback-url: ${WECOM_OPEN_PLATFORM_CALLBACK_URL:https://aicrm-saas.5kcrm.cn/crmapi/wecom/open/callback}
+    auth-redirect-uri: ${WECOM_OPEN_PLATFORM_AUTH_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/wecom/open/auth/callback}
+    login-redirect-uri: ${WECOM_OPEN_PLATFORM_LOGIN_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/auth/external/wecom/callback}
+    frontend-redirect-uri: ${WECOM_OPEN_PLATFORM_FRONTEND_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/#/wecom/scrm}
+    auth-type: ${WECOM_OPEN_PLATFORM_AUTH_TYPE:1}
+    state-ttl-seconds: ${WECOM_OPEN_PLATFORM_STATE_TTL_SECONDS:600}
+    token-cache-ttl-buffer-seconds: ${WECOM_OPEN_PLATFORM_TOKEN_CACHE_TTL_BUFFER_SECONDS:300}
+
+tencent-meeting:
+  oauth:
+    callback-url: ${TENCENT_MEETING_OAUTH_CALLBACK_URL:https://aicrm-saas.5kcrm.cn/crmapi/tencent-meeting/oauth/callback}
+    frontend-redirect-url: ${TENCENT_MEETING_OAUTH_FRONTEND_REDIRECT_URL:https://aicrm-saas.5kcrm.cn/#/tencent-meetings}
 
 media-analysis:
   ffmpeg:

@@ -1,14 +1,16 @@
 <template>
   <button
-    class="z-50 size-14 bg-primary text-white rounded-full shadow-2xl shadow-primary/30 flex items-center justify-center hover:bg-primary/90 hover:scale-110 active:scale-95 transition-all group cursor-grab active:cursor-grabbing touch-none fixed"
+    class="wk-floating-new-chat-button"
+    :class="`wk-floating-new-chat-button--${props.placement}`"
     :style="buttonStyle"
+    type="button"
+    aria-label="New chat"
+    title="AI Assistant"
     @click="handleClick"
     @pointerdown="handlePointerDown"
-    title="AI 助手"
   >
-    <WkIcon name="ai" class="text-2xl group-hover:rotate-12 transition-transform" />
-    <!-- Pulse ring -->
-    <span class="absolute inset-0 rounded-full bg-primary/20 animate-ping pointer-events-none"></span>
+    <WkIcon name="new-chat" :size="22" class="wk-floating-new-chat-button__icon" />
+    <span class="wk-floating-new-chat-button__label">Chat</span>
   </button>
 </template>
 
@@ -16,16 +18,33 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
+import WkIcon from '@/components/common/WkIcon.vue'
+
+type Point = {
+  x: number
+  y: number
+}
+
+const props = withDefaults(
+  defineProps<{
+    placement?: 'viewport' | 'menu'
+  }>(),
+  {
+    placement: 'viewport',
+  }
+)
+
+const emit = defineEmits<{
+  (e: 'new-chat'): void
+}>()
 
 const route = useRoute()
 const router = useRouter()
 const chatStore = useChatStore()
 
-type Point = { x: number; y: number }
-
 const STORAGE_KEY = 'wk_ai_crm:floating_ai_button_pos:v1'
-const BUTTON_SIZE = 56 // tailwind size-14 => 3.5rem => 56px
-const EDGE_PADDING = 20 // roughly match prototype constraints (20px)
+const BUTTON_SIZE = 56
+const EDGE_PADDING = 20
 
 const isDragging = ref(false)
 const draggedDuringPointer = ref(false)
@@ -37,31 +56,36 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n))
 }
 
-function clampToViewport(pos: Point): Point {
+function defaultPosition(placement: 'viewport' | 'menu') {
+  const rightOffset = 24
+  const bottomOffset = placement === 'menu' ? 64 : 24
+  const x = window.innerWidth - BUTTON_SIZE - rightOffset
+  const y = window.innerHeight - BUTTON_SIZE - bottomOffset
+
   const maxX = Math.max(EDGE_PADDING, window.innerWidth - BUTTON_SIZE - EDGE_PADDING)
   const maxY = Math.max(EDGE_PADDING, window.innerHeight - BUTTON_SIZE - EDGE_PADDING)
+
   return {
-    x: clamp(pos.x, EDGE_PADDING, maxX),
-    y: clamp(pos.y, EDGE_PADDING, maxY),
+    x: clamp(x, EDGE_PADDING, maxX),
+    y: clamp(y, EDGE_PADDING, maxY),
   }
 }
 
-function defaultPosition(): Point {
-  // visually matches `bottom-6 right-6` (24px) while keeping constraints consistent
-  const x = window.innerWidth - BUTTON_SIZE - 24
-  const y = window.innerHeight - BUTTON_SIZE - 24
-  return clampToViewport({ x, y })
-}
-
-function loadPosition(): Point {
+function loadPosition(placement: 'viewport' | 'menu') {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return defaultPosition()
+    if (!raw) return defaultPosition(placement)
     const parsed = JSON.parse(raw) as Partial<Point>
-    if (typeof parsed?.x !== 'number' || typeof parsed?.y !== 'number') return defaultPosition()
-    return clampToViewport({ x: parsed.x, y: parsed.y })
+    if (typeof parsed?.x !== 'number' || typeof parsed?.y !== 'number') return defaultPosition(placement)
+
+    const maxX = Math.max(EDGE_PADDING, window.innerWidth - BUTTON_SIZE - EDGE_PADDING)
+    const maxY = Math.max(EDGE_PADDING, window.innerHeight - BUTTON_SIZE - EDGE_PADDING)
+    return {
+      x: clamp(parsed.x, EDGE_PADDING, maxX),
+      y: clamp(parsed.y, EDGE_PADDING, maxY),
+    }
   } catch {
-    return defaultPosition()
+    return defaultPosition(placement)
   }
 }
 
@@ -69,18 +93,23 @@ function savePosition(pos: Point) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(pos))
   } catch {
-    // ignore (private mode / disabled storage)
+    // ignore
   }
 }
 
 const buttonStyle = computed(() => {
-  const pos = position.value
-  if (!pos) return { right: '24px', bottom: '24px' }
-  return { left: `${pos.x}px`, top: `${pos.y}px` }
+  if (!position.value) return {}
+  return {
+    left: `${position.value.x}px`,
+    top: `${position.value.y}px`,
+  }
 })
 
 async function handleClick() {
   if (draggedDuringPointer.value) return
+
+  emit('new-chat')
+
   const detailProjectId = resolveProjectDetailId()
   if (detailProjectId) {
     await router.replace({
@@ -98,7 +127,7 @@ async function handleClick() {
     return
   }
 
-  chatStore.beginNewSessionDraft('新对话', undefined, undefined, 'crm')
+  chatStore.beginNewSessionDraft('New chat', undefined, undefined, 'crm')
   await router.push({ path: '/chat' })
   chatStore.requestComposerFocus()
 }
@@ -116,7 +145,6 @@ function resolveCustomerDetailId(): string {
 }
 
 function handlePointerDown(e: PointerEvent) {
-  // Left mouse button only; allow touch/pen.
   if (e.pointerType === 'mouse' && e.button !== 0) return
 
   ;(e.currentTarget as HTMLElement | null)?.setPointerCapture?.(e.pointerId)
@@ -124,7 +152,7 @@ function handlePointerDown(e: PointerEvent) {
   isDragging.value = true
   draggedDuringPointer.value = false
   dragStartPointer.value = { x: e.clientX, y: e.clientY }
-  dragStartPos.value = position.value ?? defaultPosition()
+  dragStartPos.value = position.value ?? defaultPosition(props.placement)
 
   window.addEventListener('pointermove', handlePointerMove, { passive: false })
   window.addEventListener('pointerup', handlePointerUp, { passive: true })
@@ -138,16 +166,16 @@ function handlePointerMove(e: PointerEvent) {
   const dx = e.clientX - dragStartPointer.value.x
   const dy = e.clientY - dragStartPointer.value.y
 
-  // Small threshold to avoid treating clicks as drags
   if (!draggedDuringPointer.value && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
     draggedDuringPointer.value = true
   }
 
-  const next = clampToViewport({
-    x: dragStartPos.value.x + dx,
-    y: dragStartPos.value.y + dy,
-  })
-  position.value = next
+  const maxX = Math.max(EDGE_PADDING, window.innerWidth - BUTTON_SIZE - EDGE_PADDING)
+  const maxY = Math.max(EDGE_PADDING, window.innerHeight - BUTTON_SIZE - EDGE_PADDING)
+  position.value = {
+    x: clamp(dragStartPos.value.x + dx, EDGE_PADDING, maxX),
+    y: clamp(dragStartPos.value.y + dy, EDGE_PADDING, maxY),
+  }
 }
 
 function handlePointerUp() {
@@ -156,7 +184,6 @@ function handlePointerUp() {
 
   if (position.value) savePosition(position.value)
 
-  // Prevent click immediately after drag end
   if (draggedDuringPointer.value) {
     window.setTimeout(() => {
       draggedDuringPointer.value = false
@@ -174,13 +201,17 @@ function cleanupPointerListeners() {
 
 function handleResize() {
   if (!position.value) return
-  const next = clampToViewport(position.value)
-  position.value = next
-  savePosition(next)
+  const maxX = Math.max(EDGE_PADDING, window.innerWidth - BUTTON_SIZE - EDGE_PADDING)
+  const maxY = Math.max(EDGE_PADDING, window.innerHeight - BUTTON_SIZE - EDGE_PADDING)
+  position.value = {
+    x: clamp(position.value.x, EDGE_PADDING, maxX),
+    y: clamp(position.value.y, EDGE_PADDING, maxY),
+  }
+  savePosition(position.value)
 }
 
 onMounted(() => {
-  position.value = loadPosition()
+  position.value = loadPosition(props.placement)
   window.addEventListener('resize', handleResize, { passive: true })
 })
 
@@ -189,3 +220,100 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
 })
 </script>
+
+<style scoped>
+.wk-floating-new-chat-button {
+  display: inline-flex;
+  height: 54px;
+  min-width: 124px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 9999px;
+  background: #252525;
+  color: #fff;
+  box-shadow:
+    0 18px 42px rgb(15 23 42 / 0.24),
+    0 2px 8px rgb(15 23 42 / 0.18);
+  cursor: pointer;
+  padding: 0 22px;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.wk-floating-new-chat-button--viewport {
+  position: fixed;
+  right: max(24px, calc(18px + env(safe-area-inset-right)));
+  bottom: max(24px, calc(18px + env(safe-area-inset-bottom)));
+  z-index: 120;
+}
+
+.wk-floating-new-chat-button--menu {
+  position: absolute;
+  right: max(24px, calc(18px + env(safe-area-inset-right)));
+  bottom: max(64px, calc(58px + env(safe-area-inset-bottom)));
+  z-index: 20;
+  box-shadow:
+    0 10px 24px rgb(15 23 42 / 0.18),
+    0 0 10px 2px rgb(15 23 42 / 0.18);
+}
+
+.wk-floating-new-chat-button:hover {
+  background: #1f1f1f;
+  box-shadow:
+    0 20px 48px rgb(15 23 42 / 0.28),
+    0 2px 10px rgb(15 23 42 / 0.2);
+  transform: translateY(-1px);
+}
+
+.wk-floating-new-chat-button--menu:hover {
+  box-shadow:
+    0 12px 28px rgb(15 23 42 / 0.22),
+    0 0 12px 3px rgb(15 23 42 / 0.2);
+}
+
+.wk-floating-new-chat-button:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.wk-floating-new-chat-button__icon {
+  flex-shrink: 0;
+}
+
+.wk-floating-new-chat-button__label {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .wk-floating-new-chat-button--viewport,
+  .wk-floating-new-chat-button--menu {
+    right: max(18px, calc(14px + env(safe-area-inset-right)));
+  }
+
+  .wk-floating-new-chat-button--viewport {
+    bottom: max(20px, calc(16px + env(safe-area-inset-bottom)));
+  }
+
+  .wk-floating-new-chat-button--menu {
+    bottom: max(60px, calc(56px + env(safe-area-inset-bottom)));
+  }
+
+  .wk-floating-new-chat-button {
+    height: 52px;
+    min-width: 116px;
+    gap: 10px;
+    padding: 0 20px;
+  }
+
+  .wk-floating-new-chat-button__label {
+    font-size: 17px;
+  }
+}
+</style>
