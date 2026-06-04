@@ -18,13 +18,13 @@
       </div>
       <div class="flex flex-nowrap sm:flex-wrap items-center gap-3 flex-wrap">
         <!-- Search -->
-        <div class="relative group flex items-center">
+        <div class="relative group flex min-w-0 flex-1 items-center sm:flex-none">
           <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">search</span>
           <input
             v-model="customerStore.queryParams.keyword"
             type="text"
             placeholder="搜索公司名称、联系人、电话、标签..."
-            class="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm w-full sm:w-80 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all shadow-sm"
+            class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-11 pr-4 text-sm shadow-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 sm:w-80"
             @keydown.enter="handleSearch"
             @input="debouncedSearch"
           />
@@ -188,8 +188,8 @@
 
     <div v-if="hasAiSearchState" class="bg-white border border-primary/10 rounded-2xl px-4 py-3 shadow-sm">
       <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold">
+        <div class="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+          <span class="inline-flex shrink-0 items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold">
             <WkIcon name="ai" class="text-[12px]" />
             AI 筛选
           </span>
@@ -1752,14 +1752,34 @@ async function handleImportSuccess(_result: CustomerImportResult) {
 }
 
 .wk-ai-chip :deep(.el-tag__content) {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: #137fec;
 }
 
-:deep(.wk-ai-search-popover) {
+:global(.wk-ai-search-popover.el-popper) {
   border-radius: 20px;
   border: 1px solid #dbeafe;
   box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
   padding: 16px;
+}
+
+@media (max-width: 767px) {
+  .wk-ai-chip {
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    padding-block: 5px;
+  }
+
+  :global(.wk-ai-search-popover.el-popper) {
+    left: 50% !important;
+    width: calc(100vw - 2rem) !important;
+    max-width: calc(100vw - 2rem);
+    transform: translateX(-50%) !important;
+  }
 }
 
 :global(.wk-customer-import-export-dropdown.el-popper) {

@@ -484,7 +484,13 @@
             v-if="activeCustomerConversationTab === 'ai'"
             ref="messagesContainer"
             class="wk-chat-messages"
-            :class="[chatMessagesAreaClass, { 'wk-chat-messages--empty-chat': isCenteredEmptyChat }]"
+            :class="[
+              chatMessagesAreaClass,
+              {
+                'wk-chat-messages--empty-chat': isCenteredEmptyChat,
+                'wk-chat-messages--mobile-floating-actions': showMobileFloatingBar
+              }
+            ]"
             @scroll="handleMessagesScroll"
           >
             <div class="wk-chat-messages__inner px-4 md:px-8">
@@ -909,7 +915,7 @@
                     <div class="flex items-center gap-2">
                       <el-popover
                         v-model:visible="chatUploadMenuVisible"
-                        trigger="click"
+                        trigger="manual"
                         placement="top-start"
                         width="200"
                         :show-arrow="false"
@@ -921,9 +927,11 @@
                         <template #reference>
                           <button
                             type="button"
-                            class="group/chat-upload-trigger relative flex size-8 items-center justify-center rounded-full text-[#0d0d0d] transition-colors hover:bg-[#F1F1F1]"
+                            class="wk-chat-upload-trigger group/chat-upload-trigger relative flex size-8 items-center justify-center rounded-full text-[#0d0d0d] transition-colors hover:bg-[#F1F1F1]"
                             :disabled="isUploading"
                             aria-label="添加文件等"
+                            @pointerdown.stop
+                            @click.stop="handleChatUploadTriggerClick"
                           >
                             <WkIcon name="add-1" :box-size="16" class="shrink-0" />
                             <span
@@ -1280,7 +1288,7 @@
                   <div v-else class="wk-mobile-composer-row flex w-full items-end gap-2">
                     <el-popover
                       v-model:visible="chatUploadMenuVisible"
-                      trigger="click"
+                      trigger="manual"
                       placement="top-start"
                       width="calc(100vw - 32px)"
                       :show-arrow="false"
@@ -1292,9 +1300,11 @@
                       <template #reference>
                         <button
                           type="button"
-                          class="wk-mobile-composer-icon-button"
+                          class="wk-chat-upload-trigger wk-mobile-composer-icon-button"
                           :disabled="isUploading"
                           aria-label="添加文件等"
+                          @pointerdown.stop
+                          @click.stop="handleChatUploadTriggerClick"
                         >
                           <WkIcon name="add-1" :box-size="16" class="shrink-0" />
                         </button>
@@ -2094,7 +2104,9 @@ import {
   canCaptureMobileAudioFile,
   captureMobileAudioFile,
   hasMobileAudioInputSupport,
-  requestMobileAudioStream
+  requestMobileAudioStream,
+  shouldPreferMobileAudioFileCapture,
+  shouldUseMobileAudioFileCapture
 } from '@/utils/mobileAudioRecording'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
 import type { Contact, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAttachment } from '@/types/customer'
@@ -2185,8 +2197,6 @@ function activeChatInputEl(): HTMLTextAreaElement | null {
 const chatUploadMenuVisible = ref(false)
 const chatUploadSubmenuVisible = ref(false)
 let chatUploadMenuLeaveTimer: ReturnType<typeof setTimeout> | null = null
-/** 关闭上传菜单后跳过自动聚焦（如打开知识库选择器） */
-let skipComposerFocusOnUploadMenuClose = false
 
 function clearChatUploadMenuLeaveTimer() {
   if (chatUploadMenuLeaveTimer != null) {
@@ -2201,6 +2211,33 @@ function isInsideChatUploadMenuPopover(target: EventTarget | null): boolean {
   return Boolean(el?.closest('.wk-chat-upload-menu-popper'))
 }
 
+function isInsideChatUploadTrigger(target: EventTarget | null): boolean {
+  if (!(target instanceof Node)) return false
+  const el = target instanceof Element ? target : target.parentElement
+  return Boolean(el?.closest('.wk-chat-upload-trigger'))
+}
+
+function closeChatUploadMenu() {
+  clearChatUploadMenuLeaveTimer()
+  chatUploadMenuVisible.value = false
+  chatUploadSubmenuVisible.value = false
+}
+
+function handleChatUploadTriggerClick() {
+  if (isUploading.value) return
+  clearChatUploadMenuLeaveTimer()
+  if (!chatUploadMenuVisible.value) {
+    chatModelPopoverVisible.value = false
+  }
+  chatUploadMenuVisible.value = !chatUploadMenuVisible.value
+}
+
+function handleDocumentPointerDown(event: PointerEvent) {
+  if (!chatUploadMenuVisible.value) return
+  if (isInsideChatUploadTrigger(event.target) || isInsideChatUploadMenuPopover(event.target)) return
+  closeChatUploadMenu()
+}
+
 function handleChatUploadMenuMouseLeave(event: MouseEvent) {
   if (isInsideChatUploadMenuPopover(event.relatedTarget)) {
     clearChatUploadMenuLeaveTimer()
@@ -2209,8 +2246,7 @@ function handleChatUploadMenuMouseLeave(event: MouseEvent) {
   clearChatUploadMenuLeaveTimer()
   chatUploadMenuLeaveTimer = setTimeout(() => {
     chatUploadMenuLeaveTimer = null
-    chatUploadMenuVisible.value = false
-    chatUploadSubmenuVisible.value = false
+    closeChatUploadMenu()
   }, 120)
 }
 
@@ -2218,9 +2254,6 @@ watch(chatUploadMenuVisible, (visible) => {
   if (!visible) {
     chatUploadSubmenuVisible.value = false
     clearChatUploadMenuLeaveTimer()
-    if (!skipComposerFocusOnUploadMenuClose) {
-      void nextTick(() => focusChatTextarea())
-    }
   }
 })
 
@@ -2459,7 +2492,6 @@ function onChatModelImageError(ev: Event) {
 function handleChatModelChange(modelKey: string) {
   chatStore.setSelectedModelKey(modelKey)
   chatModelPopoverVisible.value = false
-  focusChatTextarea()
 }
 
 function openAiQuotaChoiceDialog(resumeAfterAction = false) {
@@ -3510,6 +3542,7 @@ onMounted(async () => {
     chatMessagesResizeObserver.observe(messagesContainer.value)
   }
   registerMobileKeyboardInsetListeners()
+  document.addEventListener('pointerdown', handleDocumentPointerDown, true)
   document.addEventListener('touchmove', handleMobileSummaryTouchMove, { passive: false })
   emitChatComposerNarrowState(true)
   resizeChatTextarea()
@@ -3546,6 +3579,7 @@ onBeforeUnmount(() => {
   transcriptionToken += 1
   closeMobileCustomerSummary()
   unregisterMobileKeyboardInsetListeners()
+  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
   document.removeEventListener('touchmove', handleMobileSummaryTouchMove)
   unregisterAiQuotaResumeSendHandler()
   customerPanelResizeObserver?.disconnect()
@@ -4001,9 +4035,14 @@ async function handleStartChatAudioRecording() {
   const hasAudioInput = useMobileAudioApi
     ? hasMobileAudioInputSupport()
     : Boolean(navigator.mediaDevices?.getUserMedia)
-  const useMobileAudioFileCapture = useMobileAudioApi
-    && canCaptureMobileAudioFile()
-    && (!hasAudioInput || typeof MediaRecorder === 'undefined')
+  const hasMediaRecorder = typeof MediaRecorder !== 'undefined'
+  const useMobileAudioFileCapture = shouldUseMobileAudioFileCapture({
+    useMobileAudioApi,
+    hasAudioInput,
+    hasMediaRecorder,
+    canCaptureAudioFile: canCaptureMobileAudioFile(),
+    preferFileCapture: shouldPreferMobileAudioFileCapture()
+  })
 
   if (useMobileAudioFileCapture) {
     speechInputBase = inputText.value.trim()
@@ -4015,7 +4054,7 @@ async function handleStartChatAudioRecording() {
   }
 
   if (!(await ensureChatAudioTranscriptionSupported())) return
-  if (!hasAudioInput || typeof MediaRecorder === 'undefined') {
+  if (!hasAudioInput || !hasMediaRecorder) {
     ElMessage.warning('当前浏览器不支持录音，请改用文字输入')
     return
   }
@@ -4191,7 +4230,7 @@ function handleUpload() {
 }
 
 function handleChatUploadMenuAddFile() {
-  chatUploadMenuVisible.value = false
+  closeChatUploadMenu()
   handleUpload()
 }
 
@@ -4200,17 +4239,13 @@ async function handleChatUploadMenuChooseKnowledge() {
     ElMessage.warning(`最多只能上传${MAX_CHAT_ATTACHMENT_COUNT}个文件`)
     return
   }
-  skipComposerFocusOnUploadMenuClose = true
-  chatUploadMenuVisible.value = false
+  closeChatUploadMenu()
   chatKnowledgePickerVisible.value = true
-  void nextTick(() => {
-    skipComposerFocusOnUploadMenuClose = false
-  })
 }
 
 function handleChatUploadMenuSelectApp(appCode: string) {
   if (isMobile.value) {
-    chatUploadMenuVisible.value = false
+    closeChatUploadMenu()
   }
   chatStore.setSelectedAppCode(chatStore.selectedAppCode === appCode ? 'general' : appCode)
 }
@@ -5287,6 +5322,10 @@ void sendQuickMessage
 
 .wk-chat-messages--scrollable .wk-chat-messages__inner {
   width: calc(100% + var(--wk-chat-messages-scrollbar-offset));
+}
+
+.wk-chat-messages--mobile-floating-actions .wk-chat-messages__inner {
+  padding-top: calc(64px + max(0px, env(safe-area-inset-top)));
 }
 
 .wk-chat-messages--empty-chat .wk-chat-messages__inner {

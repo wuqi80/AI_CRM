@@ -178,7 +178,7 @@
         小提示
       </h4>
       <div class="text-xs text-slate-600 leading-relaxed">
-        <slot name="tip">您可以直接粘贴简介或邮件正文，或者<strong>在输入框 Ctrl+V 粘贴名片图片</strong>，AI 会自动识别并补全信息。</slot>
+        <slot name="tip">您可以直接粘贴简介或邮件正文，或者<strong>点击上传名片图片</strong>，AI 会自动识别并补全信息。</slot>
       </div>
     </div>
   </div>

@@ -5,7 +5,17 @@
         <WkIcon name="ai" class="text-primary text-lg" />
         <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">AI 智能录入</h3>
       </div>
-      <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ headerHint }}</span>
+      <button
+        v-if="showUploadButton"
+        type="button"
+        class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:border-primary/30 hover:bg-slate-50 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="uploadDisabled"
+        @click="emit('upload-image')"
+      >
+        <span class="material-symbols-outlined text-[16px] leading-none">upload</span>
+        <span>上传名片</span>
+      </button>
+      <span v-else-if="headerHint" class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ headerHint }}</span>
     </div>
     <div class="p-4 space-y-3">
       <div class="relative">
@@ -77,7 +87,9 @@
  * Props:
  * - modelValue: 文本域内容（支持 v-model）
  * - placeholder: 输入框占位提示
- * - headerHint: 标题栏右侧辅助说明，默认「粘贴名片、邮件或简介」
+ * - headerHint: 标题栏右侧辅助说明
+ * - showUploadButton: 是否把标题栏右侧替换为「上传名片」按钮
+ * - uploadDisabled: 上传按钮是否禁用
  * - aiImagePreview: 粘贴图片后的预览 URL（如 object URL），无图传 null
  * - aiParsing: 是否正在解析（控制按钮 loading 与禁用）
  * - canExtract: 是否允许点击「智能提取」（如：有文本或已选图片）
@@ -88,6 +100,7 @@
  * - paste: 原生粘贴，父组件可从中读取剪贴板图片
  * - extract: 用户点击「智能提取」
  * - remove-image: 用户移除已粘贴的图片预览
+ * - upload-image: 用户点击标题栏上传按钮
  *
  * Slots:
  * - after-actions: 放在操作行之后，例如移动端展示 AI 解析摘要
@@ -103,10 +116,14 @@ withDefaults(
     aiParsing: boolean
     canExtract: boolean
     showImageHint?: boolean
+    showUploadButton?: boolean
+    uploadDisabled?: boolean
   }>(),
   {
-    headerHint: '粘贴名片、邮件或简介',
-    showImageHint: false
+    headerHint: '',
+    showImageHint: false,
+    showUploadButton: false,
+    uploadDisabled: false
   }
 )
 
@@ -115,5 +132,6 @@ const emit = defineEmits<{
   paste: [e: ClipboardEvent]
   extract: []
   'remove-image': []
+  'upload-image': []
 }>()
 </script>

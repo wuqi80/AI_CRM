@@ -242,6 +242,21 @@ select.border-none,
   box-shadow: 0 18px 50px rgb(var(--wk-shadow-color) / 0.14) !important;
 }
 
+/* Customer mobile summary sits at z-index 3400; nested dialogs, drawers, pickers, and messages must clear it. */
+.el-overlay {
+  z-index: 3600 !important;
+}
+
+.el-message {
+  z-index: 3700 !important;
+}
+
+.el-picker__popper.el-popper,
+.el-select__popper.el-popper,
+.el-dropdown__popper.el-popper {
+  z-index: 3700 !important;
+}
+
 .wk-sidebar-like-tooltip.el-popper {
   border: 0 !important;
   border-radius: 8px !important;
@@ -792,6 +807,31 @@ html.dark .via-white {
 
 .wk-dialog--flush .el-dialog__title {
   font-weight: bold;
+}
+
+@media (max-width: 767px) {
+  .el-dialog.wk-mobile-inset-dialog {
+    display: flex;
+    flex-direction: column;
+    width: calc(100vw - 2rem) !important;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 2rem);
+    margin: 1rem auto !important;
+    border-radius: 1rem !important;
+    overflow: hidden;
+  }
+
+  .el-dialog.wk-mobile-inset-dialog .el-dialog__header,
+  .el-dialog.wk-mobile-inset-dialog .el-dialog__footer {
+    flex-shrink: 0;
+  }
+
+  .el-dialog.wk-mobile-inset-dialog .el-dialog__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 }
 
 .el-tag.el-zoom-in-center-enter-active,

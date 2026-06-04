@@ -17,7 +17,7 @@
           @click="$emit('add-member')"
         >
           <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
-          添加成员
+          添加员工
         </button>
       </div>
 
@@ -298,11 +298,11 @@
 
                     <div class="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                       <div class="min-w-0">
-                        <p class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">department</p>
+                        <p class="text-[11px] font-bold text-slate-400 tracking-wide">部门</p>
                         <p class="text-sm text-slate-700 truncate">{{ selectedDept?.deptName || '-' }}</p>
                       </div>
                       <div class="min-w-0">
-                        <p class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">mobile</p>
+                        <p class="text-[11px] font-bold text-slate-400 tracking-wide">联系方式</p>
                         <p class="text-sm text-slate-700 truncate">{{ row.mobile || '-' }}</p>
                       </div>
                       <div class="min-w-0">
@@ -310,7 +310,7 @@
                         <p class="text-sm text-slate-700 truncate">{{ row.status === 1 ? '活跃' : row.status === 0 ? '禁用' : '未激活' }}</p>
                       </div>
                       <div class="min-w-0 col-span-2">
-                        <p class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">roles</p>
+                        <p class="text-[11px] font-bold text-slate-400 tracking-wide">角色</p>
                         <div class="mt-1 flex flex-wrap gap-1">
                           <span
                             v-for="roleName in row.roleNames || []"

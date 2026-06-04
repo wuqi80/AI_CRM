@@ -8,23 +8,23 @@
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="open" class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+      <div v-if="open" class="fixed inset-0 z-[3600] flex items-center justify-center p-4 sm:p-6">
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="handleClose" />
 
         <div
           :class="[
             'relative w-full bg-slate-50 shadow-2xl overflow-hidden flex flex-col wk-crm-el-field-scope',
-            isMobile ? 'max-w-full max-h-full rounded-none inset-0' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
+            isMobile ? 'max-w-full max-h-full rounded-[1rem] inset-0' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
           ]"
         >
           <div class="bg-white border-b border-slate-200 px-6 sm:px-8 py-4 sm:py-5 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-3 sm:gap-4">
+            <div class="flex min-w-0 items-center gap-3 sm:gap-4">
               <div class="size-10 sm:size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                 <span class="material-symbols-outlined">{{ isEdit ? 'edit' : 'person_add' }}</span>
               </div>
-              <div>
-                <h2 class="text-lg sm:text-xl font-bold text-slate-900">{{ isEdit ? '编辑联系人' : '添加联系人' }}</h2>
-                <p class="text-xs text-slate-500">
+              <div class="min-w-0">
+                <h2 class="truncate text-lg sm:text-xl font-bold text-slate-900">{{ isEdit ? '编辑联系人' : '添加联系人' }}</h2>
+                <p class="truncate text-xs text-slate-500">
                   {{ isEdit ? '修改联系人基本信息与备注' : '使用 AI 智能录入或手动填写联系人信息' }}
                 </p>
               </div>
@@ -32,7 +32,7 @@
             <div class="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
-                class="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                class="min-w-[3.5rem] px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors whitespace-nowrap"
                 @click="handleClose"
               >
                 取消
@@ -40,7 +40,7 @@
               <button
                 type="button"
                 :disabled="submitting"
-                class="px-5 sm:px-8 py-2 sm:py-2.5 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50"
+                class="min-w-[4rem] justify-center px-5 sm:px-8 py-2 sm:py-2.5 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
                 @click="handleSubmit"
               >
                 <span v-if="submitting" class="size-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -63,12 +63,15 @@
               <AiSmartEntrySection
                 v-if="!isEdit"
                 v-model="aiInputText"
-                placeholder="在此粘贴联系人描述、邮件内容，或直接粘贴 (Ctrl+V) 名片图片..."
+                placeholder="在此粘贴联系人描述、邮件内容，或点击上传名片图片..."
                 :ai-image-preview="aiImagePreview"
                 :ai-parsing="aiParsing"
                 :can-extract="Boolean(aiInputText.trim() || aiImageFile)"
                 :show-image-hint="Boolean(aiImagePreview && !aiParsing)"
+                :show-upload-button="true"
+                :upload-disabled="aiParsing"
                 @paste="handleAiPaste"
+                @upload-image="openAiImagePicker"
                 @extract="handleAiExtract"
                 @remove-image="removeAiImage"
               >
@@ -422,7 +425,7 @@ async function openAiImagePicker() {
 async function handleAiExtract() {
   if (aiParsing.value) return
   if (!aiInputText.value.trim() && !aiImageFile.value) {
-    ElMessage.warning('请输入文本或粘贴图片')
+    ElMessage.warning('请输入文本或上传图片')
     return
   }
 

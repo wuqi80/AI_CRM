@@ -2,9 +2,8 @@
   <el-dialog
     v-model="dialogVisible"
     title="重置用户名"
-    :width="isMobile ? '95%' : '460px'"
-    :fullscreen="isMobile"
-    class="wk-dialog--flush wk-crm-el-field-scope"
+    :width="isMobile ? 'calc(100vw - 2rem)' : '460px'"
+    class="wk-dialog--flush wk-crm-el-field-scope wk-reset-username-dialog wk-mobile-inset-dialog"
   >
     <div class="space-y-5">
       <div class="flex items-center gap-3">
@@ -87,3 +86,35 @@ const dialogVisible = computed({
   set: (value: boolean) => emit('update:visible', value)
 })
 </script>
+
+<style>
+.el-dialog.wk-reset-username-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  margin-top: 5vh !important;
+}
+
+.el-dialog.wk-reset-username-dialog.is-fullscreen {
+  max-height: none;
+  height: 100%;
+  margin: 0 !important;
+}
+
+.el-dialog.wk-reset-username-dialog .el-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.el-dialog.wk-reset-username-dialog .el-dialog__footer {
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .el-dialog.wk-reset-username-dialog.wk-mobile-inset-dialog {
+    max-height: calc(100dvh - 2rem);
+    margin: 1rem auto !important;
+  }
+}
+</style>

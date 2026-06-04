@@ -2,9 +2,8 @@
   <el-dialog
     v-model="dialogVisible"
     :title="editingMember ? '编辑员工' : '新增员工'"
-    :width="isMobile ? '95%' : '650px'"
-    :fullscreen="isMobile"
-    class="wk-dialog--flush wk-member-dialog wk-crm-el-field-scope"
+    :width="isMobile ? 'calc(100vw - 2rem)' : '650px'"
+    class="wk-dialog--flush wk-member-dialog wk-crm-el-field-scope wk-mobile-inset-dialog"
   >
     <el-form :model="memberForm" label-position="top">
       <el-row :gutter="16">
@@ -208,5 +207,12 @@ const isEditingTenantCreator = computed(() => Boolean(props.editingMember?.tenan
 
 .el-dialog.wk-member-dialog .wk-member-dialog__role-scroll {
   overscroll-behavior: contain;
+}
+
+@media (max-width: 767px) {
+  .el-dialog.wk-member-dialog.wk-mobile-inset-dialog {
+    max-height: calc(100dvh - 2rem);
+    margin: 1rem auto !important;
+  }
 }
 </style>

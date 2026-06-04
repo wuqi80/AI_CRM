@@ -2,9 +2,8 @@
   <el-dialog
     v-model="dialogVisible"
     :title="editingRole ? '编辑角色' : '创建角色'"
-    :width="isMobile ? '95%' : '460px'"
-    :fullscreen="isMobile"
-    class="wk-dialog--flush wk-crm-el-field-scope"
+    :width="isMobile ? 'calc(100vw - 2rem)' : '460px'"
+    class="wk-dialog--flush wk-crm-el-field-scope wk-mobile-inset-dialog"
   >
     <el-form :model="roleForm" label-position="top">
       <el-form-item label="角色名称" required>

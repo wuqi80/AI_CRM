@@ -394,6 +394,15 @@
               <span class="material-symbols-outlined text-base">check_circle</span>
               标记完成
             </button>
+            <button
+              v-else-if="canToggleComplete"
+              @click="handleToggleComplete"
+              class="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+              type="button"
+            >
+              <span class="material-symbols-outlined text-base">undo</span>
+              重新开始
+            </button>
           </div>
           <button
             v-if="canDelete"

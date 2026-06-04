@@ -86,7 +86,7 @@
                     </div>
                     <div
                       v-if="customer.tags?.length || canEditCustomerTags"
-                      class="ml-2 flex min-w-0 shrink items-center justify-end gap-1.5 overflow-hidden"
+                      class="ml-0 flex min-w-0 shrink items-center justify-start gap-1.5 overflow-hidden"
                     >
                       <span
                         v-for="tag in customerVisibleTags"
@@ -174,24 +174,62 @@
                 </div>
                 <div
                   v-if="customer.tags?.length || canEditCustomerTags"
-                  class="ml-0 flex min-w-0 flex-wrap items-center justify-end gap-2"
+                  class="customer-detail-mobile-tags-row ml-0 flex w-full min-w-0 flex-nowrap items-center justify-start gap-2 overflow-hidden"
                 >
-                  <span
-                    v-for="tag in customer.tags"
-                    :key="tag.tagId"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
-                  >
-                    {{ tag.tagName }}
+                  <div class="customer-detail-mobile-tag-list flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden">
                     <span
-                      v-if="canEditCustomerTags"
-                      class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                      @click="handleRemoveTag(tag)"
-                    >close</span>
-                  </span>
+                      v-for="tag in customerVisibleTags"
+                      :key="tag.tagId"
+                      class="inline-flex min-w-0 items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
+                      :title="tag.tagName"
+                    >
+                      <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                      <span
+                        v-if="canEditCustomerTags"
+                        class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer transition-colors"
+                        @click.stop="handleRemoveTag(tag)"
+                      >close</span>
+                    </span>
+                    <el-popover
+                      v-if="customerHiddenTags.length > 0"
+                      trigger="click"
+                      placement="bottom-start"
+                      :width="220"
+                      popper-class="wk-customer-tags-popover"
+                    >
+                      <template #reference>
+                        <span
+                          class="inline-flex h-7 shrink-0 cursor-pointer items-center rounded-lg bg-slate-100 px-2.5 text-xs font-medium text-slate-500"
+                        >
+                          +{{ customerHiddenTags.length }}
+                        </span>
+                      </template>
+                      <div class="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto">
+                        <span
+                          v-for="tag in customerHiddenTags"
+                          :key="tag.tagId"
+                          class="inline-flex max-w-full items-center gap-1 rounded-lg bg-[#f4f4f4] px-2 py-1 text-[12px] font-medium text-[#5f5f5f]"
+                          :title="tag.tagName"
+                        >
+                          <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                          <button
+                            v-if="canEditCustomerTags"
+                            type="button"
+                            class="inline-flex shrink-0 text-slate-400 transition-colors hover:text-red-500"
+                            title="删除标签"
+                            aria-label="删除标签"
+                            @click.stop="handleRemoveTag(tag)"
+                          >
+                            <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+                          </button>
+                        </span>
+                      </div>
+                    </el-popover>
+                  </div>
                   <button
                     v-if="canEditCustomerTags"
                     type="button"
-                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors"
+                    class="inline-flex shrink-0 items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors"
                     @click="showAddTagDialog = true"
                   >
                     <span class="wk-plus-button-mark" aria-hidden="true">+</span>
@@ -654,7 +692,7 @@
                 :class="isEmbeddedMobileLayout ? 'text-2xl leading-none text-slate-400' : 'mb-3 text-4xl text-slate-300'"
               >event_note</span>
               <p :class="isEmbeddedMobileLayout ? 'mt-2 text-xs font-medium text-slate-400' : 'text-sm text-slate-400'">暂无跟进记录</p>
-              <p v-if="!isEmbeddedMobileLayout" class="text-xs text-slate-300 mt-1">点击上方按钮添加第一条跟进记录</p>
+              <p :class="isEmbeddedMobileLayout ? 'mt-1 text-xs text-slate-300' : 'text-xs text-slate-300 mt-1'">点击上方语音识别按钮添加第一条跟进记录</p>
             </div>
 
             <div
@@ -971,7 +1009,7 @@
                             <button
                               v-if="!contact.isPrimary && canSetPrimaryContacts"
                               type="button"
-                              class="group/module-action relative flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600 opacity-0 pointer-events-none transition-all hover:bg-amber-100 group-hover:opacity-100 group-hover:pointer-events-auto"
+                              class="group/module-action relative flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600 transition-all hover:bg-amber-100"
                               aria-label="设为主要联系人"
                               @click.stop="handleSetPrimary(contact.contactId)"
                             >
@@ -2066,8 +2104,8 @@ function scheduleAiAnalysisPolling(customerId?: string, resetAttempts = false) {
 
 
 const customer = computed(() => customerStore.currentCustomer)
-const customerVisibleTags = computed(() => customer.value?.tags?.slice(0, 3) || [])
-const customerHiddenTags = computed(() => customer.value?.tags?.slice(3) || [])
+const customerVisibleTags = computed(() => customer.value?.tags?.slice(0, 2) || [])
+const customerHiddenTags = computed(() => customer.value?.tags?.slice(2) || [])
 const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
 const canTransferCustomer = computed(() => userStore.hasPermission('customer:transfer'))
 const canDeleteCustomer = computed(() => userStore.hasPermission('customer:delete'))

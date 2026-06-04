@@ -2,7 +2,12 @@
   <div
     ref="anchorRef"
     class="inline-editable-field"
-    :class="{ 'is-editing': editing, 'is-disabled': !editable }"
+    :class="{
+      'is-editing': editing,
+      'is-disabled': !editable,
+      'is-click-reveal': revealEditOnClick,
+      'is-edit-action-visible': editActionVisible
+    }"
   >
     <template v-if="editing">
       <!-- 与展示态同结构占位，避免行高被 min-height 撑变；不可见且不响应事件 -->
@@ -150,7 +155,7 @@
     </template>
 
     <template v-else>
-      <div class="inline-editable-field__display">
+      <div class="inline-editable-field__display" @click="handleDisplayClick">
         <div class="inline-editable-field__content">
           <slot :value="modelValue" :display-value="resolvedDisplayValue">
             <span class="inline-editable-field__fallback" :title="resolvedDisplayValue">
@@ -159,7 +164,7 @@
           </slot>
         </div>
         <button
-          v-if="editable"
+          v-if="editable && (!revealEditOnClick || editActionVisible)"
           type="button"
           class="inline-editable-field__edit"
           :title="`编辑${resolvedFieldLabel}`"
@@ -191,6 +196,7 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   emptyText?: string
   editable?: boolean
+  revealEditOnClick?: boolean
   required?: boolean
   saveHandler?: SaveHandler
 }>(), {
@@ -200,6 +206,7 @@ const props = withDefaults(defineProps<{
   placeholder: '',
   emptyText: '-',
   editable: true,
+  revealEditOnClick: false,
   required: false,
   saveHandler: undefined
 })
@@ -210,6 +217,7 @@ const emit = defineEmits<{
 }>()
 
 const editing = ref(false)
+const editActionVisible = ref(!props.revealEditOnClick)
 const saving = ref(false)
 const draftValue = ref<any>(null)
 const editorRef = ref<any>(null)
@@ -321,6 +329,13 @@ const resolvedDisplayValue = computed(() => {
   return String(props.modelValue)
 })
 
+const revealEditOnClick = computed(() => props.revealEditOnClick)
+
+function handleDisplayClick() {
+  if (!props.editable || editing.value || !props.revealEditOnClick) return
+  editActionVisible.value = true
+}
+
 function normalizeMultiselectValue(value: unknown): string[] {
   if (value === null || value === undefined || value === '') return []
   if (Array.isArray(value)) return value.map(item => String(item)).filter(Boolean)
@@ -379,6 +394,7 @@ function buildSubmitValue(): any {
 
 async function startEdit() {
   if (!props.editable || saving.value) return
+  editActionVisible.value = false
   draftValue.value = createDraftValue(props.modelValue)
   editing.value = true
   await nextTick()
@@ -400,6 +416,7 @@ function cancel() {
   teardownFloatListeners()
   floatStyle.value = {}
   editing.value = false
+  editActionVisible.value = !props.revealEditOnClick
   emit('cancel')
 }
 
@@ -417,6 +434,7 @@ async function commit() {
     teardownFloatListeners()
     floatStyle.value = {}
     editing.value = false
+    editActionVisible.value = !props.revealEditOnClick
     emit('saved', submitValue)
   } finally {
     saving.value = false
@@ -426,7 +444,12 @@ async function commit() {
 watch(() => [props.modelValue, resolvedFieldName.value], () => {
   if (!editing.value) {
     draftValue.value = createDraftValue(props.modelValue)
+    editActionVisible.value = !props.revealEditOnClick
   }
+})
+
+watch(() => props.revealEditOnClick, (value) => {
+  editActionVisible.value = !value
 })
 
 watch(editing, (v) => {
@@ -493,11 +516,16 @@ onUnmounted(() => {
 
 .inline-editable-field__display {
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0;
   min-width: 0;
+  width: 100%;
   max-width: 100%;
+}
+
+.inline-editable-field.is-click-reveal:not(.is-disabled):not(.is-editing) .inline-editable-field__display {
+  cursor: pointer;
 }
 
 .inline-editable-field__content {
@@ -509,8 +537,9 @@ onUnmounted(() => {
 }
 
 /* 悬停/聚焦编辑钮时预留宽度，避免绝对定位按钮盖住省略号文案 */
-.inline-editable-field:has(.inline-editable-field__edit):hover .inline-editable-field__content,
-.inline-editable-field:has(.inline-editable-field__edit:focus-visible) .inline-editable-field__content {
+.inline-editable-field:not(.is-click-reveal):has(.inline-editable-field__edit):hover .inline-editable-field__content,
+.inline-editable-field:has(.inline-editable-field__edit:focus-visible) .inline-editable-field__content,
+.inline-editable-field.is-edit-action-visible .inline-editable-field__content {
   padding-right: 32px;
 }
 
@@ -545,8 +574,9 @@ onUnmounted(() => {
   background: #d6ebff;
 }
 
-.inline-editable-field:hover .inline-editable-field__edit,
-.inline-editable-field__edit:focus-visible {
+.inline-editable-field:not(.is-click-reveal):hover .inline-editable-field__edit,
+.inline-editable-field__edit:focus-visible,
+.inline-editable-field.is-edit-action-visible .inline-editable-field__edit {
   opacity: 1;
   pointer-events: auto;
 }
@@ -558,11 +588,13 @@ onUnmounted(() => {
 
 /* 无 hover 的触屏设备：编辑钮不能长期 pointer-events:none，否则无法点开 */
 @media (hover: none) {
-  .inline-editable-field:has(.inline-editable-field__edit) .inline-editable-field__content {
+  .inline-editable-field:not(.is-click-reveal):has(.inline-editable-field__edit) .inline-editable-field__content,
+  .inline-editable-field.is-edit-action-visible .inline-editable-field__content {
     padding-right: 32px;
   }
 
-  .inline-editable-field__edit {
+  .inline-editable-field:not(.is-click-reveal) .inline-editable-field__edit,
+  .inline-editable-field.is-edit-action-visible .inline-editable-field__edit {
     opacity: 0.92;
     pointer-events: auto;
   }

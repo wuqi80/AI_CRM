@@ -3,7 +3,7 @@
     <Transition name="fade">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[309] bg-slate-900/60 backdrop-blur-sm"
+        class="fixed inset-0 z-[3600] bg-slate-900/60 backdrop-blur-sm"
         @click="close"
       />
     </Transition>
@@ -11,7 +11,7 @@
     <Transition name="scale-fade">
       <div
         v-if="modelValue && attachment"
-        class="fixed inset-0 z-[310] flex items-center justify-center p-4"
+        class="fixed inset-0 z-[3601] flex items-center justify-center p-4"
       >
         <div
           :class="[

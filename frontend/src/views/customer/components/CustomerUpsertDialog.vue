@@ -8,7 +8,7 @@
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="modelValue" class="fixed inset-0 z-[300] flex items-center justify-center p-4 sm:p-6">
+      <div v-if="modelValue" class="fixed inset-0 z-[3600] flex items-center justify-center p-4 sm:p-6">
         <!-- Backdrop -->
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="handleClose" />
 
@@ -19,13 +19,20 @@
         ]">
           <!-- Header -->
           <div class="bg-white border-b border-slate-200 px-6 sm:px-8 py-4 sm:py-5 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-3 sm:gap-4">
-              <div class="size-10 sm:size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                <span class="material-symbols-outlined">{{ isEdit ? 'edit' : 'person_add' }}</span>
+            <div class="flex min-w-0 items-center gap-3 sm:gap-4">
+              <div
+                :class="[
+                  'flex items-center justify-center',
+                  isEdit
+                    ? 'size-8 sm:size-9 rounded-xl text-slate-600'
+                    : 'size-10 sm:size-12 rounded-2xl text-primary'
+                ]"
+              >
+                <span class="material-symbols-outlined" :class="isEdit ? 'text-[18px]' : ''">{{ isEdit ? 'edit' : 'person_add' }}</span>
               </div>
-              <div>
-                <h2 class="text-lg sm:text-xl font-bold text-slate-900">{{ isEdit ? '编辑客户' : '新增客户' }}</h2>
-                <p class="text-xs text-slate-500">{{ isEdit ? '修改客户基本信息和联系方式' : '使用 AI 智能录入或手动填写客户信息' }}</p>
+              <div class="min-w-0">
+                <h2 class="truncate text-lg sm:text-xl font-bold text-slate-900">{{ isEdit ? '编辑客户' : '新增客户' }}</h2>
+                <p class="truncate text-xs text-slate-500">{{ isEdit ? '修改客户基本信息和联系方式' : '使用 AI 智能录入或手动填写客户信息' }}</p>
               </div>
             </div>
             <div class="flex items-center gap-2 sm:gap-3">
@@ -54,15 +61,25 @@
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <!-- Left Column -->
               <div :class="[isEdit ? 'lg:col-span-12' : 'lg:col-span-7', 'space-y-5']">
+                <input
+                  ref="aiImageInputRef"
+                  type="file"
+                  class="hidden"
+                  accept="image/*"
+                  @change="handleAiImageChange"
+                />
                 <AiSmartEntrySection
                   v-if="!isEdit"
                   v-model="aiInputText"
-                  placeholder="在此粘贴客户描述、邮件内容，或直接粘贴 (Ctrl+V) 名片图片..."
+                  placeholder="在此粘贴客户描述、邮件内容，或点击上传名片图片..."
                   :ai-image-preview="aiImagePreview"
                   :ai-parsing="aiParsing"
                   :can-extract="Boolean(aiInputText.trim() || aiImageFile)"
                   :show-image-hint="Boolean(aiImagePreview && !aiParsing)"
+                  :show-upload-button="true"
+                  :upload-disabled="aiParsing"
                   @paste="handleAiPaste"
+                  @upload-image="openAiImagePicker"
                   @extract="handleAiExtract"
                   @remove-image="removeAiImage"
                 >
@@ -233,7 +250,7 @@
                 >
                   <template #tip>
                     <p class="text-xs text-slate-600 leading-relaxed">
-                      您可以直接粘贴该客户的简介、公司官网文字，或者<strong>直接在输入框 Ctrl+V 粘贴名片图片</strong>，AI 会自动识别并补全信息。
+                      您可以直接粘贴该客户的简介、公司官网文字，或者<strong>点击上传名片图片</strong>，AI 会自动识别并补全信息。
                     </p>
                   </template>
                 </AiParseInsightSidebar>
@@ -247,7 +264,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { useCustomerStore } from '@/stores/customer'
@@ -315,6 +332,7 @@ const aiParsing = ref(false)
 const aiParseResult = ref<CustomerAiParseVO | null>(null)
 const aiImageFile = ref<File | null>(null)
 const aiImagePreview = ref<string | null>(null)
+const aiImageInputRef = ref<HTMLInputElement | null>(null)
 
 const CUSTOMER_SYSTEM_FIELD_NAMES = new Set([
   'companyName',
@@ -527,11 +545,37 @@ function handleAiPaste(e: ClipboardEvent) {
     if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
       const file = items[i].getAsFile()
       if (file) {
-        aiImageFile.value = file
-        aiImagePreview.value = URL.createObjectURL(file)
+        applyAiImageFile(file)
+        break
       }
     }
   }
+}
+
+function applyAiImageFile(file: File) {
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    return
+  }
+  removeAiImage()
+  aiImageFile.value = file
+  aiImagePreview.value = URL.createObjectURL(file)
+}
+
+function handleAiImageChange(event: Event) {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (file) {
+    applyAiImageFile(file)
+  }
+  if (input) {
+    input.value = ''
+  }
+}
+
+async function openAiImagePicker() {
+  await nextTick()
+  aiImageInputRef.value?.click()
 }
 
 function removeAiImage() {
@@ -555,7 +599,7 @@ function handleFormLogoRemoved() {
 async function handleAiExtract() {
   if (aiParsing.value) return
   if (!aiInputText.value.trim() && !aiImageFile.value) {
-    ElMessage.warning('请输入文本或粘贴图片')
+    ElMessage.warning('请输入文本或上传图片')
     return
   }
 

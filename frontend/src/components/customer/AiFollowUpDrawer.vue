@@ -369,7 +369,9 @@ import {
   canCaptureMobileAudioFile,
   captureMobileAudioFile,
   hasMobileAudioInputSupport,
-  requestMobileAudioStream
+  requestMobileAudioStream,
+  shouldPreferMobileAudioFileCapture,
+  shouldUseMobileAudioFileCapture
 } from '@/utils/mobileAudioRecording'
 
 const props = defineProps<{
@@ -861,9 +863,14 @@ async function handleStartAudioRecording() {
   const hasAudioInput = useMobileAudioApi
     ? hasMobileAudioInputSupport()
     : Boolean(navigator.mediaDevices?.getUserMedia)
-  const useMobileAudioFileCapture = useMobileAudioApi
-    && canCaptureMobileAudioFile()
-    && (!hasAudioInput || typeof MediaRecorder === 'undefined')
+  const hasMediaRecorder = typeof MediaRecorder !== 'undefined'
+  const useMobileAudioFileCapture = shouldUseMobileAudioFileCapture({
+    useMobileAudioApi,
+    hasAudioInput,
+    hasMediaRecorder,
+    canCaptureAudioFile: canCaptureMobileAudioFile(),
+    preferFileCapture: shouldPreferMobileAudioFileCapture()
+  })
 
   if (useMobileAudioFileCapture) {
     speechInputBase = textInput.value.trim()
@@ -875,7 +882,7 @@ async function handleStartAudioRecording() {
   }
 
   if (!(await ensureAudioTranscriptionSupported())) return
-  if (!hasAudioInput || typeof MediaRecorder === 'undefined') {
+  if (!hasAudioInput || !hasMediaRecorder) {
     ElMessage.warning('当前浏览器不支持录音，请改用文字输入')
     return
   }

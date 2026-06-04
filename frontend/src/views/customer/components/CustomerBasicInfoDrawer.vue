@@ -87,6 +87,7 @@
               :field="customerInlineFields.companyName"
               :display-value="customer.companyName || '-'"
               :editable="canEditCustomer"
+              reveal-edit-on-click
               :save-handler="(value) => handleInlineDetailFieldSave('companyName', value)"
             >
               <p class="text-sm text-slate-900 font-medium">{{ customer.companyName }}</p>
@@ -99,6 +100,7 @@
               :field="customerInlineFields.industry"
               :display-value="customer.industry || '-'"
               :editable="canEditCustomer"
+              reveal-edit-on-click
               :save-handler="(value) => handleInlineDetailFieldSave('industry', value)"
             >
               <p class="text-sm text-slate-900 font-medium">{{ customer.industry || '-' }}</p>
@@ -111,6 +113,7 @@
               :field="customerInlineFields.source"
               :display-value="customer.source || '-'"
               :editable="canEditCustomer"
+              reveal-edit-on-click
               :save-handler="(value) => handleInlineDetailFieldSave('source', value)"
             >
               <p class="text-sm text-slate-900 font-medium">{{ customer.source || '-' }}</p>
@@ -123,6 +126,7 @@
               :field="primaryContactInlineFields.primaryContactName"
               :display-value="primaryContact?.name || '-'"
               :editable="canEditCustomer"
+              reveal-edit-on-click
               :save-handler="(value) => handleInlineDetailFieldSave('primaryContactName', value, 'contact')"
             >
               <p class="text-sm text-slate-900 font-medium">{{ primaryContact?.name || '-' }}</p>
@@ -135,6 +139,7 @@
               :field="primaryContactInlineFields.primaryContactPhone"
               :display-value="primaryContact?.phone || '-'"
               :editable="canEditCustomer"
+              reveal-edit-on-click
               :save-handler="(value) => handleInlineDetailFieldSave('primaryContactPhone', value, 'contact')"
             >
               <p class="text-sm text-slate-900 font-medium font-mono">{{ primaryContact?.phone || '-' }}</p>
@@ -147,6 +152,7 @@
               :field="primaryContactInlineFields.primaryContactEmail"
               :display-value="primaryContact?.email || '-'"
               :editable="canEditCustomer"
+              reveal-edit-on-click
               :save-handler="(value) => handleInlineDetailFieldSave('primaryContactEmail', value, 'contact')"
             >
               <p class="text-sm text-slate-900 font-medium break-all">{{ primaryContact?.email || '-' }}</p>
@@ -159,6 +165,7 @@
               :field="customerInlineFields.address"
               :display-value="customer.address || '-'"
               :editable="canEditCustomer"
+              reveal-edit-on-click
               :save-handler="(value) => handleInlineDetailFieldSave('address', value)"
             >
               <p class="text-sm text-slate-900 font-medium whitespace-pre-wrap break-words">{{ customer.address || '-' }}</p>
@@ -171,6 +178,7 @@
               :field="customerInlineFields.website"
               :display-value="customer.website || '-'"
               :editable="canEditCustomer"
+              reveal-edit-on-click
               :save-handler="(value) => handleInlineDetailFieldSave('website', value)"
             >
               <a
@@ -193,6 +201,7 @@
               :field="customerInlineFields.quotation"
               :display-value="formatAmount(customer.quotation)"
               :editable="canEditCustomer"
+              reveal-edit-on-click
               :save-handler="(value) => handleInlineDetailFieldSave('quotation', value)"
             >
               <p class="text-sm text-slate-900 font-medium">{{ formatAmount(customer.quotation) }}</p>
@@ -221,6 +230,7 @@
               :field="customerInlineFields.remark"
               :display-value="customer.remark || '暂无备注'"
               :editable="canEditCustomer"
+              reveal-edit-on-click
               :save-handler="(value) => handleInlineDetailFieldSave('remark', value)"
             >
               <p class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{{ customer.remark || '暂无备注' }}</p>
@@ -233,6 +243,7 @@
               :field="field"
               :display-value="formatCustomFieldDisplayValue(field, customer.customFields?.[field.fieldName])"
               :editable="canEditCustomer"
+              reveal-edit-on-click
               :save-handler="(value) => handleInlineDetailFieldSave(field.fieldName, value, 'custom')"
             >
               <p class="text-sm text-slate-900 font-medium whitespace-pre-wrap break-words">{{ formatCustomFieldDisplayValue(field, customer.customFields?.[field.fieldName]) }}</p>

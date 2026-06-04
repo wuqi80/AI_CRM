@@ -32,13 +32,15 @@
           'opacity-70': sortingFields && draggedFieldId === field.fieldId
         }"
         draggable="true"
-        @dragstart="handleDragStart(field)"
-        @dragover.prevent="handleDragOver(field)"
-        @drop="handleDrop(field)"
+        @dragstart="handleDragStart($event, field)"
+        @dragenter.prevent="handleDragOver($event, field)"
+        @dragover.prevent="handleDragOver($event, field)"
+        @drop.prevent="handleDrop($event, field)"
         @dragend="handleDragEnd"
       >
         <div class="flex items-center flex-1">
           <button
+            v-if="false"
             type="button"
             class="mr-3 text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing"
             title="拖动排序"
@@ -60,9 +62,6 @@
               >
                 {{ field.fieldSource === 'system' ? '系统字段' : '自定义字段' }}
               </el-tag>
-              <span v-if="field.options && field.options.length > 0" class="ml-2">
-                选项: {{ field.options.map((item) => item.label).join(', ') }}
-              </span>
             </div>
           </div>
         </div>
@@ -154,13 +153,21 @@ async function loadCustomFields() {
   }
 }
 
-function handleDragStart(field: CustomField) {
+function handleDragStart(event: DragEvent, field: CustomField) {
   if (sortingFields.value) return
   draggedFieldId.value = field.fieldId
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.dropEffect = 'move'
+    event.dataTransfer.setData('text/plain', field.fieldId)
+  }
 }
 
-function handleDragOver(field: CustomField) {
+function handleDragOver(event: DragEvent, field: CustomField) {
   if (!draggedFieldId.value || draggedFieldId.value === field.fieldId) return
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
   dragOverFieldId.value = field.fieldId
 }
 
@@ -169,8 +176,8 @@ function handleDragEnd() {
   dragOverFieldId.value = null
 }
 
-async function handleDrop(targetField: CustomField) {
-  const sourceFieldId = draggedFieldId.value
+async function handleDrop(event: DragEvent, targetField: CustomField) {
+  const sourceFieldId = draggedFieldId.value || event.dataTransfer?.getData('text/plain') || null
   handleDragEnd()
 
   if (!sourceFieldId || sourceFieldId === targetField.fieldId || sortingFields.value) {

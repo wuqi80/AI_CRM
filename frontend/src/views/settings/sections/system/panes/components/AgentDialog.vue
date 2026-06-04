@@ -2,9 +2,8 @@
   <el-dialog
     v-model="dialogVisible"
     :title="editingAgent ? '编辑智能体' : '添加智能体'"
-    :width="isMobile ? '95%' : '460px'"
-    :fullscreen="isMobile"
-    class="wk-dialog--flush wk-crm-el-field-scope"
+    :width="isMobile ? 'calc(100vw - 2rem)' : '460px'"
+    class="wk-dialog--flush wk-crm-el-field-scope wk-mobile-inset-dialog"
   >
     <el-form :model="agentForm" label-position="top">
       <el-form-item label="名称">
