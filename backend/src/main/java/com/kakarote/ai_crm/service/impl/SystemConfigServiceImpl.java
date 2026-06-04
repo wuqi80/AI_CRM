@@ -6,12 +6,14 @@ import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.WeKnoraConfigUpdateBO;
+import com.kakarote.ai_crm.entity.BO.WeKnoraModelSyncBO;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConnectionTestVO;
+import com.kakarote.ai_crm.entity.VO.WeKnoraModelSyncVO;
 import com.kakarote.ai_crm.mapper.SystemConfigMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ISystemConfigService;
@@ -20,14 +22,22 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -292,9 +302,21 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
         if (hasExplicitConfig) {
             vo.setEnabled(parseBoolean(configs.get("weknora_enabled"), defaultWeKnoraEnabled));
-            vo.setBaseUrl(configs.getOrDefault("weknora_base_url", defaultWeKnoraBaseUrl));
+            vo.setBaseUrl(getConfigValueOrDefault(configs, "weknora_base_url", defaultWeKnoraBaseUrl));
             vo.setApiKey(maskApiKey(configs.get("weknora_api_key")));
-            vo.setKnowledgeBaseId(configs.getOrDefault("weknora_knowledge_base_id", defaultWeKnoraKnowledgeBaseId));
+            vo.setKnowledgeBaseId(getConfigValueOrDefault(configs, "weknora_knowledge_base_id", defaultWeKnoraKnowledgeBaseId));
+            vo.setKnowledgeBaseName(getConfigValueOrDefault(configs, "weknora_knowledge_base_name", "CRM Default Knowledge Base"));
+            vo.setLlmProvider(getConfigValueOrDefault(configs, "weknora_llm_provider", "aliyun"));
+            vo.setLlmModelName(configs.get("weknora_llm_model_name"));
+            vo.setLlmBaseUrl(configs.get("weknora_llm_base_url"));
+            vo.setLlmApiKey(maskApiKey(configs.get("weknora_llm_api_key")));
+            vo.setLlmModelId(configs.get("weknora_llm_model_id"));
+            vo.setEmbeddingProvider(getConfigValueOrDefault(configs, "weknora_embedding_provider", "aliyun"));
+            vo.setEmbeddingModelName(configs.get("weknora_embedding_model_name"));
+            vo.setEmbeddingBaseUrl(configs.get("weknora_embedding_base_url"));
+            vo.setEmbeddingApiKey(maskApiKey(configs.get("weknora_embedding_api_key")));
+            vo.setEmbeddingDimension(parseInt(configs.get("weknora_embedding_dimension"), 1024));
+            vo.setEmbeddingModelId(configs.get("weknora_embedding_model_id"));
             vo.setMatchCount(parseInt(configs.get("weknora_match_count"), defaultWeKnoraMatchCount));
             vo.setVectorThreshold(parseDouble(configs.get("weknora_vector_threshold"), defaultWeKnoraVectorThreshold));
             vo.setAutoRagEnabled(parseBoolean(configs.get("weknora_auto_rag_enabled"), defaultWeKnoraAutoRagEnabled));
@@ -304,6 +326,10 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             vo.setBaseUrl(defaultWeKnoraBaseUrl);
             vo.setApiKey(maskApiKey(defaultWeKnoraApiKey));
             vo.setKnowledgeBaseId(defaultWeKnoraKnowledgeBaseId);
+            vo.setKnowledgeBaseName("CRM Default Knowledge Base");
+            vo.setLlmProvider("aliyun");
+            vo.setEmbeddingProvider("aliyun");
+            vo.setEmbeddingDimension(1024);
             vo.setMatchCount(defaultWeKnoraMatchCount);
             vo.setVectorThreshold(defaultWeKnoraVectorThreshold);
             vo.setAutoRagEnabled(defaultWeKnoraAutoRagEnabled);
@@ -333,7 +359,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         if (StrUtil.isNotBlank(updateBO.getBaseUrl())) {
             configs.put("weknora_base_url", updateBO.getBaseUrl());
         }
-        if (StrUtil.isNotBlank(updateBO.getApiKey())) {
+        if (StrUtil.isNotBlank(updateBO.getApiKey()) && !isMaskedSecret(updateBO.getApiKey())) {
             configs.put("weknora_api_key", updateBO.getApiKey());
         }
         if (StrUtil.isNotBlank(updateBO.getKnowledgeBaseId())) {
@@ -360,8 +386,9 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         long startTime = System.currentTimeMillis();
 
         try {
-            String baseUrl = configBO.getBaseUrl();
-            String apiKey = configBO.getApiKey();
+            Map<String, String> currentConfigs = getConfigsByType(WEKNORA_CONFIG_TYPE);
+            String baseUrl = normalizeBaseUrl(firstNotBlank(configBO.getBaseUrl(), currentConfigs.get("weknora_base_url"), defaultWeKnoraBaseUrl));
+            String apiKey = resolveSecret(configBO.getApiKey(), currentConfigs.get("weknora_api_key"), "WeKnora API Key");
 
             if (StrUtil.isBlank(baseUrl) || StrUtil.isBlank(apiKey)) {
                 result.setSuccess(false);
@@ -401,6 +428,64 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         }
 
         result.setResponseTime(System.currentTimeMillis() - startTime);
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public WeKnoraModelSyncVO syncWeKnoraModels(WeKnoraModelSyncBO syncBO) {
+        Map<String, String> currentConfigs = getConfigsByType(WEKNORA_CONFIG_TYPE);
+
+        String baseUrl = normalizeBaseUrl(firstNotBlank(syncBO.getBaseUrl(), currentConfigs.get("weknora_base_url"), defaultWeKnoraBaseUrl));
+        String apiKey = resolveSecret(syncBO.getApiKey(), currentConfigs.get("weknora_api_key"), "WeKnora API Key");
+        String knowledgeBaseName = firstNotBlank(syncBO.getKnowledgeBaseName(), currentConfigs.get("weknora_knowledge_base_name"), "CRM Default Knowledge Base");
+
+        String llmProvider = firstNotBlank(syncBO.getLlmProvider(), currentConfigs.get("weknora_llm_provider"), "aliyun");
+        String llmName = required(firstNotBlank(syncBO.getLlmModelName(), currentConfigs.get("weknora_llm_model_name")), "LLM model name");
+        String llmBaseUrl = required(firstNotBlank(syncBO.getLlmBaseUrl(), currentConfigs.get("weknora_llm_base_url")), "LLM base URL");
+        String llmApiKey = resolveSecret(syncBO.getLlmApiKey(), currentConfigs.get("weknora_llm_api_key"), "LLM API Key");
+
+        String embeddingProvider = firstNotBlank(syncBO.getEmbeddingProvider(), currentConfigs.get("weknora_embedding_provider"), "aliyun");
+        String embeddingName = required(firstNotBlank(syncBO.getEmbeddingModelName(), currentConfigs.get("weknora_embedding_model_name")), "Embedding model name");
+        String embeddingBaseUrl = required(firstNotBlank(syncBO.getEmbeddingBaseUrl(), currentConfigs.get("weknora_embedding_base_url")), "Embedding base URL");
+        String embeddingApiKey = resolveSecret(syncBO.getEmbeddingApiKey(), currentConfigs.get("weknora_embedding_api_key"), "Embedding API Key");
+        Integer embeddingDimension = syncBO.getEmbeddingDimension();
+        if (embeddingDimension == null && StrUtil.isNotBlank(currentConfigs.get("weknora_embedding_dimension"))) {
+            embeddingDimension = parseInt(currentConfigs.get("weknora_embedding_dimension"), 1024);
+        }
+        if (embeddingDimension == null || embeddingDimension <= 0) {
+            throw new IllegalArgumentException("Embedding dimension is required");
+        }
+
+        String llmModelId = ensureWeKnoraModel(baseUrl, apiKey, "KnowledgeQA", llmName, llmProvider, llmBaseUrl, llmApiKey, null);
+        String embeddingModelId = ensureWeKnoraModel(baseUrl, apiKey, "Embedding", embeddingName, embeddingProvider, embeddingBaseUrl, embeddingApiKey, embeddingDimension);
+        String knowledgeBaseId = ensureWeKnoraKnowledgeBase(baseUrl, apiKey, knowledgeBaseName, llmModelId, embeddingModelId);
+
+        Map<String, String> configs = new HashMap<>();
+        configs.put("weknora_enabled", String.valueOf(syncBO.getEnabled() == null || syncBO.getEnabled()));
+        configs.put("weknora_base_url", baseUrl);
+        configs.put("weknora_api_key", apiKey);
+        configs.put("weknora_knowledge_base_id", knowledgeBaseId);
+        configs.put("weknora_knowledge_base_name", knowledgeBaseName);
+        configs.put("weknora_llm_provider", llmProvider);
+        configs.put("weknora_llm_model_name", llmName);
+        configs.put("weknora_llm_base_url", llmBaseUrl);
+        configs.put("weknora_llm_api_key", llmApiKey);
+        configs.put("weknora_llm_model_id", llmModelId);
+        configs.put("weknora_embedding_provider", embeddingProvider);
+        configs.put("weknora_embedding_model_name", embeddingName);
+        configs.put("weknora_embedding_base_url", embeddingBaseUrl);
+        configs.put("weknora_embedding_api_key", embeddingApiKey);
+        configs.put("weknora_embedding_dimension", String.valueOf(embeddingDimension));
+        configs.put("weknora_embedding_model_id", embeddingModelId);
+        updateConfigsWithType(configs, WEKNORA_CONFIG_TYPE);
+
+        WeKnoraModelSyncVO result = new WeKnoraModelSyncVO();
+        result.setSuccess(true);
+        result.setMessage("WeKnora models and default knowledge base synced");
+        result.setLlmModelId(llmModelId);
+        result.setEmbeddingModelId(embeddingModelId);
+        result.setKnowledgeBaseId(knowledgeBaseId);
         return result;
     }
 
@@ -451,6 +536,168 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             return "****";
         }
         return apiKey.substring(0, 3) + "****" + apiKey.substring(apiKey.length() - 4);
+    }
+
+    private String getConfigValueOrDefault(Map<String, String> configs, String key, String defaultValue) {
+        String value = configs.get(key);
+        return StrUtil.isBlank(value) ? defaultValue : value;
+    }
+
+    private String firstNotBlank(String... values) {
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value) && !isMaskedSecret(value)) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private String required(String value, String label) {
+        if (StrUtil.isBlank(value)) {
+            throw new IllegalArgumentException(label + " is required");
+        }
+        return value;
+    }
+
+    private String resolveSecret(String incoming, String stored, String label) {
+        if (StrUtil.isNotBlank(incoming) && !isMaskedSecret(incoming)) {
+            return incoming.trim();
+        }
+        if (StrUtil.isNotBlank(stored)) {
+            return stored;
+        }
+        throw new IllegalArgumentException(label + " is required");
+    }
+
+    private boolean isMaskedSecret(String value) {
+        return StrUtil.isNotBlank(value) && value.contains("****");
+    }
+
+    private String normalizeBaseUrl(String baseUrl) {
+        String normalized = required(baseUrl, "WeKnora API base URL").trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
+    }
+
+    private HttpEntity<Object> weKnoraEntity(String apiKey, Object body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-API-Key", apiKey);
+        return new HttpEntity<>(body, headers);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> weKnoraRequest(String baseUrl, String apiKey, HttpMethod method, String path, Object body) {
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<Map> response = restTemplate.exchange(
+                baseUrl + path,
+                method,
+                weKnoraEntity(apiKey, body),
+                Map.class
+        );
+        Map<String, Object> responseBody = response.getBody();
+        if (!response.getStatusCode().is2xxSuccessful() || responseBody == null || Boolean.FALSE.equals(responseBody.get("success"))) {
+            throw new IllegalStateException("WeKnora request failed: " + path);
+        }
+        return responseBody;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> weKnoraDataList(Map<String, Object> response) {
+        Object data = response.get("data");
+        if (data instanceof List<?>) {
+            return ((List<?>) data).stream()
+                    .filter(Map.class::isInstance)
+                    .map(item -> (Map<String, Object>) item)
+                    .collect(Collectors.toList());
+        }
+        return List.of();
+    }
+
+    private String objectId(Map<String, Object> item) {
+        Object id = item.get("id");
+        return id == null ? "" : String.valueOf(id);
+    }
+
+    private String ensureWeKnoraModel(String baseUrl, String apiKey, String type, String name, String provider,
+                                     String modelBaseUrl, String modelApiKey, Integer embeddingDimension) {
+        for (Map<String, Object> model : weKnoraDataList(weKnoraRequest(baseUrl, apiKey, HttpMethod.GET, "/models", null))) {
+            if (Objects.equals(type, String.valueOf(model.get("type"))) && Objects.equals(name, String.valueOf(model.get("name")))) {
+                String existingId = objectId(model);
+                if (StrUtil.isNotBlank(existingId)) {
+                    return existingId;
+                }
+            }
+        }
+
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("base_url", modelBaseUrl);
+        parameters.put("api_key", modelApiKey);
+        parameters.put("provider", provider);
+        if (embeddingDimension != null) {
+            Map<String, Object> embeddingParameters = new LinkedHashMap<>();
+            embeddingParameters.put("dimension", embeddingDimension);
+            embeddingParameters.put("truncate_prompt_tokens", 0);
+            parameters.put("embedding_parameters", embeddingParameters);
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("name", name);
+        payload.put("type", type);
+        payload.put("source", "remote");
+        payload.put("description", "Created by AI CRM model sync");
+        payload.put("parameters", parameters);
+
+        Map<String, Object> response = weKnoraRequest(baseUrl, apiKey, HttpMethod.POST, "/models", payload);
+        Object data = response.get("data");
+        if (data instanceof Map<?, ?> dataMap) {
+            String id = objectId((Map<String, Object>) dataMap);
+            if (StrUtil.isNotBlank(id)) {
+                return id;
+            }
+        }
+        throw new IllegalStateException("Failed to create WeKnora model: " + name);
+    }
+
+    private String ensureWeKnoraKnowledgeBase(String baseUrl, String apiKey, String name, String llmModelId, String embeddingModelId) {
+        for (Map<String, Object> kb : weKnoraDataList(weKnoraRequest(baseUrl, apiKey, HttpMethod.GET, "/knowledge-bases", null))) {
+            if (Objects.equals(name, String.valueOf(kb.get("name")))) {
+                String existingId = objectId(kb);
+                if (StrUtil.isNotBlank(existingId)) {
+                    return existingId;
+                }
+            }
+        }
+
+        Map<String, Object> chunkingConfig = new LinkedHashMap<>();
+        chunkingConfig.put("chunk_size", 512);
+        chunkingConfig.put("chunk_overlap", 100);
+        chunkingConfig.put("separators", Arrays.asList("\n\n", "\n", ".", ";"));
+
+        Map<String, Object> vlmConfig = new LinkedHashMap<>();
+        vlmConfig.put("enabled", false);
+        vlmConfig.put("model_id", "");
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("name", name);
+        payload.put("description", "Default knowledge base for AI CRM documents");
+        payload.put("type", "document");
+        payload.put("embedding_model_id", embeddingModelId);
+        payload.put("summary_model_id", llmModelId);
+        payload.put("chunking_config", chunkingConfig);
+        payload.put("vlm_config", vlmConfig);
+
+        Map<String, Object> response = weKnoraRequest(baseUrl, apiKey, HttpMethod.POST, "/knowledge-bases", payload);
+        Object data = response.get("data");
+        if (data instanceof Map<?, ?> dataMap) {
+            String id = objectId((Map<String, Object>) dataMap);
+            if (StrUtil.isNotBlank(id)) {
+                return id;
+            }
+        }
+        throw new IllegalStateException("Failed to create WeKnora knowledge base: " + name);
     }
 
     private double parseDouble(String value, double defaultValue) {

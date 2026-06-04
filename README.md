@@ -181,12 +181,17 @@ The Docker deployment includes a one-shot `aicrm-weknora-init` service. It regis
 
 When `WEKNORA_INIT_ENABLED=true`, the WeKnora account credentials, LLM model, and embedding model are required. The LLM model is used by WeKnora agent model selection, and the embedding model is used by knowledge base parsing and retrieval.
 
+For Docker deployments, CRM talks to the WeKnora app container through `http://app:8080/api/v1` by default. After the initializer succeeds, the default knowledge base ID is written to CRM automatically.
+
+The same LLM and embedding model settings can also be synced from AI CRM under `System Settings > Knowledge Base Service`; the sync action creates or reuses the WeKnora models, creates the default knowledge base, and writes the resulting IDs back to CRM.
+
 Set these values in `docker/.env` before deployment:
 
 ```env
 WEKNORA_INIT_ENABLED=true
 WEKNORA_INIT_EMAIL=your_admin_email@example.com
 WEKNORA_INIT_PASSWORD=your_secure_password
+CRM_WEKNORA_BASE_URL=http://app:8080/api/v1
 INIT_LLM_MODEL_PROVIDER=aliyun
 INIT_LLM_MODEL_NAME=qwen-max
 INIT_LLM_MODEL_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
