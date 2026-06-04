@@ -123,7 +123,7 @@
         @scroll.passive="onPrimaryNavScroll"
       >
         <div
-          class="w-full"
+          class="wk-primary-nav-sections w-full"
           :class="primarySidebarContentCollapsed ? 'flex flex-col items-center' : ''"
         >
 
@@ -162,7 +162,7 @@
             </button>
           </template>
 
-          <div v-if="!primarySidebarContentCollapsed && showSidebarProjects" class="space-y-1 pt-1">
+          <div v-if="!primarySidebarContentCollapsed && showSidebarProjects" class="wk-sidebar-project-section space-y-1 pt-1">
             <div
               class="wk-project-header-row group/project-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
               :style="{ backgroundColor: projectHeaderHovered ? '#f9f9f9' : 'transparent' }"
@@ -184,7 +184,7 @@
                   </span>
                 </span>
               </button>
-              <div class="ml-auto flex shrink-0 items-center justify-end gap-1 opacity-0 transition-opacity duration-150 group-hover/project-header:opacity-100">
+              <div class="ml-auto flex shrink-0 items-center justify-end gap-1">
                 <button
                   type="button"
                   class="wk-project-header-action group/project-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
@@ -197,6 +197,20 @@
                     role="tooltip"
                   >
                     新增项目
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="wk-project-header-action group/project-list-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
+                  aria-label="查看项目列表"
+                  @click.stop="navigateTo('/project')"
+                >
+                  <span class="material-symbols-outlined text-[18px] leading-none">format_list_bulleted</span>
+                  <span
+                    class="pointer-events-none absolute right-0 top-full z-[200] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/project-list-action:opacity-100"
+                    role="tooltip"
+                  >
+                    查看项目列表
                   </span>
                 </button>
               </div>
@@ -230,7 +244,7 @@
                     title="在项目中开始对话"
                     @click.stop="handleStartProjectConversation(project.projectId)"
                   >
-                    <span class="material-symbols-outlined text-[17px] leading-none">chat_bubble</span>
+                    <AiDialogIcon :size="22" :sparkle-size="13" />
                   </button>
                 </button>
               </template>
@@ -241,7 +255,7 @@
           <template v-if="!primarySidebarContentCollapsed">
             <!-- <div class="pt-2" /> -->
             <!-- <div class="mx-1 h-px bg-slate-100" /> -->
-            <div class="space-y-1 pt-0">
+            <div class="wk-sidebar-recent-section space-y-1 pt-0">
               <button
                 type="button"
                 class="group flex shrink-0 items-center gap-1 rounded-lg pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px] w-full py-[6px]"
@@ -302,7 +316,7 @@
               </div>
           </div>
 
-          <div v-if="showSidebarCustomers" class="space-y-1 pt-1">
+          <div v-if="showSidebarCustomers" class="wk-sidebar-customer-section space-y-1 pt-1">
             <div
               class="wk-customer-header-row group/customer-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
               :style="{ backgroundColor: customerHeaderHovered ? '#f9f9f9' : 'transparent' }"
@@ -407,7 +421,7 @@
             </div>
           </div>
 
-          <div v-if="showSidebarAddressBook" class="space-y-1 pt-1">
+          <div v-if="showSidebarAddressBook" class="wk-sidebar-address-section space-y-1 pt-1">
             <div
               class="wk-customer-header-row group/address-book-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
               :style="{ backgroundColor: addressBookHeaderHovered ? '#f9f9f9' : 'transparent' }"
@@ -494,7 +508,7 @@
             </div>
           </div>
 
-          <div v-if="showSidebarRelations" class="space-y-1 pt-1">
+          <div v-if="showSidebarRelations" class="wk-sidebar-relation-section space-y-1 pt-1">
             <div
               class="wk-customer-header-row group/relation-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
               :style="{ backgroundColor: relationHeaderHovered ? '#f9f9f9' : 'transparent' }"
@@ -937,7 +951,7 @@
               </button>
             </div>
           </div>
-          <nav class="wk-scrollbar-gutter-stable flex-1 space-y-1 overflow-y-auto px-2 pb-4 pt-1">
+          <nav class="wk-mobile-nav-sections wk-scrollbar-gutter-stable flex-1 space-y-1 overflow-y-auto px-2 pb-4 pt-1">
             <template v-for="group in mobileMainNavGroups" :key="group.title || 'default'">
               <div v-if="group.title" class="pb-2 pt-4">
                 <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">{{ group.title }}</p>
@@ -989,17 +1003,27 @@
               </div>
             </template>
 
-            <div v-if="showSidebarProjects" class="pt-2">
+            <div v-if="showSidebarProjects" class="wk-sidebar-project-section pt-2">
               <div class="flex items-center justify-between px-3 pb-2">
                 <p class="text-[14px] font-bold leading-7 text-[#0d0d0d]">项目</p>
-                <button
-                  type="button"
-                  class="flex size-7 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100"
-                  aria-label="新增项目"
-                  @click="openMobileCreateProjectDialog"
-                >
-                  <span class="material-symbols-outlined text-[18px] leading-none">add</span>
-                </button>
+                <div class="flex items-center gap-1">
+                  <button
+                    type="button"
+                    class="flex size-7 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100"
+                    aria-label="新增项目"
+                    @click="openMobileCreateProjectDialog"
+                  >
+                    <span class="material-symbols-outlined text-[18px] leading-none">add</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="flex size-7 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100"
+                    aria-label="查看项目列表"
+                    @click="mobileNavigate('/project')"
+                  >
+                    <span class="material-symbols-outlined text-[18px] leading-none">format_list_bulleted</span>
+                  </button>
+                </div>
               </div>
               <div v-if="projectStore.loading && sidebarProjects.length === 0" class="flex justify-center py-6">
                 <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
@@ -1026,13 +1050,13 @@
                     aria-label="在项目中开始对话"
                     @click.stop="handleMobileStartProjectConversation(project.projectId)"
                   >
-                    <span class="material-symbols-outlined text-[17px] leading-none">chat_bubble</span>
+                    <AiDialogIcon :size="22" :sparkle-size="13" />
                   </button>
                 </button>
               </template>
             </div>
 
-            <div class="pt-2">
+            <div class="wk-sidebar-recent-section pt-2">
               <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">最近</p>
               <div v-if="chatStore.sessionsLoading && mobileRecentChatSessions.length === 0" class="flex justify-center py-6">
                 <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
@@ -1054,7 +1078,7 @@
               </template>
             </div>
 
-            <div v-if="showSidebarCustomers" class="pt-2">
+            <div v-if="showSidebarCustomers" class="wk-sidebar-customer-section pt-2">
               <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">客户列表</p>
               <div v-if="sidebarCustomersLoading && sidebarCustomers.length === 0" class="flex justify-center py-6">
                 <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
@@ -1096,7 +1120,7 @@
               </template>
             </div>
 
-            <div v-if="showSidebarAddressBook" class="pt-2">
+            <div v-if="showSidebarAddressBook" class="wk-sidebar-address-section pt-2">
               <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">通讯录</p>
               <div v-if="sidebarEmployeesLoading && sidebarEmployees.length === 0" class="flex justify-center py-6">
                 <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
@@ -1138,7 +1162,7 @@
               </template>
             </div>
 
-            <div v-if="showSidebarRelations" class="pt-2">
+            <div v-if="showSidebarRelations" class="wk-sidebar-relation-section pt-2">
               <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">关系</p>
               <div v-if="sidebarRelationsLoading && sidebarRelations.length === 0" class="flex justify-center py-6">
                 <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
@@ -1606,6 +1630,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import defaultLogoImg from '@/assets/images/logo.png'
 import FloatingActionButton from '@/components/common/FloatingActionButton.vue'
+import AiDialogIcon from '@/components/common/AiDialogIcon.vue'
 import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 import AiQuotaHeaderPopover from '@/components/layout/AiQuotaHeaderPopover.vue'
 import AiQuotaModals from '@/components/layout/AiQuotaModals.vue'
@@ -3258,6 +3283,31 @@ async function handleCreateProject(payload: {
   border-color: var(--wk-border-subtle) !important;
   background: linear-gradient(180deg, var(--wk-bg-surface) 0%, var(--wk-bg-sidebar) 100%) !important;
   color: var(--wk-text-primary);
+}
+
+.wk-primary-nav-sections {
+  display: flex;
+  flex-direction: column;
+}
+
+.wk-sidebar-recent-section {
+  order: 10;
+}
+
+.wk-sidebar-customer-section {
+  order: 20;
+}
+
+.wk-sidebar-project-section {
+  order: 30;
+}
+
+.wk-sidebar-address-section {
+  order: 40;
+}
+
+.wk-sidebar-relation-section {
+  order: 50;
 }
 
 .wk-primary-sidebar :deep(button) {

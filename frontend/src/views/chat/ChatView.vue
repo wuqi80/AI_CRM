@@ -370,7 +370,7 @@
               :class="{ 'is-active': activeCustomerConversationTab === 'ai' }"
               @click="handleCustomerConversationTabClick('ai')"
             >
-              <span class="material-symbols-outlined">smart_toy</span>
+              <AiDialogIcon :size="24" :sparkle-size="14" class="wk-chat-customer-tabs__ai-icon" />
               <span>AI 对话</span>
             </button>
             <button
@@ -2105,6 +2105,7 @@ import type { RelationDetailVO } from '@/types/relation'
 import { wkIconNames } from '@/components/common/wkIcon'
 import type { WkIconName } from '@/components/common/wkIcon'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
+import AiDialogIcon from '@/components/common/AiDialogIcon.vue'
 import dashscopeBrandUrl from '@/assets/model-provider-brands/dashscope.svg?url'
 import openaiBrandUrl from '@/assets/model-provider-brands/openai.svg?url'
 import deepseekBrandUrl from '@/assets/model-provider-brands/deepseek.svg?url'
@@ -4793,6 +4794,10 @@ void sendQuickMessage
   flex: 0 0 auto;
   font-size: 17px;
   line-height: 1;
+}
+
+.wk-chat-customer-tabs__ai-icon {
+  flex: 0 0 auto;
 }
 
 .wk-chat-customer-tabs__item:hover,

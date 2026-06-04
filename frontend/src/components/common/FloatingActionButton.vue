@@ -9,7 +9,7 @@
     @click="handleClick"
     @pointerdown="handlePointerDown"
   >
-    <WkIcon name="new-chat" :size="22" class="wk-floating-new-chat-button__icon" />
+    <AiDialogIcon :size="30" :sparkle-size="18" class="wk-floating-new-chat-button__icon" />
     <span class="wk-floating-new-chat-button__label">Chat</span>
   </button>
 </template>
@@ -18,7 +18,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
-import WkIcon from '@/components/common/WkIcon.vue'
+import AiDialogIcon from '@/components/common/AiDialogIcon.vue'
 
 type Point = {
   x: number
@@ -98,10 +98,12 @@ function savePosition(pos: Point) {
 }
 
 const buttonStyle = computed(() => {
-  if (!position.value) return {}
+  if (props.placement === 'viewport' || !position.value) return {}
   return {
     left: `${position.value.x}px`,
     top: `${position.value.y}px`,
+    right: 'auto',
+    bottom: 'auto',
   }
 })
 
@@ -145,6 +147,7 @@ function resolveCustomerDetailId(): string {
 }
 
 function handlePointerDown(e: PointerEvent) {
+  if (props.placement === 'viewport') return
   if (e.pointerType === 'mouse' && e.button !== 0) return
 
   ;(e.currentTarget as HTMLElement | null)?.setPointerCapture?.(e.pointerId)
@@ -200,6 +203,7 @@ function cleanupPointerListeners() {
 }
 
 function handleResize() {
+  if (props.placement === 'viewport') return
   if (!position.value) return
   const maxX = Math.max(EDGE_PADDING, window.innerWidth - BUTTON_SIZE - EDGE_PADDING)
   const maxY = Math.max(EDGE_PADDING, window.innerHeight - BUTTON_SIZE - EDGE_PADDING)
@@ -211,8 +215,10 @@ function handleResize() {
 }
 
 onMounted(() => {
-  position.value = loadPosition(props.placement)
-  window.addEventListener('resize', handleResize, { passive: true })
+  if (props.placement !== 'viewport') {
+    position.value = loadPosition(props.placement)
+    window.addEventListener('resize', handleResize, { passive: true })
+  }
 })
 
 onBeforeUnmount(() => {
@@ -224,20 +230,21 @@ onBeforeUnmount(() => {
 <style scoped>
 .wk-floating-new-chat-button {
   display: inline-flex;
-  height: 54px;
-  min-width: 124px;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 0;
   border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 9999px;
+  border-radius: 50%;
   background: #252525;
   color: #fff;
   box-shadow:
     0 18px 42px rgb(15 23 42 / 0.24),
     0 2px 8px rgb(15 23 42 / 0.18);
   cursor: pointer;
-  padding: 0 22px;
+  padding: 0;
   transition:
     background-color 160ms ease,
     box-shadow 160ms ease,
@@ -284,11 +291,7 @@ onBeforeUnmount(() => {
 }
 
 .wk-floating-new-chat-button__label {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0;
-  white-space: nowrap;
+  display: none;
 }
 
 @media (max-width: 640px) {
@@ -306,14 +309,9 @@ onBeforeUnmount(() => {
   }
 
   .wk-floating-new-chat-button {
+    width: 52px;
     height: 52px;
-    min-width: 116px;
-    gap: 10px;
-    padding: 0 20px;
-  }
-
-  .wk-floating-new-chat-button__label {
-    font-size: 17px;
+    min-width: 52px;
   }
 }
 </style>
