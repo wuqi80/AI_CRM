@@ -4,12 +4,20 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kakarote.ai_crm.entity.BO.WecomSyncRunBO;
+import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.PO.ManagerDept;
+import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.WecomConversation;
 import com.kakarote.ai_crm.entity.PO.WecomCorpConfig;
+import com.kakarote.ai_crm.entity.PO.WecomEmployee;
+import com.kakarote.ai_crm.entity.PO.WecomExternalCustomer;
 import com.kakarote.ai_crm.entity.PO.WecomMessage;
 import com.kakarote.ai_crm.entity.PO.WecomSyncCursor;
 import com.kakarote.ai_crm.entity.PO.WecomSyncLog;
 import com.kakarote.ai_crm.entity.VO.WecomSyncStatusVO;
+import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.ManageUserMapper;
+import com.kakarote.ai_crm.mapper.ManagerDeptMapper;
 import com.kakarote.ai_crm.mapper.WecomConversationMapper;
 import com.kakarote.ai_crm.mapper.WecomEmployeeMapper;
 import com.kakarote.ai_crm.mapper.WecomExternalCustomerMapper;
@@ -18,9 +26,11 @@ import com.kakarote.ai_crm.mapper.WecomSyncCursorMapper;
 import com.kakarote.ai_crm.mapper.WecomSyncLogMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,6 +53,8 @@ class WecomSyncServiceTest {
         WecomCorpConfig config = config();
         config.setArchiveEnabled(true);
         WecomSyncRunBO runBO = new WecomSyncRunBO();
+        runBO.setSyncEmployees(false);
+        runBO.setSyncCustomers(false);
         runBO.setSyncConversations(true);
         runBO.setArchiveLimit(10);
         JSONObject rawMessage = textArchiveMessage();
@@ -94,6 +106,136 @@ class WecomSyncServiceTest {
         assertThat(logCaptor.getValue().getStatus()).isEqualTo("failed");
     }
 
+    @Test
+    void runSyncShouldMirrorExternalCustomerIntoCrmCustomer() {
+        WecomSyncServiceImpl service = newService();
+        WecomTokenService tokenService = mapper(service, "tokenService");
+        WecomApiClient apiClient = mapper(service, "apiClient");
+        WecomExternalCustomerMapper externalCustomerMapper = mapper(service, "externalCustomerMapper");
+        CustomerMapper customerMapper = mapper(service, "customerMapper");
+
+        WecomCorpConfig config = config();
+        WecomSyncRunBO runBO = new WecomSyncRunBO();
+        runBO.setSyncEmployees(false);
+        runBO.setSyncCustomers(true);
+        runBO.setSyncConversations(false);
+        when(tokenService.fetchContactAccessToken(config)).thenReturn("contact-token");
+        when(apiClient.listFollowUsers("contact-token")).thenReturn(List.of("sales_1"));
+        when(apiClient.listExternalUserIds("contact-token", "sales_1")).thenReturn(List.of("wm_ext_1"));
+        when(apiClient.getExternalCustomer("contact-token", "wm_ext_1")).thenReturn(externalCustomerPayload());
+        when(externalCustomerMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(customerMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        doAnswer(invocation -> {
+            Customer customer = invocation.getArgument(0);
+            customer.setCustomerId(9001L);
+            return 1;
+        }).when(customerMapper).insert(any(Customer.class));
+
+        WecomSyncStatusVO status = service.runSync(config, runBO);
+
+        assertThat(status.getLastSyncStatus()).isEqualTo("success");
+        assertThat(status.getSavedCount()).isEqualTo(1);
+        ArgumentCaptor<Customer> customerCaptor = ArgumentCaptor.forClass(Customer.class);
+        verify(customerMapper).insert(customerCaptor.capture());
+        Customer customer = customerCaptor.getValue();
+        assertThat(customer.getCompanyName()).isEqualTo("悟空科技有限公司");
+        assertThat(customer.getPrimaryContactName()).isEqualTo("孙悟空");
+        assertThat(customer.getSource()).isEqualTo("企业微信");
+        assertThat(customer.getWecomCustomer()).isTrue();
+        assertThat(customer.getWecomCorpId()).isEqualTo("corp_1");
+        assertThat(customer.getWecomExternalUserId()).isEqualTo("wm_ext_1");
+        assertThat(customer.getWecomSyncedAt()).isNotNull();
+
+        ArgumentCaptor<WecomExternalCustomer> wecomCustomerCaptor = ArgumentCaptor.forClass(WecomExternalCustomer.class);
+        verify(externalCustomerMapper).insert(wecomCustomerCaptor.capture());
+        assertThat(wecomCustomerCaptor.getValue().getBindStatus()).isEqualTo("BOUND");
+        assertThat(wecomCustomerCaptor.getValue().getCustomerId()).isEqualTo(9001L);
+    }
+
+    @Test
+    void syncVisibleCustomersShouldUseBoundWecomMemberAndCurrentUserOwner() {
+        WecomSyncServiceImpl service = newService();
+        WecomTokenService tokenService = mapper(service, "tokenService");
+        WecomApiClient apiClient = mapper(service, "apiClient");
+        WecomExternalCustomerMapper externalCustomerMapper = mapper(service, "externalCustomerMapper");
+        CustomerMapper customerMapper = mapper(service, "customerMapper");
+
+        WecomCorpConfig config = config();
+        when(tokenService.fetchContactAccessToken(config)).thenReturn("contact-token");
+        when(apiClient.listExternalUserIds("contact-token", "sales_1")).thenReturn(List.of("wm_ext_1"));
+        when(apiClient.getExternalCustomer("contact-token", "wm_ext_1")).thenReturn(externalCustomerPayload());
+        when(externalCustomerMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(customerMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        doAnswer(invocation -> {
+            Customer customer = invocation.getArgument(0);
+            customer.setCustomerId(9001L);
+            return 1;
+        }).when(customerMapper).insert(any(Customer.class));
+
+        int saved = service.syncVisibleCustomers(config, "sales_1", 77L);
+
+        assertThat(saved).isEqualTo(1);
+        verify(apiClient).listExternalUserIds("contact-token", "sales_1");
+        ArgumentCaptor<Customer> customerCaptor = ArgumentCaptor.forClass(Customer.class);
+        verify(customerMapper).insert(customerCaptor.capture());
+        assertThat(customerCaptor.getValue().getOwnerId()).isEqualTo(77L);
+        assertThat(customerCaptor.getValue().getWecomCustomer()).isTrue();
+    }
+
+    @Test
+    void syncOrganizationShouldUpsertDepartmentsUsersAndEmployeeMappings() {
+        WecomSyncServiceImpl service = newService();
+        WecomTokenService tokenService = mapper(service, "tokenService");
+        WecomApiClient apiClient = mapper(service, "apiClient");
+        ManagerDeptMapper deptMapper = mapper(service, "deptMapper");
+        ManageUserMapper userMapper = mapper(service, "userMapper");
+        WecomEmployeeMapper employeeMapper = mapper(service, "employeeMapper");
+
+        WecomCorpConfig config = config();
+        when(tokenService.fetchAppAccessToken(config)).thenReturn("app-token");
+        when(apiClient.listDepartments("app-token")).thenReturn(List.of(
+                departmentPayload(1L, 0L, "Headquarters"),
+                departmentPayload(2L, 1L, "Sales")
+        ));
+        when(apiClient.listDepartmentUsers("app-token", 1L)).thenReturn(List.of());
+        when(apiClient.listDepartmentUsers("app-token", 2L)).thenReturn(List.of(wecomUserPayload()));
+        when(deptMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        AtomicLong nextDeptId = new AtomicLong(100L);
+        doAnswer(invocation -> {
+            ManagerDept dept = invocation.getArgument(0);
+            dept.setDeptId(nextDeptId.getAndIncrement());
+            return 1;
+        }).when(deptMapper).insert(any(ManagerDept.class));
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        doAnswer(invocation -> {
+            ManagerUser user = invocation.getArgument(0);
+            user.setUserId(700L);
+            return 1;
+        }).when(userMapper).insert(any(ManagerUser.class));
+        when(employeeMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+
+        int saved = service.syncOrganization(config);
+
+        assertThat(saved).isEqualTo(3);
+        ArgumentCaptor<ManagerDept> deptCaptor = ArgumentCaptor.forClass(ManagerDept.class);
+        verify(deptMapper, org.mockito.Mockito.times(2)).insert(deptCaptor.capture());
+        assertThat(deptCaptor.getAllValues())
+                .extracting(ManagerDept::getWecomDeptId)
+                .containsExactly(1L, 2L);
+
+        ArgumentCaptor<ManagerUser> userCaptor = ArgumentCaptor.forClass(ManagerUser.class);
+        verify(userMapper).insert(userCaptor.capture());
+        assertThat(userCaptor.getValue().getWecomCorpId()).isEqualTo("corp_1");
+        assertThat(userCaptor.getValue().getWecomUserId()).isEqualTo("sales_1");
+        assertThat(userCaptor.getValue().getMobile()).isEqualTo("13800000001");
+        assertThat(userCaptor.getValue().getDeptId()).isEqualTo(101L);
+
+        ArgumentCaptor<WecomEmployee> employeeCaptor = ArgumentCaptor.forClass(WecomEmployee.class);
+        verify(employeeMapper).insert(employeeCaptor.capture());
+        assertThat(employeeCaptor.getValue().getCrmUserId()).isEqualTo(700L);
+        assertThat(employeeCaptor.getValue().getMobile()).isEqualTo("13800000001");
+    }
+
     @SuppressWarnings("unchecked")
     private static <T> T mapper(WecomSyncServiceImpl service, String fieldName) {
         return (T) ReflectionTestUtils.getField(service, fieldName);
@@ -111,6 +253,10 @@ class WecomSyncServiceTest {
         ReflectionTestUtils.setField(service, "messageMapper", mock(WecomMessageMapper.class));
         ReflectionTestUtils.setField(service, "cursorMapper", mock(WecomSyncCursorMapper.class));
         ReflectionTestUtils.setField(service, "syncLogMapper", mock(WecomSyncLogMapper.class));
+        ReflectionTestUtils.setField(service, "customerMapper", mock(CustomerMapper.class));
+        ReflectionTestUtils.setField(service, "deptMapper", mock(ManagerDeptMapper.class));
+        ReflectionTestUtils.setField(service, "userMapper", mock(ManageUserMapper.class));
+        ReflectionTestUtils.setField(service, "passwordEncoder", mock(PasswordEncoder.class));
         return service;
     }
 
@@ -132,5 +278,38 @@ class WecomSyncServiceTest {
         text.put("content", "hello");
         raw.put("text", text);
         return raw;
+    }
+
+    private static JSONObject externalCustomerPayload() {
+        JSONObject externalContact = new JSONObject();
+        externalContact.put("external_userid", "wm_ext_1");
+        externalContact.put("name", "孙悟空");
+        externalContact.put("corp_name", "悟空科技");
+        externalContact.put("corp_full_name", "悟空科技有限公司");
+        JSONObject payload = new JSONObject();
+        payload.put("external_contact", externalContact);
+        return payload;
+    }
+
+    private static JSONObject departmentPayload(Long id, Long parentId, String name) {
+        JSONObject department = new JSONObject();
+        department.put("id", id);
+        department.put("parentid", parentId);
+        department.put("name", name);
+        department.put("order", id.intValue());
+        return department;
+    }
+
+    private static JSONObject wecomUserPayload() {
+        JSONObject user = new JSONObject();
+        user.put("userid", "sales_1");
+        user.put("name", "Sales User");
+        user.put("mobile", "13800000001");
+        user.put("email", "sales@example.com");
+        user.put("department", new JSONArray(List.of(2L)));
+        user.put("position", "Sales");
+        user.put("avatar", "https://example.com/a.png");
+        user.put("status", 1);
+        return user;
     }
 }

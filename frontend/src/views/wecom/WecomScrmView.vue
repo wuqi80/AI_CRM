@@ -6,8 +6,19 @@
         <p>{{ statusText }}</p>
       </div>
       <div class="wecom-scrm-view__actions">
+        <el-tag v-if="canManageWecom && wecomConfig.thirdPartyEnabled" :type="wecomConfig.thirdPartyAuthorized ? 'success' : 'warning'" effect="plain">
+          {{ wecomConfig.thirdPartyAuthorized ? '已授权' : '未授权' }}
+        </el-tag>
+        <el-button v-if="canManageWecom" :loading="authorizing" @click="handleAuthorize">
+          <span class="material-symbols-outlined mr-1 text-[18px]">verified_user</span>
+          {{ wecomConfig.thirdPartyAuthorized ? '重新授权' : '授权企业微信' }}
+        </el-button>
         <el-segmented v-model="conversationType" :options="conversationTypeOptions" @change="loadConversations" />
-        <el-button :loading="syncing" @click="handleSync">
+        <el-button v-if="canManageWecom" :loading="orgSyncing" @click="handleSyncOrg">
+          <span class="material-symbols-outlined mr-1 text-[18px]">account_tree</span>
+          同步组织
+        </el-button>
+        <el-button :loading="syncing" :title="syncButtonText" @click="handleSync">
           <span class="material-symbols-outlined mr-1 text-[18px]">sync</span>
           同步
         </el-button>
@@ -104,13 +115,24 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
+  getWecomConfig,
   getWecomConversationMessages,
+  getWecomOpenAuthorizeUrl,
   getWecomSyncStatus,
   queryWecomConversations,
   queryWecomEmployees,
+  runMyWecomCustomerSync,
+  runWecomOrgSync,
   runWecomSync
 } from '@/api/wecom'
-import type { WecomConversationType, WecomConversationVO, WecomEmployeeSessionVO, WecomMessageVO } from '@/types/wecom'
+import { useUserStore } from '@/stores/user'
+import type {
+  WecomConfigVO,
+  WecomConversationType,
+  WecomConversationVO,
+  WecomEmployeeSessionVO,
+  WecomMessageVO
+} from '@/types/wecom'
 import WecomMessageList from './components/WecomMessageList.vue'
 
 const conversationType = ref<WecomConversationType>('customer')
@@ -125,7 +147,13 @@ const employeeLoading = ref(false)
 const conversationLoading = ref(false)
 const messageLoading = ref(false)
 const syncing = ref(false)
+const orgSyncing = ref(false)
+const authorizing = ref(false)
 const lastSyncText = ref('')
+const wecomConfig = ref<WecomConfigVO>({})
+const userStore = useUserStore()
+const canManageWecom = computed(() => userStore.permissionsLoaded && userStore.hasPermission('config:ai'))
+const syncButtonText = computed(() => (canManageWecom.value ? '全量同步' : '同步我的客户'))
 
 const conversationTypeOptions = [
   { label: '客户会话', value: 'customer' },
@@ -133,12 +161,21 @@ const conversationTypeOptions = [
   { label: '群会话', value: 'group' }
 ]
 
-const statusText = computed(() => lastSyncText.value || '企微会话存档')
+const statusText = computed(() => {
+  if (wecomConfig.value.thirdPartyEnabled && !wecomConfig.value.thirdPartyAuthorized) {
+    return '请先授权企业微信第三方应用'
+  }
+  return lastSyncText.value || '企微会话存档'
+})
 
 onMounted(async () => {
-  await Promise.all([loadEmployees(), loadStatus()])
+  await Promise.all([loadConfig(), loadEmployees(), loadStatus()])
   await loadConversations()
 })
+
+async function loadConfig() {
+  wecomConfig.value = await getWecomConfig().catch(() => ({}))
+}
 
 async function loadStatus() {
   const status = await getWecomSyncStatus().catch(() => null)
@@ -195,11 +232,35 @@ async function selectEmployee(userId: string) {
 async function handleSync() {
   syncing.value = true
   try {
-    const status = await runWecomSync()
+    const status = canManageWecom.value ? await runWecomSync() : await runMyWecomCustomerSync()
     ElMessage.success(status.lastSyncStatus === 'failed' ? '同步已记录失败状态' : '同步完成')
-    await Promise.all([loadEmployees(), loadStatus(), loadConversations()])
+    await Promise.all([loadConfig(), loadEmployees(), loadStatus(), loadConversations()])
   } finally {
     syncing.value = false
+  }
+}
+
+async function handleSyncOrg() {
+  orgSyncing.value = true
+  try {
+    const status = await runWecomOrgSync()
+    ElMessage.success(status.lastSyncStatus === 'failed' ? '组织同步已记录失败状态' : '组织同步完成')
+    await Promise.all([loadConfig(), loadEmployees(), loadStatus(), loadConversations()])
+  } finally {
+    orgSyncing.value = false
+  }
+}
+
+async function handleAuthorize() {
+  authorizing.value = true
+  try {
+    const redirect = `${window.location.origin}${window.location.pathname}${window.location.hash || '#/wecom/scrm'}`
+    const data = await getWecomOpenAuthorizeUrl(redirect)
+    if (data.authorizeUrl) {
+      window.location.href = data.authorizeUrl
+    }
+  } finally {
+    authorizing.value = false
   }
 }
 

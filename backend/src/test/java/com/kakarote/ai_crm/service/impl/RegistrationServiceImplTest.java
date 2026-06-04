@@ -4,6 +4,7 @@ import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.redis.Redis;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
+import com.kakarote.ai_crm.entity.BO.ExternalTenantRegisterBO;
 import com.kakarote.ai_crm.entity.BO.RegisterBO;
 import com.kakarote.ai_crm.entity.PO.CrmTenant;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
@@ -19,15 +20,19 @@ import com.kakarote.ai_crm.service.WeKnoraClient;
 import com.kakarote.ai_crm.utils.CloudUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -163,5 +168,40 @@ class RegistrationServiceImplTest {
         verify(systemConfigService).updateEnterpriseConfig(any(EnterpriseConfigUpdateBO.class));
         verify(manageUserService).save(any(ManagerUser.class));
         verify(manageUserService, never()).queryUsersByUsername(anyString());
+    }
+
+    @Test
+    void registerExternalTenantShouldAllowUsernameOnlyAdminWithoutPassword() {
+        ExternalTenantRegisterBO registerBO = new ExternalTenantRegisterBO();
+        registerBO.setUsername("user_a");
+        registerBO.setCompanyName("Corp One");
+        registerBO.setRealname("Alice");
+        registerBO.setEmailVerificationRequired(Boolean.FALSE);
+        when(weKnoraClient.isEnabled()).thenReturn(false);
+        when(menuService.list()).thenReturn(Collections.emptyList());
+        doAnswer(invocation -> {
+            CrmTenant tenant = invocation.getArgument(0);
+            tenant.setTenantId(10002L);
+            return true;
+        }).when(tenantService).save(any(CrmTenant.class));
+
+        registrationService.registerExternalTenant(registerBO);
+
+        ArgumentCaptor<ManagerUser> userCaptor = ArgumentCaptor.forClass(ManagerUser.class);
+        verify(manageUserService).save(userCaptor.capture());
+        assertEquals("user_a", userCaptor.getValue().getUsername());
+        assertEquals("Alice", userCaptor.getValue().getRealname());
+        assertEquals(null, userCaptor.getValue().getEmail());
+        assertEquals(null, userCaptor.getValue().getPassword());
+        verify(passwordEncoder, never()).encode(anyString());
+    }
+
+    @Test
+    void loginUserMapperShouldQueryByUsernameEmailOrMobile() throws Exception {
+        String mapperXml = Files.readString(Path.of("src/main/resources/mapper/ManageUserMapper.xml"));
+
+        assertTrue(mapperXml.contains("a.username=#{username}"));
+        assertTrue(mapperXml.contains("a.email=#{username}"));
+        assertTrue(mapperXml.contains("a.mobile=#{username}"));
     }
 }

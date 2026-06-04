@@ -26,6 +26,10 @@ CREATE TABLE crm_customer (
     owner_id BIGINT NOT NULL,
     level CHAR(1),
     source VARCHAR(100),
+    wecom_customer BOOLEAN DEFAULT FALSE,
+    wecom_corp_id VARCHAR(128),
+    wecom_external_user_id VARCHAR(255),
+    wecom_synced_at TIMESTAMP(3),
     address VARCHAR(500),
     website VARCHAR(255),
     quotation DECIMAL(15,2) DEFAULT 0,
@@ -46,6 +50,9 @@ CREATE INDEX idx_customer_owner_id ON crm_customer (owner_id);
 CREATE INDEX idx_customer_stage ON crm_customer (stage);
 CREATE INDEX idx_customer_level ON crm_customer (level);
 CREATE INDEX idx_customer_create_time ON crm_customer (create_time);
+CREATE UNIQUE INDEX uk_customer_wecom_external ON crm_customer (wecom_corp_id, wecom_external_user_id)
+    WHERE wecom_customer = TRUE AND wecom_corp_id IS NOT NULL AND wecom_external_user_id IS NOT NULL AND status = 1;
+CREATE INDEX idx_customer_wecom_customer ON crm_customer (wecom_customer, update_time DESC);
 
 CREATE TRIGGER trg_customer_update_time
     BEFORE UPDATE ON crm_customer
@@ -59,6 +66,10 @@ COMMENT ON COLUMN crm_customer.stage IS '阶段: lead, qualified, proposal, nego
 COMMENT ON COLUMN crm_customer.owner_id IS '负责人ID';
 COMMENT ON COLUMN crm_customer.level IS '客户等级: A, B, C';
 COMMENT ON COLUMN crm_customer.source IS '客户来源';
+COMMENT ON COLUMN crm_customer.wecom_customer IS '是否企业微信客户';
+COMMENT ON COLUMN crm_customer.wecom_corp_id IS '企业微信企业ID';
+COMMENT ON COLUMN crm_customer.wecom_external_user_id IS '企业微信外部客户ID';
+COMMENT ON COLUMN crm_customer.wecom_synced_at IS '企业微信同步时间';
 COMMENT ON COLUMN crm_customer.status IS '状态: 0-禁用, 1-正常';
 
 -- ============================================
@@ -580,8 +591,15 @@ CREATE TABLE IF NOT EXISTS crm_wecom_corp_config (
     corp_id VARCHAR(128) NOT NULL,
     corp_name VARCHAR(255),
     agent_id VARCHAR(64),
-    app_secret_encrypted TEXT,
-    contact_secret_encrypted TEXT,
+    suite_id VARCHAR(128),
+    permanent_code_encrypted TEXT,
+    auth_info_json TEXT,
+    auth_corp_info_json TEXT,
+    auth_status VARCHAR(32),
+    authorized_at TIMESTAMP(3),
+    unauthorized_at TIMESTAMP(3),
+    auth_user_id VARCHAR(255),
+    auth_user_name VARCHAR(255),
     archive_secret_encrypted TEXT,
     archive_private_key_encrypted TEXT,
     archive_public_key_version VARCHAR(128),

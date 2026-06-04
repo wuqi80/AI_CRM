@@ -4,7 +4,11 @@ import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import cn.hutool.core.util.IdUtil;
 import com.kakarote.ai_crm.entity.BO.WecomSyncRunBO;
+import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.PO.ManagerDept;
+import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.WecomConversation;
 import com.kakarote.ai_crm.entity.PO.WecomCorpConfig;
 import com.kakarote.ai_crm.entity.PO.WecomEmployee;
@@ -13,19 +17,29 @@ import com.kakarote.ai_crm.entity.PO.WecomMessage;
 import com.kakarote.ai_crm.entity.PO.WecomSyncCursor;
 import com.kakarote.ai_crm.entity.PO.WecomSyncLog;
 import com.kakarote.ai_crm.entity.VO.WecomSyncStatusVO;
+import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.ManageUserMapper;
+import com.kakarote.ai_crm.mapper.ManagerDeptMapper;
 import com.kakarote.ai_crm.mapper.WecomConversationMapper;
 import com.kakarote.ai_crm.mapper.WecomEmployeeMapper;
 import com.kakarote.ai_crm.mapper.WecomExternalCustomerMapper;
 import com.kakarote.ai_crm.mapper.WecomMessageMapper;
 import com.kakarote.ai_crm.mapper.WecomSyncCursorMapper;
 import com.kakarote.ai_crm.mapper.WecomSyncLogMapper;
+import com.kakarote.ai_crm.utils.UserUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.HashSet;
 
 @Service
 public class WecomSyncServiceImpl {
@@ -34,6 +48,9 @@ public class WecomSyncServiceImpl {
     private static final String SYNC_STATUS_FAILED = "failed";
     private static final String CURSOR_ARCHIVE = "archive";
     private static final String CURSOR_KEY_MAIN = "main";
+    private static final String CRM_CUSTOMER_STAGE_LEAD = "lead";
+    private static final String CRM_CUSTOMER_SOURCE_WECOM = "企业微信";
+    private static final String WECOM_BIND_STATUS_BOUND = "BOUND";
 
     @Autowired
     private WecomTokenService tokenService;
@@ -65,6 +82,18 @@ public class WecomSyncServiceImpl {
     @Autowired
     private WecomSyncLogMapper syncLogMapper;
 
+    @Autowired
+    private CustomerMapper customerMapper;
+
+    @Autowired
+    private ManagerDeptMapper deptMapper;
+
+    @Autowired
+    private ManageUserMapper userMapper;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @Transactional(rollbackFor = Exception.class)
     public WecomSyncStatusVO runSync(WecomCorpConfig config, WecomSyncRunBO runBO) {
         WecomSyncLog log = new WecomSyncLog();
@@ -82,10 +111,9 @@ public class WecomSyncServiceImpl {
         int failed = 0;
         try {
             if (Boolean.TRUE.equals(runBO.getSyncEmployees())) {
-                String token = tokenService.fetchAppAccessToken(config);
-                List<JSONObject> employees = apiClient.listEmployees(token);
-                fetched += employees.size();
-                saved += saveEmployees(config, employees);
+                int orgSaved = syncOrganization(config);
+                fetched += orgSaved;
+                saved += orgSaved;
             }
             if (Boolean.TRUE.equals(runBO.getSyncCustomers())) {
                 String token = tokenService.fetchContactAccessToken(config);
@@ -94,7 +122,8 @@ public class WecomSyncServiceImpl {
                     List<String> externalUserIds = apiClient.listExternalUserIds(token, followUser);
                     fetched += externalUserIds.size();
                     for (String externalUserId : externalUserIds) {
-                        saved += saveExternalCustomer(config, apiClient.getExternalCustomer(token, externalUserId));
+                        saved += saveExternalCustomer(config, apiClient.getExternalCustomer(token, externalUserId),
+                                resolveSyncOwnerId());
                     }
                 }
             }
@@ -125,6 +154,196 @@ public class WecomSyncServiceImpl {
         return status;
     }
 
+    public int syncVisibleCustomers(WecomCorpConfig config, String employeeUserId, Long ownerId) {
+        if (StrUtil.isBlank(employeeUserId) || ownerId == null) {
+            return 0;
+        }
+        String token = tokenService.fetchContactAccessToken(config);
+        int saved = 0;
+        for (String externalUserId : apiClient.listExternalUserIds(token, employeeUserId)) {
+            saved += saveExternalCustomer(config, apiClient.getExternalCustomer(token, externalUserId), ownerId);
+        }
+        return saved;
+    }
+
+    public int syncOrganization(WecomCorpConfig config) {
+        String token = tokenService.fetchAppAccessToken(config);
+        List<JSONObject> departments = apiClient.listDepartments(token);
+        Map<Long, Long> deptIdMap = new LinkedHashMap<>();
+        int saved = 0;
+        Date syncedAt = new Date();
+        List<JSONObject> sortedDepartments = departments.stream()
+                .filter(item -> item.getLong("id") != null)
+                .sorted(Comparator.comparing((JSONObject item) -> item.getLongValue("parentid"))
+                        .thenComparing(item -> item.getLongValue("id")))
+                .toList();
+        for (JSONObject department : sortedDepartments) {
+            saved += saveDepartment(config, department, deptIdMap, syncedAt);
+        }
+
+        Set<String> syncedUsers = new HashSet<>();
+        for (JSONObject department : sortedDepartments) {
+            Long departmentId = department.getLong("id");
+            for (JSONObject user : apiClient.listDepartmentUsers(token, departmentId)) {
+                String userId = user.getString("userid");
+                if (StrUtil.isBlank(userId) || !syncedUsers.add(userId)) {
+                    continue;
+                }
+                saved += saveSystemUserAndEmployee(config, user, deptIdMap, syncedAt);
+            }
+        }
+        return saved;
+    }
+
+    private int saveDepartment(WecomCorpConfig config, JSONObject department, Map<Long, Long> deptIdMap, Date syncedAt) {
+        Long wecomDeptId = department.getLong("id");
+        if (wecomDeptId == null) {
+            return 0;
+        }
+        Long wecomParentDeptId = department.getLong("parentid");
+        ManagerDept dept = deptMapper.selectOne(Wrappers.<ManagerDept>lambdaQuery()
+                .eq(ManagerDept::getWecomCorpId, config.getCorpId())
+                .eq(ManagerDept::getWecomDeptId, wecomDeptId)
+                .last("LIMIT 1"));
+        if (dept == null) {
+            dept = new ManagerDept();
+            dept.setCreateTime(syncedAt);
+        }
+        dept.setDeptName(StrUtil.blankToDefault(department.getString("name"), "WeCom Dept " + wecomDeptId));
+        dept.setParentId(resolveParentDeptId(wecomParentDeptId, deptIdMap));
+        dept.setSortOrder(department.getInteger("order"));
+        dept.setWecomCorpId(config.getCorpId());
+        dept.setWecomDeptId(wecomDeptId);
+        dept.setWecomParentDeptId(wecomParentDeptId);
+        dept.setWecomSyncedAt(syncedAt);
+        if (dept.getDeptId() == null) {
+            deptMapper.insert(dept);
+        } else {
+            deptMapper.updateById(dept);
+        }
+        deptIdMap.put(wecomDeptId, dept.getDeptId());
+        return 1;
+    }
+
+    private int saveSystemUserAndEmployee(WecomCorpConfig config,
+                                          JSONObject user,
+                                          Map<Long, Long> deptIdMap,
+                                          Date syncedAt) {
+        String wecomUserId = user.getString("userid");
+        if (StrUtil.isBlank(wecomUserId)) {
+            return 0;
+        }
+        ManagerUser managerUser = findSystemUser(config.getCorpId(), wecomUserId, user);
+        if (managerUser == null) {
+            managerUser = new ManagerUser();
+            managerUser.setUsername(resolveSystemUsername(config, user));
+            managerUser.setPassword(encodeGeneratedPassword());
+            managerUser.setCreateTime(syncedAt);
+        }
+        managerUser.setRealname(StrUtil.blankToDefault(user.getString("name"), wecomUserId));
+        managerUser.setMobile(StrUtil.blankToDefault(user.getString("mobile"), managerUser.getMobile()));
+        managerUser.setEmail(StrUtil.blankToDefault(user.getString("email"), managerUser.getEmail()));
+        managerUser.setImg(StrUtil.blankToDefault(user.getString("avatar"), managerUser.getImg()));
+        managerUser.setPost(StrUtil.blankToDefault(user.getString("position"), managerUser.getPost()));
+        managerUser.setStatus(resolveManagerUserStatus(user.getInteger("status")));
+        managerUser.setDeptId(resolveUserDeptId(user.getJSONArray("department"), deptIdMap));
+        managerUser.setWecomCorpId(config.getCorpId());
+        managerUser.setWecomUserId(wecomUserId);
+        managerUser.setWecomSyncedAt(syncedAt);
+        if (managerUser.getUserId() == null) {
+            userMapper.insert(managerUser);
+        } else {
+            userMapper.updateById(managerUser);
+        }
+        saveWecomEmployee(config, user, managerUser.getUserId(), syncedAt);
+        return 1;
+    }
+
+    private Long resolveParentDeptId(Long wecomParentDeptId, Map<Long, Long> deptIdMap) {
+        if (wecomParentDeptId == null || wecomParentDeptId <= 0) {
+            return 0L;
+        }
+        return deptIdMap.getOrDefault(wecomParentDeptId, 0L);
+    }
+
+    private Long resolveUserDeptId(JSONArray departments, Map<Long, Long> deptIdMap) {
+        if (departments == null || departments.isEmpty()) {
+            return null;
+        }
+        Long firstDeptId = departments.getLong(0);
+        return firstDeptId == null ? null : deptIdMap.get(firstDeptId);
+    }
+
+    private ManagerUser findSystemUser(String corpId, String wecomUserId, JSONObject user) {
+        ManagerUser managerUser = userMapper.selectOne(Wrappers.<ManagerUser>lambdaQuery()
+                .eq(ManagerUser::getWecomCorpId, corpId)
+                .eq(ManagerUser::getWecomUserId, wecomUserId)
+                .last("LIMIT 1"));
+        if (managerUser != null) {
+            return managerUser;
+        }
+        String email = user.getString("email");
+        if (StrUtil.isNotBlank(email)) {
+            managerUser = userMapper.selectOne(Wrappers.<ManagerUser>lambdaQuery()
+                    .eq(ManagerUser::getEmail, email)
+                    .last("LIMIT 1"));
+            if (managerUser != null) {
+                return managerUser;
+            }
+        }
+        String mobile = user.getString("mobile");
+        if (StrUtil.isNotBlank(mobile)) {
+            return userMapper.selectOne(Wrappers.<ManagerUser>lambdaQuery()
+                    .eq(ManagerUser::getMobile, mobile)
+                    .last("LIMIT 1"));
+        }
+        return null;
+    }
+
+    private String resolveSystemUsername(WecomCorpConfig config, JSONObject user) {
+        String email = user.getString("email");
+        if (StrUtil.isNotBlank(email)) {
+            return StrUtil.trim(email).toLowerCase();
+        }
+        return syntheticWecomEmail(config.getCorpId(), user.getString("userid"));
+    }
+
+    private String encodeGeneratedPassword() {
+        String password = "Wecom" + IdUtil.fastSimpleUUID().substring(0, 12);
+        return passwordEncoder == null ? password : passwordEncoder.encode(password);
+    }
+
+    private int resolveManagerUserStatus(Integer wecomStatus) {
+        return wecomStatus == null || wecomStatus == 1 ? 1 : 0;
+    }
+
+    private void saveWecomEmployee(WecomCorpConfig config, JSONObject user, Long crmUserId, Date syncedAt) {
+        String userId = user.getString("userid");
+        WecomEmployee employee = employeeMapper.selectOne(Wrappers.<WecomEmployee>lambdaQuery()
+                .eq(WecomEmployee::getCorpId, config.getCorpId())
+                .eq(WecomEmployee::getUserId, userId)
+                .last("LIMIT 1"));
+        if (employee == null) {
+            employee = new WecomEmployee();
+            employee.setCorpId(config.getCorpId());
+            employee.setUserId(userId);
+        }
+        employee.setCrmUserId(crmUserId);
+        employee.setName(StrUtil.blankToDefault(user.getString("name"), userId));
+        employee.setAvatar(user.getString("avatar"));
+        employee.setDepartmentList(jsonArrayToString(user.getJSONArray("department")));
+        employee.setMobile(StrUtil.blankToDefault(user.getString("mobile"), employee.getMobile()));
+        employee.setEmail(StrUtil.blankToDefault(user.getString("email"), employee.getEmail()));
+        employee.setPosition(StrUtil.blankToDefault(user.getString("position"), employee.getPosition()));
+        employee.setStatus(user.getInteger("status"));
+        employee.setSyncedAt(syncedAt);
+        if (employee.getId() == null) {
+            employeeMapper.insert(employee);
+        } else {
+            employeeMapper.updateById(employee);
+        }
+    }
+
     private int saveEmployees(WecomCorpConfig config, List<JSONObject> employees) {
         int saved = 0;
         for (JSONObject user : employees) {
@@ -144,6 +363,9 @@ public class WecomSyncServiceImpl {
             employee.setName(StrUtil.blankToDefault(user.getString("name"), userId));
             employee.setAvatar(user.getString("avatar"));
             employee.setDepartmentList(jsonArrayToString(user.getJSONArray("department")));
+            employee.setMobile(StrUtil.blankToDefault(user.getString("mobile"), employee.getMobile()));
+            employee.setEmail(StrUtil.blankToDefault(user.getString("email"), employee.getEmail()));
+            employee.setPosition(StrUtil.blankToDefault(user.getString("position"), employee.getPosition()));
             employee.setStatus(user.getInteger("status"));
             employee.setSyncedAt(new Date());
             if (employee.getId() == null) {
@@ -156,7 +378,7 @@ public class WecomSyncServiceImpl {
         return saved;
     }
 
-    private int saveExternalCustomer(WecomCorpConfig config, JSONObject response) {
+    private int saveExternalCustomer(WecomCorpConfig config, JSONObject response, Long ownerId) {
         JSONObject customerJson = response.getJSONObject("external_contact");
         if (customerJson == null) {
             return 0;
@@ -169,12 +391,15 @@ public class WecomSyncServiceImpl {
                 .eq(WecomExternalCustomer::getCorpId, config.getCorpId())
                 .eq(WecomExternalCustomer::getExternalUserId, externalUserId)
                 .last("LIMIT 1"));
+        Date syncedAt = new Date();
+        Long crmCustomerId = saveCrmCustomer(config, customerJson, externalUserId, customer, syncedAt, ownerId);
         if (customer == null) {
             customer = new WecomExternalCustomer();
             customer.setCorpId(config.getCorpId());
             customer.setExternalUserId(externalUserId);
-            customer.setBindStatus("UNBOUND");
         }
+        customer.setBindStatus(WECOM_BIND_STATUS_BOUND);
+        customer.setCustomerId(crmCustomerId);
         customer.setName(StrUtil.blankToDefault(customerJson.getString("name"), externalUserId));
         customer.setAvatar(customerJson.getString("avatar"));
         customer.setType(customerJson.getInteger("type"));
@@ -184,13 +409,98 @@ public class WecomSyncServiceImpl {
         customer.setCorpName(customerJson.getString("corp_name"));
         customer.setCorpFullName(customerJson.getString("corp_full_name"));
         customer.setExternalProfile(response.toJSONString());
-        customer.setSyncedAt(new Date());
+        customer.setSyncedAt(syncedAt);
         if (customer.getId() == null) {
             externalCustomerMapper.insert(customer);
         } else {
             externalCustomerMapper.updateById(customer);
         }
         return 1;
+    }
+
+    private Long saveCrmCustomer(WecomCorpConfig config, JSONObject customerJson, String externalUserId,
+                                 WecomExternalCustomer externalCustomer, Date syncedAt, Long ownerId) {
+        Customer customer = findExistingCrmCustomer(config, externalUserId, externalCustomer);
+        if (customer == null) {
+            customer = new Customer();
+            customer.setStage(CRM_CUSTOMER_STAGE_LEAD);
+            customer.setOwnerId(ownerId);
+            customer.setStatus(1);
+            customer.setSource(CRM_CUSTOMER_SOURCE_WECOM);
+            customer.setContactCount(1);
+        } else {
+            if (StrUtil.isBlank(customer.getStage())) {
+                customer.setStage(CRM_CUSTOMER_STAGE_LEAD);
+            }
+            if (ownerId != null) {
+                customer.setOwnerId(ownerId);
+            } else if (customer.getOwnerId() == null) {
+                customer.setOwnerId(resolveSyncOwnerId());
+            }
+            if (customer.getStatus() == null) {
+                customer.setStatus(1);
+            }
+            if (customer.getContactCount() == null || customer.getContactCount() <= 0) {
+                customer.setContactCount(1);
+            }
+        }
+        customer.setCompanyName(resolveCrmCustomerName(customerJson, externalUserId));
+        customer.setPrimaryContactName(StrUtil.blankToDefault(customerJson.getString("name"), externalUserId));
+        customer.setPrimaryContactPosition(customerJson.getString("position"));
+        customer.setSource(CRM_CUSTOMER_SOURCE_WECOM);
+        customer.setWecomCustomer(true);
+        customer.setWecomCorpId(config.getCorpId());
+        customer.setWecomExternalUserId(externalUserId);
+        customer.setWecomSyncedAt(syncedAt);
+        if (customer.getCustomerId() == null) {
+            customerMapper.insert(customer);
+        } else {
+            customerMapper.updateById(customer);
+        }
+        return customer.getCustomerId();
+    }
+
+    private Customer findExistingCrmCustomer(WecomCorpConfig config, String externalUserId,
+                                             WecomExternalCustomer externalCustomer) {
+        if (externalCustomer != null && externalCustomer.getCustomerId() != null) {
+            Customer boundCustomer = customerMapper.selectById(externalCustomer.getCustomerId());
+            if (boundCustomer != null) {
+                return boundCustomer;
+            }
+        }
+        return customerMapper.selectOne(Wrappers.<Customer>lambdaQuery()
+                .eq(Customer::getWecomCustomer, true)
+                .eq(Customer::getWecomCorpId, config.getCorpId())
+                .eq(Customer::getWecomExternalUserId, externalUserId)
+                .last("LIMIT 1"));
+    }
+
+    private String resolveCrmCustomerName(JSONObject customerJson, String externalUserId) {
+        String corpFullName = customerJson.getString("corp_full_name");
+        if (StrUtil.isNotBlank(corpFullName)) {
+            return corpFullName;
+        }
+        String corpName = customerJson.getString("corp_name");
+        if (StrUtil.isNotBlank(corpName)) {
+            return corpName;
+        }
+        return StrUtil.blankToDefault(customerJson.getString("name"), externalUserId);
+    }
+
+    private Long resolveSyncOwnerId() {
+        Long userId = UserUtil.getUserIdOrNull();
+        return userId == null ? UserUtil.getSuperUserId() : userId;
+    }
+
+    private String syntheticWecomEmail(String corpId, String userId) {
+        String safeCorp = sanitizeEmailPart(StrUtil.blankToDefault(corpId, "corp"));
+        String safeUser = sanitizeEmailPart(StrUtil.blankToDefault(userId, "user"));
+        return "wecom." + safeUser + "." + safeCorp + "@external.wecom.local";
+    }
+
+    private String sanitizeEmailPart(String value) {
+        String sanitized = value.toLowerCase().replaceAll("[^a-z0-9._-]", "_");
+        return StrUtil.blankToDefault(sanitized, "unknown");
     }
 
     private int syncArchiveMessages(WecomCorpConfig config, Integer archiveLimit) {

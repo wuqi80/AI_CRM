@@ -12,6 +12,10 @@ export interface Customer {
   website?: string
   logo?: string
   logoUrl?: string
+  wecomCustomer?: boolean
+  wecomCorpId?: string
+  wecomExternalUserId?: string
+  wecomSyncedAt?: string
   address?: string
   aiStatusDetection?: string
   aiInsight?: string

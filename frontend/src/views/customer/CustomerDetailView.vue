@@ -48,6 +48,14 @@
                     <h2 class="text-lg md:text-xl font-bold text-slate-900 truncate min-w-0 w-full md:w-auto">
                       {{ customer.companyName }}
                     </h2>
+                    <span
+                      v-if="customer.wecomCustomer"
+                      class="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700"
+                      title="企业微信客户"
+                    >
+                      <span class="material-symbols-outlined text-[14px] leading-none">forum</span>
+                      企微
+                    </span>
                     <!-- <span
                       class="px-2 py-0.5 text-xs font-bold rounded uppercase"
                       :class="getStageBadgeClass(customer.stage)"
@@ -771,20 +779,6 @@
                   </span>
                   企业微信关联
                 </h4>
-                <button
-                  type="button"
-                  class="group/module-action relative flex size-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-primary/30 hover:bg-[#efefef] hover:text-primary"
-                  aria-label="关联企微客户"
-                  @click="openWecomCustomerBindingPage"
-                >
-                  <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add_link</span>
-                  <span
-                    class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                    role="tooltip"
-                  >
-                    关联企微客户
-                  </span>
-                </button>
               </div>
               <div v-if="wecomBindingsLoading" class="space-y-2">
                 <div v-for="index in 2" :key="`wecom-binding-skeleton-${index}`" class="h-12 animate-pulse rounded-xl bg-slate-100" />
@@ -2463,14 +2457,6 @@ async function fetchCustomerTencentMeetings(customerId: string) {
   } finally {
     tencentMeetingsLoading.value = false
   }
-}
-
-function openWecomCustomerBindingPage() {
-  if (!customer.value) return
-  router.push({
-    path: '/wecom-customers',
-    query: { customerId: customer.value.customerId }
-  })
 }
 
 function openTencentMeetingBindingPage() {

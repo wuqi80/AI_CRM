@@ -14,7 +14,9 @@ import com.kakarote.ai_crm.entity.BO.WecomConversationQueryBO;
 import com.kakarote.ai_crm.entity.BO.WecomCustomerQueryBO;
 import com.kakarote.ai_crm.entity.BO.WecomEmployeeSessionQueryBO;
 import com.kakarote.ai_crm.entity.BO.WecomSyncRunBO;
+import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.PO.ExternalAuthIdentity;
 import com.kakarote.ai_crm.entity.PO.WecomConversation;
 import com.kakarote.ai_crm.entity.PO.WecomCorpConfig;
 import com.kakarote.ai_crm.entity.PO.WecomEmployee;
@@ -30,6 +32,7 @@ import com.kakarote.ai_crm.entity.VO.WecomExternalCustomerVO;
 import com.kakarote.ai_crm.entity.VO.WecomMessageVO;
 import com.kakarote.ai_crm.entity.VO.WecomSyncStatusVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.ExternalAuthIdentityMapper;
 import com.kakarote.ai_crm.mapper.WecomConversationMapper;
 import com.kakarote.ai_crm.mapper.WecomCorpConfigMapper;
 import com.kakarote.ai_crm.mapper.WecomEmployeeMapper;
@@ -38,6 +41,7 @@ import com.kakarote.ai_crm.mapper.WecomMessageMapper;
 import com.kakarote.ai_crm.mapper.WecomSyncLogMapper;
 import com.kakarote.ai_crm.service.DataPermissionService;
 import com.kakarote.ai_crm.utils.SecretTextCipher;
+import com.kakarote.ai_crm.utils.UserUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,10 +84,16 @@ public class WecomServiceImpl {
     private CustomerMapper customerMapper;
 
     @Autowired
+    private ExternalAuthIdentityMapper identityMapper;
+
+    @Autowired
     private SecretTextCipher secretTextCipher;
 
     @Autowired
     private WecomSyncServiceImpl syncService;
+
+    @Autowired
+    private WecomOpenPlatformService openPlatformService;
 
     @Autowired
     private WecomCustomerBindingServiceImpl bindingService;
@@ -97,26 +107,14 @@ public class WecomServiceImpl {
 
     @Transactional(rollbackFor = Exception.class)
     public WecomConfigVO saveConfig(WecomConfigSaveBO saveBO) {
-        WecomCorpConfig config = findConfig();
-        if (config == null) {
-            config = new WecomCorpConfig();
-        }
-        config.setCorpId(StrUtil.trim(saveBO.getCorpId()));
-        config.setCorpName(StrUtil.trim(saveBO.getCorpName()));
-        config.setAgentId(StrUtil.trim(saveBO.getAgentId()));
+        WecomCorpConfig config = requireConfig();
         config.setArchivePublicKeyVersion(StrUtil.trim(saveBO.getArchivePublicKeyVersion()));
         config.setArchiveEnabled(Boolean.TRUE.equals(saveBO.getArchiveEnabled()));
         config.setCustomerContactEnabled(Boolean.TRUE.equals(saveBO.getCustomerContactEnabled()));
         config.setSyncEnabled(Boolean.TRUE.equals(saveBO.getSyncEnabled()));
-        setEncryptedIfPresent(saveBO.getAppSecret(), config::setAppSecretEncrypted);
-        setEncryptedIfPresent(saveBO.getContactSecret(), config::setContactSecretEncrypted);
         setEncryptedIfPresent(saveBO.getArchiveSecret(), config::setArchiveSecretEncrypted);
         setEncryptedIfPresent(saveBO.getArchivePrivateKey(), config::setArchivePrivateKeyEncrypted);
-        if (config.getId() == null) {
-            configMapper.insert(config);
-        } else {
-            configMapper.updateById(config);
-        }
+        configMapper.updateById(config);
         return toConfigVO(config);
     }
 
@@ -124,6 +122,46 @@ public class WecomServiceImpl {
     public WecomSyncStatusVO runSync(WecomSyncRunBO runBO) {
         WecomCorpConfig config = requireConfig();
         WecomSyncStatusVO status = syncService.runSync(config, runBO == null ? new WecomSyncRunBO() : runBO);
+        config.setLastSyncTime(status.getLastSyncTime());
+        config.setLastSyncStatus(status.getLastSyncStatus());
+        config.setLastSyncError(status.getLastSyncError());
+        configMapper.updateById(config);
+        return status;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public WecomSyncStatusVO syncOrganization() {
+        WecomCorpConfig config = requireConfig();
+        int saved = syncService.syncOrganization(config);
+        WecomSyncStatusVO status = buildSyncStatus(config, saved, saved);
+        config.setLastSyncTime(status.getLastSyncTime());
+        config.setLastSyncStatus(status.getLastSyncStatus());
+        config.setLastSyncError(status.getLastSyncError());
+        configMapper.updateById(config);
+        return status;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public WecomSyncStatusVO syncMyCustomers() {
+        LoginUser loginUser = UserUtil.getLoginUser();
+        Long currentUserId = loginUser.getUser().getUserId();
+        ExternalAuthIdentity identity = identityMapper.selectOne(Wrappers.<ExternalAuthIdentity>lambdaQuery()
+                .eq(ExternalAuthIdentity::getProvider, "wecom")
+                .eq(ExternalAuthIdentity::getTenantId, loginUser.getUser().getTenantId())
+                .eq(ExternalAuthIdentity::getUserId, currentUserId)
+                .eq(ExternalAuthIdentity::getStatus, 1)
+                .last("LIMIT 1"));
+        if (identity == null || StrUtil.isBlank(identity.getSubject())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Please bind WeCom in personal center first");
+        }
+        String corpId = resolveSubjectCorpId(identity.getSubject());
+        String wecomUserId = resolveSubjectUserId(identity.getSubject());
+        if (StrUtil.isBlank(corpId) || StrUtil.isBlank(wecomUserId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom binding is incomplete");
+        }
+        WecomCorpConfig config = requireConfig(corpId);
+        int saved = syncService.syncVisibleCustomers(config, wecomUserId, currentUserId);
+        WecomSyncStatusVO status = buildSyncStatus(config, saved, saved);
         config.setLastSyncTime(status.getLastSyncTime());
         config.setLastSyncStatus(status.getLastSyncStatus());
         config.setLastSyncError(status.getLastSyncError());
@@ -159,7 +197,7 @@ public class WecomServiceImpl {
                 .like(StrUtil.isNotBlank(queryBO.getKeyword()), WecomEmployee::getName, queryBO.getKeyword())
                 .eq(StrUtil.isNotBlank(queryBO.getUserId()), WecomEmployee::getUserId, queryBO.getUserId())
                 .orderByAsc(WecomEmployee::getName);
-        DataPermissionContext context = dataPermissionService.createContext("wecomEmployeeSession");
+        DataPermissionContext context = dataPermissionService.createContext("wecomCustomerSession");
         if (!context.isAllData()) {
             if (context.isEmpty()) {
                 wrapper.eq(WecomEmployee::getId, -1L);
@@ -282,8 +320,13 @@ public class WecomServiceImpl {
 
     private WecomCorpConfig findConfig() {
         return configMapper.selectOne(Wrappers.<WecomCorpConfig>lambdaQuery()
-                .orderByDesc(WecomCorpConfig::getUpdateTime)
-                .last("LIMIT 1"));
+                .last("""
+                        ORDER BY CASE
+                            WHEN auth_status = 'AUTHORIZED' THEN 0
+                            ELSE 1
+                        END, update_time DESC
+                        LIMIT 1
+                        """));
     }
 
     private WecomCorpConfig requireConfig() {
@@ -291,7 +334,53 @@ public class WecomServiceImpl {
         if (config == null || StrUtil.isBlank(config.getCorpId())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom config is not complete");
         }
+        if (!openPlatformService.isAuthorized(config)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom enterprise is not authorized");
+        }
         return config;
+    }
+
+    private WecomCorpConfig requireConfig(String corpId) {
+        WecomCorpConfig config = configMapper.selectOne(Wrappers.<WecomCorpConfig>lambdaQuery()
+                .eq(WecomCorpConfig::getCorpId, corpId)
+                .last("""
+                        ORDER BY CASE
+                            WHEN auth_status = 'AUTHORIZED' THEN 0
+                            ELSE 1
+                        END, update_time DESC
+                        LIMIT 1
+                        """));
+        if (config == null || StrUtil.isBlank(config.getCorpId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom config is not complete");
+        }
+        if (!openPlatformService.isAuthorized(config)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom enterprise is not authorized");
+        }
+        return config;
+    }
+
+    private WecomSyncStatusVO buildSyncStatus(WecomCorpConfig config, int fetched, int saved) {
+        WecomSyncStatusVO status = new WecomSyncStatusVO();
+        status.setCorpId(config.getCorpId());
+        status.setLastSyncTime(new Date());
+        status.setLastSyncStatus("success");
+        status.setFetchedCount(fetched);
+        status.setSavedCount(saved);
+        status.setFailedCount(0);
+        return status;
+    }
+
+    private String resolveSubjectCorpId(String subject) {
+        int index = subject == null ? -1 : subject.indexOf(':');
+        return index <= 0 ? null : subject.substring(0, index);
+    }
+
+    private String resolveSubjectUserId(String subject) {
+        int index = subject == null ? -1 : subject.indexOf(':');
+        if (index < 0 || index + 1 >= subject.length()) {
+            return null;
+        }
+        return subject.substring(index + 1);
     }
 
     private WecomConfigVO toConfigVO(WecomCorpConfig config) {
@@ -303,8 +392,11 @@ public class WecomServiceImpl {
         vo.setCorpId(config.getCorpId());
         vo.setCorpName(config.getCorpName());
         vo.setAgentId(config.getAgentId());
-        vo.setAppSecretConfigured(StrUtil.isNotBlank(config.getAppSecretEncrypted()));
-        vo.setContactSecretConfigured(StrUtil.isNotBlank(config.getContactSecretEncrypted()));
+        vo.setAuthStatus(config.getAuthStatus());
+        vo.setThirdPartyEnabled(openPlatformService.isUsable());
+        vo.setThirdPartyAuthorized(openPlatformService.isAuthorized(config));
+        vo.setAuthorizedAt(config.getAuthorizedAt());
+        vo.setUnauthorizedAt(config.getUnauthorizedAt());
         vo.setArchiveSecretConfigured(StrUtil.isNotBlank(config.getArchiveSecretEncrypted()));
         vo.setArchivePrivateKeyConfigured(StrUtil.isNotBlank(config.getArchivePrivateKeyEncrypted()));
         vo.setArchivePublicKeyVersion(config.getArchivePublicKeyVersion());

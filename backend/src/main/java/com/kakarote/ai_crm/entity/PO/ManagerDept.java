@@ -36,6 +36,14 @@ public class ManagerDept implements Serializable {
     @Schema(description = "创建时间")
     private Date createTime;
 
+    private String wecomCorpId;
+
+    private Long wecomDeptId;
+
+    private Long wecomParentDeptId;
+
+    private Date wecomSyncedAt;
+
     @TableField(fill = FieldFill.INSERT)
     @Schema(description = "租户ID")
     private Long tenantId;

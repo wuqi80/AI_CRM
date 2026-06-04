@@ -52,11 +52,16 @@ public class ExternalAuthController {
     @Operation(summary = "External auth callback")
     public void callback(@PathVariable String provider,
                          @RequestParam(required = false) String code,
+                         @RequestParam(value = "auth_code", required = false) String authCode,
                          @RequestParam(required = false) String state,
                          @RequestParam(required = false) String error,
                          HttpServletRequest request,
                          HttpServletResponse response) throws IOException {
-        response.sendRedirect(externalAuthService.handleCallback(provider, code, state, error, request));
+        response.sendRedirect(externalAuthService.handleCallback(provider,
+                authCode == null || authCode.isBlank() ? code : authCode,
+                state,
+                error,
+                request));
     }
 
     @PostMapping("/login-ticket")

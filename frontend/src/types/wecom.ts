@@ -8,8 +8,12 @@ export interface WecomConfigVO {
   corpId?: string
   corpName?: string
   agentId?: string
-  appSecretConfigured?: boolean
-  contactSecretConfigured?: boolean
+  authStatus?: 'AUTHORIZED' | 'UNAUTHORIZED' | string
+  thirdPartyEnabled?: boolean
+  thirdPartyAuthorized?: boolean
+  authorizationUrl?: string
+  authorizedAt?: string
+  unauthorizedAt?: string
   archiveSecretConfigured?: boolean
   archivePrivateKeyConfigured?: boolean
   archivePublicKeyVersion?: string
@@ -19,6 +23,11 @@ export interface WecomConfigVO {
   lastSyncTime?: string
   lastSyncStatus?: string
   lastSyncError?: string
+}
+
+export interface WecomOpenAuthorizeVO {
+  authorizeUrl: string
+  state?: string
 }
 
 export interface WecomSyncStatusVO {

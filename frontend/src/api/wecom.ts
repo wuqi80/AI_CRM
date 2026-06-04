@@ -12,6 +12,7 @@ import type {
   WecomEmployeePage,
   WecomEmployeeSessionQuery,
   WecomExternalCustomerVO,
+  WecomOpenAuthorizeVO,
   WecomMessagePage,
   WecomSyncStatusVO
 } from '@/types/wecom'
@@ -24,8 +25,20 @@ export function saveWecomConfig(data: Partial<WecomConfigVO>): Promise<WecomConf
   return post('/wecom/config', data)
 }
 
+export function getWecomOpenAuthorizeUrl(redirect?: string): Promise<WecomOpenAuthorizeVO> {
+  return get('/wecom/open/authorize', { params: { redirect } })
+}
+
 export function runWecomSync(data = {}): Promise<WecomSyncStatusVO> {
   return post('/wecom/sync/run', data)
+}
+
+export function runWecomOrgSync(): Promise<WecomSyncStatusVO> {
+  return post('/wecom/sync/org')
+}
+
+export function runMyWecomCustomerSync(): Promise<WecomSyncStatusVO> {
+  return post('/wecom/sync/my-customers')
 }
 
 export function getWecomSyncStatus(): Promise<WecomSyncStatusVO> {

@@ -15,9 +15,17 @@ public class WecomConfigVO {
 
     private String agentId;
 
-    private Boolean appSecretConfigured;
+    private String authStatus;
 
-    private Boolean contactSecretConfigured;
+    private Boolean thirdPartyEnabled;
+
+    private Boolean thirdPartyAuthorized;
+
+    private String authorizationUrl;
+
+    private Date authorizedAt;
+
+    private Date unauthorizedAt;
 
     private Boolean archiveSecretConfigured;
 

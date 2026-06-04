@@ -5,7 +5,11 @@ import lombok.Data;
 @Data
 public class ExternalTenantRegisterBO {
 
+    private String username;
+
     private String email;
+
+    private String mobile;
 
     private String verificationCode;
 

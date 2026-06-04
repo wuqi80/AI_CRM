@@ -34,7 +34,8 @@ public class MybatisPlusConfig {
             "crm_access_log",
             "crm_error_log",
             "crm_external_auth_identity",
-            "crm_external_tenant_binding"
+            "crm_external_tenant_binding",
+            "crm_wecom_suite_ticket"
     );
 
     @Bean

@@ -9,6 +9,8 @@ public class ExternalTenantMemberRegisterBO {
 
     private String email;
 
+    private String mobile;
+
     private String password;
 
     private String realname;

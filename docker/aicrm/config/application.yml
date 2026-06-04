@@ -83,6 +83,23 @@ external-auth:
     redirect-uri: ${EXTERNAL_AUTH_WECOM_REDIRECT_URI:}
 
 # MinIO 对象存储配置 (S3 兼容，同时支持 RustFS)
+wecom:
+  open-platform:
+    enabled: ${WECOM_OPEN_PLATFORM_ENABLED:true}
+    suite-id: ${WECOM_OPEN_PLATFORM_SUITE_ID:wwc241ee78c24021e7}
+    suite-secret: ${WECOM_OPEN_PLATFORM_SUITE_SECRET:aqz6mm29b7OcjxdW7-11wbmS_7DLN7RQubN3qArF6d0}
+    provider-corp-id: ${WECOM_OPEN_PLATFORM_PROVIDER_CORP_ID:wwbc43295670db368a}
+    provider-secret: ${WECOM_OPEN_PLATFORM_PROVIDER_SECRET:${WECOM_OPEN_PLATFORM_SUITE_SECRET:aqz6mm29b7OcjxdW7-11wbmS_7DLN7RQubN3qArF6d0}}
+    token: ${WECOM_OPEN_PLATFORM_TOKEN:5nTAZePlAZ5EPfOP8zEemj}
+    encoding-aes-key: ${WECOM_OPEN_PLATFORM_ENCODING_AES_KEY:gGal1ShzR4QSiZoAAJlyurMGZSC70bsPwJdhqcuTq7F}
+    callback-url: ${WECOM_OPEN_PLATFORM_CALLBACK_URL:https://aicrm-saas.5kcrm.cn/crmapi/wecom/open/callback}
+    auth-redirect-uri: ${WECOM_OPEN_PLATFORM_AUTH_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/wecom/open/auth/callback}
+    login-redirect-uri: ${WECOM_OPEN_PLATFORM_LOGIN_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/auth/external/wecom/callback}
+    frontend-redirect-uri: ${WECOM_OPEN_PLATFORM_FRONTEND_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/#/wecom/scrm}
+    auth-type: ${WECOM_OPEN_PLATFORM_AUTH_TYPE:1}
+    state-ttl-seconds: ${WECOM_OPEN_PLATFORM_STATE_TTL_SECONDS:600}
+    token-cache-ttl-buffer-seconds: ${WECOM_OPEN_PLATFORM_TOKEN_CACHE_TTL_BUFFER_SECONDS:300}
+
 minio:
   # 是否启用 MinIO（设为 false 使用本地文件存储）
   enabled: true

@@ -62,6 +62,19 @@ public class WecomController {
         return Result.ok(wecomService.runSync(runBO));
     }
 
+    @PostMapping("/sync/org")
+    @Operation(summary = "Sync WeCom visible organization")
+    @RequirePermission("config:ai")
+    public Result<WecomSyncStatusVO> syncOrg() {
+        return Result.ok(wecomService.syncOrganization());
+    }
+
+    @PostMapping("/sync/my-customers")
+    @Operation(summary = "Sync current user's WeCom customers")
+    public Result<WecomSyncStatusVO> syncMyCustomers() {
+        return Result.ok(wecomService.syncMyCustomers());
+    }
+
     @GetMapping("/sync/status")
     @Operation(summary = "Get WeCom sync status")
     @RequirePermission("config:ai")
@@ -71,7 +84,7 @@ public class WecomController {
 
     @PostMapping("/scrm/employees")
     @Operation(summary = "Query WeCom employee sessions")
-    @RequirePermission("wecomEmployeeSession:view")
+    @RequirePermission("wecomCustomerSession:view")
     public Result<BasePage<WecomEmployeeSessionVO>> queryEmployees(@RequestBody WecomEmployeeSessionQueryBO queryBO) {
         return Result.ok(wecomService.queryEmployeeSessions(queryBO));
     }

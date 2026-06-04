@@ -1,6 +1,5 @@
 package com.kakarote.ai_crm.service.impl;
 
-import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -20,18 +19,32 @@ public class WecomApiClient {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public String fetchAccessToken(String corpId, String secret) {
-        if (StrUtil.isBlank(corpId) || StrUtil.isBlank(secret)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom CorpID and Secret are required");
+    public List<JSONObject> listDepartments(String accessToken) {
+        JSONObject response = get("/department/list", accessToken, null);
+        JSONArray departments = response.getJSONArray("department");
+        if (departments == null || departments.isEmpty()) {
+            return List.of();
         }
-        String raw = restTemplate.getForObject(UriComponentsBuilder.fromHttpUrl(BASE_URL + "/gettoken")
-                .queryParam("corpid", corpId)
-                .queryParam("corpsecret", secret)
-                .build()
-                .toUriString(), String.class);
-        JSONObject json = JSON.parseObject(raw);
-        assertWecomOk(json, "Fetch WeCom access token failed");
-        return json.getString("access_token");
+        List<JSONObject> result = new ArrayList<>();
+        for (Object department : departments) {
+            result.add((JSONObject) department);
+        }
+        return result;
+    }
+
+    public List<JSONObject> listDepartmentUsers(String accessToken, Long departmentId) {
+        JSONObject users = get("/user/list", accessToken, builder -> builder
+                .queryParam("department_id", departmentId)
+                .queryParam("fetch_child", 0));
+        JSONArray userList = users.getJSONArray("userlist");
+        if (userList == null || userList.isEmpty()) {
+            return List.of();
+        }
+        List<JSONObject> result = new ArrayList<>();
+        for (Object user : userList) {
+            result.add((JSONObject) user);
+        }
+        return result;
     }
 
     public List<JSONObject> listEmployees(String accessToken) {

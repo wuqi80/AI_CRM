@@ -118,9 +118,6 @@ public class WecomCustomerBindingServiceImpl {
                 .eq(WecomCustomerBinding::getCustomerId, customerId)
                 .eq(WecomCustomerBinding::getStatus, STATUS_ACTIVE)
                 .orderByDesc(WecomCustomerBinding::getBindTime));
-        if (bindings.isEmpty()) {
-            return List.of();
-        }
         List<Long> externalCustomerIds = bindings.stream()
                 .map(WecomCustomerBinding::getExternalCustomerId)
                 .filter(Objects::nonNull)
@@ -132,6 +129,7 @@ public class WecomCustomerBindingServiceImpl {
                 .stream()
                 .collect(Collectors.toMap(WecomExternalCustomer::getId, item -> item, (left, right) -> left));
         List<WecomCustomerBindingVO> result = new ArrayList<>();
+        List<Long> existingExternalCustomerIds = new ArrayList<>();
         for (WecomCustomerBinding binding : bindings) {
             WecomCustomerBindingVO vo = BeanUtil.copyProperties(binding, WecomCustomerBindingVO.class);
             WecomExternalCustomer externalCustomer = externalById.get(binding.getExternalCustomerId());
@@ -139,6 +137,29 @@ public class WecomCustomerBindingServiceImpl {
                 vo.setExternalCustomerName(externalCustomer.getName());
                 vo.setExternalCustomerAvatar(externalCustomer.getAvatar());
             }
+            result.add(vo);
+            if (binding.getExternalCustomerId() != null) {
+                existingExternalCustomerIds.add(binding.getExternalCustomerId());
+            }
+        }
+        List<WecomExternalCustomer> directCustomers = externalCustomerMapper.selectList(Wrappers.<WecomExternalCustomer>lambdaQuery()
+                .eq(WecomExternalCustomer::getCustomerId, customerId)
+                .eq(WecomExternalCustomer::getBindStatus, BIND_STATUS_BOUND)
+                .orderByDesc(WecomExternalCustomer::getSyncedAt));
+        for (WecomExternalCustomer externalCustomer : directCustomers) {
+            if (externalCustomer.getId() != null && existingExternalCustomerIds.contains(externalCustomer.getId())) {
+                continue;
+            }
+            WecomCustomerBindingVO vo = new WecomCustomerBindingVO();
+            vo.setId(externalCustomer.getId());
+            vo.setCustomerId(customerId);
+            vo.setExternalCustomerId(externalCustomer.getId());
+            vo.setExternalUserId(externalCustomer.getExternalUserId());
+            vo.setExternalCustomerName(externalCustomer.getName());
+            vo.setExternalCustomerAvatar(externalCustomer.getAvatar());
+            vo.setCorpId(externalCustomer.getCorpId());
+            vo.setBindTime(externalCustomer.getSyncedAt());
+            vo.setStatus(STATUS_ACTIVE);
             result.add(vo);
         }
         return result;

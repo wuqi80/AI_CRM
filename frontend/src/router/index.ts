@@ -74,12 +74,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '企业微信', icon: 'forum', permission: 'wecomCustomerSession:view' }
       },
       {
-        path: 'wecom-customers',
-        name: 'WecomCustomers',
-        component: () => import('@/views/wecom/WecomCustomersView.vue'),
-        meta: { title: '企微客户', icon: 'groups', permission: 'wecomCustomer:view' }
-      },
-      {
         path: 'tencent-meetings',
         name: 'TencentMeetings',
         component: () => import('@/views/tencentMeeting/TencentMeetingView.vue'),

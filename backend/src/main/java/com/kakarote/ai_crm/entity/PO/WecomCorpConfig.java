@@ -30,9 +30,23 @@ public class WecomCorpConfig implements Serializable {
 
     private String agentId;
 
-    private String appSecretEncrypted;
+    private String suiteId;
 
-    private String contactSecretEncrypted;
+    private String permanentCodeEncrypted;
+
+    private String authInfoJson;
+
+    private String authCorpInfoJson;
+
+    private String authStatus;
+
+    private Date authorizedAt;
+
+    private Date unauthorizedAt;
+
+    private String authUserId;
+
+    private String authUserName;
 
     private String archiveSecretEncrypted;
 

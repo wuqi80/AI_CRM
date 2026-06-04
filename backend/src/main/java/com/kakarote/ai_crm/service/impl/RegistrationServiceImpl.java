@@ -208,26 +208,42 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ManagerUser registerExternalTenant(ExternalTenantRegisterBO registerBO) {
-        String email = normalizeEmail(registerBO.getEmail());
+        String email = normalizeOptionalEmail(registerBO.getEmail());
+        String mobile = normalizeText(registerBO.getMobile());
+        String username = normalizeText(registerBO.getUsername());
+        if (StrUtil.isBlank(username)) {
+            username = firstNotBlank(email, mobile);
+        }
         String realname = normalizeText(registerBO.getRealname());
         String companyName = StrUtil.trim(registerBO.getCompanyName());
         String password = registerBO.getPassword();
-        if (!Validator.isEmail(email, true)) {
+        if (StrUtil.isBlank(username)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Username is required");
+        }
+        if (StrUtil.isNotBlank(email) && !Validator.isEmail(email, true)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Invalid email");
         }
         if (StrUtil.isBlank(companyName)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Company name is required");
         }
-        validatePassword(password);
+        if (StrUtil.isNotBlank(password)) {
+            validatePassword(password);
+        }
         if (Boolean.TRUE.equals(registerBO.getEmailVerificationRequired())) {
+            if (StrUtil.isBlank(email)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Email is required");
+            }
             verifyEmailCode(email, registerBO.getVerificationCode());
         }
-        ensureEmailNotRegistered(email);
+        if (StrUtil.isNotBlank(email)) {
+            ensureEmailNotRegistered(email);
+        }
 
         CrmTenant tenant = new CrmTenant();
         tenant.setTenantName(companyName);
         tenant.setContactEmail(email);
-        tenant.setContactName(StrUtil.isNotBlank(realname) ? realname : email);
+        tenant.setContactPhone(mobile);
+        tenant.setContactName(StrUtil.isNotBlank(realname) ? realname : username);
         tenant.setStatus(1);
         tenant.setMaxUsers(50);
         tenant.setGiftCreditTotal(ICrmTenantService.DEFAULT_GIFT_CREDIT_TOTAL);
@@ -262,10 +278,11 @@ public class RegistrationServiceImpl implements RegistrationService {
             initializeDefaultRole();
 
             ManagerUser user = new ManagerUser();
-            user.setUsername(email);
-            user.setPassword(passwordEncoder.encode(password));
+            user.setUsername(username);
+            user.setPassword(StrUtil.isBlank(password) ? null : passwordEncoder.encode(password));
             user.setEmail(email);
-            user.setRealname(StrUtil.isNotBlank(realname) ? realname : email);
+            user.setMobile(mobile);
+            user.setRealname(StrUtil.isNotBlank(realname) ? realname : username);
             user.setDeptId(dept.getDeptId());
             user.setStatus(1);
             user.setCreateTime(new Date());
@@ -277,8 +294,10 @@ public class RegistrationServiceImpl implements RegistrationService {
             userRole.setCreateTime(LocalDateTime.now());
             userRoleService.save(userRole);
 
-            redis.del(getEmailCodeCacheKey(email));
-            log.info("External auth tenant registration succeeded: tenantId={}, email={}", newTenantId, email);
+            if (StrUtil.isNotBlank(email)) {
+                redis.del(getEmailCodeCacheKey(email));
+            }
+            log.info("External auth tenant registration succeeded: tenantId={}, username={}", newTenantId, username);
 
             if (weKnoraClient.isEnabled()) {
                 try {
@@ -301,6 +320,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Tenant is required");
         }
         String email = normalizeEmail(registerBO.getEmail());
+        String mobile = normalizeText(registerBO.getMobile());
         String realname = normalizeText(registerBO.getRealname());
         String password = registerBO.getPassword();
         if (!Validator.isEmail(email, true)) {
@@ -317,6 +337,15 @@ public class RegistrationServiceImpl implements RegistrationService {
             if (duplicateCount > 0) {
                 throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
                         "This email already exists in the enterprise. Please sign in and bind it manually.");
+            }
+            if (StrUtil.isNotBlank(mobile)) {
+                long duplicateMobileCount = manageUserService.lambdaQuery()
+                        .eq(ManagerUser::getMobile, mobile)
+                        .count();
+                if (duplicateMobileCount > 0) {
+                    throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                            "This mobile already exists in the enterprise. Please sign in and bind it manually.");
+                }
             }
 
             CrmTenant tenant = tenantService.getById(registerBO.getTenantId());
@@ -347,6 +376,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             user.setUsername(email);
             user.setPassword(passwordEncoder.encode(password));
             user.setEmail(email);
+            user.setMobile(mobile);
             user.setRealname(StrUtil.isNotBlank(realname) ? realname : email);
             user.setDeptId(rootDept == null ? null : rootDept.getDeptId());
             user.setStatus(1);
@@ -510,12 +540,29 @@ public class RegistrationServiceImpl implements RegistrationService {
         return StrUtil.trim(email).toLowerCase();
     }
 
+    private String normalizeOptionalEmail(String email) {
+        String normalized = StrUtil.trim(email);
+        return StrUtil.isBlank(normalized) ? null : normalized.toLowerCase();
+    }
+
     /**
      * 标准化文本。
      */
     private String normalizeText(String value) {
         String normalized = StrUtil.trim(value);
         return StrUtil.isBlank(normalized) ? null : normalized;
+    }
+
+    private String firstNotBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value)) {
+                return value;
+            }
+        }
+        return null;
     }
 
     /**

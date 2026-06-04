@@ -298,7 +298,17 @@
                             {{ row.companyName?.charAt(0) || '?' }}
                           </span>
                         </div>
-                        <span class="text-sm font-semibold text-slate-900 truncate block cursor-pointer transition-colors hover:text-primary hover:underline hover:decoration-primary underline-offset-2">{{ row.companyName || '-' }}</span>
+                        <div class="flex min-w-0 items-center gap-2">
+                          <span class="min-w-0 truncate text-sm font-semibold text-slate-900 cursor-pointer transition-colors hover:text-primary hover:underline hover:decoration-primary underline-offset-2">{{ row.companyName || '-' }}</span>
+                          <span
+                            v-if="row.wecomCustomer"
+                            class="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700"
+                            title="企业微信客户"
+                          >
+                            <span class="material-symbols-outlined text-[13px] leading-none">forum</span>
+                            企微
+                          </span>
+                        </div>
                       </div>
                     </template>
                     <template v-else-if="field.fieldName === 'aiStatusDetection'">
@@ -500,8 +510,17 @@
                   <div class="min-w-0 flex-1">
                     <div class="flex items-start gap-2">
                       <div class="min-w-0 flex-1">
-                        <div class="text-sm font-bold text-slate-900 truncate">
-                          {{ row.companyName || '-' }}
+                        <div class="flex min-w-0 items-center gap-1.5">
+                          <div class="min-w-0 truncate text-sm font-bold text-slate-900">
+                            {{ row.companyName || '-' }}
+                          </div>
+                          <span
+                            v-if="row.wecomCustomer"
+                            class="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700"
+                            title="企业微信客户"
+                          >
+                            企微
+                          </span>
                         </div>
                       </div>
                       <span class="material-symbols-outlined text-slate-300 text-base leading-none pt-0.5">chevron_right</span>

@@ -102,6 +102,12 @@ public class ManagerUser implements Serializable {
 	@Schema(description = "直属上级ID")
 	private Long parentId;
 
+	private String wecomCorpId;
+
+	private String wecomUserId;
+
+	private Date wecomSyncedAt;
+
 	/**
 	 * 租户ID
 	 */

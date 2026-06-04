@@ -13,7 +13,7 @@ class ExternalAuthPropertiesTest {
         assertThat(properties.getProvider("google")).isSameAs(properties.getGoogle());
         assertThat(properties.getProvider("outlook")).isSameAs(properties.getOutlook());
         assertThat(properties.getProvider("wechat")).isSameAs(properties.getWechat());
-        assertThat(properties.getProvider("wecom")).isSameAs(properties.getWecom());
+        assertThat(properties.getProvider("wecom")).isNull();
         assertThat(properties.getProvider("unknown")).isNull();
     }
 
@@ -29,22 +29,9 @@ class ExternalAuthPropertiesTest {
         outlook.setClientId("outlook-client");
         outlook.setClientSecret("outlook-secret");
 
-        ExternalAuthProperties.ProviderConfig wecom = new ExternalAuthProperties.ProviderConfig();
-        wecom.setEnabled(Boolean.TRUE);
-        wecom.setClientId("ignored-client");
-        wecom.setClientSecret("wecom-secret");
-
         assertThat(google.isUsable("google")).isTrue();
         assertThat(outlook.isUsable("outlook")).isTrue();
         assertThat(outlook.getTenant()).isEqualTo("common");
-        assertThat(wecom.isUsable("wecom")).isFalse();
-
-        wecom.setCorpId("corp-id");
-        assertThat(wecom.isUsable("wecom")).isFalse();
-
-        wecom.setAgentId("1000002");
-        assertThat(wecom.isUsable("wecom")).isTrue();
-        assertThat(wecom.resolveClientId("wecom")).isEqualTo("corp-id");
     }
 
     @Test
