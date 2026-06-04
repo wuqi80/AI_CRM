@@ -183,7 +183,7 @@ def upsert_crm_config(api_key, knowledge_base_id, enabled):
     db_user = os.getenv("DB_USER", "postgres")
     db_password = os.getenv("DB_PASSWORD", "")
     db_name = os.getenv("CRM_DB_NAME", "wk_ai_crm")
-    base_url = os.getenv("CRM_WEKNORA_BASE_URL", "http://frontend/api/v1")
+    base_url = os.getenv("CRM_WEKNORA_BASE_URL", "http://app:8080/api/v1")
 
     values = [
         (101, "weknora_enabled", "true" if enabled else "false", "WeKnora enabled"),

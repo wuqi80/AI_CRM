@@ -8,7 +8,9 @@ import type {
   MinioConsoleConfig,
   WeKnoraConfig,
   WeKnoraConfigUpdateBO,
-  WeKnoraConnectionTestResult
+  WeKnoraConnectionTestResult,
+  WeKnoraModelSyncBO,
+  WeKnoraModelSyncResult
 } from '@/types/systemConfig'
 
 /**
@@ -81,6 +83,13 @@ export function updateWeKnoraConfig(data: WeKnoraConfigUpdateBO): Promise<void> 
  */
 export function testWeKnoraConnection(data: WeKnoraConfigUpdateBO): Promise<WeKnoraConnectionTestResult> {
   return post('/systemConfig/weknora/test', data)
+}
+
+/**
+ * 同步 WeKnora LLM / Embedding 模型和默认知识库
+ */
+export function syncWeKnoraModels(data: WeKnoraModelSyncBO): Promise<WeKnoraModelSyncResult> {
+  return post('/systemConfig/weknora/syncModels', data)
 }
 
 // ==================== 企业信息配置接口 ====================
