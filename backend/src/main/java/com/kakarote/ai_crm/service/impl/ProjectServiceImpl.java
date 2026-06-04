@@ -126,8 +126,13 @@ public class ProjectServiceImpl implements IProjectService {
 
     @Override
     public ProjectVO getProject(Long projectId) {
+        return getProject(projectId, null);
+    }
+
+    @Override
+    public ProjectVO getProject(Long projectId, String taskKeyword) {
         ensureProjectPermission(projectId, PERMISSION_VIEW_PROJECT);
-        return buildProjectVO(projectId);
+        return buildProjectVO(projectId, taskKeyword);
     }
 
     @Override
@@ -656,6 +661,10 @@ public class ProjectServiceImpl implements IProjectService {
     }
 
     private ProjectVO buildProjectVO(Long projectId) {
+        return buildProjectVO(projectId, null);
+    }
+
+    private ProjectVO buildProjectVO(Long projectId, String taskKeyword) {
         ProjectRow project = findProject(projectId);
         ensureProjectPermission(projectId, PERMISSION_VIEW_PROJECT);
         boolean admin = isSystemAdmin();
@@ -682,7 +691,7 @@ public class ProjectServiceImpl implements IProjectService {
         List<ProjectVO.ProjectLaneVO> lanes = loadLanes(projectId).stream().map(this::toLaneVO).collect(Collectors.toList());
         vo.setLanes(lanes);
 
-        List<ProjectVO.ProjectTaskVO> tasks = loadTasks(projectId).stream()
+        List<ProjectVO.ProjectTaskVO> tasks = loadTasks(projectId, taskKeyword).stream()
                 .filter(task -> canViewTask(projectId, task))
                 .map(this::toTaskVO)
                 .sorted(Comparator.comparing(ProjectVO.ProjectTaskVO::getUpdateTime, Comparator.nullsLast(Comparator.reverseOrder())))
@@ -860,14 +869,51 @@ public class ProjectServiceImpl implements IProjectService {
     }
 
     private List<TaskRow> loadTasks(Long projectId) {
-        return jdbcTemplate.query("""
-                SELECT task_id, project_id, lane_id, title, description, due_date, priority, status,
-                       assigned_to, customer_id, generated_by_ai, participant_user_ids, participant_names,
-                       source, ai_source_text, has_attachments, has_schedule, create_time, update_time
-                FROM crm_task
-                WHERE project_id = ?
-                ORDER BY update_time DESC
-                """, (rs, rowNum) -> mapTask(rs), projectId);
+        return loadTasks(projectId, null);
+    }
+
+    private List<TaskRow> loadTasks(Long projectId, String taskKeyword) {
+        String keyword = normalizeTaskSearchKeyword(taskKeyword);
+        List<Object> params = new ArrayList<>();
+        params.add(projectId);
+        StringBuilder sql = new StringBuilder("""
+                SELECT t.task_id, t.project_id, t.lane_id, t.title, t.description, t.due_date, t.priority, t.status,
+                       t.assigned_to, t.customer_id, t.generated_by_ai, t.participant_user_ids, t.participant_names,
+                       t.source, t.ai_source_text, t.has_attachments, t.has_schedule, t.create_time, t.update_time
+                FROM crm_task t
+                LEFT JOIN crm_project_lane l ON l.project_id = t.project_id AND l.lane_id = t.lane_id
+                LEFT JOIN crm_customer c ON c.customer_id = t.customer_id
+                LEFT JOIN crm_project p ON p.project_id = t.project_id
+                LEFT JOIN manager_user assignee ON assignee.user_id = t.assigned_to
+                WHERE t.project_id = ?
+                """);
+
+        if (keyword != null) {
+            sql.append("""
+                      AND LOWER(CONCAT_WS(' ',
+                          t.title,
+                          t.description,
+                          t.priority,
+                          t.status,
+                          t.participant_names,
+                          l.name,
+                          c.company_name,
+                          p.customer_name,
+                          assignee.realname
+                      )) LIKE ?
+                    """);
+            params.add("%" + keyword + "%");
+        }
+
+        sql.append(" ORDER BY t.update_time DESC");
+        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> mapTask(rs), params.toArray());
+    }
+
+    private String normalizeTaskSearchKeyword(String taskKeyword) {
+        if (StrUtil.isBlank(taskKeyword)) {
+            return null;
+        }
+        return taskKeyword.trim().toLowerCase(Locale.ROOT);
     }
 
     private List<MemberRow> loadMembers(Long projectId) {

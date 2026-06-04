@@ -81,6 +81,16 @@ const buttonStyle = computed(() => {
 
 async function handleClick() {
   if (draggedDuringPointer.value) return
+  const detailProjectId = resolveProjectDetailId()
+  if (detailProjectId) {
+    await router.replace({
+      name: 'ProjectDetail',
+      params: { id: detailProjectId },
+      query: { ...route.query, taskId: undefined, view: 'ai' },
+    })
+    return
+  }
+
   const detailCustomerId = resolveCustomerDetailId()
   if (detailCustomerId) {
     await router.push({ path: '/chat', query: { customerId: detailCustomerId } })
@@ -91,6 +101,12 @@ async function handleClick() {
   chatStore.beginNewSessionDraft('新对话', undefined, undefined, 'crm')
   await router.push({ path: '/chat' })
   chatStore.requestComposerFocus()
+}
+
+function resolveProjectDetailId(): string {
+  if (route.name !== 'ProjectDetail') return ''
+  const raw = route.params.id
+  return String(Array.isArray(raw) ? raw[0] || '' : raw || '')
 }
 
 function resolveCustomerDetailId(): string {

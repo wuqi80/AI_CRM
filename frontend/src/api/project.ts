@@ -186,8 +186,9 @@ export async function queryProjectList(): Promise<ProjectEntity[]> {
   return list<RawProject>(projects).map(normalizeProject)
 }
 
-export function getProjectDetail(projectId: string): Promise<ProjectEntity> {
-  return unwrapProject(get(`/project/detail/${projectId}`))
+export function getProjectDetail(projectId: string, taskKeyword?: string): Promise<ProjectEntity> {
+  const keyword = taskKeyword?.trim()
+  return unwrapProject(get(`/project/detail/${projectId}`, keyword ? { params: { taskKeyword: keyword } } : undefined))
 }
 
 export function createProject(payload: ProjectCreatePayload): Promise<ProjectEntity> {
