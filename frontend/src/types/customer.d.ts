@@ -264,7 +264,9 @@ export interface ContactQueryBO {
 // FollowUp types
 export interface FollowUp {
   followUpId: string
-  customerId: string
+  customerId?: string
+  relationId?: string
+  relationName?: string
   type: FollowUpType
   content: string
   summary?: string
@@ -307,7 +309,8 @@ export interface FollowUpTask {
 export type FollowUpType = 'call' | 'meeting' | 'email' | 'visit' | 'other'
 
 export interface FollowUpAddBO {
-  customerId: string
+  customerId?: string
+  relationId?: string
   type: string
   content: string
   summary?: string
@@ -341,6 +344,7 @@ export interface FollowUpUpdateBO {
 
 export interface FollowUpQueryBO {
   customerId?: string
+  relationId?: string
   contactId?: string
   type?: string
   startTime?: string

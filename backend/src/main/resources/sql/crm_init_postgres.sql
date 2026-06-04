@@ -194,6 +194,7 @@ CREATE TABLE crm_knowledge (
     file_size BIGINT DEFAULT 0,
     mime_type VARCHAR(100),
     customer_id BIGINT,
+    employee_id BIGINT,
     summary TEXT,
     content_text TEXT,
     status SMALLINT DEFAULT 1,
@@ -206,6 +207,7 @@ CREATE TABLE crm_knowledge (
 );
 
 CREATE INDEX idx_knowledge_customer_id ON crm_knowledge (customer_id);
+CREATE INDEX idx_knowledge_employee_id ON crm_knowledge (employee_id);
 CREATE INDEX idx_knowledge_type ON crm_knowledge (type);
 CREATE INDEX idx_knowledge_upload_user_id ON crm_knowledge (upload_user_id);
 
@@ -334,6 +336,7 @@ CREATE TABLE crm_chat_session (
     user_id BIGINT NOT NULL,
     agent_id BIGINT,
     customer_id BIGINT,
+    employee_id BIGINT,
     title VARCHAR(255),
     app_code VARCHAR(50) NOT NULL DEFAULT 'general',
     pinned BOOLEAN NOT NULL DEFAULT FALSE,
@@ -347,6 +350,7 @@ CREATE TABLE crm_chat_session (
 CREATE INDEX idx_chat_session_user_id ON crm_chat_session (user_id);
 CREATE INDEX idx_chat_session_agent_id ON crm_chat_session (agent_id);
 CREATE INDEX idx_chat_session_customer_id ON crm_chat_session (customer_id);
+CREATE INDEX idx_chat_session_employee_id ON crm_chat_session (employee_id);
 CREATE INDEX idx_chat_session_app_code ON crm_chat_session (app_code);
 CREATE INDEX idx_chat_session_user_pin ON crm_chat_session (user_id, pinned DESC, pinned_time DESC, update_time DESC);
 

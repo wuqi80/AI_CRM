@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.ai.tools;
 
 import cn.hutool.core.util.StrUtil;
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.ai.tools.support.AiToolCustomerResolver;
 import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
 import com.kakarote.ai_crm.entity.BO.TaskAddBO;
@@ -73,6 +74,9 @@ public class TaskTools {
                 if (task.getCustomerName() != null) {
                     sb.append(String.format("，客户: %s", task.getCustomerName()));
                 }
+                if (task.getRelationName() != null) {
+                    sb.append(String.format("，关系人: %s", task.getRelationName()));
+                }
                 if (task.getGeneratedByAi() != null && task.getGeneratedByAi() == 1) {
                     sb.append(" [AI生成]");
                 }
@@ -104,21 +108,34 @@ public class TaskTools {
         try {
             Long customerId = null;
             String matchedCompanyName = null;
-            AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
-                customerIdStr, customerName, "关联该客户创建任务", "创建任务失败", "创建任务");
-            if (customerResolve.errorMessage() != null) {
-                return customerResolve.errorMessage();
-            }
-            Customer resolvedCustomer = customerResolve.customer();
-            if (resolvedCustomer != null) {
-                customerId = resolvedCustomer.getCustomerId();
-                matchedCompanyName = resolvedCustomer.getCompanyName();
+            Long currentRelationId = AiContextHolder.getCurrentRelationId();
+            boolean useRelationContext = currentRelationId != null
+                && !hasTextValue(customerIdStr)
+                && !hasTextValue(customerName);
+            if (!useRelationContext) {
+                AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
+                    customerIdStr, customerName, "关联该客户创建任务", "创建任务失败", "创建任务");
+                if (customerResolve.errorMessage() != null) {
+                    return customerResolve.errorMessage();
+                }
+                Customer resolvedCustomer = customerResolve.customer();
+                if (resolvedCustomer != null) {
+                    customerId = resolvedCustomer.getCustomerId();
+                    matchedCompanyName = resolvedCustomer.getCompanyName();
+                }
             }
 
             TaskAddBO bo = new TaskAddBO();
             bo.setTitle(title);
             bo.setDescription(description);
             bo.setCustomerId(customerId);
+            if (useRelationContext) {
+                bo.setRelationId(currentRelationId);
+            }
+            Long currentEmployeeId = AiContextHolder.getCurrentEmployeeId();
+            if (currentEmployeeId != null) {
+                bo.setAssignedTo(currentEmployeeId);
+            }
             bo.setPriority(priority != null ? priority : "medium");
 
             if (hasTextValue(dueDate)) {
@@ -137,6 +154,12 @@ public class TaskTools {
             }
             if (customerId != null) {
                 result.append("\n- customerId: ").append(customerId);
+            }
+            if (useRelationContext) {
+                result.append("\n- relationId: ").append(currentRelationId);
+            }
+            if (currentEmployeeId != null) {
+                result.append("\n- employeeId: ").append(currentEmployeeId);
             }
             if (hasTextValue(dueDate)) {
                 result.append("\n- 截止日期: ").append(dueDate);

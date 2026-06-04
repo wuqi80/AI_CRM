@@ -95,12 +95,22 @@
       </el-row>
     </el-form>
 
-    <div class="mb-4">
-      <label class="text-sm font-medium text-slate-700 mb-2 block">状态</label>
-      <el-radio-group v-model="memberForm.status" :disabled="isEditingTenantCreator">
-        <el-radio :value="1">活跃</el-radio>
-        <el-radio :value="0">离职/停用</el-radio>
-      </el-radio-group>
+    <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div>
+        <label class="text-sm font-medium text-slate-700 mb-2 block">员工状态</label>
+        <el-radio-group v-model="memberForm.employeeStatus">
+          <el-radio value="active">在职</el-radio>
+          <el-radio value="resigned">离职</el-radio>
+          <el-radio value="disabled">停用</el-radio>
+        </el-radio-group>
+      </div>
+      <div>
+        <label class="text-sm font-medium text-slate-700 mb-2 block">账号状态</label>
+        <el-radio-group v-model="memberForm.status" :disabled="isEditingTenantCreator">
+          <el-radio :value="1">活跃</el-radio>
+          <el-radio :value="0">禁用</el-radio>
+        </el-radio-group>
+      </div>
     </div>
 
     <div class="mt-4">
@@ -151,6 +161,7 @@ const props = defineProps<{
     deptId: number | string | null
     parentId: number | string | null
     status: number
+    employeeStatus: string
     roleIds: string[]
   }
   deptTree: DeptVO[]

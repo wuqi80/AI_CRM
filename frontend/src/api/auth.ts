@@ -57,7 +57,7 @@ export function changePassword(oldPassword: string, newPassword: string): Promis
 /**
  * Query user list
  */
-export function queryUserList(params?: { search?: string; deptId?: string | number; roleId?: string | number; page?: number; limit?: number }): Promise<any> {
+export function queryUserList(params?: { search?: string; deptId?: string | number; roleId?: string | number; employeeStatus?: string; page?: number; limit?: number }): Promise<any> {
   return post('/managerUser/queryPageList', { page: 1, limit: 100, ...params })
 }
 
@@ -74,6 +74,7 @@ export function addUser(data: {
   post?: string
   parentId?: number | string
   status?: number
+  employeeStatus?: string
   roleIds?: (number | string)[]
 }): Promise<void> {
   return post('/managerUser/addUser', data)
@@ -93,6 +94,7 @@ export function updateUserInfo(data: {
   status?: number
   password?: string
   parentId?: number | string
+  employeeStatus?: string
   roleIds?: (number | string)[]
 }): Promise<void> {
   return post('/managerUser/updateUser', data)

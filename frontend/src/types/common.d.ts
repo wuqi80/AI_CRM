@@ -5,8 +5,12 @@ export interface Task {
   description?: string
   customerId?: string
   customerName?: string
+  relationId?: string
+  relationName?: string
   priority: TaskPriority
+  priorityName?: string
   status: TaskStatus
+  statusName?: string
   dueDate?: string
   overdue?: boolean
   assignedTo?: string
@@ -32,6 +36,7 @@ export interface TaskAddBO {
   description?: string
   customerId?: string
   priority?: TaskPriority
+  relationId?: string
   dueDate?: string
   assignedTo?: string
   taskType?: string
@@ -50,6 +55,7 @@ export interface TaskQueryBO {
   priority?: TaskPriority
   customerId?: string
   assignedTo?: string
+  relationId?: string
   filter?: 'all' | 'today' | 'thisWeek' | 'overdue' | 'mine'
   sortMode?: 'default' | 'value'
   highValueOnly?: boolean
@@ -64,6 +70,10 @@ export interface Knowledge {
   type: KnowledgeType
   customerId?: string
   customerName?: string
+  employeeId?: string
+  employeeName?: string
+  relationId?: string
+  relationName?: string
   filePath?: string
   /** 文件大小，单位：字节 (B)，来自知识库列表/详情等接口 */
   fileSize?: number | string
@@ -95,6 +105,8 @@ export interface KnowledgeQueryBO {
   type?: KnowledgeType
   fileType?: KnowledgeFileType
   customerId?: string
+  employeeId?: string
+  relationId?: string
   page?: number
   limit?: number
 }
@@ -188,6 +200,12 @@ export interface ChatSession {
   customerId?: string
   customerName?: string
   customerLogoUrl?: string
+  employeeId?: string
+  employeeName?: string
+  employeeAvatarUrl?: string
+  relationId?: string
+  relationName?: string
+  relationAvatarUrl?: string
   pinned?: boolean
   pinnedTime?: string
   createTime: string

@@ -15,7 +15,7 @@ import {
 import type { PermItem, RolePermissionVO, RoleVO } from '@/types/role'
 import { ROLE_AVATAR_COLORS, ROLE_DATA_SCOPE_OPTIONS } from './constants'
 
-const ROLE_PERMISSION_MODULE_ORDER = ['customer', 'contact', 'followup', 'task', 'schedule', 'knowledge', 'chat', 'agent', 'user', 'dept', 'role', 'config', 'customField']
+const ROLE_PERMISSION_MODULE_ORDER = ['customer', 'addressBook', 'contact', 'followup', 'task', 'schedule', 'knowledge', 'chat', 'agent', 'user', 'dept', 'role', 'config', 'customField']
 
 function sortRolePermissions(permissionList: RolePermissionVO[]): RolePermissionVO[] {
   return [...permissionList].sort((left, right) => {

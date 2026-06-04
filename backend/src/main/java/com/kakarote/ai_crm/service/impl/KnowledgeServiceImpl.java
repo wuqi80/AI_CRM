@@ -25,6 +25,7 @@ import com.kakarote.ai_crm.entity.BO.KnowledgeTargetedScriptBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
+import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.VO.ContactVO;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
@@ -37,7 +38,10 @@ import com.kakarote.ai_crm.mapper.FollowUpMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.ManageUserMapper;
+import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
+import com.kakarote.ai_crm.service.DataPermissionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
@@ -113,6 +117,12 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     private CustomerMapper customerMapper;
 
     @Autowired
+    private ManageUserMapper manageUserMapper;
+
+    @Autowired
+    private RelationMapper relationMapper;
+
+    @Autowired
     private FollowUpMapper followUpMapper;
 
     @Autowired
@@ -143,6 +153,9 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     private AiAudioTranscriptionService aiAudioTranscriptionService;
 
     @Autowired
+    private DataPermissionService dataPermissionService;
+
+    @Autowired
     private VideoMediaExtractionService videoMediaExtractionService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -153,12 +166,26 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long uploadFile(MultipartFile file, String type, Long customerId, String summary) {
+        return uploadFile(file, type, customerId, null, null, summary);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long uploadFile(MultipartFile file, String type, Long customerId, Long employeeId, String summary) {
+        return uploadFile(file, type, customerId, employeeId, null, summary);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long uploadFile(MultipartFile file, String type, Long customerId, Long employeeId, Long relationId, String summary) {
         if (customerId != null) {
             Customer customer = customerMapper.selectById(customerId);
             if (ObjectUtil.isNull(customer)) {
                 throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
             }
         }
+        validateEmployee(employeeId);
+        validateRelation(relationId);
         // Generate file path
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         String fileName = IdUtil.fastSimpleUUID() + "." + FileUtil.extName(file.getOriginalFilename());
@@ -172,6 +199,8 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         knowledge.setName(file.getOriginalFilename());
         knowledge.setType(StrUtil.isEmpty(type) ? "document" : type);
         knowledge.setCustomerId(customerId);
+        knowledge.setEmployeeId(employeeId);
+        knowledge.setRelationId(relationId);
         knowledge.setFilePath(relativePath);
         knowledge.setFileSize(file.getSize());
         knowledge.setMimeType(file.getContentType());
@@ -232,6 +261,88 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         } else {
             knowledge.setWeKnoraParseStatus("unsupported");
             log.info("聊天附件类型不被 WeKnora 支持，跳过 RAG 解析: {}", normalizedFileName);
+        }
+
+        save(knowledge);
+
+        if (weKnoraClient.isEnabled() && weKnoraSupported) {
+            self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), filePath, normalizedFileName, UserUtil.getTenantId());
+        }
+
+        globalSearchIndexService.refreshKnowledgeIndex(knowledge.getKnowledgeId());
+        return knowledge.getKnowledgeId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long archiveExistingEmployeeFile(String fileName, String filePath, Long fileSize, String mimeType, Long employeeId, String summary) {
+        if (employeeId == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "员工不能为空");
+        }
+        validateEmployee(employeeId);
+        if (StrUtil.isBlank(filePath)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "文件路径不能为空");
+        }
+
+        String normalizedFileName = StrUtil.blankToDefault(fileName, FileUtil.getName(filePath));
+        Knowledge knowledge = new Knowledge();
+        knowledge.setName(normalizedFileName);
+        knowledge.setType("document");
+        knowledge.setEmployeeId(employeeId);
+        knowledge.setFilePath(filePath);
+        knowledge.setFileSize(fileSize);
+        knowledge.setMimeType(mimeType);
+        knowledge.setSummary(normalizeUserFacingSummary(summary));
+        knowledge.setContentText(extractSearchableContent(filePath, mimeType, normalizedFileName));
+        knowledge.setUploadUserId(UserUtil.getUserId());
+
+        boolean weKnoraSupported = weKnoraClient.isSupportedFileType(normalizedFileName);
+        if (weKnoraSupported) {
+            knowledge.setWeKnoraParseStatus("pending");
+        } else {
+            knowledge.setWeKnoraParseStatus("unsupported");
+            log.info("员工会话附件类型不被 WeKnora 支持，跳过 RAG 解析: {}", normalizedFileName);
+        }
+
+        save(knowledge);
+
+        if (weKnoraClient.isEnabled() && weKnoraSupported) {
+            self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), filePath, normalizedFileName, UserUtil.getTenantId());
+        }
+
+        globalSearchIndexService.refreshKnowledgeIndex(knowledge.getKnowledgeId());
+        return knowledge.getKnowledgeId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long archiveExistingRelationFile(String fileName, String filePath, Long fileSize, String mimeType, Long relationId, String summary) {
+        if (relationId == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不能为空");
+        }
+        validateRelation(relationId);
+        if (StrUtil.isBlank(filePath)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "文件路径不能为空");
+        }
+
+        String normalizedFileName = StrUtil.blankToDefault(fileName, FileUtil.getName(filePath));
+        Knowledge knowledge = new Knowledge();
+        knowledge.setName(normalizedFileName);
+        knowledge.setType("document");
+        knowledge.setRelationId(relationId);
+        knowledge.setFilePath(filePath);
+        knowledge.setFileSize(fileSize);
+        knowledge.setMimeType(mimeType);
+        knowledge.setSummary(normalizeUserFacingSummary(summary));
+        knowledge.setContentText(extractSearchableContent(filePath, mimeType, normalizedFileName));
+        knowledge.setUploadUserId(UserUtil.getUserId());
+
+        boolean weKnoraSupported = weKnoraClient.isSupportedFileType(normalizedFileName);
+        if (weKnoraSupported) {
+            knowledge.setWeKnoraParseStatus("pending");
+        } else {
+            knowledge.setWeKnoraParseStatus("unsupported");
+            log.info("关系人会话附件类型不被 WeKnora 支持，跳过 RAG 解析: {}", normalizedFileName);
         }
 
         save(knowledge);
@@ -1428,6 +1539,27 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             return null;
         }
         return normalized;
+    }
+
+    private void validateEmployee(Long employeeId) {
+        if (employeeId == null) {
+            return;
+        }
+        dataPermissionService.assertUserDataAccessByPermission("addressBook:detail", employeeId);
+        if (ObjectUtil.isNull(manageUserMapper.getUserId(employeeId))) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "员工不存在或无权限访问");
+        }
+    }
+
+    private void validateRelation(Long relationId) {
+        if (relationId == null) {
+            return;
+        }
+        Relation relation = relationMapper.selectById(relationId);
+        if (relation == null || Integer.valueOf(0).equals(relation.getStatus())
+                || !UserUtil.getUserId().equals(relation.getCreateUserId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在或无权限访问");
+        }
     }
 
     /**

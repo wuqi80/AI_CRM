@@ -149,6 +149,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         try {
             customFieldService.initializeSystemFields("customer");
             customFieldService.initializeSystemFields("contact");
+            customFieldService.initializeSystemFields("relation");
             initializeEnterpriseConfig(companyName);
 
             ManagerDept dept = new ManagerDept();

@@ -33,10 +33,28 @@ public class ChatSessionVO {
     @Schema(description = "关联客户Logo访问地址")
     private String customerLogoUrl;
 
+    @Schema(description = "关联员工ID")
+    private Long employeeId;
+
+    @Schema(description = "关联员工姓名")
+    private String employeeName;
+
+    @Schema(description = "关联员工头像访问地址")
+    private String employeeAvatarUrl;
+
+    @Schema(description = "关联关系人ID")
+    private Long relationId;
+
+    @Schema(description = "关联关系人姓名")
+    private String relationName;
+
+    @Schema(description = "关联关系人头像访问地址")
+    private String relationAvatarUrl;
+
     @Schema(description = "会话标题")
     private String title;
 
-    @Schema(description = "聊天应用编码: general/crm/knowledge")
+    @Schema(description = "聊天应用编码: general/crm/knowledge/address_book")
     private String appCode;
 
     @Schema(description = "Whether the session is pinned")

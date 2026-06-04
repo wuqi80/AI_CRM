@@ -45,12 +45,12 @@
           <p class="text-2xl md:text-3xl font-black text-slate-900">{{ deptMemberList.length }}</p>
         </div>
         <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">活跃账号</p>
-          <p class="text-2xl md:text-3xl font-black text-emerald-500">{{ deptMemberList.filter((member) => member.status === 1).length }}</p>
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">在职员工</p>
+          <p class="text-2xl md:text-3xl font-black text-emerald-500">{{ deptMemberList.filter((member) => normalizeEmployeeStatus(member.employeeStatus) === 'active').length }}</p>
         </div>
         <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">待激活</p>
-          <p class="text-2xl md:text-3xl font-black text-amber-500">{{ deptMemberList.filter((member) => member.status !== 1 && member.status !== 0).length }}</p>
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">停用员工</p>
+          <p class="text-2xl md:text-3xl font-black text-amber-500">{{ deptMemberList.filter((member) => normalizeEmployeeStatus(member.employeeStatus) === 'disabled').length }}</p>
         </div>
         <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
           <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">部门数量</p>
@@ -194,7 +194,18 @@
                 </template>
               </el-table-column>
 
-              <el-table-column label="状态" width="120" align="center">
+              <el-table-column label="员工状态" width="120" align="center">
+                <template #default="{ row }">
+                  <span
+                    class="px-2 py-1 rounded-full text-xs font-bold"
+                    :class="getEmployeeStatusClass(row)"
+                  >
+                    {{ getEmployeeStatusLabel(row) }}
+                  </span>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="账号状态" width="120" align="center">
                 <template #default="{ row }">
                   <span
                     class="px-2 py-1 rounded-full text-xs font-bold uppercase tracking-widest"
@@ -279,9 +290,9 @@
                       </div>
                       <span
                         class="shrink-0 px-2 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
-                        :class="row.status === 1 ? 'bg-emerald-50 text-emerald-600' : row.status === 0 ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'"
+                        :class="getEmployeeStatusClass(row)"
                       >
-                        {{ row.status === 1 ? '活跃' : row.status === 0 ? '禁用' : '未激活' }}
+                        {{ getEmployeeStatusLabel(row) }}
                       </span>
                     </div>
 
@@ -293,6 +304,10 @@
                       <div class="min-w-0">
                         <p class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">mobile</p>
                         <p class="text-sm text-slate-700 truncate">{{ row.mobile || '-' }}</p>
+                      </div>
+                      <div class="min-w-0">
+                        <p class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">account</p>
+                        <p class="text-sm text-slate-700 truncate">{{ row.status === 1 ? '活跃' : row.status === 0 ? '禁用' : '未激活' }}</p>
                       </div>
                       <div class="min-w-0 col-span-2">
                         <p class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">roles</p>
@@ -438,6 +453,26 @@ function getMemberMobile(member: any) {
 
 function getMemberPost(member: any) {
   return String(member?.post || '').trim()
+}
+
+function normalizeEmployeeStatus(status?: string) {
+  const value = String(status || '').trim()
+  return value === 'resigned' || value === 'disabled' ? value : 'active'
+}
+
+function getEmployeeStatusLabel(member: any) {
+  if (member?.employeeStatusName) return member.employeeStatusName
+  const status = normalizeEmployeeStatus(member?.employeeStatus)
+  if (status === 'resigned') return '离职'
+  if (status === 'disabled') return '停用'
+  return '在职'
+}
+
+function getEmployeeStatusClass(member: any) {
+  const status = normalizeEmployeeStatus(member?.employeeStatus)
+  if (status === 'resigned') return 'bg-slate-100 text-slate-500'
+  if (status === 'disabled') return 'bg-amber-50 text-amber-600'
+  return 'bg-emerald-50 text-emerald-600'
 }
 </script>
 

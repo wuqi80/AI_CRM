@@ -315,6 +315,21 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
                         "wecomCustomer",
                         "tencentMeeting"
                 );
+                Set<String> dataScopeModules = Set.of(
+                        "customer",
+                        "contact",
+                        "task",
+                        "followup",
+                        "schedule",
+                        "knowledge",
+                        "relation",
+                        "wecomEmployeeSession",
+                        "wecomCustomerSession",
+                        "wecomGroupSession",
+                        "wecomCustomer",
+                        "tencentMeeting",
+                        "addressBook"
+                );
                 ap.setHasScopeOption(dataScopeModules.contains(module.getRealm()) && !realm.endsWith(":create"));
                 ManagerRoleMenu rm = roleMenuMap.get(action.getMenuId());
                 if (rm != null) {

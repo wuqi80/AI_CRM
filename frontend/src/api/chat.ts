@@ -8,6 +8,8 @@ export function createSession(data: {
   title?: string
   agentId?: string
   customerId?: string
+  employeeId?: string
+  relationId?: string
   appCode?: string
 }): Promise<string> {
   return post('/chat/session/create', data)

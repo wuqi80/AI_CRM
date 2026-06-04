@@ -40,6 +40,10 @@ public class AiContextHolder {
 
     private static final Map<Long, Long> SESSION_CUSTOMER_MAP = new ConcurrentHashMap<>();
 
+    private static final Map<Long, Long> SESSION_EMPLOYEE_MAP = new ConcurrentHashMap<>();
+
+    private static final Map<Long, Long> SESSION_RELATION_MAP = new ConcurrentHashMap<>();
+
     /**
      * 当前正在处理的会话ID
      * 通过 Micrometer context-propagation 实现跨线程传递
@@ -53,6 +57,10 @@ public class AiContextHolder {
     private static final ThreadLocal<Long> CURRENT_USER_ID = new ThreadLocal<>();
 
     private static final ThreadLocal<Long> CURRENT_CUSTOMER_ID = new ThreadLocal<>();
+
+    private static final ThreadLocal<Long> CURRENT_EMPLOYEE_ID = new ThreadLocal<>();
+
+    private static final ThreadLocal<Long> CURRENT_RELATION_ID = new ThreadLocal<>();
 
     /**
      * 设置会话上下文
@@ -78,6 +86,15 @@ public class AiContextHolder {
     }
 
     public static void setContext(Long sessionId, Long userId, Long tenantId, Long customerId) {
+        setContext(sessionId, userId, tenantId, customerId, null);
+    }
+
+    public static void setContext(Long sessionId, Long userId, Long tenantId, Long customerId, Long employeeId) {
+        setContext(sessionId, userId, tenantId, customerId, employeeId, null);
+    }
+
+    public static void setContext(Long sessionId, Long userId, Long tenantId,
+                                  Long customerId, Long employeeId, Long relationId) {
         if (sessionId != null && userId != null) {
             // 存储到 Map 中（线程安全，全局可访问）
             SESSION_USER_MAP.put(sessionId, userId);
@@ -96,8 +113,22 @@ public class AiContextHolder {
                 SESSION_CUSTOMER_MAP.remove(sessionId);
                 CURRENT_CUSTOMER_ID.remove();
             }
-            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, 线程={}",
-                sessionId, userId, tenantId, customerId, Thread.currentThread().getName());
+            if (employeeId != null) {
+                SESSION_EMPLOYEE_MAP.put(sessionId, employeeId);
+                CURRENT_EMPLOYEE_ID.set(employeeId);
+            } else {
+                SESSION_EMPLOYEE_MAP.remove(sessionId);
+                CURRENT_EMPLOYEE_ID.remove();
+            }
+            if (relationId != null) {
+                SESSION_RELATION_MAP.put(sessionId, relationId);
+                CURRENT_RELATION_ID.set(relationId);
+            } else {
+                SESSION_RELATION_MAP.remove(sessionId);
+                CURRENT_RELATION_ID.remove();
+            }
+            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}, 线程={}",
+                sessionId, userId, tenantId, customerId, employeeId, relationId, Thread.currentThread().getName());
         }
     }
 
@@ -108,6 +139,8 @@ public class AiContextHolder {
     public static void bindThreadContext(Long userId, Long tenantId) {
         CURRENT_SESSION_ID.remove();
         CURRENT_CUSTOMER_ID.remove();
+        CURRENT_EMPLOYEE_ID.remove();
+        CURRENT_RELATION_ID.remove();
         if (userId == null) {
             CURRENT_USER_ID.remove();
         } else {
@@ -156,7 +189,20 @@ public class AiContextHolder {
         } else {
             CURRENT_CUSTOMER_ID.remove();
         }
-        log.trace("恢复 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}", sessionId, userId, tenantId, customerId);
+        Long employeeId = SESSION_EMPLOYEE_MAP.get(sessionId);
+        if (employeeId != null) {
+            CURRENT_EMPLOYEE_ID.set(employeeId);
+        } else {
+            CURRENT_EMPLOYEE_ID.remove();
+        }
+        Long relationId = SESSION_RELATION_MAP.get(sessionId);
+        if (relationId != null) {
+            CURRENT_RELATION_ID.set(relationId);
+        } else {
+            CURRENT_RELATION_ID.remove();
+        }
+        log.trace("恢复 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}",
+            sessionId, userId, tenantId, customerId, employeeId, relationId);
     }
 
     /**
@@ -199,6 +245,28 @@ public class AiContextHolder {
         return CURRENT_CUSTOMER_ID.get();
     }
 
+    public static Long getCurrentEmployeeId() {
+        Long sessionId = CURRENT_SESSION_ID.get();
+        if (sessionId != null) {
+            Long employeeId = SESSION_EMPLOYEE_MAP.get(sessionId);
+            if (employeeId != null) {
+                return employeeId;
+            }
+        }
+        return CURRENT_EMPLOYEE_ID.get();
+    }
+
+    public static Long getCurrentRelationId() {
+        Long sessionId = CURRENT_SESSION_ID.get();
+        if (sessionId != null) {
+            Long relationId = SESSION_RELATION_MAP.get(sessionId);
+            if (relationId != null) {
+                return relationId;
+            }
+        }
+        return CURRENT_RELATION_ID.get();
+    }
+
     /**
      * 获取会话对应的用户ID（从全局 Map 中）
      *
@@ -221,6 +289,8 @@ public class AiContextHolder {
         CURRENT_SESSION_ID.remove();
         CURRENT_USER_ID.remove();
         CURRENT_CUSTOMER_ID.remove();
+        CURRENT_EMPLOYEE_ID.remove();
+        CURRENT_RELATION_ID.remove();
     }
 
     /**
@@ -231,6 +301,8 @@ public class AiContextHolder {
         CURRENT_SESSION_ID.remove();
         CURRENT_USER_ID.remove();
         CURRENT_CUSTOMER_ID.remove();
+        CURRENT_EMPLOYEE_ID.remove();
+        CURRENT_RELATION_ID.remove();
         TenantContextHolder.clear();
     }
 
@@ -245,6 +317,8 @@ public class AiContextHolder {
             SESSION_USER_MAP.remove(sessionId);
             SESSION_TENANT_MAP.remove(sessionId);
             SESSION_CUSTOMER_MAP.remove(sessionId);
+            SESSION_EMPLOYEE_MAP.remove(sessionId);
+            SESSION_RELATION_MAP.remove(sessionId);
             log.trace("移除会话: sessionId={}", sessionId);
         }
     }
