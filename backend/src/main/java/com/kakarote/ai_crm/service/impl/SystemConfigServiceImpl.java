@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.ai.AiMode;
-import com.kakarote.ai_crm.ai.AiModelSource;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.provider.AiProviderDescriptor;
@@ -82,9 +81,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Autowired
     private ICrmTenantService tenantService;
-
-    @Autowired
-    private AiQuotaService aiQuotaService;
 
     @Autowired
     private AiBillingConfigService aiBillingConfigService;
@@ -336,15 +332,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         result.setProvider(descriptor.getCode());
 
         try {
-            String quotaFailureMessage = aiQuotaService.resolveQuotaFailureMessage(
-                UserUtil.getTenantId(), "system_ai_test", 32, null, AiModelSource.CUSTOM);
-            if (quotaFailureMessage != null) {
-                result.setSuccess(false);
-                result.setMessage(quotaFailureMessage);
-                result.setResponseTime(System.currentTimeMillis() - startTime);
-                return result;
-            }
-
+            // 连接测试仅验证配置可用性，不预检也不扣减 AI 积分
             AiModelCapabilities capabilities = validateAiConfig(descriptor, configBO);
 
             ChatClient testClient = chatClientProvider().createTestChatClient(
@@ -364,17 +352,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
                     .chatResponse();
 
             String response = chatResponse.getResult().getOutput().getText();
-            aiQuotaService.consumeResolvedTokens(
-                UserUtil.getTenantId(),
-                "system_ai_test",
-                aiQuotaService.resolveTokenUsage(chatResponse, null, null, "请只回复 OK", response),
-                null,
-                AiModelSource.CUSTOM,
-                descriptor.getCode(),
-                configBO.getModel(),
-                null,
-                null
-            );
 
             result.setSuccess(true);
             result.setMessage(response);
