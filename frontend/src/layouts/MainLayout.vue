@@ -299,15 +299,6 @@
                   <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="project.name">
                     {{ project.name }}
                   </span>
-                  <button
-                    type="button"
-                    class="relative flex size-6 shrink-0 items-center justify-center rounded-md text-[#8f8f8f] opacity-0 transition-all hover:text-[#0d0d0d] group-hover/project-row:opacity-100"
-                    aria-label="在项目中开始对话"
-                    title="在项目中开始对话"
-                    @click.stop="handleStartProjectConversation(project.projectId)"
-                  >
-                    <WkIcon name="new-chat" :size="18" class="shrink-0" />
-                  </button>
                 </div>
               </template>
             </div>
@@ -1163,14 +1154,6 @@
                     folder
                   </span>
                   <span class="block min-w-0 flex-1 truncate text-[1rem] leading-6">{{ project.name }}</span>
-                  <button
-                    type="button"
-                    class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f]"
-                    aria-label="在项目中开始对话"
-                    @click.stop="handleMobileStartProjectConversation(project.projectId)"
-                  >
-                    <span class="material-symbols-outlined text-[17px] leading-none">chat_bubble</span>
-                  </button>
                 </div>
               </template>
             </div>
@@ -1933,6 +1916,7 @@ const SIDEBAR_STORAGE_KEYS = {
   primaryCollapsed: 'wk_ai_crm:main_layout:primary_sidebar_collapsed:v1',
   recentChatExpanded: 'wk_ai_crm:main_layout:recent_chat_sessions_expanded:v1',
   sidebarProjectsExpanded: 'wk_ai_crm:main_layout:sidebar_projects_expanded:v1',
+  sidebarProjectCache: 'wk_ai_crm:main_layout:sidebar_project_cache:v1',
   sidebarCustomersExpanded: 'wk_ai_crm:main_layout:sidebar_customers_expanded:v1',
   sidebarAddressBookExpanded: 'wk_ai_crm:main_layout:sidebar_address_book_expanded:v1',
   sidebarRelationsExpanded: 'wk_ai_crm:main_layout:sidebar_relations_expanded:v1'
@@ -2113,6 +2097,40 @@ async function saveSidebarModuleOrder() {
   } finally {
     sidebarSavingModuleOrder.value = false
     sidebarDraggingModuleKey.value = null
+  }
+}
+
+function normalizeSidebarProjectItem(value: unknown): SidebarProjectItem | null {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Partial<Record<'projectId' | 'name', unknown>>
+  const projectId = typeof record.projectId === 'string' ? record.projectId : String(record.projectId || '')
+  const name = typeof record.name === 'string' ? record.name : String(record.name || '')
+  if (!projectId || !name) return null
+  return { projectId, name }
+}
+
+function readStoredSidebarProjects(): SidebarProjectItem[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_STORAGE_KEYS.sidebarProjectCache)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map(normalizeSidebarProjectItem)
+      .filter((project): project is SidebarProjectItem => Boolean(project))
+      .slice(0, 12)
+  } catch {
+    return []
+  }
+}
+
+function writeStoredSidebarProjects(projects: SidebarProjectItem[]) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEYS.sidebarProjectCache, JSON.stringify(projects.slice(0, 12)))
+  } catch {
+    // Ignore storage failures.
   }
 }
 
@@ -2482,6 +2500,8 @@ type MobileMainMenuDragPayload = {
   open?: boolean
 }
 
+type SidebarProjectItem = Pick<ProjectEntity, 'projectId' | 'name'>
+
 function refreshSidebarCustomersFromEvent(payload?: SidebarRefreshPayload) {
   void fetchSidebarCustomers({ reset: true, preserveScroll: payload?.preserveScroll !== false })
 }
@@ -2548,7 +2568,18 @@ function handleChatComposerNarrowChange(payload?: ChatComposerNarrowPayload) {
 }
 
 const showSidebarProjects = computed(() => userStore.hasPermission('task'))
-const sidebarProjects = computed(() => projectStore.accessibleProjectSummaries.slice(0, 12))
+const sidebarProjectCache = ref<SidebarProjectItem[]>(readStoredSidebarProjects())
+const liveSidebarProjects = computed<SidebarProjectItem[]>(() =>
+  projectStore.accessibleProjectSummaries
+    .slice(0, 12)
+    .map(project => ({
+      projectId: project.projectId,
+      name: project.name
+    }))
+)
+const sidebarProjects = computed<SidebarProjectItem[]>(() =>
+  liveSidebarProjects.value.length > 0 ? liveSidebarProjects.value : sidebarProjectCache.value
+)
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
 const showSidebarAddressBook = computed(() => true)
 const showSidebarRelations = computed(() => true)
@@ -2622,6 +2653,7 @@ const allMainNavItems: MainNavItem[] = [
   { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer:view', action: 'customerSearch' },
   { key: 'task', icon: 'task-1', label: '项目', route: '/project', permission: 'task' },
   { key: 'calendar', icon: 'event', label: '日程', route: '/calendar', permission: 'schedule' },
+  { key: 'work-task', icon: 'task-1', label: '任务', route: '/task', permission: 'task:view' },
   { key: 'mail', icon: 'event', materialIcon: 'mail', label: '邮箱', route: '/mail', permission: 'mail:view' },
   { key: 'wecom', icon: 'event', materialIcon: 'forum', label: '企业微信', route: '/scrm', permission: 'wecomCustomerSession:view' },
   { key: 'tencent-meetings', icon: 'event', materialIcon: 'video_camera_front', label: '腾讯会议', route: '/tencent-meetings', permission: 'tencentMeeting:view' },
@@ -2850,6 +2882,16 @@ watch(recentChatSessionsExpanded, expanded => {
 watch(sidebarProjectsExpanded, expanded => {
   writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarProjectsExpanded, expanded)
 })
+
+watch(
+  () => [projectStore.initialized, projectStore.loading, liveSidebarProjects.value] as const,
+  ([initialized, loading, projects]) => {
+    if (!initialized || loading) return
+    sidebarProjectCache.value = projects
+    writeStoredSidebarProjects(projects)
+  },
+  { deep: true, immediate: true }
+)
 
 watch(sidebarCustomersExpanded, expanded => {
   writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, expanded)
