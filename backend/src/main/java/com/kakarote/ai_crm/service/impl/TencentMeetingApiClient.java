@@ -100,6 +100,22 @@ public class TencentMeetingApiClient implements TencentMeetingApiGateway {
     }
 
     @Override
+    public List<JSONObject> getMeetingParticipantsHistory(TencentMeetingOAuthCredential credential, String meetingId, String subMeetingId) {
+        if (StrUtil.isBlank(meetingId) || StrUtil.isBlank(credential.openId())) {
+            return List.of();
+        }
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/v1/meetings/" + meetingId + "/participants/history")
+                .queryParam("userid", credential.openId())
+                .queryParam("page_size", 50)
+                .queryParam("page", 1);
+        if (StrUtil.isNotBlank(subMeetingId)) {
+            builder.queryParam("sub_meeting_id", subMeetingId);
+        }
+        JSONObject response = get(credential, builder.build().toUriString(), false);
+        return firstArray(response, "participants", "participant_list", "users");
+    }
+
+    @Override
     public JSONObject getMeetingDetail(TencentMeetingOAuthCredential credential, String meetingId) {
         if (StrUtil.isBlank(meetingId) || StrUtil.isBlank(credential.openId())) {
             return new JSONObject();

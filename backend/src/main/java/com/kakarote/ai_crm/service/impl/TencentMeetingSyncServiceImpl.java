@@ -239,6 +239,154 @@ public class TencentMeetingSyncServiceImpl {
         return null;
     }
 
+    /**
+     * 处理腾讯会议 webhook（meeting.end / meeting.canceled 等）：即时更新状态，并从回调载荷中
+     * 写入真实发起人与实际时长；会议结束时再调历史成员接口补全参会人。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void refreshMeetingFromWebhook(String eventName, JSONObject meetingInfo, TencentMeetingCorpConfig config) {
+        String meetingId = meetingInfo == null ? null
+                : firstText(meetingInfo, "meeting_id", "meetingId", "meeting_uuid");
+        log.info("Tencent Meeting webhook refresh requested: event={}, meetingId={}", eventName, meetingId);
+        if (StrUtil.isBlank(meetingId)) {
+            return;
+        }
+        TencentMeeting meeting = meetingMapper.selectOne(Wrappers.<TencentMeeting>lambdaQuery()
+                .eq(TencentMeeting::getMeetingId, meetingId)
+                .last("LIMIT 1"));
+        if (meeting == null) {
+            log.info("Tencent Meeting webhook refresh skipped, meeting not found: meetingId={}", meetingId);
+            return;
+        }
+        String targetStatus = statusForWebhookEvent(eventName);
+        if (targetStatus != null) {
+            meeting.setStatus(targetStatus);
+        }
+        applyWebhookCreator(meeting, meetingInfo);
+        applyWebhookTimes(meeting, meetingInfo);
+        meeting.setSyncedAt(new Date());
+        meetingMapper.updateById(meeting);
+        log.info("Tencent Meeting refreshed via webhook: meetingId={}, status={}", meetingId, meeting.getStatus());
+
+        if ("ended".equals(targetStatus)) {
+            refreshParticipantsFromHistory(config, meeting, meetingInfo);
+        }
+    }
+
+    private void applyWebhookCreator(TencentMeeting meeting, JSONObject meetingInfo) {
+        if (meetingInfo == null) {
+            return;
+        }
+        JSONObject creator = meetingInfo.getJSONObject("creator");
+        String creatorUserId = creator != null
+                ? firstText(creator, "userid", "user_id", "ms_open_id", "open_id")
+                : firstText(meetingInfo, "creator_userid", "creator_user_id");
+        String creatorName = creator != null
+                ? firstText(creator, "user_name", "username", "nick_name", "nickname", "name")
+                : firstText(meetingInfo, "creator_name", "creatorName");
+        if (StrUtil.isBlank(creatorUserId) && StrUtil.isBlank(creatorName)) {
+            return;
+        }
+        TencentMeetingUserMapping creatorMapping = null;
+        if (StrUtil.isNotBlank(creatorUserId)) {
+            meeting.setCreatorUserId(creatorUserId);
+            creatorMapping = findMappingByMeetingUserId(meeting.getAppId(), creatorUserId);
+            if (creatorMapping != null && creatorMapping.getCrmUserId() != null) {
+                meeting.setCrmCreatorUserId(creatorMapping.getCrmUserId());
+            }
+        }
+        String resolved = resolveDisplayName(creatorName, creatorUserId, creatorMapping);
+        if (StrUtil.isNotBlank(resolved)) {
+            meeting.setCreatorName(resolved);
+        }
+    }
+
+    private void applyWebhookTimes(TencentMeeting meeting, JSONObject meetingInfo) {
+        if (meetingInfo == null) {
+            return;
+        }
+        Date start = toDate(firstValue(meetingInfo, "media_start_time", "start_time"));
+        Date end = toDate(firstValue(meetingInfo, "media_end_time", "end_time"));
+        if (start != null) {
+            meeting.setStartTime(start);
+        }
+        if (end != null) {
+            meeting.setEndTime(end);
+        }
+        if (meeting.getStartTime() != null && meeting.getEndTime() != null
+                && !meeting.getEndTime().before(meeting.getStartTime())) {
+            meeting.setDurationSeconds(Math.max(0L,
+                    (meeting.getEndTime().getTime() - meeting.getStartTime().getTime()) / 1000L));
+        }
+    }
+
+    private void refreshParticipantsFromHistory(TencentMeetingCorpConfig config, TencentMeeting meeting, JSONObject meetingInfo) {
+        if (config == null) {
+            return;
+        }
+        try {
+            TencentMeetingUserMapping mapping = resolveCredentialMapping(config, meetingInfo);
+            if (mapping == null) {
+                log.info("Tencent Meeting webhook participant refresh skipped, no active account: meetingId={}", meeting.getMeetingId());
+                return;
+            }
+            TencentMeetingOAuthCredential credential = tokenProvider.credential(config, mapping);
+            String subMeetingId = meetingInfo == null ? null : firstText(meetingInfo, "sub_meeting_id", "subMeetingId");
+            List<JSONObject> participants = apiGateway.getMeetingParticipantsHistory(credential, meeting.getMeetingId(), subMeetingId);
+            if (participants.isEmpty()) {
+                // 历史成员接口为空时，退回实时成员接口（会议刚结束可能仍可取到）。
+                participants = apiGateway.getMeetingParticipants(credential, meeting.getMeetingId());
+            }
+            if (participants.isEmpty()) {
+                return;
+            }
+            participantMapper.delete(Wrappers.<TencentMeetingParticipant>lambdaQuery()
+                    .eq(TencentMeetingParticipant::getMeetingDbId, meeting.getId()));
+            List<TencentMeetingParticipant> saved = new ArrayList<>();
+            for (JSONObject rawParticipant : participants) {
+                saved.add(saveParticipant(config, meeting, rawParticipant));
+            }
+            applyParticipantSummary(meeting, saved);
+            log.info("Tencent Meeting participants refreshed via webhook: meetingId={}, count={}", meeting.getMeetingId(), saved.size());
+        } catch (Exception e) {
+            log.warn("Tencent Meeting webhook participant refresh failed: meetingId={}, error={}", meeting.getMeetingId(), e.getMessage());
+        }
+    }
+
+    private TencentMeetingUserMapping findMappingByMeetingUserId(String appId, String meetingUserId) {
+        if (StrUtil.isBlank(appId) || StrUtil.isBlank(meetingUserId)) {
+            return null;
+        }
+        return userMappingMapper.selectOne(Wrappers.<TencentMeetingUserMapping>lambdaQuery()
+                .eq(TencentMeetingUserMapping::getAppId, appId)
+                .eq(TencentMeetingUserMapping::getMeetingUserId, meetingUserId)
+                .last("LIMIT 1"));
+    }
+
+    private TencentMeetingUserMapping resolveCredentialMapping(TencentMeetingCorpConfig config, JSONObject meetingInfo) {
+        JSONObject creator = meetingInfo == null ? null : meetingInfo.getJSONObject("creator");
+        String creatorUserId = creator != null
+                ? firstText(creator, "userid", "user_id", "ms_open_id", "open_id")
+                : (meetingInfo == null ? null : firstText(meetingInfo, "creator_userid", "creator_user_id"));
+        if (StrUtil.isNotBlank(creatorUserId)) {
+            TencentMeetingUserMapping creatorMapping = userMappingMapper.selectOne(Wrappers.<TencentMeetingUserMapping>lambdaQuery()
+                    .eq(TencentMeetingUserMapping::getAppId, config.getAppId())
+                    .eq(TencentMeetingUserMapping::getMeetingUserId, creatorUserId)
+                    .eq(TencentMeetingUserMapping::getStatus, 1)
+                    .eq(TencentMeetingUserMapping::getAuthStatus, TencentMeetingOAuthTokenProvider.AUTH_STATUS_ACTIVE)
+                    .last("LIMIT 1"));
+            if (creatorMapping != null) {
+                return creatorMapping;
+            }
+        }
+        return userMappingMapper.selectOne(Wrappers.<TencentMeetingUserMapping>lambdaQuery()
+                .eq(TencentMeetingUserMapping::getAppId, config.getAppId())
+                .eq(TencentMeetingUserMapping::getStatus, 1)
+                .eq(TencentMeetingUserMapping::getAuthStatus, TencentMeetingOAuthTokenProvider.AUTH_STATUS_ACTIVE)
+                .orderByDesc(TencentMeetingUserMapping::getLastAuthTime)
+                .last("LIMIT 1"));
+    }
+
     public JSONObject createMeeting(TencentMeetingOAuthCredential credential, JSONObject requestBody) {
         return apiGateway.createMeeting(credential, requestBody);
     }
@@ -315,7 +463,9 @@ public class TencentMeetingSyncServiceImpl {
         Long explicitDuration = resolveDurationSeconds(raw);
         if (explicitDuration != null) {
             meeting.setDurationSeconds(explicitDuration);
-        } else if (!"ended".equals(meeting.getStatus()) && meeting.getStartTime() != null && meeting.getEndTime() != null) {
+        } else if (meeting.getStartTime() != null && meeting.getEndTime() != null
+                && !meeting.getEndTime().before(meeting.getStartTime())) {
+            // 起止时间兜底（含已结束会议）。若随后取到参会人进出场时间，applyParticipantSummary 会用实际时长覆盖。
             meeting.setDurationSeconds(Math.max(0L, (meeting.getEndTime().getTime() - meeting.getStartTime().getTime()) / 1000L));
         } else {
             meeting.setDurationSeconds(null);

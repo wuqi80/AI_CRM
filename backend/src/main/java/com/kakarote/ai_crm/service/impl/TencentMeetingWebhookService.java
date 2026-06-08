@@ -63,7 +63,7 @@ public class TencentMeetingWebhookService {
             TenantContextHolder.setTenantId(matchedConfig.getTenantId());
         }
         try {
-            return doHandleWebhook(decryptWebhookBodyIfNeeded(body, matchedConfig, encrypt));
+            return doHandleWebhook(decryptWebhookBodyIfNeeded(body, matchedConfig, encrypt), matchedConfig);
         } finally {
             if (previousTenantId != null) {
                 TenantContextHolder.setTenantId(previousTenantId);
@@ -87,7 +87,7 @@ public class TencentMeetingWebhookService {
         return decryptedCheckStr.getBytes(StandardCharsets.UTF_8);
     }
 
-    private boolean doHandleWebhook(String body) {
+    private boolean doHandleWebhook(String body, TencentMeetingCorpConfig config) {
         JSONObject root = JSONObject.parseObject(body);
         String traceId = root.getString("trace_id");
         String eventName = root.getString("event");
@@ -109,9 +109,10 @@ public class TencentMeetingWebhookService {
         eventMapper.insert(event);
 
         try {
-            String meetingId = extractMeetingId(root);
+            JSONObject meetingInfo = extractMeetingInfo(root);
+            String meetingId = meetingInfo == null ? null : meetingInfo.getString("meeting_id");
             if (StrUtil.isNotBlank(meetingId) && isRefreshEvent(eventName)) {
-                syncService.refreshMeetingByExternalId(eventName, meetingId);
+                syncService.refreshMeetingFromWebhook(eventName, meetingInfo, config);
             }
             event.setProcessStatus("success");
             eventMapper.updateById(event);
@@ -278,7 +279,7 @@ public class TencentMeetingWebhookService {
                 || "smart.transcripts".equals(eventName);
     }
 
-    private String extractMeetingId(JSONObject root) {
+    private JSONObject extractMeetingInfo(JSONObject root) {
         JSONArray payload = root.getJSONArray("payload");
         if (payload == null || payload.isEmpty()) {
             return null;
@@ -288,9 +289,6 @@ public class TencentMeetingWebhookService {
             return null;
         }
         JSONObject meetingInfo = first.getJSONObject("meeting_info");
-        if (meetingInfo != null) {
-            return meetingInfo.getString("meeting_id");
-        }
-        return first.getString("meeting_id");
+        return meetingInfo != null ? meetingInfo : first;
     }
 }

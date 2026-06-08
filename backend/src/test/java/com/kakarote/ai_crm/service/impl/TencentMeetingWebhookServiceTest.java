@@ -19,6 +19,8 @@ import java.util.Base64;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -46,7 +48,7 @@ class TencentMeetingWebhookServiceTest {
 
         assertThat(processed).isFalse();
         verify(eventMapper, never()).insert(any(TencentMeetingWebhookEvent.class));
-        verify(syncService, never()).refreshMeetingByExternalId(any(), any());
+        verify(syncService, never()).refreshMeetingFromWebhook(any(), any(), any());
     }
 
     @Test
@@ -76,7 +78,8 @@ class TencentMeetingWebhookServiceTest {
 
         assertThat(processed).isTrue();
         verify(eventMapper).insert(any(TencentMeetingWebhookEvent.class));
-        verify(syncService).refreshMeetingByExternalId("meeting.end", "m-2");
+        verify(syncService).refreshMeetingFromWebhook(eq("meeting.end"),
+                argThat(info -> info != null && "m-2".equals(info.getString("meeting_id"))), any());
     }
 
     @Test
@@ -105,7 +108,7 @@ class TencentMeetingWebhookServiceTest {
                 .hasMessageContaining("signature verification failed");
 
         verify(eventMapper, never()).insert(any(TencentMeetingWebhookEvent.class));
-        verify(syncService, never()).refreshMeetingByExternalId(any(), any());
+        verify(syncService, never()).refreshMeetingFromWebhook(any(), any(), any());
     }
 
     @Test
@@ -162,7 +165,8 @@ class TencentMeetingWebhookServiceTest {
 
         assertThat(processed).isTrue();
         verify(eventMapper).insert(any(TencentMeetingWebhookEvent.class));
-        verify(syncService).refreshMeetingByExternalId("meeting.end", "m-encrypted");
+        verify(syncService).refreshMeetingFromWebhook(eq("meeting.end"),
+                argThat(info -> info != null && "m-encrypted".equals(info.getString("meeting_id"))), any());
     }
 
     private static String encryptTencentMeetingPayload(String plainText) throws Exception {

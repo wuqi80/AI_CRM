@@ -12,6 +12,8 @@ public interface TencentMeetingApiGateway {
 
     List<JSONObject> getMeetingParticipants(TencentMeetingOAuthCredential credential, String meetingId);
 
+    List<JSONObject> getMeetingParticipantsHistory(TencentMeetingOAuthCredential credential, String meetingId, String subMeetingId);
+
     JSONObject getMeetingDetail(TencentMeetingOAuthCredential credential, String meetingId);
 
     List<JSONObject> listRecordings(TencentMeetingOAuthCredential credential, int syncDays);
