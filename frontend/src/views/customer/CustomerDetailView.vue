@@ -68,7 +68,7 @@
                         'bg-blue-100 text-blue-700': customer.level === 'B',
                         'bg-slate-100 text-slate-600': customer.level === 'C'
                       }"
-                    >{{ customer.level }}级客户</span>
+                    >{{ enumStore.levelLabel(customer.level) }}</span>
                   </div>
                   <div class="hidden md:flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm">
                     <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
@@ -1122,6 +1122,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useTaskStore } from '@/stores/task'
 import { useUserStore } from '@/stores/user'
+import { useEnumStore } from '@/stores/enums'
 import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, generateCustomerAiReport, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
 import { getCustomerWecomBindings } from '@/api/wecom'
@@ -1173,6 +1174,9 @@ const router = useRouter()
 const customerStore = useCustomerStore()
 const taskStore = useTaskStore()
 const userStore = useUserStore()
+const enumStore = useEnumStore()
+enumStore.ensureCustomerStage()
+enumStore.ensureCustomerLevel()
 const { isMobile: responsiveIsMobile } = useResponsive()
 
 const props = withDefaults(defineProps<{
@@ -2568,11 +2572,15 @@ async function handleDeleteFollowUp(followUpId: string) {
 }
 
 function getStageLabel(stage: string): string {
+  if (!stage) return stage
+  // 真相源：/enum/customerStage（回退内置短标签）
+  const label = enumStore.stageLabel(stage)
+  if (label && label !== stage) return label
   const labels: Record<string, string> = {
     lead: '线索', qualified: '已验证', proposal: '方案',
     negotiation: '谈判', closed: '成交', lost: '流失'
   }
-  return labels[stage] || stage
+  return labels[stage] || label || stage
 }
 
 function getStageIndex(stage: string): number {
@@ -2588,7 +2596,7 @@ function getStageIndex(stage: string): number {
 }
 
 const stageFlow = ['lead', 'qualified', 'proposal', 'negotiation', 'closed']
-const stageOptions = [
+const STAGE_OPTIONS_FALLBACK = [
   { value: 'lead', label: '线索' },
   { value: 'qualified', label: '资格审查' },
   { value: 'proposal', label: '方案报价' },
@@ -2596,13 +2604,19 @@ const stageOptions = [
   { value: 'closed', label: '已成交' },
   { value: 'lost', label: '已流失' }
 ]
+// 真相源：/enum/customerStage（未加载时回退内置）
+const stageOptions = computed(() =>
+  enumStore.customerStage.length
+    ? enumStore.customerStage.map(o => ({ value: o.value, label: o.label }))
+    : STAGE_OPTIONS_FALLBACK
+)
 const STEPPER_SEGMENT_WIDTH = 180
 const STEPPER_SEGMENT_HEIGHT = 32
 const STEPPER_CHEVRON_SIZE = 12
 const STEPPER_END_RADIUS = STEPPER_SEGMENT_HEIGHT / 2
 
 function getStageLabelFull(stage: string): string {
-  return stageOptions.find(s => s.value === stage)?.label || stage
+  return stageOptions.value.find(s => s.value === stage)?.label || stage
 }
 
 function getStepperClipPath(idx: number): string {

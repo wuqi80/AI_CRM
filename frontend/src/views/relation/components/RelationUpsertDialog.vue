@@ -60,7 +60,7 @@
             size="large"
           >
             <el-option
-              v-for="option in relationTypeOptions"
+              v-for="option in relationTypeChoices"
               :key="option.value"
               :label="option.label"
               :value="option.value"
@@ -178,6 +178,7 @@ import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 import { useResponsive } from '@/composables/useResponsive'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import { relationTypeOptions } from '@/views/relation/constants'
+import { useEnumStore } from '@/stores/enums'
 import type { RelationAddBO, RelationUpdateBO, RelationVO } from '@/types/relation'
 
 type RelationUpsertSavedPayload = {
@@ -198,6 +199,11 @@ const emit = defineEmits<{
 }>()
 
 const { isMobile } = useResponsive()
+const enumStore = useEnumStore()
+enumStore.ensureRelationType()
+const relationTypeChoices = computed(() =>
+  enumStore.relationType.length ? enumStore.relationType : relationTypeOptions
+)
 
 const submitting = ref(false)
 const dynamicFieldFormRef = ref<InstanceType<typeof DynamicFieldForm> | null>(null)

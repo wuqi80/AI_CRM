@@ -13,7 +13,9 @@ import com.kakarote.ai_crm.entity.BO.CustomerUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.CustomerListVO;
+import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.ICustomerService;
+import org.springframework.context.annotation.Lazy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -42,6 +44,10 @@ public class CustomerTools {
 
     @Autowired
     private AiToolPermissionSupport permissionSupport;
+
+    @Lazy
+    @Autowired
+    private ICustomFieldService customFieldService;
 
     /**
      * 创建客户。
@@ -666,14 +672,7 @@ public class CustomerTools {
         if (stage == null) {
             return "未知";
         }
-        return switch (stage.toLowerCase()) {
-            case "lead" -> "线索";
-            case "qualified" -> "已验证";
-            case "proposal" -> "方案阶段";
-            case "negotiation" -> "商务谈判";
-            case "closed" -> "已成交";
-            case "lost" -> "已流失";
-            default -> stage;
-        };
+        // 真相源：crm_custom_field.options
+        return customFieldService.resolveOptionLabel("customer", "stage", stage);
     }
 }

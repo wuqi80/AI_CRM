@@ -122,12 +122,12 @@
                   <el-switch v-model="fieldForm.defaultValue" />
                 </el-form-item>
 
-                <el-form-item v-if="['select', 'multiselect'].includes(fieldForm.fieldType) && !isSystemField" label="选项配置">
+                <el-form-item v-if="['select', 'multiselect'].includes(fieldForm.fieldType)" label="选项配置">
                   <div class="w-full space-y-2">
                     <div v-for="(option, index) in fieldForm.options" :key="index" class="flex gap-2">
-                      <el-input v-model="option.value" placeholder="值" class="w-1/3 min-w-0 wk-crm-el-field-input" size="large" />
+                      <el-input v-model="option.value" placeholder="值" :disabled="isOptionValueLocked(option)" class="w-1/3 min-w-0 wk-crm-el-field-input" size="large" />
                       <el-input v-model="option.label" placeholder="显示文字" class="min-w-0 flex-1 wk-crm-el-field-input" size="large" />
-                      <el-button text type="danger" @click="fieldForm.options.splice(index, 1)">
+                      <el-button v-if="!isOptionValueLocked(option)" text type="danger" @click="fieldForm.options.splice(index, 1)">
                         <el-icon><Delete /></el-icon>
                       </el-button>
                     </div>
@@ -137,6 +137,7 @@
                         <span>添加选项</span>
                       </span>
                     </el-button>
+                    <p v-if="isSystemField" class="text-xs text-slate-400">系统内置选项的“值”不可修改或删除，可改显示文字或新增选项</p>
                   </div>
                 </el-form-item>
 
@@ -164,7 +165,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import type { CustomField, FieldOption, FieldType } from '@/types/customField'
 
@@ -198,4 +199,23 @@ const dialogVisible = computed({
 })
 
 const isSystemField = computed(() => props.editingField?.fieldSource === 'system')
+
+// 系统字段：弹窗打开时已存在的选项值视为“内置值”，锁定不可改/删；仅可改标签或新增选项
+const lockedOptionValues = ref<Set<string>>(new Set())
+
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible && isSystemField.value) {
+      lockedOptionValues.value = new Set((props.editingField?.options ?? []).map((o) => o.value))
+    } else if (!visible) {
+      lockedOptionValues.value = new Set()
+    }
+  },
+  { immediate: true }
+)
+
+function isOptionValueLocked(option: FieldOption): boolean {
+  return isSystemField.value && lockedOptionValues.value.has(option.value)
+}
 </script>

@@ -319,26 +319,15 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
         if (StrUtil.isBlank(relationType)) {
             return "其他";
         }
-        return switch (relationType) {
-            case "friend" -> "朋友";
-            case "family" -> "家人";
-            case "relative" -> "亲戚";
-            case "partner" -> "合作伙伴";
-            case SOURCE_CUSTOMER_CONTACT -> "客户联系人";
-            case "supplier" -> "供应商";
-            case "investor" -> "投资人";
-            case RELATION_TYPE_OTHER -> "其他";
-            default -> relationType;
-        };
+        // 真相源：crm_custom_field.options（relation/relation_type）
+        return customFieldService.resolveOptionLabel("relation", "relation_type", relationType);
     }
 
     private String resolveSourceName(String source) {
-        if (SOURCE_CUSTOMER_CONTACT.equals(source)) {
-            return "客户联系人";
+        if (StrUtil.isBlank(source)) {
+            return source;
         }
-        if (SOURCE_MANUAL.equals(source)) {
-            return "手动录入";
-        }
-        return source;
+        // 真相源：crm_custom_field.options（relation/source）
+        return customFieldService.resolveOptionLabel("relation", "source", source);
     }
 }

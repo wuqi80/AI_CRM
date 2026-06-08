@@ -7,7 +7,7 @@
       :style="{ height: `${bodyHeight}px`, minHeight: '200px' }"
     >
       <div
-        v-for="col in KANBAN_STAGE_COLUMNS"
+        v-for="col in stageColumns"
         :key="col.id"
         class="flex h-full min-h-0 min-w-[280px] max-w-[320px] shrink-0 flex-col overflow-hidden rounded-xl p-2 transition-[box-shadow,background-color] duration-150"
         :class="[col.laneClass, columnDropHighlightClass(col)]"
@@ -163,18 +163,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import type { CustomerListVO, CustomerStage } from '@/types/customer'
 import { getCustomerAiStatusMeta } from '@/utils/customerAi'
 import {
   KANBAN_STAGE_COLUMNS,
+  buildStageColumns,
   customersInStage,
   formatCardQuotation,
   formatLastContactDate,
   lastFollowUpHighlightClass,
   normalizeListStage,
-  type KanbanDropTone
+  type KanbanDropTone,
+  type StageColumn
 } from '@/utils/customerListViewUi'
+import { useEnumStore } from '@/stores/enums'
 
 const props = defineProps<{
   customers: CustomerListVO[]
@@ -189,6 +192,12 @@ const emit = defineEmits<{
   createInStage: [stage: CustomerStage]
   stageDropped: [payload: { customerId: string; stage: CustomerStage }]
 }>()
+
+const enumStore = useEnumStore()
+enumStore.ensureCustomerStage()
+const stageColumns = computed<StageColumn[]>(() =>
+  enumStore.customerStage.length ? buildStageColumns(enumStore.customerStage) : KANBAN_STAGE_COLUMNS
+)
 
 const draggingCustomerId = ref<string | null>(null)
 const dropTargetStage = shallowRef<CustomerStage | null>(null)
@@ -228,7 +237,7 @@ function cardHotClass(row: CustomerListVO) {
   return ''
 }
 
-function dropZoneIcon(col: (typeof KANBAN_STAGE_COLUMNS)[number]) {
+function dropZoneIcon(col: StageColumn) {
   if (col.dropTone === 'success') return 'check_circle'
   if (col.dropTone === 'danger') return 'cancel'
   return 'move_to_inbox'
@@ -238,14 +247,14 @@ function isDropTarget(stage: CustomerStage) {
   return props.canChangeStage && dropTargetStage.value === stage
 }
 
-function columnDropHighlightClass(col: (typeof KANBAN_STAGE_COLUMNS)[number]) {
+function columnDropHighlightClass(col: StageColumn) {
   if (!isDropTarget(col.id)) return ''
   if (col.dropTone === 'success') return 'ring-2 ring-inset ring-green-400/45 shadow-[inset_0_0_0_1px_rgba(74,222,128,0.35)]'
   if (col.dropTone === 'danger') return 'ring-2 ring-inset ring-red-400/45 shadow-[inset_0_0_0_1px_rgba(248,113,113,0.35)]'
   return 'ring-2 ring-inset ring-primary/30 shadow-[inset_0_0_0_1px_rgba(19,127,236,0.25)]'
 }
 
-function dropZoneClassList(col: (typeof KANBAN_STAGE_COLUMNS)[number]) {
+function dropZoneClassList(col: StageColumn) {
   const active = isDropTarget(col.id)
   const base: Record<KanbanDropTone, string> = {
     neutral: active
@@ -257,7 +266,7 @@ function dropZoneClassList(col: (typeof KANBAN_STAGE_COLUMNS)[number]) {
   return base[col.dropTone]
 }
 
-function dropZoneIconClass(col: (typeof KANBAN_STAGE_COLUMNS)[number]) {
+function dropZoneIconClass(col: StageColumn) {
   const active = isDropTarget(col.id)
   if (col.dropTone === 'success') {
     return active ? 'text-green-600' : 'text-green-200 group-hover:text-green-400'
@@ -268,7 +277,7 @@ function dropZoneIconClass(col: (typeof KANBAN_STAGE_COLUMNS)[number]) {
   return active ? 'text-primary' : 'text-slate-300'
 }
 
-function dropZoneHintClass(col: (typeof KANBAN_STAGE_COLUMNS)[number]) {
+function dropZoneHintClass(col: StageColumn) {
   const active = isDropTarget(col.id)
   if (col.dropTone === 'success') {
     return active ? 'text-green-700' : 'text-green-200'

@@ -1884,6 +1884,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
 import { useUserStore } from '@/stores/user'
+import { useEnumStore } from '@/stores/enums'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { shouldCloseMobileDrawerFromSwipe, type SwipePoint } from '@/utils/mobileDrawerSwipe'
@@ -1906,6 +1907,8 @@ const userStore = useUserStore()
 const enterpriseStore = useEnterpriseStore()
 const chatStore = useChatStore()
 const projectStore = useProjectStore()
+const enumStore = useEnumStore()
+enumStore.ensureCustomerStage()
 const { isMobile } = useResponsive()
 const { isOpen: chatDrawerOpen } = useChatDrawer()
 const { isDark, toggleTheme } = useTheme()
@@ -3721,17 +3724,9 @@ async function handleSelectCustomerFromSearch(customer: CustomerListVO) {
 }
 
 function getCustomerSearchSubtitle(customer: CustomerListVO): string {
-  const stageLabels: Record<string, string> = {
-    lead: '线索',
-    qualified: '已验证',
-    proposal: '方案阶段',
-    negotiation: '谈判中',
-    closed: '已成交',
-    lost: '已流失',
-  }
   const parts = [
     customer.industry,
-    stageLabels[customer.stage],
+    enumStore.stageLabel(customer.stage),
     customer.ownerName ? `负责人 ${customer.ownerName}` : '',
   ].filter(Boolean)
   return parts.join(' · ') || '点击进入客户对话'

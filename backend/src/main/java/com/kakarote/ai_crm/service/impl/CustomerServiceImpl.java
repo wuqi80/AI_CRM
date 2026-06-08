@@ -1573,7 +1573,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             tags.add(aiStatus);
         }
         if (StrUtil.isNotBlank(detail.getLevel())) {
-            tags.add(getLevelDisplayLabel(detail.getLevel()) + "客户");
+            tags.add(getLevelDisplayLabel(detail.getLevel()));
         }
         if (StrUtil.isNotBlank(detail.getStage())) {
             tags.add(getStageLabel(detail.getStage()));
@@ -2205,12 +2205,32 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
      * 获取LevelDisplayLabel。
      */
     private String getLevelDisplayLabel(String level) {
-        return switch (StrUtil.blankToDefault(level, "")) {
-            case "A" -> "A级";
-            case "B" -> "B级";
-            case "C" -> "C级";
-            default -> StrUtil.blankToDefault(level, "未评级");
-        };
+        if (StrUtil.isBlank(level)) {
+            return "未评级";
+        }
+        // 真相源：crm_custom_field.options（找不到时原样返回该值）
+        return customFieldService.resolveOptionLabel("customer", "level", level);
+    }
+
+    /**
+     * 导入解析：把单元格内容（可能是选项 code 或中文 label）解析为 customer 选项字段的值。
+     * 真相源 crm_custom_field.options，支持用户新增选项；找不到返回 null。
+     */
+    private String resolveImportOptionValue(String fieldName, String input) {
+        if (StrUtil.isBlank(input)) {
+            return null;
+        }
+        String trimmed = input.trim();
+        for (FieldOption option : customFieldService.getFieldOptions("customer", fieldName)) {
+            if (option == null) {
+                continue;
+            }
+            if (StrUtil.equalsIgnoreCase(option.getValue(), trimmed)
+                    || StrUtil.equals(option.getLabel(), trimmed)) {
+                return option.getValue();
+            }
+        }
+        return null;
     }
 
     /**
@@ -3035,13 +3055,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 bo.setContactEmail(getCellStr(rowData, colContactEmail));
                 bo.setContactWechat(getCellStr(rowData, colContactWechat));
 
-                // 阶段：中文标签 → 英文code
+                // 阶段：支持中文标签或英文code（真相源 crm_custom_field.options，含用户新增）
                 String stageStr = getCellStr(rowData, colStage);
                 if (StrUtil.isNotEmpty(stageStr)) {
-                    String stageCode = LABEL_STAGE_MAP.get(stageStr);
-                    if (stageCode == null && STAGE_LABEL_MAP.containsKey(stageStr)) {
-                        stageCode = stageStr; // 允许直接写英文code
-                    }
+                    String stageCode = resolveImportOptionValue("stage", stageStr);
                     if (stageCode != null) {
                         bo.setStage(stageCode);
                     } else {
@@ -3049,14 +3066,14 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                     }
                 }
 
-                // 级别
+                // 级别：支持中文标签或code（真相源 crm_custom_field.options，含用户新增）
                 String levelStr = getCellStr(rowData, colLevel);
                 if (StrUtil.isNotEmpty(levelStr)) {
-                    String upperLevel = levelStr.toUpperCase();
-                    if (VALID_LEVELS.contains(upperLevel)) {
-                        bo.setLevel(upperLevel);
+                    String levelCode = resolveImportOptionValue("level", levelStr);
+                    if (levelCode != null) {
+                        bo.setLevel(levelCode);
                     } else {
-                        rowErrors.add("客户级别「" + levelStr + "」无效，可选 A/B/C");
+                        rowErrors.add("客户级别「" + levelStr + "」无效");
                     }
                 }
 
@@ -3453,17 +3470,18 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             ? Collections.emptyMap()
             : customFieldService.getBatchCustomFieldValues("customer", customerIds);
 
-        int refreshed = 0;
+        List<Customer> updates = new ArrayList<>(customers.size());
         for (Customer customer : customers) {
             Map<String, Object> customFields = customFieldMap.getOrDefault(customer.getCustomerId(), Collections.emptyMap());
             String searchText = buildCustomerSearchText(customer, searchableFields, customFields);
-            lambdaUpdate()
-                .eq(Customer::getCustomerId, customer.getCustomerId())
-                .set(Customer::getSearchText, searchText)
-                .update();
-            refreshed++;
+            Customer update = new Customer();
+            update.setCustomerId(customer.getCustomerId());
+            update.setSearchText(searchText);
+            updates.add(update);
         }
-        return refreshed;
+        // 批量更新，避免逐行 UPDATE 刷屏（全局更新策略 NOT_NULL，仅写入 search_text 列）
+        updateBatchById(updates);
+        return updates.size();
     }
 
     /**
@@ -4624,7 +4642,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (StrUtil.isBlank(stage)) {
             return "未知";
         }
-        return STAGE_LABEL_MAP.getOrDefault(stage, stage);
+        // 真相源：crm_custom_field.options（无租户/无数据时回退内置标签表）
+        String label = customFieldService.resolveOptionLabel("customer", "stage", stage);
+        return StrUtil.isNotBlank(label) ? label : STAGE_LABEL_MAP.getOrDefault(stage, stage);
     }
 
     /**

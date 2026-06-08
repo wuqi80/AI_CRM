@@ -24,7 +24,7 @@
           @change="loadRelations"
         >
           <option value="">全部类型</option>
-          <option v-for="option in relationTypeOptions" :key="option.value" :value="option.value">
+          <option v-for="option in relationTypeChoices" :key="option.value" :value="option.value">
             {{ option.label }}
           </option>
         </select>
@@ -275,6 +275,7 @@ import AiDialogIcon from '@/components/common/AiDialogIcon.vue'
 import RelationUpsertDialog from '@/views/relation/components/RelationUpsertDialog.vue'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
+import { useEnumStore } from '@/stores/enums'
 import { useResponsive } from '@/composables/useResponsive'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import { appEvents, APP_EVENT } from '@/utils/events'
@@ -285,6 +286,11 @@ const router = useRouter()
 const route = useRoute()
 const chatStore = useChatStore()
 const userStore = useUserStore()
+const enumStore = useEnumStore()
+enumStore.ensureRelationType()
+const relationTypeChoices = computed(() =>
+  enumStore.relationType.length ? enumStore.relationType : relationTypeOptions
+)
 const { isMobile } = useResponsive()
 
 const relations = ref<RelationVO[]>([])

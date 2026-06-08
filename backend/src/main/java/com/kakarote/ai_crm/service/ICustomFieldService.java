@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.entity.BO.CustomFieldAddBO;
 import com.kakarote.ai_crm.entity.BO.CustomFieldUpdateBO;
+import com.kakarote.ai_crm.entity.BO.FieldOption;
 import com.kakarote.ai_crm.entity.BO.FieldSortBO;
 import com.kakarote.ai_crm.entity.PO.CustomField;
 import com.kakarote.ai_crm.entity.VO.CustomFieldVO;
@@ -146,4 +147,24 @@ public interface ICustomFieldService extends IService<CustomField> {
      * @return entityId -> (fieldName -> value)
      */
     Map<Long, Map<String, Object>> getBatchCustomFieldValues(String entityType, List<Long> entityIds);
+
+    /**
+     * 获取某个字段当前租户的选项列表（单一真相源：crm_custom_field.options，带缓存）。
+     * 无租户上下文或无数据时回退到系统内置定义。
+     *
+     * @param entityType 实体类型
+     * @param fieldName  字段标识（如 stage / level / relation_type）
+     * @return 选项列表，永不为 null
+     */
+    List<FieldOption> getFieldOptions(String entityType, String fieldName);
+
+    /**
+     * 把某个选项字段的"值"解析为"显示标签"。找不到时原样返回该值。
+     *
+     * @param entityType 实体类型
+     * @param fieldName  字段标识
+     * @param value      选项值
+     * @return 显示标签
+     */
+    String resolveOptionLabel(String entityType, String fieldName, String value);
 }

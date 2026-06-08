@@ -26,8 +26,9 @@ export interface Customer {
   updateTime: string
 }
 
-export type CustomerStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed' | 'lost'
-export type CustomerLevel = 'A' | 'B' | 'C'
+// 内置取值用于自动补全；(string & {}) 允许用户在系统设置里新增的自定义取值
+export type CustomerStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed' | 'lost' | (string & {})
+export type CustomerLevel = 'A' | 'B' | 'C' | (string & {})
 
 export interface CustomerListVO extends Customer {
   contactCount: number

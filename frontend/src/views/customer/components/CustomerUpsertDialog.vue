@@ -142,20 +142,23 @@
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">客户级别</label>
                       <el-select v-model="formData.level" class="w-full wk-crm-el-field-select" size="large">
-                        <el-option label="A级客户" value="A" />
-                        <el-option label="B级客户" value="B" />
-                        <el-option label="C级客户" value="C" />
+                        <el-option
+                          v-for="opt in enumStore.customerLevel"
+                          :key="opt.value"
+                          :label="opt.label"
+                          :value="opt.value"
+                        />
                       </el-select>
                     </div>
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">商机阶段</label>
                       <el-select v-model="formData.stage" class="w-full wk-crm-el-field-select" size="large">
-                        <el-option label="线索" value="lead" />
-                        <el-option label="资格审查" value="qualified" />
-                        <el-option label="方案报价" value="proposal" />
-                        <el-option label="谈判中" value="negotiation" />
-                        <el-option label="已成交" value="closed" />
-                        <el-option label="已流失" value="lost" />
+                        <el-option
+                          v-for="opt in enumStore.customerStage"
+                          :key="opt.value"
+                          :label="opt.label"
+                          :value="opt.value"
+                        />
                       </el-select>
                     </div>
                     <div class="space-y-1.5">
@@ -268,6 +271,7 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { useCustomerStore } from '@/stores/customer'
+import { useEnumStore } from '@/stores/enums'
 import { aiParseCustomer } from '@/api/customer'
 import type { CustomerAiParseVO } from '@/api/customer'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
@@ -281,8 +285,6 @@ import type { CustomField } from '@/types/customField'
 
 type Mode = 'create' | 'edit'
 type CustomerLike = CustomerListVO | CustomerDetailVO | null
-
-const ALLOWED_STAGES: CustomerStage[] = ['lead', 'qualified', 'proposal', 'negotiation', 'closed', 'lost']
 
 const props = defineProps<{
   modelValue: boolean
@@ -299,6 +301,9 @@ const emit = defineEmits<{
 
 const { isMobile } = useResponsive()
 const customerStore = useCustomerStore()
+const enumStore = useEnumStore()
+enumStore.ensureCustomerStage()
+enumStore.ensureCustomerLevel()
 
 const isEdit = computed(() => props.mode === 'edit')
 
@@ -487,7 +492,7 @@ function hydrateFromCustomer() {
 
 function applyCreateInitialStage() {
   const s = props.initialStage
-  if (!s || !ALLOWED_STAGES.includes(s)) return
+  if (!s) return
   formData.stage = s
   customerFieldValues.value = { ...customerFieldValues.value, stage: s }
 }

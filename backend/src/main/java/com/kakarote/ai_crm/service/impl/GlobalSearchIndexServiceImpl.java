@@ -691,7 +691,9 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
      * 获取阶段Label。
      */
     private String getStageLabel(String stage) {
-        return CustomerStageEnum.getNameByCode(stage);
+        // 真相源：crm_custom_field.options（回退内置枚举）
+        String label = customFieldService.resolveOptionLabel("customer", "stage", stage);
+        return StrUtil.isNotBlank(label) ? label : CustomerStageEnum.getNameByCode(stage);
     }
 
     /**
@@ -701,12 +703,8 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         if (StrUtil.isBlank(level)) {
             return null;
         }
-        return switch (level.toUpperCase(Locale.ROOT)) {
-            case "A" -> "A级客户";
-            case "B" -> "B级客户";
-            case "C" -> "C级客户";
-            default -> level;
-        };
+        // 真相源：crm_custom_field.options
+        return customFieldService.resolveOptionLabel("customer", "level", level);
     }
 
     /**

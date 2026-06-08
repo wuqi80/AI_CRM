@@ -2161,6 +2161,7 @@ import { useAgentStore } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
 import { useEnterpriseStore } from '@/stores/enterprise'
 import { useProjectStore } from '@/stores/project'
+import { useEnumStore } from '@/stores/enums'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
@@ -2243,6 +2244,8 @@ const agentStore = useAgentStore()
 const userStore = useUserStore()
 const enterpriseStore = useEnterpriseStore()
 const projectStore = useProjectStore()
+const enumStore = useEnumStore()
+enumStore.ensureCustomerStage()
 const { isMobile } = useResponsive()
 const {
   aiConfig,
@@ -2498,20 +2501,26 @@ const chatCustomerHeaderStyle = computed(() => (
     : undefined
 ))
 
-const CUSTOMER_STAGE_FLOW = [
+const CUSTOMER_STAGE_FLOW_FALLBACK = [
   { value: 'lead', label: '线索' },
   { value: 'qualified', label: '资格审查' },
   { value: 'proposal', label: '方案报价' },
   { value: 'negotiation', label: '谈判中' },
   { value: 'closed', label: '已成交' },
   { value: 'lost', label: '已流失' },
-] as const
+]
+// 真相源：/enum/customerStage（未加载时回退内置）
+const CUSTOMER_STAGE_FLOW = computed(() =>
+  enumStore.customerStage.length
+    ? enumStore.customerStage.map(o => ({ value: o.value, label: o.label }))
+    : CUSTOMER_STAGE_FLOW_FALLBACK
+)
 
 const selectedCustomerStageText = computed(() => {
   const c = selectedCustomer.value
   if (!c) return '--'
   if ('stageName' in c && c.stageName) return c.stageName
-  const stage = CUSTOMER_STAGE_FLOW.find(item => item.value === c.stage)
+  const stage = CUSTOMER_STAGE_FLOW.value.find(item => item.value === c.stage)
   return stage?.label || c.stage || '--'
 })
 const selectedCustomerStageButtonClass = computed(() => getCustomerStageButtonClass(selectedCustomer.value?.stage || 'lead'))

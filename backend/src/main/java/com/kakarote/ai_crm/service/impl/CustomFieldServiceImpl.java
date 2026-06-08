@@ -29,6 +29,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -53,6 +56,13 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
     @Autowired
     private CustomerServiceImpl customerService;
 
+    /** 选项真相源缓存：key = tenantId:entityType:fieldName，TTL 兜底跨实例一致性 */
+    private final Map<String, OptionsCacheEntry> optionsCache = new ConcurrentHashMap<>();
+    private static final long OPTIONS_CACHE_TTL_MS = 60_000L;
+
+    private record OptionsCacheEntry(long expireAt, List<FieldOption> options) {
+    }
+
     private static final Set<String> CUSTOMER_SEARCHABLE_TEXT_FIELD_TYPES = Set.of("text", "textarea", "select", "multiselect");
     private static final String FIELD_SOURCE_SYSTEM = "system";
     private static final String FIELD_SOURCE_CUSTOM = "custom";
@@ -69,7 +79,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                             option("closed", "已成交"),
                             option("lost", "已流失")
                     ), 30),
-                    systemField("level", "客户级别", "select", "level", "CHAR(1)", null, null, false, false, true, List.of(
+                    systemField("level", "客户级别", "select", "level", "VARCHAR(10)", null, null, false, false, true, List.of(
                             option("A", "A级客户"),
                             option("B", "B级客户"),
                             option("C", "C级客户")
@@ -163,6 +173,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         field.setSortOrder(bo.getSortOrder() != null ? bo.getSortOrder() : getNextSortOrder(bo.getEntityType()));
         field.setStatus(1);
         save(field);
+        evictOptionsCache(TenantContextHolder.getTenantId());
 
         return field.getFieldId();
     }
@@ -177,6 +188,9 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         if (ObjectUtil.isNull(field)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "字段不存在");
         }
+
+        // 记录修改前的"可搜索"状态，用于判断是否需要重建客户搜索文本
+        boolean wasSearchable = field.getIsSearchable() != null && field.getIsSearchable() == 1;
 
         // 只更新允许修改的字段
         if (StrUtil.isNotEmpty(bo.getFieldLabel())) {
@@ -200,7 +214,11 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         if (bo.getIsUnique() != null) {
             field.setIsUnique(bo.getIsUnique() ? 1 : 0);
         }
-        if (bo.getOptions() != null && !isSystemField(field)) {
+        if (bo.getOptions() != null) {
+            // 系统字段允许改标签 / 新增选项，但内置选项的值锁定（不可删除、不可改值），并校验长度与重复
+            if (isSystemField(field)) {
+                validateSystemFieldOptions(field, bo.getOptions());
+            }
             field.setOptions(JSON.toJSONString(bo.getOptions()));
         }
         if (bo.getValidation() != null && !isSystemField(field)) {
@@ -210,13 +228,15 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             field.setSortOrder(bo.getSortOrder());
         }
 
-        boolean needsRefresh = isCustomField(field) && shouldRefreshCustomerSearchText(
-                field.getEntityType(),
-                field.getFieldType(),
-                field.getIsSearchable() != null && field.getIsSearchable() == 1
-        ) && bo.getIsSearchable() != null;
+        // 仅当"可搜索"状态真正发生翻转时才重建客户搜索文本。
+        // 单纯新增/修改选项、标签等不会改变已存客户的字段值，无需全量刷新（否则会逐行 UPDATE 所有客户）。
+        boolean isSearchableNow = field.getIsSearchable() != null && field.getIsSearchable() == 1;
+        boolean needsRefresh = isCustomField(field)
+                && wasSearchable != isSearchableNow
+                && shouldRefreshCustomerSearchText(field.getEntityType(), field.getFieldType(), true);
 
         updateById(field);
+        evictOptionsCache(TenantContextHolder.getTenantId());
 
         if (needsRefresh) {
             customerService.refreshAllCustomerSearchText();
@@ -278,6 +298,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }
 
         removeById(fieldId);
+        evictOptionsCache(TenantContextHolder.getTenantId());
 
         // 清理该字段的所有用户排序记录
         customFieldSortService.removeByFieldId(fieldId);
@@ -895,6 +916,123 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         return searchable
                 && "customer".equals(entityType)
                 && CUSTOMER_SEARCHABLE_TEXT_FIELD_TYPES.contains(fieldType);
+    }
+
+    // ==================== 选项真相源：读取 / 解析标签 / 校验 ====================
+
+    /**
+     * 获取字段当前租户的选项列表（真相源 crm_custom_field.options，带缓存，回退内置定义）。
+     */
+    @Override
+    public List<FieldOption> getFieldOptions(String entityType, String fieldName) {
+        if (StrUtil.isBlank(entityType) || StrUtil.isBlank(fieldName)) {
+            return Collections.emptyList();
+        }
+        Long tenantId = TenantContextHolder.getTenantId();
+        if (tenantId == null || tenantId <= 0) {
+            return builtinOptions(entityType, fieldName);
+        }
+
+        String key = optionsCacheKey(tenantId, entityType, fieldName);
+        OptionsCacheEntry cached = optionsCache.get(key);
+        if (cached != null && cached.expireAt() >= System.currentTimeMillis()) {
+            return cached.options();
+        }
+
+        CustomField field = getOne(new LambdaQueryWrapper<CustomField>()
+                .eq(CustomField::getEntityType, entityType)
+                .eq(CustomField::getFieldName, fieldName)
+                .last("LIMIT 1"), false);
+        List<FieldOption> options = (field != null && StrUtil.isNotEmpty(field.getOptions()))
+                ? JSON.parseArray(field.getOptions(), FieldOption.class)
+                : builtinOptions(entityType, fieldName);
+        if (options == null) {
+            options = Collections.emptyList();
+        }
+        optionsCache.put(key, new OptionsCacheEntry(System.currentTimeMillis() + OPTIONS_CACHE_TTL_MS, options));
+        return options;
+    }
+
+    /**
+     * 把选项字段的"值"解析为"显示标签"，找不到时原样返回。
+     */
+    @Override
+    public String resolveOptionLabel(String entityType, String fieldName, String value) {
+        if (StrUtil.isBlank(value)) {
+            return value;
+        }
+        for (FieldOption option : getFieldOptions(entityType, fieldName)) {
+            if (option != null && StrUtil.equals(option.getValue(), value)) {
+                return StrUtil.isNotBlank(option.getLabel()) ? option.getLabel() : value;
+            }
+        }
+        return value;
+    }
+
+    /**
+     * 系统内置选项（来自 SYSTEM_FIELD_DEFINITIONS），作为无租户/无数据时的回退。
+     */
+    private List<FieldOption> builtinOptions(String entityType, String fieldName) {
+        List<SystemFieldDefinition> definitions = SYSTEM_FIELD_DEFINITIONS.get(entityType);
+        if (definitions != null) {
+            for (SystemFieldDefinition definition : definitions) {
+                if (definition.fieldName().equals(fieldName) && definition.options() != null) {
+                    return definition.options();
+                }
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    private String optionsCacheKey(Long tenantId, String entityType, String fieldName) {
+        return tenantId + ":" + entityType + ":" + fieldName;
+    }
+
+    private void evictOptionsCache(Long tenantId) {
+        if (tenantId == null) {
+            optionsCache.clear();
+            return;
+        }
+        String prefix = tenantId + ":";
+        optionsCache.keySet().removeIf(k -> k.startsWith(prefix));
+    }
+
+    /**
+     * 校验系统字段提交的选项：内置选项的值不可删除/修改，仅允许改标签或新增选项；
+     * 同时校验值非空、不重复、长度不超过物理列限制。
+     */
+    private void validateSystemFieldOptions(CustomField field, List<FieldOption> options) {
+        Set<String> submittedValues = new LinkedHashSet<>();
+        int maxLen = parseColumnLength(field.getColumnType());
+        for (FieldOption option : options) {
+            if (option == null || StrUtil.isBlank(option.getValue())) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "选项值不能为空");
+            }
+            if (!submittedValues.add(option.getValue())) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "选项值重复: " + option.getValue());
+            }
+            if (maxLen > 0 && option.getValue().length() > maxLen) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                        "选项值「" + option.getValue() + "」长度超过该字段限制(" + maxLen + ")");
+            }
+        }
+        for (FieldOption builtin : builtinOptions(field.getEntityType(), field.getFieldName())) {
+            if (!submittedValues.contains(builtin.getValue())) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                        "系统内置选项不可删除或修改取值: " + builtin.getValue());
+            }
+        }
+    }
+
+    /**
+     * 从列类型声明（如 VARCHAR(10) / CHAR(1)）解析出最大长度，解析不到返回 0（不限制）。
+     */
+    private int parseColumnLength(String columnType) {
+        if (StrUtil.isBlank(columnType)) {
+            return 0;
+        }
+        Matcher matcher = Pattern.compile("\\((\\d+)").matcher(columnType);
+        return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
     }
 
     private record SystemFieldDefinition(String fieldName,

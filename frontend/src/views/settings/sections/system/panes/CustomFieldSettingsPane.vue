@@ -107,10 +107,12 @@ import {
   disableCustomField
 } from '@/api/customField'
 import type { CustomField, EntityType, FieldOption, FieldType } from '@/types/customField'
+import { useEnumStore } from '@/stores/enums'
 import { SYSTEM_FIELD_TYPE_LABELS } from '../constants'
 import CustomFieldDialog from './components/CustomFieldDialog.vue'
 
 const { isMobile } = useResponsive()
+const enumStore = useEnumStore()
 
 const showFieldDialog = ref(false)
 const activeEntityType = ref<EntityType>('customer')
@@ -270,9 +272,10 @@ async function handleSaveField() {
     return
   }
 
-  if (!isEditingSystemField && ['select', 'multiselect'].includes(fieldForm.fieldType)) {
+  if (['select', 'multiselect'].includes(fieldForm.fieldType)) {
     const validOptions = fieldForm.options.filter((option) => option.value.trim() && option.label.trim())
-    if (validOptions.length === 0) {
+    // 系统字段内置选项由后端校验保留；自定义字段要求至少一个有效选项
+    if (!isEditingSystemField && validOptions.length === 0) {
       ElMessage.warning('请至少添加一个有效选项')
       return
     }
@@ -291,7 +294,7 @@ async function handleSaveField() {
         isSearchable: fieldForm.isSearchable,
         isShowInList: fieldForm.isShowInList,
         isUnique: fieldForm.isUnique,
-        options: isEditingSystemField ? undefined : (fieldForm.options.length > 0 ? fieldForm.options : undefined)
+        options: fieldForm.options.length > 0 ? fieldForm.options : undefined
       })
       ElMessage.success('字段更新成功')
     } else {
@@ -312,6 +315,8 @@ async function handleSaveField() {
     showFieldDialog.value = false
     resetFieldForm()
     await loadCustomFields()
+    // 选项可能变化（stage/level/relation 等），刷新枚举真相源缓存让各页面立即生效
+    enumStore.refreshAll()
   } catch {
     // Error handled by interceptor
   } finally {

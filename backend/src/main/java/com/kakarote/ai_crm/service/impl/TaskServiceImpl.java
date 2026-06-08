@@ -24,6 +24,7 @@ import com.kakarote.ai_crm.entity.VO.TaskVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.mapper.TaskMapper;
+import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.ITaskService;
@@ -74,6 +75,10 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
 
     @Autowired
     private AiQuotaService aiQuotaService;
+
+    @Autowired
+    @Lazy
+    private ICustomFieldService customFieldService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -1018,15 +1023,24 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
      * 获取阶段Label。
      */
     private String getStageLabel(String stage) {
-        return switch (stage.toLowerCase()) {
+        if (StrUtil.isBlank(stage)) {
+            return "推进中";
+        }
+        // 内置阶段沿用任务语境的措辞；非内置（用户新增）阶段走真相源 crm_custom_field.options
+        String label = switch (stage.toLowerCase()) {
             case "lead" -> "线索初期";
             case "qualified" -> "需求确认";
             case "proposal" -> "方案评估";
             case "negotiation" -> "商务谈判";
             case "closed" -> "成交";
             case "lost" -> "流失";
-            default -> "推进中";
+            default -> null;
         };
+        if (label != null) {
+            return label;
+        }
+        String resolved = customFieldService.resolveOptionLabel("customer", "stage", stage);
+        return StrUtil.isNotBlank(resolved) ? resolved : "推进中";
     }
 
     /**
