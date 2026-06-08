@@ -368,9 +368,21 @@ import type {
 } from '@/types/tencentMeeting'
 
 const route = useRoute()
+
+function routeQueryString(value: unknown) {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : ''
+  return ''
+}
+
+function routeBindStatus(value: unknown) {
+  const actual = routeQueryString(value)
+  return actual === 'BOUND' || actual === 'UNBOUND' ? actual : ''
+}
+
 const keyword = ref('')
 const status = ref('')
-const bindStatus = ref('')
+const bindStatus = ref(routeBindStatus(route.query.bindStatus))
 const dateRange = ref<[string, string] | null>(null)
 const page = ref(1)
 const limit = ref(15)
@@ -407,8 +419,11 @@ const crmCustomerLoading = ref(false)
 const binding = ref(false)
 
 const preferredCustomerId = computed(() => {
-  const raw = route.query.customerId
-  return typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] || '' : ''
+  return routeQueryString(route.query.customerId)
+})
+
+const preferredBindCustomerId = computed(() => {
+  return routeQueryString(route.query.bindCustomerId)
 })
 
 const meetingJoinUrl = computed(() => createdMeeting.value?.joinUrl || createdMeeting.value?.hostJoinUrl || '')
@@ -667,7 +682,7 @@ async function openDetail(row: TencentMeetingVO) {
 
 async function openBindDialog(row: TencentMeetingVO) {
   selectedMeeting.value = row
-  selectedCrmCustomerId.value = preferredCustomerId.value || ''
+  selectedCrmCustomerId.value = preferredBindCustomerId.value || preferredCustomerId.value || ''
   bindDialogVisible.value = true
   await loadCrmCustomers()
 }

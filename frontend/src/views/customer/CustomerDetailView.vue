@@ -2015,7 +2015,10 @@ function openTencentMeetingBindingPage() {
   if (!customer.value) return
   router.push({
     path: '/tencent-meetings',
-    query: { customerId: customer.value.customerId }
+    query: {
+      bindCustomerId: customer.value.customerId,
+      bindStatus: 'UNBOUND'
+    }
   })
 }
 

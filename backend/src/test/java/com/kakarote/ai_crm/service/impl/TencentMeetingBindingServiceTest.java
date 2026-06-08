@@ -1,8 +1,10 @@
 package com.kakarote.ai_crm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingBindBO;
+import com.kakarote.ai_crm.entity.BO.TencentMeetingUnbindBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.TencentMeeting;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingCustomerBinding;
@@ -19,6 +21,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -84,6 +87,46 @@ class TencentMeetingBindingServiceTest {
         assertThat(meeting.getCustomerId()).isEqualTo(100L);
         assertThat(meeting.getCustomerName()).isEqualTo("北京科技有限公司");
         verify(meetingMapper).updateById(meeting);
+    }
+
+    @Test
+    void unbindShouldForceClearMeetingCustomerFields() {
+        TencentMeetingCustomerBindingServiceImpl service = newService();
+        TencentMeetingCustomerBindingMapper bindingMapper = mapper(service, "bindingMapper");
+        TencentMeetingMapper meetingMapper = mapper(service, "meetingMapper");
+
+        TencentMeetingCustomerBinding binding = new TencentMeetingCustomerBinding();
+        binding.setMeetingId(200L);
+        binding.setCustomerId(100L);
+        binding.setStatus(1);
+        when(bindingMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(binding));
+
+        TencentMeeting meeting = new TencentMeeting();
+        meeting.setId(200L);
+        meeting.setBindStatus("BOUND");
+        meeting.setCustomerId(100L);
+        meeting.setCustomerName("company-1");
+        when(meetingMapper.selectById(200L)).thenReturn(meeting);
+
+        TencentMeetingUnbindBO unbindBO = new TencentMeetingUnbindBO();
+        unbindBO.setMeetingId(200L);
+
+        service.unbindCustomer(unbindBO);
+
+        assertThat(binding.getStatus()).isZero();
+        assertThat(binding.getUnbindTime()).isInstanceOf(Date.class);
+        verify(bindingMapper).updateById(binding);
+
+        ArgumentCaptor<UpdateWrapper<TencentMeeting>> updateWrapper =
+                ArgumentCaptor.forClass(UpdateWrapper.class);
+        verify(meetingMapper).update(isNull(), updateWrapper.capture());
+        assertThat(updateWrapper.getValue().getSqlSet())
+                .contains("bind_status")
+                .contains("customer_id")
+                .contains("customer_name");
+        assertThat(updateWrapper.getValue().getParamNameValuePairs().values())
+                .contains("UNBOUND")
+                .containsNull();
     }
 
     @SuppressWarnings("unchecked")

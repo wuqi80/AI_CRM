@@ -88,10 +88,12 @@ public class TencentMeetingCustomerBindingServiceImpl {
         }
         TencentMeeting meeting = meetingMapper.selectById(unbindBO.getMeetingId());
         if (meeting != null) {
-            meeting.setBindStatus("UNBOUND");
-            meeting.setCustomerId(null);
-            meeting.setCustomerName(null);
-            meetingMapper.updateById(meeting);
+            meetingMapper.update(null, Wrappers.<TencentMeeting>update()
+                    .eq("id", meeting.getId())
+                    .set("bind_status", "UNBOUND")
+                    .set("customer_id", null)
+                    .set("customer_name", null)
+                    .set("update_time", now));
         }
     }
 }
