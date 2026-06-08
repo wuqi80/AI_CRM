@@ -202,8 +202,41 @@ public class TencentMeetingSyncServiceImpl {
         return status;
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void refreshMeetingByExternalId(String eventName, String meetingId) {
         log.info("Tencent Meeting webhook refresh requested: event={}, meetingId={}", eventName, meetingId);
+        String targetStatus = statusForWebhookEvent(eventName);
+        if (targetStatus == null || StrUtil.isBlank(meetingId)) {
+            return;
+        }
+        TencentMeeting meeting = meetingMapper.selectOne(Wrappers.<TencentMeeting>lambdaQuery()
+                .eq(TencentMeeting::getMeetingId, meetingId)
+                .last("LIMIT 1"));
+        if (meeting == null) {
+            log.info("Tencent Meeting webhook refresh skipped, meeting not found: meetingId={}", meetingId);
+            return;
+        }
+        if (targetStatus.equals(meeting.getStatus())) {
+            return;
+        }
+        meeting.setStatus(targetStatus);
+        meeting.setSyncedAt(new Date());
+        meetingMapper.updateById(meeting);
+        log.info("Tencent Meeting status updated via webhook: meetingId={}, status={}", meetingId, targetStatus);
+    }
+
+    private String statusForWebhookEvent(String eventName) {
+        if (StrUtil.isBlank(eventName)) {
+            return null;
+        }
+        String value = eventName.trim().toLowerCase();
+        if ("meeting.end".equals(value) || "meeting.ended".equals(value)) {
+            return "ended";
+        }
+        if ("meeting.canceled".equals(value) || "meeting.cancelled".equals(value) || "meeting.cancel".equals(value)) {
+            return "cancelled";
+        }
+        return null;
     }
 
     public JSONObject createMeeting(TencentMeetingOAuthCredential credential, JSONObject requestBody) {

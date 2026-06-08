@@ -272,6 +272,8 @@ public class TencentMeetingWebhookService {
 
     private boolean isRefreshEvent(String eventName) {
         return "meeting.end".equals(eventName)
+                || "meeting.canceled".equals(eventName)
+                || "meeting.cancelled".equals(eventName)
                 || "recording.completed".equals(eventName)
                 || "smart.transcripts".equals(eventName);
     }
