@@ -3,6 +3,8 @@ package com.kakarote.ai_crm.service.impl;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.common.auth.DataPermissionContext;
+import com.kakarote.ai_crm.common.auth.DataPermissionHolder;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
@@ -48,6 +50,7 @@ class TencentMeetingSyncServiceTest {
     @AfterEach
     void cleanup() {
         SecurityContextHolder.clearContext();
+        DataPermissionHolder.clear();
     }
 
     @Test
@@ -383,6 +386,38 @@ class TencentMeetingSyncServiceTest {
 
         verify(meetingMapper, never()).insert(any(TencentMeeting.class));
         verify(meetingMapper, never()).updateById(any(TencentMeeting.class));
+    }
+
+    @Test
+    void refreshMeetingFromWebhookShouldElevateDataPermissionInSystemThread() {
+        // 模拟 webhook 线程：无 SecurityContext / 无登录用户。
+        SecurityContextHolder.clearContext();
+        TencentMeetingSyncServiceImpl service = newService();
+        TencentMeetingMapper meetingMapper = mapper(service, "meetingMapper");
+        TencentMeetingUserMappingMapper userMappingMapper = mapper(service, "userMappingMapper");
+
+        TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
+        config.setAppId("app-1");
+
+        TencentMeetingUserMapping mapping = new TencentMeetingUserMapping();
+        mapping.setMeetingUserId("host-1");
+        mapping.setCrmUserId(9L);
+
+        // 捕获 selectOne 执行那一刻（即 DataPermissionInterceptor 实际触发处）的数据权限上下文，
+        // 验证已被预置为“全部数据”。修复前此处上下文为 null，运行时会抛 “网络错误，请稍候再试”。
+        boolean[] allDataDuringQuery = {false};
+        when(meetingMapper.selectOne(any(LambdaQueryWrapper.class))).thenAnswer(invocation -> {
+            DataPermissionContext ctx = DataPermissionHolder.get("tencentMeeting");
+            allDataDuringQuery[0] = ctx != null && ctx.isAllData();
+            return null;
+        });
+        when(userMappingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(mapping);
+
+        service.refreshMeetingFromWebhook("meeting.created", externalMeetingInfoJson(), config);
+
+        assertThat(allDataDuringQuery[0]).isTrue();
+        // 调用结束后必须清理上下文，避免线程池复用造成 ThreadLocal 泄漏。
+        assertThat(DataPermissionHolder.get("tencentMeeting")).isNull();
     }
 
     private static JSONObject externalMeetingInfoJson() {

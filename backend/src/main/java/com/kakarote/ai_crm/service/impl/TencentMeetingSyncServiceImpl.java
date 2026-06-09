@@ -3,6 +3,8 @@ package com.kakarote.ai_crm.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.kakarote.ai_crm.common.auth.DataPermissionContext;
+import com.kakarote.ai_crm.common.auth.DataPermissionHolder;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingSyncRunBO;
 import com.kakarote.ai_crm.entity.PO.TencentMeeting;
@@ -64,6 +66,9 @@ public class TencentMeetingSyncServiceImpl {
 
     @Autowired
     private ManageUserMapper manageUserMapper;
+
+    /** 腾讯会议数据权限模块标识，与 GlobalDataPermissionHandler.MODULE_BY_MAPPER 中各腾讯会议 mapper 的映射保持一致。 */
+    private static final String TENCENT_MEETING_PERMISSION_MODULE = "tencentMeeting";
 
     @Transactional(rollbackFor = Exception.class)
     public TencentMeetingSyncStatusVO runSync(TencentMeetingCorpConfig config, TencentMeetingSyncRunBO runBO) {
@@ -253,6 +258,13 @@ public class TencentMeetingSyncServiceImpl {
      */
     @Transactional(rollbackFor = Exception.class)
     public void refreshMeetingFromWebhook(String eventName, JSONObject meetingInfo, TencentMeetingCorpConfig config) {
+        // webhook 回调线程没有登录用户，而腾讯会议各 mapper 注册在数据权限模块；若不预置上下文，
+        // DataPermissionInterceptor 会调用 UserUtil.getUserId() 抛 “网络错误，请稍候再试”。
+        // 这里以租户级系统身份（全部数据）放行行级数据权限，租户隔离仍由 TenantContextHolder 保证。
+        withTencentMeetingDataPermission(() -> doRefreshMeetingFromWebhook(eventName, meetingInfo, config));
+    }
+
+    private void doRefreshMeetingFromWebhook(String eventName, JSONObject meetingInfo, TencentMeetingCorpConfig config) {
         String meetingId = meetingInfo == null ? null
                 : firstText(meetingInfo, "meeting_id", "meetingId", "meeting_uuid");
         log.info("Tencent Meeting webhook refresh requested: event={}, meetingId={}", eventName, meetingId);
@@ -301,6 +313,26 @@ public class TencentMeetingSyncServiceImpl {
 
         if ("ended".equals(targetStatus)) {
             refreshParticipantsFromHistory(config, meeting, meetingInfo);
+        }
+    }
+
+    /**
+     * 在无登录用户的系统线程（如 webhook 回调）中执行腾讯会议相关读写时，临时把数据权限上下文预置为
+     * “全部数据”。这样 GlobalDataPermissionHandler 会直接复用缓存的上下文、跳过 UserUtil.getUserId()，
+     * 避免因线程内没有 SecurityContext/AiContext 而抛 BusinessException；行级权限放行，租户隔离不受影响。
+     * 执行结束后恢复/清理上下文，防止线程池复用导致 ThreadLocal 泄漏。
+     */
+    private void withTencentMeetingDataPermission(Runnable action) {
+        DataPermissionContext previousContext = DataPermissionHolder.get(TENCENT_MEETING_PERMISSION_MODULE);
+        DataPermissionHolder.put(TENCENT_MEETING_PERMISSION_MODULE, DataPermissionContext.all());
+        try {
+            action.run();
+        } finally {
+            if (previousContext == null) {
+                DataPermissionHolder.remove(TENCENT_MEETING_PERMISSION_MODULE);
+            } else {
+                DataPermissionHolder.put(TENCENT_MEETING_PERMISSION_MODULE, previousContext);
+            }
         }
     }
 
