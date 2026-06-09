@@ -104,6 +104,11 @@ wecom:
     # 可在此直接填写明文，或用环境变量 WECOM_DEV_CALLBACK_TOKEN / WECOM_DEV_CALLBACK_AES_KEY 注入。
     token: ${WECOM_DEV_CALLBACK_TOKEN:}
     encoding-aes-key: ${WECOM_DEV_CALLBACK_AES_KEY:}
+  archive-callback:
+    # 会话存档「接收事件服务器」回调（/wecom/archive/callback）的 Token / EncodingAESKey，必须与企业会话存档设置一致
+    token: ${WECOM_ARCHIVE_CALLBACK_TOKEN:}
+    encoding-aes-key: ${WECOM_ARCHIVE_CALLBACK_AES_KEY:}
+    event-drain-max-pages: ${WECOM_ARCHIVE_EVENT_DRAIN_MAX_PAGES:10}
 
 minio:
   # 是否启用 MinIO（设为 false 使用本地文件存储）

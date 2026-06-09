@@ -131,7 +131,7 @@ public class WecomSyncServiceImpl {
                 appendError(errorMessage, customerResult.errorMessage());
             }
             if (Boolean.TRUE.equals(runBO.getSyncConversations())) {
-                saved += syncArchiveMessages(config, runBO.getArchiveLimit());
+                saved += syncArchiveMessages(config, runBO.getArchiveLimit()).saved();
             }
             log.setStatus(SYNC_STATUS_SUCCESS);
         } catch (Exception e) {
@@ -613,9 +613,33 @@ public class WecomSyncServiceImpl {
         return StrUtil.blankToDefault(sanitized, "unknown");
     }
 
-    private int syncArchiveMessages(WecomCorpConfig config, Integer archiveLimit) {
-        if (!Boolean.TRUE.equals(config.getArchiveEnabled())) {
+    /**
+     * 增量拉取会话存档（事件推送 / 打开外部联系人时触发）。从游标连续拉取，最多 maxPages 页，
+     * 直到某页返回不足一整页（已追平）。返回本次新入库的消息数。
+     * 注意：若调用方不在请求上下文（如回调异步线程），必须先 TenantContextHolder.setTenantId(config.getTenantId())。
+     * 刻意不加 @Transactional：每页（getchatdata 网络/原生调用 + 落库）各自自动提交，避免在慢速拉取期间长时间占用数据库连接；
+     * 部分失败靠 msgId 去重幂等重试，不会重复入库。
+     */
+    public int drainArchive(WecomCorpConfig config, int maxPages) {
+        if (config == null || !Boolean.TRUE.equals(config.getArchiveEnabled())) {
             return 0;
+        }
+        int limit = resolveArchiveLimit(null);
+        int totalSaved = 0;
+        int pages = Math.max(1, maxPages);
+        for (int i = 0; i < pages; i++) {
+            ArchiveSyncResult result = syncArchiveMessages(config, limit);
+            totalSaved += result.saved();
+            if (result.fetched() < limit) {
+                break;
+            }
+        }
+        return totalSaved;
+    }
+
+    private ArchiveSyncResult syncArchiveMessages(WecomCorpConfig config, Integer archiveLimit) {
+        if (!Boolean.TRUE.equals(config.getArchiveEnabled())) {
+            return new ArchiveSyncResult(0, 0);
         }
         WecomSyncCursor cursor = cursorMapper.selectOne(Wrappers.<WecomSyncCursor>lambdaQuery()
                 .eq(WecomSyncCursor::getCorpId, config.getCorpId())
@@ -654,7 +678,7 @@ public class WecomSyncServiceImpl {
                 cursorMapper.updateById(cursor);
             }
         }
-        return saved;
+        return new ArchiveSyncResult(messages.size(), saved);
     }
 
     private Long ensureConversation(WecomCorpConfig config, JSONObject raw) {
@@ -778,5 +802,8 @@ public class WecomSyncServiceImpl {
     }
 
     public record CustomerSyncResult(int fetched, int saved, int failed, String errorMessage) {
+    }
+
+    public record ArchiveSyncResult(int fetched, int saved) {
     }
 }
