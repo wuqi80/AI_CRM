@@ -1,5 +1,5 @@
-import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
-import { getOidcSessionToken } from '@/api/auth'
+import { createRouter, createWebHashHistory, type NavigationGuardNext, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router'
+import { getOidcSessionToken, getWecomWorkbenchLoginRedirect } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
 import { getToken } from '@/utils/request'
 
@@ -158,7 +158,73 @@ const router = createRouter({
   routes
 })
 
+let isHandlingWecomWorkbenchAuth = false
+
+function getWecomWorkbenchAuthCode(): string {
+  const params = new URLSearchParams(window.location.search)
+  if (params.has('state')) {
+    return ''
+  }
+  return params.get('auth_code')?.trim() || params.get('code')?.trim() || ''
+}
+
+function resolveWecomWorkbenchRedirectTarget(to: RouteLocationNormalized): string {
+  if (typeof to.query.redirect === 'string' && to.query.redirect) {
+    return to.query.redirect
+  }
+  if (to.name !== 'Login' && to.name !== 'Register' && to.fullPath !== '/') {
+    return to.fullPath
+  }
+  return '/chat'
+}
+
+function buildWecomWorkbenchLoginRedirect(to: RouteLocationNormalized): string {
+  const target = resolveWecomWorkbenchRedirectTarget(to)
+  const resolved = router.resolve({ name: 'Login', query: { redirect: target } })
+  return `${window.location.origin}${window.location.pathname}${resolved.href}`
+}
+
+async function handleWecomWorkbenchAuth(to: RouteLocationNormalized, next: NavigationGuardNext): Promise<boolean> {
+  const authCode = getWecomWorkbenchAuthCode()
+  if (!authCode) {
+    return false
+  }
+
+  next(false)
+  if (isHandlingWecomWorkbenchAuth) {
+    return true
+  }
+
+  isHandlingWecomWorkbenchAuth = true
+  const target = resolveWecomWorkbenchRedirectTarget(to)
+  try {
+    const { authorizeUrl } = await getWecomWorkbenchLoginRedirect(
+      authCode,
+      buildWecomWorkbenchLoginRedirect(to)
+    )
+    window.location.replace(authorizeUrl)
+  } catch (error) {
+    console.error('WeCom workbench login failed:', error)
+    const resolved = router.resolve({
+      name: 'Login',
+      query: {
+        redirect: target,
+        externalAuthError: 'wecom_workbench_failed',
+        provider: 'wecom'
+      }
+    })
+    window.location.replace(`${window.location.origin}${window.location.pathname}${resolved.href}`)
+  } finally {
+    isHandlingWecomWorkbenchAuth = false
+  }
+  return true
+}
+
 router.beforeEach(async (to, _from, next) => {
+  if (await handleWecomWorkbenchAuth(to, next)) {
+    return
+  }
+
   const token = getToken()
   const requiresAuth = to.meta.requiresAuth !== false
 

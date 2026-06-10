@@ -51,8 +51,17 @@ export interface WecomSyncStatusVO {
   failedCount?: number
 }
 
+export interface WecomJsSdkAgentConfigVO {
+  corpId: string
+  agentId: string
+  timestamp: number
+  nonceStr: string
+  signature: string
+}
+
 export interface WecomEmployeeSessionVO {
   id: string
+  corpId?: string
   userId: string
   crmUserId?: string
   name?: string
@@ -82,6 +91,7 @@ export interface WecomExternalCustomerVO {
 
 export interface WecomConversationVO {
   id: string
+  corpId?: string
   conversationType: WecomConversationType | string
   employeeId?: string
   employeeUserId?: string
@@ -102,12 +112,14 @@ export interface WecomConversationVO {
 
 export interface WecomMessageVO {
   id: string
+  corpId?: string
   conversationId: string
   msgId: string
   seq?: number
   action?: string
   msgType?: string
   senderId?: string
+  senderName?: string
   senderType?: string
   receiverList?: string
   msgTime?: string
@@ -138,7 +150,9 @@ export interface WecomCustomerBindingVO {
 
 export interface WecomConversationTabVO {
   conversationId: string
+  corpId?: string
   tabKey: string
+  chatId?: string
   title: string
   employeeUserId?: string
   employeeName?: string

@@ -19,7 +19,13 @@
         </div>
         <div class="wecom-message-list__bubble">
           <div class="wecom-message-list__meta">
-            <span class="truncate">{{ message.senderId || '-' }}</span>
+            <WecomOpenDataName
+              v-if="message.senderType === 'employee' && message.senderId"
+              :user-id="message.senderId"
+              :corp-id="message.corpId || corpId"
+              :fallback="message.senderName || message.senderId"
+            />
+            <span v-else class="truncate">{{ message.senderName || message.senderId || '-' }}</span>
             <span>{{ formatDate(message.msgTime) }}</span>
           </div>
           <div v-if="message.recalled" class="wecom-message-list__recalled">
@@ -49,12 +55,15 @@
 
 <script setup lang="ts">
 import type { WecomMessageVO } from '@/types/wecom'
+import WecomOpenDataName from './WecomOpenDataName.vue'
 
 withDefaults(defineProps<{
   messages: WecomMessageVO[]
+  corpId?: string
   loading?: boolean
   emptyText?: string
 }>(), {
+  corpId: '',
   loading: false,
   emptyText: '暂无企微会话记录'
 })

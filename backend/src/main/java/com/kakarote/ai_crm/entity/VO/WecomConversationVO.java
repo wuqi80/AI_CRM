@@ -9,6 +9,8 @@ public class WecomConversationVO {
 
     private Long id;
 
+    private String corpId;
+
     private String conversationType;
 
     private Long employeeId;

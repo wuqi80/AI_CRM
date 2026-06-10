@@ -137,18 +137,18 @@ wecom:
     token-cache-ttl-buffer-seconds: ${WECOM_OPEN_PLATFORM_TOKEN_CACHE_TTL_BUFFER_SECONDS:300}
   dev-callback:
     # 代开发模板回调（/wecom/dev/callback）的 Token / EncodingAESKey，必须与企微服务商后台「代开发模板回调配置」一致
-    token: ${WECOM_DEV_CALLBACK_TOKEN:}
-    encoding-aes-key: ${WECOM_DEV_CALLBACK_AES_KEY:}
+    token: ${WECOM_DEV_CALLBACK_TOKEN:eFjSj5GtNKP}
+    encoding-aes-key: ${WECOM_DEV_CALLBACK_AES_KEY:Up1a7wFYhIKN6BkMHzxeThi9HRP15P7JfiVGKbosXtS}
   archive-callback:
     # 会话存档「接收事件服务器」回调（/wecom/archive/callback）的 Token / EncodingAESKey，必须与企业会话存档设置一致
-    token: ${WECOM_ARCHIVE_CALLBACK_TOKEN:}
-    encoding-aes-key: ${WECOM_ARCHIVE_CALLBACK_AES_KEY:}
+    token: ${WECOM_ARCHIVE_CALLBACK_TOKEN:IzxwoJSn1Jx82MgjxTlvNG87VLdJ5Wmf}
+    encoding-aes-key: ${WECOM_ARCHIVE_CALLBACK_AES_KEY:859IutuflGKy2Z8FnH0B8GkVZjQ65TH1Sqz7zM8Bj2O}
     event-drain-max-pages: ${WECOM_ARCHIVE_EVENT_DRAIN_MAX_PAGES:10}
   agency-dev:
     # 代开发自建应用：suite 凭证（服务商后台「代开发应用」详情页）。回调 Token/AESKey 复用 wecom.dev-callback.*
-    enabled: ${WECOM_AGENCY_DEV_ENABLED:false}
-    suite-id: ${WECOM_AGENCY_DEV_SUITE_ID:}
-    suite-secret: ${WECOM_AGENCY_DEV_SUITE_SECRET:}
+    enabled: ${WECOM_AGENCY_DEV_ENABLED:true}
+    suite-id: ${WECOM_AGENCY_DEV_SUITE_ID:dk8996ea7546b98a50}
+    suite-secret: ${WECOM_AGENCY_DEV_SUITE_SECRET:9yUGJuyou8rwvF148PidqOEDRuqnA5fZgmvcdamofyA}
 
 tencent-meeting:
   oauth:

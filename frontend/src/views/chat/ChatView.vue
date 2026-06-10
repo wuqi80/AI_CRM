@@ -415,7 +415,13 @@
               @click="handleCustomerConversationTabClick(tab.tabKey)"
             >
               <span class="material-symbols-outlined">forum</span>
-              <span>{{ tab.employeeName || tab.employeeUserId || tab.title }}</span>
+              <WecomOpenDataName
+                v-if="tab.employeeUserId"
+                :user-id="tab.employeeUserId"
+                :corp-id="tab.corpId"
+                :fallback="tab.employeeName || tab.employeeUserId"
+              />
+              <span v-else>{{ tab.title }}</span>
             </button>
             <span v-if="customerWecomTabsLoading" class="wk-chat-customer-tabs__loading">
               <span class="material-symbols-outlined animate-spin">progress_activity</span>
@@ -737,6 +743,7 @@
               class="wk-chat-wecom-pane__messages"
               :messages="customerWecomMessages"
               :loading="customerWecomMessagesLoading"
+              :corp-id="activeCustomerWecomTab?.corpId"
             />
           </div>
 
@@ -2291,6 +2298,7 @@ import CustomerDetailView from '@/views/customer/CustomerDetailView.vue'
 import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import WecomMessageList from '@/views/wecom/components/WecomMessageList.vue'
+import WecomOpenDataName from '@/views/wecom/components/WecomOpenDataName.vue'
 import { getAddressBookDetail } from '@/api/addressBook'
 import { getRelationDetail } from '@/api/relation'
 import MobileChatTopHeader from '@/views/chat/components/MobileChatTopHeader.vue'
@@ -2487,6 +2495,9 @@ const customerWecomTabs = ref<WecomConversationTabVO[]>([])
 const customerWecomMessages = ref<WecomMessageVO[]>([])
 const customerWecomTabsLoading = ref(false)
 const customerWecomMessagesLoading = ref(false)
+const activeCustomerWecomTab = computed(() =>
+  customerWecomTabs.value.find(tab => tab.tabKey === activeCustomerConversationTab.value)
+)
 const mobileCustomerSummaryVisible = ref(false)
 const customerSummaryDetailRef = ref<InstanceType<typeof CustomerDetailView> | null>(null)
 const customerSummarySheetHeight = ref(58)

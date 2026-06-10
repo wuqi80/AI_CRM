@@ -64,6 +64,21 @@ public class ExternalAuthController {
                 request));
     }
 
+    @GetMapping("/wecom/workbench-login")
+    @Operation(summary = "Exchange WeCom workbench auth code")
+    public Result<ExternalAuthAuthorizeVO> wecomWorkbenchLogin(@RequestParam(required = false) String code,
+                                                               @RequestParam(value = "auth_code", required = false) String authCode,
+                                                               @RequestParam(required = false) String redirect,
+                                                               HttpServletRequest request) {
+        ExternalAuthAuthorizeVO vo = new ExternalAuthAuthorizeVO();
+        vo.setProvider("wecom");
+        vo.setAuthorizeUrl(externalAuthService.handleWorkbenchLogin(
+                authCode == null || authCode.isBlank() ? code : authCode,
+                redirect,
+                request));
+        return Result.ok(vo);
+    }
+
     @PostMapping("/login-ticket")
     @Operation(summary = "Exchange external auth login ticket")
     public Result<LoginResponseVO> loginTicket(@Valid @RequestBody ExternalAuthTicketLoginBO loginBO,

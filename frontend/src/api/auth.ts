@@ -216,6 +216,12 @@ export function getExternalAuthAuthorizeUrl(provider: string, redirect: string):
   })
 }
 
+export function getWecomWorkbenchLoginRedirect(authCode: string, redirect: string): Promise<ExternalAuthAuthorizeResult> {
+  return get('/auth/external/wecom/workbench-login', {
+    params: { auth_code: authCode, redirect }
+  })
+}
+
 export function exchangeExternalLoginTicket(params: ExternalAuthTicketLoginParams): Promise<LoginResult> {
   return post('/auth/external/login-ticket', params)
 }

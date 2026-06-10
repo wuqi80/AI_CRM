@@ -9,6 +9,8 @@ public class WecomMessageVO {
 
     private Long id;
 
+    private String corpId;
+
     private Long conversationId;
 
     private String msgId;
@@ -20,6 +22,8 @@ public class WecomMessageVO {
     private String msgType;
 
     private String senderId;
+
+    private String senderName;
 
     private String senderType;
 

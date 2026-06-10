@@ -13,6 +13,7 @@ import type {
   WecomEmployeePage,
   WecomEmployeeSessionQuery,
   WecomExternalCustomerVO,
+  WecomJsSdkAgentConfigVO,
   WecomOpenAuthorizeVO,
   WecomMessagePage,
   WecomSyncStatusVO
@@ -44,6 +45,10 @@ export function runMyWecomCustomerSync(): Promise<WecomSyncStatusVO> {
 
 export function getWecomSyncStatus(): Promise<WecomSyncStatusVO> {
   return get('/wecom/sync/status')
+}
+
+export function getWecomJsSdkAgentConfig(url: string): Promise<WecomJsSdkAgentConfigVO> {
+  return get('/wecom/js-sdk/agent-config', { params: { url } })
 }
 
 export function queryWecomEmployees(query: WecomEmployeeSessionQuery): Promise<WecomEmployeePage> {

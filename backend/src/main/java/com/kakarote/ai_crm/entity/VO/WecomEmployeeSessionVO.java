@@ -9,6 +9,8 @@ public class WecomEmployeeSessionVO {
 
     private Long id;
 
+    private String corpId;
+
     private String userId;
 
     private Long crmUserId;

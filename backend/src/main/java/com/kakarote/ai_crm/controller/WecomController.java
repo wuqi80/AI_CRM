@@ -15,6 +15,7 @@ import com.kakarote.ai_crm.entity.VO.WecomConversationVO;
 import com.kakarote.ai_crm.entity.VO.WecomCustomerBindingVO;
 import com.kakarote.ai_crm.entity.VO.WecomEmployeeSessionVO;
 import com.kakarote.ai_crm.entity.VO.WecomExternalCustomerVO;
+import com.kakarote.ai_crm.entity.VO.WecomJsSdkAgentConfigVO;
 import com.kakarote.ai_crm.entity.VO.WecomMessageVO;
 import com.kakarote.ai_crm.entity.VO.WecomSyncStatusVO;
 import com.kakarote.ai_crm.service.impl.WecomCustomerBindingServiceImpl;
@@ -80,6 +81,13 @@ public class WecomController {
     @RequirePermission("config:ai")
     public Result<WecomSyncStatusVO> getSyncStatus() {
         return Result.ok(wecomService.getSyncStatus());
+    }
+
+    @GetMapping("/js-sdk/agent-config")
+    @Operation(summary = "Get WeCom JS-SDK agent config")
+    @RequirePermission("wecomCustomerSession:view")
+    public Result<WecomJsSdkAgentConfigVO> getJsSdkAgentConfig(@RequestParam("url") String url) {
+        return Result.ok(wecomService.getJsSdkAgentConfig(url));
     }
 
     @PostMapping("/scrm/employees")

@@ -18,4 +18,13 @@ class WecomControllerEndpointTest {
         assertThat(permission).isNotNull();
         assertThat(permission.value()).isEqualTo("wecomCustomerSession:view");
     }
+
+    @Test
+    void jsSdkAgentConfigEndpointShouldUseCustomerSessionViewPermission() throws Exception {
+        Method method = WecomController.class.getMethod("getJsSdkAgentConfig", String.class);
+        RequirePermission permission = method.getAnnotation(RequirePermission.class);
+
+        assertThat(permission).isNotNull();
+        assertThat(permission.value()).isEqualTo("wecomCustomerSession:view");
+    }
 }

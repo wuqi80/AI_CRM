@@ -198,6 +198,35 @@ class ExternalAuthServiceImplTest {
     }
 
     @Test
+    void handleWorkbenchLoginShouldReturnLoginTicketForExistingWecomIdentity() {
+        ExternalAuthServiceImpl service = newService();
+        Redis redis = mapper(service, "redis");
+        ExternalAuthIdentityMapper identityMapper = mapper(service, "identityMapper");
+        WecomOpenPlatformService wecomOpenPlatformService = mapper(service, "wecomOpenPlatformService");
+        when(wecomOpenPlatformService.isLoginUsable()).thenReturn(true);
+        when(wecomOpenPlatformService.fetchLoginProfile("auth_code_1")).thenReturn(wecomProfile());
+        ExternalAuthIdentity identity = new ExternalAuthIdentity();
+        identity.setId(99L);
+        identity.setProvider("wecom");
+        identity.setSubject("corp_1:user_a");
+        identity.setTenantId(66L);
+        identity.setUserId(77L);
+        when(identityMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(identity);
+
+        String redirect = service.handleWorkbenchLogin("auth_code_1",
+                "https://crm.example.com/#/login",
+                mock(HttpServletRequest.class));
+
+        assertThat(redirect).startsWith("https://crm.example.com/#/login?externalLoginTicket=");
+        assertThat(redirect).contains("provider=wecom");
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> ticketCaptor = ArgumentCaptor.forClass(String.class);
+        verify(redis).setex(keyCaptor.capture(), any(Integer.class), ticketCaptor.capture());
+        assertThat(keyCaptor.getValue()).startsWith("external-auth:login-ticket:");
+        assertThat(ticketCaptor.getValue()).contains("\"identityId\":99");
+    }
+
+    @Test
     void registerByTicketShouldRejectUnboundWecomCorpAndRequireAuthorization() {
         ExternalAuthServiceImpl service = newService();
         Redis redis = mapper(service, "redis");

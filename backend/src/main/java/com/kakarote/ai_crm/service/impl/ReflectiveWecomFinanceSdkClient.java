@@ -95,8 +95,8 @@ public class ReflectiveWecomFinanceSdkClient implements WecomFinanceSdkClient {
             String messagePublicKeyVersion = encryptedMessage.getString("publickey_ver");
             if (StrUtil.isNotBlank(publicKeyVersion) && StrUtil.isNotBlank(messagePublicKeyVersion)
                     && !publicKeyVersion.equals(messagePublicKeyVersion)) {
-                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
-                        "企业微信会话存档公钥版本与消息版本不匹配");
+                result.add(skippedMessage(encryptedMessage, SKIP_REASON_PUBLIC_KEY_VERSION_MISMATCH));
+                continue;
             }
             String decryptedRandomKey = decryptRandomKey(encryptedMessage.getString("encrypt_random_key"), privateKey);
             long messageSlice = number(invoke(financeClass, "NewSlice")).longValue();
@@ -114,6 +114,14 @@ public class ReflectiveWecomFinanceSdkClient implements WecomFinanceSdkClient {
             }
         }
         return result;
+    }
+
+    private JSONObject skippedMessage(JSONObject encryptedMessage, String reason) {
+        JSONObject skipped = new JSONObject();
+        skipped.put("seq", encryptedMessage.getLong("seq"));
+        skipped.put(SKIP_MESSAGE_FIELD, true);
+        skipped.put(SKIP_REASON_FIELD, reason);
+        return skipped;
     }
 
     private String decryptRandomKey(String encryptedRandomKey, String privateKeyPem) {

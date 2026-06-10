@@ -25,6 +25,10 @@ public interface ExternalAuthService {
                           String error,
                           HttpServletRequest request);
 
+    String handleWorkbenchLogin(String code,
+                                String redirect,
+                                HttpServletRequest request);
+
     LoginResponseVO loginByTicket(ExternalAuthTicketLoginBO loginBO,
                                   HttpServletRequest request,
                                   HttpServletResponse response);

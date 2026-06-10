@@ -10,7 +10,9 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class WecomApiClient {
@@ -87,6 +89,57 @@ public class WecomApiClient {
         return get("/externalcontact/get", accessToken, builder -> builder.queryParam("external_userid", externalUserId));
     }
 
+    public JSONObject getCustomerGroupChat(String accessToken, String chatId) {
+        JSONObject body = new JSONObject();
+        body.put("chat_id", chatId);
+        body.put("need_name", 1);
+        return post("/externalcontact/groupchat/get", accessToken, body);
+    }
+
+    public JSONObject getArchiveInternalGroupChat(String accessToken, String roomId) {
+        JSONObject body = new JSONObject();
+        body.put("roomid", roomId);
+        return post("/msgaudit/groupchat/get", accessToken, body);
+    }
+
+    public String getAgentJsApiTicket(String accessToken) {
+        JSONObject response = get("/ticket/get", accessToken,
+                builder -> builder.queryParam("type", "agent_config"));
+        return response.getString("ticket");
+    }
+
+    public Map<String, String> convertUserIdsToOpenUserIds(String accessToken, List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Map.of();
+        }
+        List<String> normalizedUserIds = userIds.stream()
+                .filter(userId -> userId != null && !userId.isBlank())
+                .distinct()
+                .toList();
+        if (normalizedUserIds.isEmpty()) {
+            return Map.of();
+        }
+        JSONObject body = new JSONObject();
+        body.put("userid_list", normalizedUserIds);
+        JSONObject response = post("/batch/userid_to_openuserid", accessToken, body);
+        JSONArray openUserIds = response.getJSONArray("open_userid_list");
+        if (openUserIds == null || openUserIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        for (Object item : openUserIds) {
+            if (!(item instanceof JSONObject json)) {
+                continue;
+            }
+            String userId = json.getString("userid");
+            String openUserId = json.getString("open_userid");
+            if (userId != null && !userId.isBlank() && openUserId != null && !openUserId.isBlank()) {
+                result.put(userId, openUserId);
+            }
+        }
+        return result;
+    }
+
     private JSONObject get(String path, String accessToken, QueryCustomizer customizer) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(BASE_URL + path)
                 .queryParam("access_token", accessToken);
@@ -94,6 +147,15 @@ public class WecomApiClient {
             customizer.customize(builder);
         }
         String raw = restTemplate.getForObject(builder.build().toUriString(), String.class);
+        JSONObject json = JSON.parseObject(raw);
+        assertWecomOk(json, "WeCom API request failed");
+        return json;
+    }
+
+    private JSONObject post(String path, String accessToken, JSONObject body) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(BASE_URL + path)
+                .queryParam("access_token", accessToken);
+        String raw = restTemplate.postForObject(builder.build().toUriString(), body, String.class);
         JSONObject json = JSON.parseObject(raw);
         assertWecomOk(json, "WeCom API request failed");
         return json;

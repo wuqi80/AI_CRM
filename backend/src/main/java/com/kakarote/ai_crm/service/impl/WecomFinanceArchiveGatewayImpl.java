@@ -34,7 +34,8 @@ public class WecomFinanceArchiveGatewayImpl implements WecomFinanceArchiveGatewa
         if (StrUtil.isBlank(config.getArchivePublicKeyVersion())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请先配置企业微信会话存档公钥版本");
         }
-        // 会话存档 SDK 需要企业真实明文 corpid；优先用单独配置的 archiveCorpId，留空则回退授权回写的 corpId。
+        // 会话存档 SDK 初始化优先使用单独配置的 archiveCorpId；
+        // 代开发场景下该值可能是授权回写的加密 corpId，留空才回退 corpId。
         String archiveCorpId = StrUtil.blankToDefault(config.getArchiveCorpId(), config.getCorpId());
         return sdkClient.fetchMessages(new WecomFinanceSdkClient.FetchRequest(
                 archiveCorpId,

@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.service.impl;
 
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -29,6 +30,7 @@ import com.kakarote.ai_crm.entity.VO.WecomConversationVO;
 import com.kakarote.ai_crm.entity.VO.WecomCustomerBindingVO;
 import com.kakarote.ai_crm.entity.VO.WecomEmployeeSessionVO;
 import com.kakarote.ai_crm.entity.VO.WecomExternalCustomerVO;
+import com.kakarote.ai_crm.entity.VO.WecomJsSdkAgentConfigVO;
 import com.kakarote.ai_crm.entity.VO.WecomMessageVO;
 import com.kakarote.ai_crm.entity.VO.WecomSyncStatusVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
@@ -46,6 +48,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -93,6 +97,12 @@ public class WecomServiceImpl {
     @Autowired
     private WecomSyncServiceImpl syncService;
 
+    @Autowired
+    private WecomTokenService tokenService;
+
+    @Autowired
+    private WecomApiClient apiClient;
+
     /** 打开外部联系人会话时的增量拉取节流（每企业最短间隔，进程内） */
     private static final long ARCHIVE_ON_OPEN_THROTTLE_MS = 10_000L;
     private final java.util.concurrent.ConcurrentHashMap<String, Long> archiveOnOpenLastPull = new java.util.concurrent.ConcurrentHashMap<>();
@@ -108,6 +118,31 @@ public class WecomServiceImpl {
 
     public WecomConfigVO getConfig() {
         return toConfigVO(findConfig());
+    }
+
+    public WecomJsSdkAgentConfigVO getJsSdkAgentConfig(String url) {
+        WecomCorpConfig config = requireConfig();
+        String agentId = resolveAgentId(config);
+        if (StrUtil.isBlank(agentId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom agentId is not configured");
+        }
+        String signedUrl = normalizeJsSdkUrl(url);
+        String ticket = apiClient.getAgentJsApiTicket(tokenService.fetchAppAccessToken(config));
+        if (StrUtil.isBlank(ticket)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom JS-SDK ticket is empty");
+        }
+        long timestamp = System.currentTimeMillis() / 1000;
+        String nonceStr = IdUtil.fastSimpleUUID();
+        WecomJsSdkAgentConfigVO vo = new WecomJsSdkAgentConfigVO();
+        vo.setCorpId(config.getCorpId());
+        vo.setAgentId(agentId);
+        vo.setTimestamp(timestamp);
+        vo.setNonceStr(nonceStr);
+        vo.setSignature(sha1("jsapi_ticket=" + ticket
+                + "&noncestr=" + nonceStr
+                + "&timestamp=" + timestamp
+                + "&url=" + signedUrl));
+        return vo;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -479,7 +514,9 @@ public class WecomServiceImpl {
     private WecomConversationTabVO toConversationTabVO(WecomConversation conversation) {
         WecomConversationTabVO vo = new WecomConversationTabVO();
         vo.setConversationId(conversation.getId());
+        vo.setCorpId(conversation.getCorpId());
         vo.setTabKey("wecom-" + conversation.getId());
+        vo.setChatId(conversation.getChatId());
         vo.setTitle(StrUtil.blankToDefault(conversation.getTitle(),
                 StrUtil.blankToDefault(conversation.getEmployeeUserId(), "WeCom")));
         vo.setEmployeeUserId(conversation.getEmployeeUserId());
@@ -538,6 +575,36 @@ public class WecomServiceImpl {
             return type.toLowerCase();
         }
         return StrUtil.isBlank(type) ? TYPE_CUSTOMER : type.toLowerCase();
+    }
+
+    private String resolveAgentId(WecomCorpConfig config) {
+        if (config == null) {
+            return null;
+        }
+        return StrUtil.trim(config.getAgentId());
+    }
+
+    private String normalizeJsSdkUrl(String url) {
+        String normalized = StrUtil.trim(url);
+        if (StrUtil.isBlank(normalized)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom JS-SDK url is required");
+        }
+        int hashIndex = normalized.indexOf('#');
+        return hashIndex >= 0 ? normalized.substring(0, hashIndex) : normalized;
+    }
+
+    private String sha1(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-1");
+            byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (Exception e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Generate WeCom JS-SDK signature failed");
+        }
     }
 
     private void setEncryptedIfPresent(String plainText, java.util.function.Consumer<String> setter) {

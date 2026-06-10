@@ -71,7 +71,12 @@
             @click="selectEmployee(employee.userId)"
           >
             <span class="wecom-scrm-view__avatar">{{ initials(employee.name || employee.userId) }}</span>
-            <span class="min-w-0 flex-1 truncate">{{ employee.name || employee.userId }}</span>
+            <WecomOpenDataName
+              class="min-w-0 flex-1"
+              :user-id="employee.userId"
+              :corp-id="employee.corpId || wecomConfig.corpId"
+              :fallback="employee.name || employee.userId"
+            />
             <span class="wecom-scrm-view__count">{{ employee.conversationCount || 0 }}</span>
           </button>
         </div>
@@ -100,7 +105,19 @@
             @click="selectConversation(conversation)"
           >
             <div class="wecom-scrm-view__conversation-title">
-              <span class="truncate">{{ conversation.title || conversation.peerName || conversation.chatId || '企微会话' }}</span>
+              <span class="wecom-scrm-view__conversation-name">
+                <template v-if="isEmployeeConversation(conversation)">
+                  <template v-for="(participant, index) in conversationParticipants(conversation)" :key="participant">
+                    <span v-if="index > 0">:</span>
+                    <WecomOpenDataName
+                      :user-id="participant"
+                      :corp-id="conversation.corpId || wecomConfig.corpId"
+                      :fallback="participant"
+                    />
+                  </template>
+                </template>
+                <template v-else>{{ conversationDisplayTitle(conversation) }}</template>
+              </span>
               <time>{{ formatShortTime(conversation.lastMsgTime) }}</time>
             </div>
             <p>{{ conversation.lastMsgPreview || '暂无消息' }}</p>
@@ -114,12 +131,30 @@
       <section class="wecom-scrm-view__panel wecom-scrm-view__messages">
         <div class="wecom-scrm-view__message-header">
           <div>
-            <h3>{{ activeConversation?.title || activeConversation?.peerName || '会话详情' }}</h3>
+            <h3>
+              <span class="wecom-scrm-view__message-title">
+                <template v-if="activeConversation && isEmployeeConversation(activeConversation)">
+                  <template v-for="(participant, index) in conversationParticipants(activeConversation)" :key="participant">
+                    <span v-if="index > 0">:</span>
+                    <WecomOpenDataName
+                      :user-id="participant"
+                      :corp-id="activeConversation.corpId || wecomConfig.corpId"
+                      :fallback="participant"
+                    />
+                  </template>
+                </template>
+                <template v-else>{{ activeConversation ? conversationDisplayTitle(activeConversation) : '会话详情' }}</template>
+              </span>
+            </h3>
             <span>{{ activeConversation ? typeLabel(activeConversation.conversationType) : '未选择' }}</span>
           </div>
           <el-tag v-if="activeConversation" type="info" effect="plain">只读</el-tag>
         </div>
-        <WecomMessageList :messages="messages" :loading="messageLoading" />
+        <WecomMessageList
+          :messages="messages"
+          :loading="messageLoading"
+          :corp-id="activeConversation?.corpId || wecomConfig.corpId"
+        />
       </section>
     </main>
 
@@ -193,6 +228,7 @@ import type {
   WecomSyncStatusVO
 } from '@/types/wecom'
 import WecomMessageList from './components/WecomMessageList.vue'
+import WecomOpenDataName from './components/WecomOpenDataName.vue'
 
 const conversationType = ref<WecomConversationType>('customer')
 const employeeKeyword = ref('')
@@ -436,6 +472,26 @@ function initials(value?: string) {
   return (value || '?').trim().slice(0, 1).toUpperCase()
 }
 
+function isEmployeeConversation(conversation?: WecomConversationVO | null) {
+  return conversation?.conversationType === 'employee'
+}
+
+function conversationParticipants(conversation?: WecomConversationVO | null) {
+  const raw = conversation?.chatId || [conversation?.employeeUserId, conversation?.externalUserId]
+    .filter(Boolean)
+    .join(':')
+  const participants = raw
+    .split(':')
+    .map(item => item.trim())
+    .filter(Boolean)
+  return participants.length > 0 ? participants : [conversationDisplayTitle(conversation)]
+}
+
+function conversationDisplayTitle(conversation?: WecomConversationVO | null) {
+  if (!conversation) return '会话详情'
+  return conversation.title || conversation.peerName || conversation.chatId || '企微会话'
+}
+
 function formatShortTime(value?: string) {
   if (!value) return ''
   const date = new Date(value)
@@ -579,6 +635,22 @@ function typeLabel(value?: string) {
   font-weight: 650;
 }
 
+.wecom-scrm-view__conversation-name,
+.wecom-scrm-view__message-title {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wecom-scrm-view__conversation-name {
+  flex: 1;
+}
+
 .wecom-scrm-view__conversation-title time {
   flex: 0 0 auto;
   color: #94a3b8;
@@ -612,7 +684,13 @@ function typeLabel(value?: string) {
   padding: 13px 16px;
 }
 
+.wecom-scrm-view__message-header > div {
+  min-width: 0;
+}
+
 .wecom-scrm-view__message-header h3 {
+  display: flex;
+  min-width: 0;
   margin: 0;
   color: #0f172a;
   font-size: 16px;

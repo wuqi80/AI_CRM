@@ -14,6 +14,7 @@ import com.kakarote.ai_crm.entity.PO.WecomCorpConfig;
 import com.kakarote.ai_crm.entity.PO.WecomEmployee;
 import com.kakarote.ai_crm.entity.PO.WecomExternalCustomer;
 import com.kakarote.ai_crm.entity.PO.WecomExternalCustomerFollow;
+import com.kakarote.ai_crm.entity.PO.WecomGroupChat;
 import com.kakarote.ai_crm.entity.PO.WecomMessage;
 import com.kakarote.ai_crm.entity.PO.WecomSyncCursor;
 import com.kakarote.ai_crm.entity.PO.WecomSyncLog;
@@ -25,6 +26,7 @@ import com.kakarote.ai_crm.mapper.WecomConversationMapper;
 import com.kakarote.ai_crm.mapper.WecomEmployeeMapper;
 import com.kakarote.ai_crm.mapper.WecomExternalCustomerFollowMapper;
 import com.kakarote.ai_crm.mapper.WecomExternalCustomerMapper;
+import com.kakarote.ai_crm.mapper.WecomGroupChatMapper;
 import com.kakarote.ai_crm.mapper.WecomMessageMapper;
 import com.kakarote.ai_crm.mapper.WecomSyncCursorMapper;
 import com.kakarote.ai_crm.mapper.WecomSyncLogMapper;
@@ -34,8 +36,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +65,9 @@ public class WecomSyncServiceImpl {
     private WecomApiClient apiClient;
 
     @Autowired
+    private WecomAgencyDevService agencyDevService;
+
+    @Autowired
     private WecomFinanceArchiveGateway archiveGateway;
 
     @Autowired
@@ -77,6 +84,9 @@ public class WecomSyncServiceImpl {
 
     @Autowired
     private WecomConversationMapper conversationMapper;
+
+    @Autowired
+    private WecomGroupChatMapper groupChatMapper;
 
     @Autowired
     private WecomMessageMapper messageMapper;
@@ -124,7 +134,7 @@ public class WecomSyncServiceImpl {
             if (Boolean.TRUE.equals(runBO.getSyncCustomers())) {
                 String token = tokenService.fetchContactAccessToken(config);
                 List<String> followUsers = apiClient.listFollowUsers(token);
-                CustomerSyncResult customerResult = syncCustomersForUsers(config, token, followUsers, resolveSyncOwnerId());
+                CustomerSyncResult customerResult = syncCustomersForUsers(config, token, followUsers, resolveSyncOwnerId(), false);
                 fetched += customerResult.fetched();
                 saved += customerResult.saved();
                 failed += customerResult.failed();
@@ -169,30 +179,36 @@ public class WecomSyncServiceImpl {
             return new CustomerSyncResult(0, 0, 0, null);
         }
         String token = tokenService.fetchContactAccessToken(config);
-        return syncCustomersForUsers(config, token, List.of(employeeUserId), ownerId);
+        return syncCustomersForUsers(config, token, List.of(employeeUserId), ownerId, true);
     }
 
     private CustomerSyncResult syncCustomersForUsers(WecomCorpConfig config,
                                                      String token,
                                                      List<String> followUsers,
-                                                     Long ownerId) {
+                                                     Long ownerId,
+                                                     boolean localEmployeeUserIds) {
         int fetched = 0;
         int saved = 0;
         int failed = 0;
         StringBuilder errors = new StringBuilder();
-        for (String followUser : followUsers == null ? List.<String>of() : followUsers) {
+        List<FollowUserLookup> followUserLookups = resolveCustomerFollowUserLookups(config, token, followUsers, localEmployeeUserIds);
+        Map<String, String> followUserAliases = new LinkedHashMap<>();
+        for (FollowUserLookup followUser : followUserLookups) {
+            followUserAliases.put(followUser.queryUserId(), followUser.employeeUserId());
+        }
+        for (FollowUserLookup followUser : followUserLookups) {
             List<String> externalUserIds;
             try {
-                externalUserIds = apiClient.listExternalUserIds(token, followUser);
+                externalUserIds = apiClient.listExternalUserIds(token, followUser.queryUserId());
             } catch (Exception e) {
                 failed++;
-                appendError(errors, "follow user " + followUser + ": " + e.getMessage());
+                appendError(errors, "follow user " + followUser.employeeUserId() + ": " + e.getMessage());
                 continue;
             }
             fetched += externalUserIds.size();
             for (String externalUserId : externalUserIds) {
                 try {
-                    saved += saveExternalCustomer(config, apiClient.getExternalCustomer(token, externalUserId), ownerId);
+                    saved += saveExternalCustomer(config, apiClient.getExternalCustomer(token, externalUserId), ownerId, followUserAliases);
                 } catch (Exception e) {
                     failed++;
                     appendError(errors, "external customer " + externalUserId + ": " + e.getMessage());
@@ -200,6 +216,92 @@ public class WecomSyncServiceImpl {
             }
         }
         return new CustomerSyncResult(fetched, saved, failed, errors.isEmpty() ? null : errors.toString());
+    }
+
+    private List<FollowUserLookup> resolveCustomerFollowUserLookups(WecomCorpConfig config,
+                                                                    String token,
+                                                                    List<String> followUsers,
+                                                                    boolean localEmployeeUserIds) {
+        List<String> normalizedFollowUsers = normalizeUserIds(followUsers);
+        if (normalizedFollowUsers.isEmpty()) {
+            return List.of();
+        }
+        if (!isAgencyDevConfig(config)) {
+            return normalizedFollowUsers.stream()
+                    .map(userId -> new FollowUserLookup(userId, userId))
+                    .toList();
+        }
+        Map<String, String> clearToOpenUserIds = resolveAgencyOpenUserIds(config, token,
+                localEmployeeUserIds ? normalizedFollowUsers : List.of());
+        Map<String, String> openToClearUserIds = new LinkedHashMap<>();
+        clearToOpenUserIds.forEach((clearUserId, openUserId) -> {
+            if (StrUtil.isNotBlank(openUserId)) {
+                openToClearUserIds.put(openUserId, clearUserId);
+            }
+        });
+        List<FollowUserLookup> result = new ArrayList<>();
+        for (String followUser : normalizedFollowUsers) {
+            String openUserId = clearToOpenUserIds.get(followUser);
+            if (StrUtil.isNotBlank(openUserId)) {
+                result.add(new FollowUserLookup(openUserId, followUser));
+                continue;
+            }
+            result.add(new FollowUserLookup(followUser,
+                    StrUtil.blankToDefault(openToClearUserIds.get(followUser), followUser)));
+        }
+        return result;
+    }
+
+    private Map<String, String> resolveAgencyOpenUserIds(WecomCorpConfig config,
+                                                         String token,
+                                                         List<String> extraLocalEmployeeUserIds) {
+        List<String> candidates = new ArrayList<>(loadKnownEmployeeUserIds(config));
+        if (extraLocalEmployeeUserIds != null) {
+            candidates.addAll(extraLocalEmployeeUserIds);
+        }
+        List<String> candidateUserIds = normalizeUserIds(candidates);
+        if (candidateUserIds.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            return apiClient.convertUserIdsToOpenUserIds(token, candidateUserIds);
+        } catch (Exception ignored) {
+            return Map.of();
+        }
+    }
+
+    private List<String> loadKnownEmployeeUserIds(WecomCorpConfig config) {
+        if (config == null || StrUtil.isBlank(config.getCorpId())) {
+            return List.of();
+        }
+        List<WecomEmployee> employees = employeeMapper.selectList(Wrappers.<WecomEmployee>lambdaQuery()
+                .eq(WecomEmployee::getCorpId, config.getCorpId())
+                .isNotNull(WecomEmployee::getUserId));
+        if (employees == null || employees.isEmpty()) {
+            return List.of();
+        }
+        return employees.stream()
+                .map(WecomEmployee::getUserId)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .toList();
+    }
+
+    private List<String> normalizeUserIds(List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+        Set<String> normalized = new LinkedHashSet<>();
+        for (String userId : userIds) {
+            if (StrUtil.isNotBlank(userId)) {
+                normalized.add(userId);
+            }
+        }
+        return List.copyOf(normalized);
+    }
+
+    private boolean isAgencyDevConfig(WecomCorpConfig config) {
+        return agencyDevService != null && agencyDevService.owns(config);
     }
 
     private void appendError(StringBuilder errors, String message) {
@@ -436,13 +538,25 @@ public class WecomSyncServiceImpl {
     }
 
     private int saveExternalCustomer(WecomCorpConfig config, JSONObject response, Long ownerId) {
+        return saveExternalCustomer(config, response, ownerId, Map.of());
+    }
+
+    private int saveExternalCustomer(WecomCorpConfig config, JSONObject response, Long ownerId,
+                                     Map<String, String> followUserAliases) {
+        return saveExternalCustomerRecord(config, response, ownerId, followUserAliases) == null ? 0 : 1;
+    }
+
+    private WecomExternalCustomer saveExternalCustomerRecord(WecomCorpConfig config,
+                                                             JSONObject response,
+                                                             Long ownerId,
+                                                             Map<String, String> followUserAliases) {
         JSONObject customerJson = response.getJSONObject("external_contact");
         if (customerJson == null) {
-            return 0;
+            return null;
         }
         String externalUserId = customerJson.getString("external_userid");
         if (StrUtil.isBlank(externalUserId)) {
-            return 0;
+            return null;
         }
         WecomExternalCustomer customer = externalCustomerMapper.selectOne(Wrappers.<WecomExternalCustomer>lambdaQuery()
                 .eq(WecomExternalCustomer::getCorpId, config.getCorpId())
@@ -472,20 +586,24 @@ public class WecomSyncServiceImpl {
         } else {
             externalCustomerMapper.updateById(customer);
         }
-        saveExternalCustomerFollows(config, customer, response.getJSONArray("follow_user"), syncedAt);
-        return 1;
+        saveExternalCustomerFollows(config, customer, response.getJSONArray("follow_user"), syncedAt, followUserAliases);
+        return customer;
     }
 
     private void saveExternalCustomerFollows(WecomCorpConfig config,
                                              WecomExternalCustomer customer,
                                              JSONArray followUsers,
-                                             Date syncedAt) {
+                                             Date syncedAt,
+                                             Map<String, String> followUserAliases) {
         if (followUsers == null || followUsers.isEmpty() || customer == null || customer.getId() == null) {
             return;
         }
         for (Object item : followUsers) {
             JSONObject followJson = (JSONObject) item;
-            String employeeUserId = followJson.getString("userid");
+            String sourceEmployeeUserId = followJson.getString("userid");
+            String employeeUserId = StrUtil.blankToDefault(
+                    followUserAliases == null ? null : followUserAliases.get(sourceEmployeeUserId),
+                    sourceEmployeeUserId);
             if (StrUtil.isBlank(employeeUserId)) {
                 continue;
             }
@@ -651,13 +769,21 @@ public class WecomSyncServiceImpl {
         long maxSeq = startSeq;
         int saved = 0;
         for (JSONObject raw : messages) {
+            Long seq = raw.getLong("seq");
+            if (seq != null) {
+                maxSeq = Math.max(maxSeq, seq);
+            }
+            if (raw.getBooleanValue(WecomFinanceSdkClient.SKIP_MESSAGE_FIELD)) {
+                continue;
+            }
+            if (shouldSkipArchiveRecord(raw)) {
+                continue;
+            }
             Long conversationId = ensureConversation(config, raw);
             WecomMessage message = messageNormalizeService.normalize(conversationId, raw);
             message.setCorpId(config.getCorpId());
-            Long seq = raw.getLong("seq");
             if (seq != null) {
                 message.setSeq(seq);
-                maxSeq = Math.max(maxSeq, seq);
             }
             if (StrUtil.isNotBlank(message.getMsgId()) && messageMapper.selectCount(Wrappers.<WecomMessage>lambdaQuery()
                     .eq(WecomMessage::getMsgId, message.getMsgId())) == 0) {
@@ -681,6 +807,22 @@ public class WecomSyncServiceImpl {
         return new ArchiveSyncResult(messages.size(), saved);
     }
 
+    private boolean shouldSkipArchiveRecord(JSONObject raw) {
+        if (raw == null) {
+            return true;
+        }
+        if ("switch".equalsIgnoreCase(raw.getString("action"))) {
+            return true;
+        }
+        if (StrUtil.isBlank(raw.getString("msgtype"))) {
+            return true;
+        }
+        String from = raw.getString("from");
+        String roomId = raw.getString("roomid");
+        JSONArray toList = raw.getJSONArray("tolist");
+        return StrUtil.isBlank(from) && StrUtil.isBlank(roomId) && (toList == null || toList.isEmpty());
+    }
+
     private Long ensureConversation(WecomCorpConfig config, JSONObject raw) {
         String from = raw.getString("from");
         JSONArray toList = raw.getJSONArray("tolist");
@@ -688,7 +830,7 @@ public class WecomSyncServiceImpl {
         String roomId = raw.getString("roomid");
         String externalUserId = resolveExternalUserId(from, toList);
         String employeeUserId = resolveEmployeeUserId(from, toList);
-        String conversationKey = StrUtil.isNotBlank(roomId) ? roomId : from + ":" + firstTo;
+        String conversationKey = resolveConversationKey(roomId, from, firstTo, employeeUserId, externalUserId);
         WecomConversation conversation = conversationMapper.selectOne(Wrappers.<WecomConversation>lambdaQuery()
                 .eq(WecomConversation::getCorpId, config.getCorpId())
                 .eq(WecomConversation::getChatId, conversationKey)
@@ -705,7 +847,7 @@ public class WecomSyncServiceImpl {
         conversation.setConversationType(resolveConversationType(roomId, externalUserId));
         conversation.setEmployeeUserId(employeeUserId);
         conversation.setExternalUserId(externalUserId);
-        applyConversationRelations(config, conversation, employeeUserId, externalUserId);
+        applyConversationRelations(config, conversation, roomId, employeeUserId, externalUserId, from, toList);
         conversation.setLastMsgId(raw.getString("msgid"));
         conversation.setLastMsgTime(raw.getLong("msgtime") == null ? null : new Date(raw.getLong("msgtime")));
         conversation.setLastMsgPreview(messageNormalizeService.normalize(conversation.getId(), raw).getContentText());
@@ -714,10 +856,38 @@ public class WecomSyncServiceImpl {
         return conversation.getId();
     }
 
+    private String resolveConversationKey(String roomId,
+                                          String from,
+                                          String firstTo,
+                                          String employeeUserId,
+                                          String externalUserId) {
+        if (StrUtil.isNotBlank(roomId)) {
+            return roomId;
+        }
+        if (StrUtil.isNotBlank(externalUserId) && StrUtil.isNotBlank(employeeUserId)) {
+            return externalUserId + ":" + employeeUserId;
+        }
+        if (StrUtil.isNotBlank(from) && StrUtil.isNotBlank(firstTo)) {
+            return canonicalPairKey(from, firstTo);
+        }
+        return from + ":" + firstTo;
+    }
+
+    private String canonicalPairKey(String first, String second) {
+        return first.compareTo(second) <= 0 ? first + ":" + second : second + ":" + first;
+    }
+
     private void applyConversationRelations(WecomCorpConfig config,
                                             WecomConversation conversation,
+                                            String roomId,
                                             String employeeUserId,
-                                            String externalUserId) {
+                                            String externalUserId,
+                                            String from,
+                                            JSONArray toList) {
+        if (StrUtil.isNotBlank(roomId)) {
+            applyGroupConversationRelations(config, conversation, roomId, from, toList);
+            return;
+        }
         WecomEmployee employee = null;
         if (StrUtil.isNotBlank(employeeUserId)) {
             employee = employeeMapper.selectOne(Wrappers.<WecomEmployee>lambdaQuery()
@@ -737,16 +907,268 @@ public class WecomSyncServiceImpl {
             if (customer != null) {
                 conversation.setExternalCustomerId(customer.getId());
                 conversation.setCustomerId(customer.getCustomerId());
-                conversation.setPeerName(customer.getName());
-                conversation.setPeerAvatar(customer.getAvatar());
-                if (StrUtil.isBlank(conversation.getTitle())) {
-                    conversation.setTitle(StrUtil.blankToDefault(customer.getName(), conversation.getChatId()));
+                applyConversationPeer(conversation, customer.getName(), customer.getAvatar());
+            } else {
+                Customer crmCustomer = customerMapper.selectOne(Wrappers.<Customer>lambdaQuery()
+                        .eq(Customer::getWecomCustomer, true)
+                        .eq(Customer::getWecomCorpId, config.getCorpId())
+                        .eq(Customer::getWecomExternalUserId, externalUserId)
+                        .last("LIMIT 1"));
+                if (crmCustomer != null) {
+                    conversation.setCustomerId(crmCustomer.getCustomerId());
+                    applyConversationPeer(conversation, resolveCustomerDisplayName(crmCustomer), crmCustomer.getLogo());
+                } else {
+                    WecomExternalCustomer syncedCustomer = syncArchiveExternalCustomer(config, externalUserId);
+                    if (syncedCustomer != null) {
+                        conversation.setExternalCustomerId(syncedCustomer.getId());
+                        conversation.setCustomerId(syncedCustomer.getCustomerId());
+                        applyConversationPeer(conversation, syncedCustomer.getName(), syncedCustomer.getAvatar());
+                    }
                 }
             }
         } else if (employee != null) {
-            conversation.setPeerName(employee.getName());
-            conversation.setPeerAvatar(employee.getAvatar());
+            applyConversationPeer(conversation, employee.getName(), employee.getAvatar());
         }
+    }
+
+    private WecomExternalCustomer syncArchiveExternalCustomer(WecomCorpConfig config, String externalUserId) {
+        if (StrUtil.isBlank(externalUserId)) {
+            return null;
+        }
+        try {
+            String token = tokenService.fetchContactAccessToken(config);
+            return saveExternalCustomerRecord(config, apiClient.getExternalCustomer(token, externalUserId),
+                    resolveSyncOwnerId(), Map.of());
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private void applyGroupConversationRelations(WecomCorpConfig config,
+                                                 WecomConversation conversation,
+                                                 String roomId,
+                                                 String from,
+                                                 JSONArray toList) {
+        if (StrUtil.isBlank(roomId) || groupChatMapper == null) {
+            return;
+        }
+        WecomGroupChat groupChat = groupChatMapper.selectOne(Wrappers.<WecomGroupChat>lambdaQuery()
+                .eq(WecomGroupChat::getCorpId, config.getCorpId())
+                .eq(WecomGroupChat::getChatId, roomId)
+                .last("LIMIT 1"));
+        if (groupChat == null) {
+            groupChat = fetchAndSaveGroupChat(config, roomId);
+        }
+        if (groupChat == null) {
+            applyConversationPeer(conversation, buildGroupFallbackTitle(config, from, toList), null);
+            return;
+        }
+        conversation.setGroupChatId(groupChat.getId());
+        String groupName = StrUtil.blankToDefault(groupChat.getName(), buildGroupFallbackTitle(config, from, toList));
+        conversation.setPeerName(groupName);
+        if (isGeneratedConversationTitle(conversation)) {
+            conversation.setTitle(groupName);
+        }
+    }
+
+    private String buildGroupFallbackTitle(WecomCorpConfig config, String from, JSONArray toList) {
+        List<String> participantIds = resolveGroupParticipantIds(from, toList);
+        if (participantIds.isEmpty()) {
+            return "群会话";
+        }
+        List<String> knownNames = resolveKnownParticipantNames(config, participantIds);
+        if (!knownNames.isEmpty()) {
+            int limit = Math.min(knownNames.size(), 3);
+            String summary = String.join("、", knownNames.subList(0, limit));
+            return participantIds.size() > limit ? summary + "等" + participantIds.size() + "人" : summary;
+        }
+        return "群会话（" + participantIds.size() + "人）";
+    }
+
+    private List<String> resolveGroupParticipantIds(String from, JSONArray toList) {
+        List<String> userIds = new ArrayList<>();
+        if (StrUtil.isNotBlank(from)) {
+            userIds.add(from);
+        }
+        if (toList != null) {
+            for (Object item : toList) {
+                if (item != null && StrUtil.isNotBlank(item.toString())) {
+                    userIds.add(item.toString());
+                }
+            }
+        }
+        return normalizeUserIds(userIds);
+    }
+
+    private List<String> resolveKnownParticipantNames(WecomCorpConfig config, List<String> userIds) {
+        if (config == null || StrUtil.isBlank(config.getCorpId()) || userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+        Map<String, String> displayNames = new LinkedHashMap<>();
+        List<String> employeeUserIds = userIds.stream()
+                .filter(userId -> !isWecomExternalUser(userId))
+                .toList();
+        if (!employeeUserIds.isEmpty()) {
+            List<WecomEmployee> employees = employeeMapper.selectList(Wrappers.<WecomEmployee>lambdaQuery()
+                    .eq(WecomEmployee::getCorpId, config.getCorpId())
+                    .in(WecomEmployee::getUserId, employeeUserIds));
+            if (employees != null) {
+                for (WecomEmployee employee : employees) {
+                    if (employee != null && StrUtil.isNotBlank(employee.getUserId())) {
+                        displayNames.put(employee.getUserId(), employee.getName());
+                    }
+                }
+            }
+        }
+        List<String> externalUserIds = userIds.stream()
+                .filter(this::isWecomExternalUser)
+                .toList();
+        if (!externalUserIds.isEmpty()) {
+            List<WecomExternalCustomer> customers = externalCustomerMapper.selectList(Wrappers.<WecomExternalCustomer>lambdaQuery()
+                    .eq(WecomExternalCustomer::getCorpId, config.getCorpId())
+                    .in(WecomExternalCustomer::getExternalUserId, externalUserIds));
+            if (customers != null) {
+                for (WecomExternalCustomer customer : customers) {
+                    if (customer != null && StrUtil.isNotBlank(customer.getExternalUserId())) {
+                        displayNames.put(customer.getExternalUserId(), customer.getName());
+                    }
+                }
+            }
+        }
+        List<String> names = new ArrayList<>();
+        for (String userId : userIds) {
+            String displayName = displayNames.get(userId);
+            if (StrUtil.isNotBlank(displayName) && !StrUtil.equals(displayName, userId)) {
+                names.add(displayName);
+            }
+        }
+        return names;
+    }
+
+    private WecomGroupChat fetchAndSaveGroupChat(WecomCorpConfig config, String roomId) {
+        try {
+            String token = tokenService.fetchContactAccessToken(config);
+            WecomGroupChat groupChat = saveCustomerGroupChat(config, roomId,
+                    apiClient.getCustomerGroupChat(token, roomId));
+            if (groupChat != null) {
+                return groupChat;
+            }
+        } catch (Exception ignored) {
+            // Customer group APIs only work for customer groups visible to the app.
+        }
+        try {
+            String token = tokenService.fetchArchiveAccessToken(config);
+            return saveInternalArchiveGroupChat(config, roomId,
+                    apiClient.getArchiveInternalGroupChat(token, roomId));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private WecomGroupChat saveCustomerGroupChat(WecomCorpConfig config, String roomId, JSONObject response) {
+        JSONObject groupJson = response == null ? null : response.getJSONObject("group_chat");
+        if (groupJson == null) {
+            return null;
+        }
+        String chatId = StrUtil.blankToDefault(groupJson.getString("chat_id"), roomId);
+        WecomGroupChat groupChat = findOrCreateGroupChat(config, chatId);
+        groupChat.setName(groupJson.getString("name"));
+        groupChat.setOwnerUserId(groupJson.getString("owner"));
+        JSONArray memberList = groupJson.getJSONArray("member_list");
+        groupChat.setMemberList(jsonArrayToString(memberList));
+        groupChat.setCustomerList(jsonArrayToString(filterCustomerGroupMembers(memberList)));
+        groupChat.setStatus(1);
+        groupChat.setNotice(groupJson.getString("notice"));
+        groupChat.setExternalCreateTime(resolveUnixSeconds(groupJson.getLong("create_time")));
+        groupChat.setSyncedAt(new Date());
+        saveGroupChat(groupChat);
+        return groupChat;
+    }
+
+    private WecomGroupChat saveInternalArchiveGroupChat(WecomCorpConfig config, String roomId, JSONObject response) {
+        if (response == null) {
+            return null;
+        }
+        WecomGroupChat groupChat = findOrCreateGroupChat(config, roomId);
+        groupChat.setName(response.getString("roomname"));
+        groupChat.setOwnerUserId(response.getString("creator"));
+        groupChat.setMemberList(jsonArrayToString(response.getJSONArray("members")));
+        groupChat.setCustomerList("[]");
+        groupChat.setStatus(1);
+        groupChat.setNotice(response.getString("notice"));
+        groupChat.setExternalCreateTime(resolveUnixSeconds(response.getLong("room_create_time")));
+        groupChat.setSyncedAt(new Date());
+        saveGroupChat(groupChat);
+        return groupChat;
+    }
+
+    private WecomGroupChat findOrCreateGroupChat(WecomCorpConfig config, String chatId) {
+        WecomGroupChat groupChat = groupChatMapper.selectOne(Wrappers.<WecomGroupChat>lambdaQuery()
+                .eq(WecomGroupChat::getCorpId, config.getCorpId())
+                .eq(WecomGroupChat::getChatId, chatId)
+                .last("LIMIT 1"));
+        if (groupChat == null) {
+            groupChat = new WecomGroupChat();
+            groupChat.setCorpId(config.getCorpId());
+            groupChat.setChatId(chatId);
+        }
+        return groupChat;
+    }
+
+    private void saveGroupChat(WecomGroupChat groupChat) {
+        if (groupChat.getId() == null) {
+            groupChatMapper.insert(groupChat);
+        } else {
+            groupChatMapper.updateById(groupChat);
+        }
+    }
+
+    private JSONArray filterCustomerGroupMembers(JSONArray memberList) {
+        JSONArray customers = new JSONArray();
+        if (memberList == null) {
+            return customers;
+        }
+        for (Object item : memberList) {
+            if (item instanceof JSONObject member && member.getInteger("type") != null && member.getInteger("type") == 2) {
+                customers.add(member);
+            }
+        }
+        return customers;
+    }
+
+    private void applyConversationPeer(WecomConversation conversation, String peerName, String peerAvatar) {
+        String displayName = StrUtil.blankToDefault(peerName, conversation.getChatId());
+        conversation.setPeerName(displayName);
+        conversation.setPeerAvatar(peerAvatar);
+        if (isGeneratedConversationTitle(conversation)) {
+            conversation.setTitle(displayName);
+        }
+    }
+
+    private boolean isGeneratedConversationTitle(WecomConversation conversation) {
+        String title = conversation.getTitle();
+        if (StrUtil.isBlank(title)) {
+            return true;
+        }
+        if (StrUtil.equals(title, conversation.getChatId())) {
+            return true;
+        }
+        String externalUserId = conversation.getExternalUserId();
+        String employeeUserId = conversation.getEmployeeUserId();
+        return StrUtil.isNotBlank(externalUserId)
+                && StrUtil.isNotBlank(employeeUserId)
+                && (StrUtil.equals(title, externalUserId + ":" + employeeUserId)
+                || StrUtil.equals(title, employeeUserId + ":" + externalUserId));
+    }
+
+    private String resolveCustomerDisplayName(Customer customer) {
+        if (customer == null) {
+            return null;
+        }
+        if (StrUtil.isNotBlank(customer.getCompanyName())) {
+            return customer.getCompanyName();
+        }
+        return customer.getPrimaryContactName();
     }
 
     private String resolveConversationType(String roomId, String externalUserId) {
@@ -802,6 +1224,9 @@ public class WecomSyncServiceImpl {
     }
 
     public record CustomerSyncResult(int fetched, int saved, int failed, String errorMessage) {
+    }
+
+    private record FollowUserLookup(String queryUserId, String employeeUserId) {
     }
 
     public record ArchiveSyncResult(int fetched, int saved) {

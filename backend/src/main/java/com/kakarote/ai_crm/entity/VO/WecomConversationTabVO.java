@@ -9,7 +9,11 @@ public class WecomConversationTabVO {
 
     private Long conversationId;
 
+    private String corpId;
+
     private String tabKey;
+
+    private String chatId;
 
     private String title;
 

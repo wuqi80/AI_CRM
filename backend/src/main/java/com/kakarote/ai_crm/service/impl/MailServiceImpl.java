@@ -297,7 +297,8 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                     .queryParam("prompt", "consent")
                     .queryParam("scope", "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send")
                     .queryParam("state", state)
-                    .build(true)
+                    .build()
+                    .encode()
                     .toUriString();
         } else {
             authorizeUrl = UriComponentsBuilder.fromUriString(outlookOAuthUrl(oauthProvider, "authorize"))
@@ -306,7 +307,8 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                     .queryParam("response_type", "code")
                     .queryParam("scope", "offline_access Mail.Read Mail.Send User.Read")
                     .queryParam("state", state)
-                    .build(true)
+                    .build()
+                    .encode()
                     .toUriString();
         }
         return new MailOAuthStartVO(normalizedProvider, authorizeUrl, state);

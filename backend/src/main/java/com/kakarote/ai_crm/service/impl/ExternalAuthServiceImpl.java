@@ -201,26 +201,45 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
             return appendQuery(authState.getRedirect(), "externalBind", "success", "provider", normalizedProvider);
         }
 
-        ExternalAuthIdentity identity = findIdentity(normalizedProvider, profile.getSubject());
+        return completeLogin(profile, authState.getRedirect(), request);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String handleWorkbenchLogin(String code,
+                                       String redirect,
+                                       HttpServletRequest request) {
+        String normalizedProvider = "wecom";
+        requireUsableProvider(normalizedProvider);
+        if (StrUtil.isBlank(code)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Missing WeCom workbench auth code");
+        }
+        ExternalProfile profile = fetchProfile(normalizedProvider, code, request);
+        return completeLogin(profile, resolveRedirect(redirect, request), request);
+    }
+
+    private String completeLogin(ExternalProfile profile, String redirect, HttpServletRequest request) {
+        String provider = profile.getProvider();
+        ExternalAuthIdentity identity = findIdentity(provider, profile.getSubject());
         if (identity != null) {
             String ticket = createLoginTicket(identity);
-            return appendQuery(authState.getRedirect(), "externalLoginTicket", ticket, "provider", normalizedProvider);
+            return appendQuery(redirect, "externalLoginTicket", ticket, "provider", provider);
         }
 
-        if ("wecom".equals(normalizedProvider) && StrUtil.isNotBlank(profile.getExternalTenantKey())) {
+        if ("wecom".equals(provider) && StrUtil.isNotBlank(profile.getExternalTenantKey())) {
             ExternalTenantBinding binding = findTenantBinding(profile.getProvider(), profile.getExternalTenantKey());
             if (binding == null || !wecomOpenPlatformService.isEnterpriseAuthorized(profile.getExternalTenantKey())) {
                 WecomOpenAuthorizeVO authorize = wecomOpenPlatformService.createDirectInstallAuthorizeUrl(
-                        authState.getRedirect(), request);
+                        redirect, request);
                 return authorize.getAuthorizeUrl();
             }
             ExternalAuthIdentity provisionedIdentity = autoProvisionWecomIdentity(profile);
             String ticket = createLoginTicket(provisionedIdentity);
-            return appendQuery(authState.getRedirect(), "externalLoginTicket", ticket, "provider", normalizedProvider);
+            return appendQuery(redirect, "externalLoginTicket", ticket, "provider", provider);
         }
 
         String ticket = createRegisterTicket(profile);
-        return appendQuery(authState.getRedirect(), "externalRegisterTicket", ticket, "provider", normalizedProvider);
+        return appendQuery(redirect, "externalRegisterTicket", ticket, "provider", provider);
     }
 
     @Override
