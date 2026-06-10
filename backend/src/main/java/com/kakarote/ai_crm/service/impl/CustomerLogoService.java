@@ -131,7 +131,12 @@ public class CustomerLogoService {
         if (isExternalUrl(normalizedLogo)) {
             return normalizedLogo;
         }
-        return fileStorageService.getUrl(normalizedLogo);
+        try {
+            return fileStorageService.getUrl(normalizedLogo);
+        } catch (Exception exception) {
+            log.warn("resolve customer logo url failed, logo={}", normalizedLogo, exception);
+            return null;
+        }
     }
 
     /**
