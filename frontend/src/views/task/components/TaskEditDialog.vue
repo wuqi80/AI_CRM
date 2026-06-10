@@ -90,6 +90,7 @@
               placeholder="选择截止时间"
               value-format="YYYY-MM-DDTHH:mm"
               format="YYYY-MM-DD HH:mm"
+              :editable="false"
               size="large"
               class="w-full wk-crm-el-field-date"
             />
@@ -654,6 +655,7 @@ function formatDateTimeLocal(dateStr: string): string {
 .task-dialog .el-dialog__header {
   padding: 22px 24px 16px !important;
   margin-right: 0;
+  flex-shrink: 0;
 }
 .task-dialog .el-dialog__body {
   padding: 0 !important;
@@ -663,6 +665,7 @@ function formatDateTimeLocal(dateStr: string): string {
 }
 .task-dialog .el-dialog__footer {
   padding: 14px 24px 22px !important;
+  flex-shrink: 0;
 }
 .task-dialog.el-dialog {
   display: flex;
@@ -676,9 +679,18 @@ function formatDateTimeLocal(dateStr: string): string {
 .task-dialog--mobile.el-dialog {
   height: calc(100vh - 32px);
   max-height: calc(100vh - 32px);
+  height: calc(100dvh - 32px);
+  max-height: calc(100dvh - 32px);
   margin: 16px auto !important;
   border-radius: 1rem !important;
 }
+
+html.wk-native-mobile .task-dialog--mobile.el-dialog {
+  height: calc(100dvh - 32px - var(--wk-safe-top) - var(--wk-safe-bottom));
+  max-height: calc(100dvh - 32px - var(--wk-safe-top) - var(--wk-safe-bottom));
+  margin: calc(16px + var(--wk-safe-top)) auto calc(16px + var(--wk-safe-bottom)) !important;
+}
+
 /* Prevent overlay from scrolling — dialog body scrolls internally */
 .el-overlay:has(.task-dialog),
 .el-overlay-dialog:has(.task-dialog) {

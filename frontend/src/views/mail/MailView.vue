@@ -401,13 +401,40 @@
       </template>
     </el-drawer>
 
-    <el-dialog v-model="connectDialogVisible" title="连接邮箱账号" :width="isMobile ? '92%' : '560px'">
-      <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-        <el-button class="h-11" @click="handleOAuth('gmail')">Gmail OAuth</el-button>
-        <el-button class="h-11" @click="handleOAuth('outlook')">Outlook / M365</el-button>
+    <el-dialog v-model="connectDialogVisible" class="mail-connect-dialog" :width="isMobile ? '92%' : '860px'">
+      <template #header>
+        <div class="mail-connect-header">
+          <h3>绑定邮箱账号</h3>
+          <p>绑定后可在系统内收发邮件，并自动关联客户沟通记录</p>
+        </div>
+      </template>
+
+      <div class="mail-connect-section-title">推荐方式</div>
+      <div class="mail-connect-oauth-grid">
+        <el-button class="h-11" @click="handleOAuth('gmail')">
+          <span class="mail-oauth-provider">
+            <span class="mail-oauth-logo mail-oauth-logo--google">G</span>
+            <span>Gmail 一键授权</span>
+          </span>
+        </el-button>
+        <el-button class="h-11" @click="handleOAuth('outlook')">
+          <span class="mail-oauth-provider">
+            <span class="material-symbols-outlined mail-oauth-logo mail-oauth-logo--outlook">mail</span>
+            <span>Outlook / Microsoft 365 一键授权</span>
+          </span>
+        </el-button>
       </div>
-      <el-form label-position="top">
-        <el-form-item label="邮箱厂商">
+      <div class="mail-connect-security-tip">
+        <span class="material-symbols-outlined">verified_user</span>
+        <span>无需填写密码，更安全，推荐使用</span>
+      </div>
+      <div class="mail-connect-or">
+        <span>或</span>
+      </div>
+
+      <el-form class="mail-connect-form" label-position="left" label-width="116px">
+        <div class="mail-connect-section-title">其他邮箱</div>
+        <el-form-item label="邮箱类型">
           <el-select
             v-model="selectedMailProviderPreset"
             class="w-full"
@@ -428,25 +455,56 @@
             </el-option>
           </el-select>
         </el-form-item>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <el-form-item label="邮箱地址"><el-input v-model="imapForm.emailAddress" @blur="syncUsernameFromEmail" /></el-form-item>
-          <el-form-item label="显示名称"><el-input v-model="imapForm.displayName" /></el-form-item>
-          <el-form-item label="IMAP 主机"><el-input v-model="imapForm.imapHost" placeholder="imap.example.com" /></el-form-item>
-          <el-form-item label="IMAP 端口"><el-input-number v-model="imapForm.imapPort" class="w-full" :min="1" :max="65535" /></el-form-item>
-          <el-form-item label="SMTP 主机"><el-input v-model="imapForm.smtpHost" placeholder="smtp.example.com" /></el-form-item>
-          <el-form-item label="SMTP 端口"><el-input-number v-model="imapForm.smtpPort" class="w-full" :min="1" :max="65535" /></el-form-item>
+        <el-form-item label="邮箱地址">
+          <el-input v-model="imapForm.emailAddress" placeholder="example@163.com" @blur="syncUsernameFromEmail" />
+        </el-form-item>
+        <el-form-item label="授权码 / 邮箱密码">
+          <el-input v-model="imapForm.password" type="password" show-password />
+        </el-form-item>
+        <div class="mail-connect-password-tip">
+          <span>请填写邮箱授权码。若连接失败，请确认邮箱已开启 IMAP/SMTP 服务。</span>
+          <el-link type="primary" :underline="false" @click="showAuthCodeHelp">如何获取授权码?</el-link>
         </div>
-        <el-form-item label="登录账号"><el-input v-model="imapForm.username" /></el-form-item>
-        <el-form-item label="授权码 / 密码"><el-input v-model="imapForm.password" type="password" show-password /></el-form-item>
-        <div class="flex gap-4">
-          <el-checkbox v-model="imapForm.imapSsl">IMAP SSL</el-checkbox>
-          <el-checkbox v-model="imapForm.smtpSsl">SMTP SSL</el-checkbox>
-          <el-checkbox v-model="imapForm.testConnection">连接测试</el-checkbox>
-        </div>
+
+        <el-collapse v-model="connectAdvancedPanels" class="mail-connect-advanced">
+          <el-collapse-item name="advanced">
+            <template #title>
+              <span class="mail-connect-advanced-title">
+                <span class="material-symbols-outlined">settings</span>
+                高级设置
+              </span>
+            </template>
+            <div class="mail-connect-advanced-grid">
+              <div class="mail-connect-advanced-field">
+                <label>IMAP 服务器</label>
+                <el-input v-model="imapForm.imapHost" placeholder="imap.example.com" />
+              </div>
+              <div class="mail-connect-advanced-field">
+                <label>IMAP 端口</label>
+                <el-input v-model.number="imapForm.imapPort" placeholder="993" />
+              </div>
+              <div class="mail-connect-advanced-field">
+                <label>SMTP 服务器</label>
+                <el-input v-model="imapForm.smtpHost" placeholder="smtp.example.com" />
+              </div>
+              <div class="mail-connect-advanced-field">
+                <label>SMTP 端口</label>
+                <el-input v-model.number="imapForm.smtpPort" placeholder="465" />
+              </div>
+            </div>
+            <div class="mail-connect-ssl-row">
+              <el-checkbox v-model="imapForm.imapSsl">开启 IMAP SSL</el-checkbox>
+              <el-checkbox v-model="imapForm.smtpSsl">开启 SMTP SSL</el-checkbox>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
       </el-form>
       <template #footer>
-        <el-button @click="connectDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="connecting" @click="connectImap">连接</el-button>
+        <div class="mail-connect-footer">
+          <el-button @click="connectDialogVisible = false">取消</el-button>
+          <el-button :loading="testingConnection" @click="testImapConnect">测试连接</el-button>
+          <el-button type="primary" :loading="connecting" @click="connectImap">保存并连接</el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -505,6 +563,7 @@ import {
   starMail,
   startMailOAuth,
   syncMailbox,
+  testImapMailbox,
   updateDraft,
   updateMailTemplate,
   type MailAuthStatus,
@@ -544,6 +603,7 @@ const authLoading = ref(false)
 const loading = ref(false)
 const syncingMailbox = ref(false)
 const connecting = ref(false)
+const testingConnection = ref(false)
 const savingDraft = ref(false)
 const sending = ref(false)
 const savingTemplate = ref(false)
@@ -564,6 +624,7 @@ const totalRow = ref(0)
 const aiIntent = ref('followup')
 const autoSaveState = ref<AutoSaveState>('idle')
 const selectedMailProviderPreset = ref('custom')
+const connectAdvancedPanels = ref(['advanced'])
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 let suppressAutoSave = false
 
@@ -1169,14 +1230,43 @@ function applyMailProviderPreset(value: string) {
 
 function syncUsernameFromEmail() {
   const email = imapForm.emailAddress.trim()
-  if (email && !imapForm.username?.trim()) {
-    imapForm.username = email
+  imapForm.username = email
+}
+
+function showAuthCodeHelp() {
+  ElMessage.info('请在邮箱设置中开启 IMAP/SMTP 服务，并生成客户端授权码或专用密码。')
+}
+
+function validateImapConnectForm() {
+  syncUsernameFromEmail()
+  if (!imapForm.emailAddress || !imapForm.imapHost || !imapForm.smtpHost || !imapForm.password) {
+    ElMessage.warning('请填写邮箱地址、IMAP/SMTP 主机和授权码')
+    return false
+  }
+  const imapPort = Number(imapForm.imapPort)
+  const smtpPort = Number(imapForm.smtpPort)
+  if (!Number.isInteger(imapPort) || !Number.isInteger(smtpPort) || imapPort < 1 || imapPort > 65535 || smtpPort < 1 || smtpPort > 65535) {
+    ElMessage.warning('请填写有效的 IMAP/SMTP 端口')
+    return false
+  }
+  imapForm.imapPort = imapPort
+  imapForm.smtpPort = smtpPort
+  return true
+}
+
+async function testImapConnect() {
+  if (!validateImapConnectForm()) return
+  testingConnection.value = true
+  try {
+    await testImapMailbox(imapForm)
+    ElMessage.success('连接测试成功')
+  } finally {
+    testingConnection.value = false
   }
 }
 
 async function connectImap() {
-  if (!imapForm.emailAddress || !imapForm.imapHost || !imapForm.smtpHost || !imapForm.password) {
-    ElMessage.warning('请填写邮箱地址、IMAP/SMTP 主机和授权码')
+  if (!validateImapConnectForm()) {
     return
   }
   connecting.value = true
@@ -1749,6 +1839,229 @@ const MAIL_FRAME_STYLE =
   width: 132px;
 }
 
+.mail-connect-header h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.mail-connect-header p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.mail-connect-section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.mail-connect-section-title::after {
+  height: 1px;
+  min-width: 24px;
+  flex: 1;
+  background: #e2e8f0;
+  content: '';
+}
+
+.mail-connect-oauth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.mail-connect-oauth-grid :deep(.el-button) {
+  width: 100%;
+  margin-left: 0;
+}
+
+.mail-oauth-provider {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.mail-oauth-logo {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.mail-oauth-logo--google {
+  width: 24px;
+  height: 24px;
+  color: #4285f4;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.mail-oauth-logo--outlook {
+  color: #0b83d8;
+  font-size: 24px;
+}
+
+.mail-connect-security-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.mail-connect-security-tip .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.mail-connect-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 18px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.mail-connect-or::before,
+.mail-connect-or::after {
+  height: 1px;
+  flex: 1;
+  background: #e2e8f0;
+  content: '';
+}
+
+.mail-connect-form :deep(.el-form-item) {
+  margin-bottom: 12px;
+}
+
+.mail-connect-form :deep(.el-form-item__label) {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mail-connect-form :deep(.el-input__wrapper),
+.mail-connect-form :deep(.el-select__wrapper) {
+  min-height: 42px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.mail-connect-form :deep(.el-input__wrapper:hover),
+.mail-connect-form :deep(.el-select__wrapper:hover),
+.mail-connect-form :deep(.el-input__wrapper.is-focus),
+.mail-connect-form :deep(.el-select__wrapper.is-focused) {
+  border-color: #cbd5e1;
+  box-shadow: none;
+}
+
+.mail-connect-password-tip {
+  display: flex;
+  width: calc(100% - 116px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -2px 0 12px 116px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mail-connect-password-tip :deep(.el-link) {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.mail-connect-advanced {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.mail-connect-advanced :deep(.el-collapse) {
+  border: 0;
+}
+
+.mail-connect-advanced :deep(.el-collapse-item__header) {
+  height: 42px;
+  border: 0;
+  background: transparent;
+  padding: 0 14px;
+}
+
+.mail-connect-advanced :deep(.el-collapse-item__wrap) {
+  border: 0;
+  background: transparent;
+}
+
+.mail-connect-advanced :deep(.el-collapse-item__content) {
+  padding: 0 14px 14px;
+}
+
+.mail-connect-advanced-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.mail-connect-advanced-title .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.mail-connect-advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+  row-gap: 12px;
+}
+
+.mail-connect-advanced-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mail-connect-advanced-field label {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.mail-connect-ssl-row {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  margin-top: 12px;
+}
+
+.mail-connect-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 .mail-editor {
   min-height: 260px;
   max-height: 48vh;
@@ -1878,6 +2191,60 @@ const MAIL_FRAME_STYLE =
   gap: 8px;
   padding: 14px 20px;
   border-top: 1px solid #ebe6dd;
+}
+
+@media (max-width: 767px) {
+  .mail-connect-oauth-grid,
+  .mail-connect-advanced-grid,
+  .mail-connect-ssl-row {
+    grid-template-columns: 1fr;
+  }
+
+  .mail-connect-form {
+    --el-form-label-width: 96px;
+  }
+
+  .mail-connect-password-tip,
+  .mail-connect-ssl-row {
+    width: calc(100% - 96px);
+    margin-left: 96px;
+  }
+
+  .mail-connect-ssl-row {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .mail-oauth-provider {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 520px) {
+  .mail-connect-form {
+    --el-form-label-width: 0;
+  }
+
+  .mail-connect-form :deep(.el-form-item) {
+    display: block;
+  }
+
+  .mail-connect-form :deep(.el-form-item__label) {
+    justify-content: flex-start;
+    height: auto;
+    margin-bottom: 6px;
+  }
+
+  .mail-connect-password-tip,
+  .mail-connect-ssl-row {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .mail-connect-password-tip {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>
 

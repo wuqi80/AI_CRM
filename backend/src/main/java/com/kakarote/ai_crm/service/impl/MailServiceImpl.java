@@ -275,6 +275,13 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     }
 
     @Override
+    public void testImapConnection(MailImapBindBO bindBO) {
+        String email = normalizeEmail(bindBO.getEmailAddress());
+        String username = StrUtil.blankToDefault(bindBO.getUsername(), email);
+        testImapConnection(bindBO.getImapHost(), resolveImapPort(bindBO.getImapPort()), Boolean.TRUE.equals(bindBO.getImapSsl()), username, bindBO.getPassword());
+    }
+
+    @Override
     public MailOAuthStartVO startOAuth(String provider) {
         Long tenantId = UserUtil.getTenantId();
         Long userId = UserUtil.getUserId();

@@ -3222,7 +3222,6 @@ const showMobileSummaryVoiceAction = computed(() =>
   mobileCustomerSummaryVisible.value
     && isMobile.value
     && isCustomerContextChat.value
-    && customerSummarySheetHeight.value >= CUSTOMER_SUMMARY_SHEET_MAX_HEIGHT - 1
 )
 const mobileCustomerSummarySheetStyle = computed(() => ({
   height: `${customerSummarySheetHeight.value}vh`,
