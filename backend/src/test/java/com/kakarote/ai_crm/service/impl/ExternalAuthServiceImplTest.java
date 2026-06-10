@@ -11,6 +11,7 @@ import com.kakarote.ai_crm.entity.BO.ExternalTenantRegisterBO;
 import com.kakarote.ai_crm.entity.PO.ExternalAuthIdentity;
 import com.kakarote.ai_crm.entity.PO.ExternalTenantBinding;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
+import com.kakarote.ai_crm.entity.VO.ExternalAuthAuthorizeVO;
 import com.kakarote.ai_crm.entity.PO.WecomEmployee;
 import com.kakarote.ai_crm.entity.VO.WecomOpenAuthorizeVO;
 import com.kakarote.ai_crm.mapper.ExternalAuthIdentityMapper;
@@ -23,21 +24,173 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class ExternalAuthServiceImplTest {
+
+    @Test
+    void createAuthorizeUrlShouldBuildWechatQrConnectUrl() {
+        ExternalAuthServiceImpl service = newService();
+        Redis redis = mapper(service, "redis");
+        ExternalAuthProperties properties = mapper(service, "properties");
+        properties.getWechat().setEnabled(Boolean.TRUE);
+        properties.getWechat().setClientId("wechat_app_id");
+        properties.getWechat().setClientSecret("wechat_secret");
+        properties.getWechat().setRedirectUri("https://crm.example.com/crmapi/auth/external/wechat/callback");
+
+        ExternalAuthAuthorizeVO vo = service.createAuthorizeUrl("wechat",
+                "https://crm.example.com/#/login",
+                mock(HttpServletRequest.class));
+
+        assertThat(vo.getProvider()).isEqualTo("wechat");
+        assertThat(vo.getAuthorizeUrl()).startsWith("https://open.weixin.qq.com/connect/qrconnect?");
+        assertThat(vo.getAuthorizeUrl()).contains("appid=wechat_app_id");
+        assertThat(vo.getAuthorizeUrl()).contains("redirect_uri=https://crm.example.com/crmapi/auth/external/wechat/callback");
+        assertThat(vo.getAuthorizeUrl()).contains("scope=snsapi_login");
+        assertThat(vo.getAuthorizeUrl()).endsWith("#wechat_redirect");
+        verify(redis).setex(any(String.class), anyInt(), contains("LOGIN"));
+    }
+
+    @Test
+    void fetchWechatProfileShouldResolveProfileAndExcludeOauthTokens() {
+        ExternalAuthServiceImpl service = newService();
+        ExternalAuthProperties.ProviderConfig config = usableWechatConfig();
+        RestTemplate restTemplate = mapper(service, "restTemplate");
+        MockRestServiceServer server = MockRestServiceServer.createServer(restTemplate);
+        server.expect(requestTo(containsString("/sns/oauth2/access_token")))
+                .andRespond(withSuccess("""
+                        {
+                          "access_token": "wechat_access_token",
+                          "refresh_token": "wechat_refresh_token",
+                          "openid": "openid_1",
+                          "unionid": "union_1"
+                        }
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(containsString("/sns/userinfo")))
+                .andRespond(withSuccess("""
+                        {
+                          "openid": "openid_1",
+                          "nickname": "Wechat User",
+                          "headimgurl": "https://wx.example.com/avatar.png",
+                          "unionid": "union_1"
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        ExternalAuthServiceImpl.ExternalProfile profile = ReflectionTestUtils.invokeMethod(
+                service, "fetchWechatProfile", "code_1", config);
+
+        assertThat(profile).isNotNull();
+        assertThat(profile.getProvider()).isEqualTo("wechat");
+        assertThat(profile.getSubject()).isEqualTo("openid_1");
+        assertThat(profile.getDisplayName()).isEqualTo("Wechat User");
+        assertThat(profile.getAvatarUrl()).isEqualTo("https://wx.example.com/avatar.png");
+        assertThat(profile.getExternalTenantKey()).isEqualTo("union_1");
+        assertThat(profile.getRawJson()).contains("union_1");
+        assertThat(profile.getRawJson()).doesNotContain("wechat_access_token", "wechat_refresh_token");
+        server.verify();
+    }
+
+    @Test
+    void fetchWechatProfileShouldDecodeUtf8NicknameWhenWechatOmitsCharset() {
+        ExternalAuthServiceImpl service = newService();
+        ExternalAuthProperties.ProviderConfig config = usableWechatConfig();
+        RestTemplate restTemplate = mapper(service, "restTemplate");
+        MockRestServiceServer server = MockRestServiceServer.createServer(restTemplate);
+        server.expect(requestTo(containsString("/sns/oauth2/access_token")))
+                .andRespond(withSuccess("""
+                        {
+                          "access_token": "wechat_access_token",
+                          "openid": "openid_1",
+                          "unionid": "union_1"
+                        }
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(containsString("/sns/userinfo")))
+                .andRespond(withSuccess("""
+                        {
+                          "openid": "openid_1",
+                          "nickname": "测试用户",
+                          "headimgurl": "https://wx.example.com/avatar.png",
+                          "unionid": "union_1"
+                        }
+                        """.getBytes(StandardCharsets.UTF_8), MediaType.TEXT_PLAIN));
+
+        ExternalAuthServiceImpl.ExternalProfile profile = ReflectionTestUtils.invokeMethod(
+                service, "fetchWechatProfile", "code_1", config);
+
+        assertThat(profile).isNotNull();
+        assertThat(profile.getDisplayName()).isEqualTo("测试用户");
+        assertThat(profile.getRawJson()).contains("测试用户");
+        server.verify();
+    }
+
+    @Test
+    void fetchWechatProfileShouldRejectTokenError() {
+        ExternalAuthServiceImpl service = newService();
+        ExternalAuthProperties.ProviderConfig config = usableWechatConfig();
+        RestTemplate restTemplate = mapper(service, "restTemplate");
+        MockRestServiceServer server = MockRestServiceServer.createServer(restTemplate);
+        server.expect(requestTo(containsString("/sns/oauth2/access_token")))
+                .andRespond(withSuccess("""
+                        {
+                          "errcode": 40029,
+                          "errmsg": "invalid code"
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "fetchWechatProfile", "bad_code", config))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("WeChat token exchange failed");
+        server.verify();
+    }
+
+    @Test
+    void fetchWechatProfileShouldRejectUserInfoError() {
+        ExternalAuthServiceImpl service = newService();
+        ExternalAuthProperties.ProviderConfig config = usableWechatConfig();
+        RestTemplate restTemplate = mapper(service, "restTemplate");
+        MockRestServiceServer server = MockRestServiceServer.createServer(restTemplate);
+        server.expect(requestTo(containsString("/sns/oauth2/access_token")))
+                .andRespond(withSuccess("""
+                        {
+                          "access_token": "wechat_access_token",
+                          "openid": "openid_1",
+                          "unionid": "union_1"
+                        }
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(containsString("/sns/userinfo")))
+                .andRespond(withSuccess("""
+                        {
+                          "errcode": 40003,
+                          "errmsg": "invalid openid"
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "fetchWechatProfile", "code_1", config))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("WeChat userinfo failed");
+        server.verify();
+    }
 
     @Test
     void autoProvisionWecomIdentityShouldCreateMemberUnderExistingAuthorizedCorp() {
@@ -251,6 +404,117 @@ class ExternalAuthServiceImplTest {
         verify(registrationService, never()).registerExternalTenantMember(any(ExternalTenantMemberRegisterBO.class));
     }
 
+    @Test
+    void registerByTicketShouldCreateWechatTenantWithoutEmailAndWithoutWecomSideEffects() {
+        ExternalAuthServiceImpl service = newService();
+        Redis redis = mapper(service, "redis");
+        RegistrationService registrationService = mapper(service, "registrationService");
+        ExternalAuthIdentityMapper identityMapper = mapper(service, "identityMapper");
+        ExternalTenantBindingMapper tenantBindingMapper = mapper(service, "tenantBindingMapper");
+        WecomEmployeeMapper wecomEmployeeMapper = mapper(service, "wecomEmployeeMapper");
+
+        ExternalAuthServiceImpl.ExternalRegisterTicket ticket = new ExternalAuthServiceImpl.ExternalRegisterTicket();
+        ticket.setProfile(wechatProfile());
+        when(redis.get("external-auth:register-ticket:ticket_1")).thenReturn(JSON.toJSONString(ticket));
+        when(identityMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        ManagerUser createdUser = new ManagerUser();
+        createdUser.setTenantId(66L);
+        createdUser.setUserId(77L);
+        when(registrationService.registerExternalTenant(any(ExternalTenantRegisterBO.class))).thenReturn(createdUser);
+
+        ExternalAuthRegisterBO bo = new ExternalAuthRegisterBO();
+        bo.setTicket("ticket_1");
+        bo.setCompanyName("Wechat Corp");
+        bo.setPassword("secret123");
+
+        service.registerByTicket(bo, mock(HttpServletRequest.class), mock(HttpServletResponse.class));
+
+        ArgumentCaptor<ExternalTenantRegisterBO> registerCaptor = ArgumentCaptor.forClass(ExternalTenantRegisterBO.class);
+        verify(registrationService).registerExternalTenant(registerCaptor.capture());
+        assertThat(registerCaptor.getValue().getEmail()).isNull();
+        assertThat(registerCaptor.getValue().getUsername()).startsWith("wechat_");
+        assertThat(registerCaptor.getValue().getUsername()).hasSize(23);
+        assertThat(registerCaptor.getValue().getCompanyName()).isEqualTo("Wechat Corp");
+        assertThat(registerCaptor.getValue().getPassword()).isEqualTo("secret123");
+        assertThat(registerCaptor.getValue().getRealname()).isEqualTo("Wechat User");
+        assertThat(registerCaptor.getValue().getEmailVerificationRequired()).isFalse();
+        ArgumentCaptor<ExternalAuthIdentity> identityCaptor = ArgumentCaptor.forClass(ExternalAuthIdentity.class);
+        verify(identityMapper).insert(identityCaptor.capture());
+        assertThat(identityCaptor.getValue().getProvider()).isEqualTo("wechat");
+        assertThat(identityCaptor.getValue().getSubject()).isEqualTo("openid_1");
+        assertThat(identityCaptor.getValue().getTenantId()).isEqualTo(66L);
+        assertThat(identityCaptor.getValue().getUserId()).isEqualTo(77L);
+        assertThat(identityCaptor.getValue().getEmail()).isNull();
+        assertThat(identityCaptor.getValue().getExternalTenantKey()).isEqualTo("union_1");
+        verify(tenantBindingMapper, never()).insert(any(ExternalTenantBinding.class));
+        verify(wecomEmployeeMapper, never()).insert(any(WecomEmployee.class));
+        verify(redis).del("external-auth:register-ticket:ticket_1");
+    }
+
+    @Test
+    void bindIdentityShouldSaveWechatBindingForCurrentUser() {
+        ExternalAuthServiceImpl service = newService();
+        ExternalAuthIdentityMapper identityMapper = mapper(service, "identityMapper");
+        when(identityMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(identityMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        ExternalAuthServiceImpl.AuthState state = new ExternalAuthServiceImpl.AuthState();
+        state.setProvider("wechat");
+        state.setScene("BIND");
+        state.setTenantId(66L);
+        state.setUserId(77L);
+
+        ReflectionTestUtils.invokeMethod(service, "bindIdentity", state, wechatProfile());
+
+        ArgumentCaptor<ExternalAuthIdentity> identityCaptor = ArgumentCaptor.forClass(ExternalAuthIdentity.class);
+        verify(identityMapper).insert(identityCaptor.capture());
+        assertThat(identityCaptor.getValue().getProvider()).isEqualTo("wechat");
+        assertThat(identityCaptor.getValue().getTenantId()).isEqualTo(66L);
+        assertThat(identityCaptor.getValue().getUserId()).isEqualTo(77L);
+    }
+
+    @Test
+    void bindIdentityShouldRejectWechatIdentityAlreadyBoundToAnotherUser() {
+        ExternalAuthServiceImpl service = newService();
+        ExternalAuthIdentityMapper identityMapper = mapper(service, "identityMapper");
+        ExternalAuthIdentity existing = new ExternalAuthIdentity();
+        existing.setProvider("wechat");
+        existing.setSubject("openid_1");
+        existing.setTenantId(66L);
+        existing.setUserId(88L);
+        when(identityMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(existing);
+
+        ExternalAuthServiceImpl.AuthState state = new ExternalAuthServiceImpl.AuthState();
+        state.setProvider("wechat");
+        state.setScene("BIND");
+        state.setTenantId(66L);
+        state.setUserId(77L);
+
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "bindIdentity", state, wechatProfile()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("External identity is already bound");
+        verify(identityMapper, never()).insert(any(ExternalAuthIdentity.class));
+    }
+
+    @Test
+    void bindIdentityShouldRejectSecondWechatProviderForSameUser() {
+        ExternalAuthServiceImpl service = newService();
+        ExternalAuthIdentityMapper identityMapper = mapper(service, "identityMapper");
+        when(identityMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(identityMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+
+        ExternalAuthServiceImpl.AuthState state = new ExternalAuthServiceImpl.AuthState();
+        state.setProvider("wechat");
+        state.setScene("BIND");
+        state.setTenantId(66L);
+        state.setUserId(77L);
+
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "bindIdentity", state, wechatProfile()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Please unbind this provider first");
+        verify(identityMapper, never()).insert(any(ExternalAuthIdentity.class));
+    }
+
     private static ExternalAuthServiceImpl.ExternalProfile wecomProfile() {
         ExternalAuthServiceImpl.ExternalProfile profile = new ExternalAuthServiceImpl.ExternalProfile();
         profile.setProvider("wecom");
@@ -260,6 +524,27 @@ class ExternalAuthServiceImplTest {
         profile.setExternalTenantName("Corp One");
         profile.setRawJson("{}");
         return profile;
+    }
+
+    private static ExternalAuthServiceImpl.ExternalProfile wechatProfile() {
+        ExternalAuthServiceImpl.ExternalProfile profile = new ExternalAuthServiceImpl.ExternalProfile();
+        profile.setProvider("wechat");
+        profile.setSubject("openid_1");
+        profile.setDisplayName("Wechat User");
+        profile.setAvatarUrl("https://wx.example.com/avatar.png");
+        profile.setExternalTenantKey("union_1");
+        profile.setEmailVerified(Boolean.FALSE);
+        profile.setRawJson("{\"openid\":\"openid_1\",\"unionid\":\"union_1\"}");
+        return profile;
+    }
+
+    private static ExternalAuthProperties.ProviderConfig usableWechatConfig() {
+        ExternalAuthProperties.ProviderConfig config = new ExternalAuthProperties.ProviderConfig();
+        config.setEnabled(Boolean.TRUE);
+        config.setClientId("wechat_app_id");
+        config.setClientSecret("wechat_secret");
+        config.setRedirectUri("https://crm.example.com/crmapi/auth/external/wechat/callback");
+        return config;
     }
 
     @SuppressWarnings("unchecked")

@@ -2,6 +2,7 @@ package com.kakarote.ai_crm.service.impl;
 
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.SecureUtil;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -46,6 +47,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
@@ -79,8 +81,10 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
     private static final int ENABLED_STATUS = 1;
     private static final String WECOM_EMPLOYEE_PERMISSION_MODULE = "wecomEmployeeSession";
     private static final String DEFAULT_WECOM_TENANT_NAME = "\u4f01\u4e1a\u5fae\u4fe1\u4f01\u4e1a";
+    private static final String WECHAT_USERNAME_PREFIX = "wechat_";
+    private static final int WECHAT_USERNAME_HASH_LENGTH = 16;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = createRestTemplate();
 
     @Autowired
     private ExternalAuthProperties properties;
@@ -108,6 +112,15 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
 
     @Autowired
     private WecomEmployeeMapper wecomEmployeeMapper;
+
+    private static RestTemplate createRestTemplate() {
+        RestTemplate template = new RestTemplate();
+        template.getMessageConverters().replaceAll(converter ->
+                converter instanceof StringHttpMessageConverter
+                        ? new StringHttpMessageConverter(StandardCharsets.UTF_8)
+                        : converter);
+        return template;
+    }
 
     @PostConstruct
     void configureRestTemplateProxy() {
@@ -294,6 +307,7 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
             redis.del(ticketKey);
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Please authorize WeCom third-party app first");
         }
+        boolean wechatProfile = "wechat".equals(profile.getProvider());
         String email = resolveRegistrationEmail(profile);
         String realname = StrUtil.blankToDefault(StrUtil.trim(profile.getDisplayName()),
                 firstNotBlank(email, profile.getSubject()));
@@ -311,6 +325,9 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
         } else {
             requireManualRegisterInput(registerBO);
             ExternalTenantRegisterBO tenantRegisterBO = new ExternalTenantRegisterBO();
+            if (wechatProfile) {
+                tenantRegisterBO.setUsername(resolveWechatRegistrationUsername(profile));
+            }
             tenantRegisterBO.setEmail(email);
             tenantRegisterBO.setPassword(registerBO.getPassword());
             tenantRegisterBO.setCompanyName(companyName);
@@ -548,32 +565,61 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
                 String.class
         );
         JSONObject token = JSON.parseObject(tokenJson);
+        assertWechatOk(token, "WeChat token exchange failed");
         String openId = token.getString("openid");
         String accessToken = token.getString("access_token");
-        JSONObject profileJson = new JSONObject();
-        if (StrUtil.isNotBlank(accessToken) && StrUtil.isNotBlank(openId)) {
-            String userInfoJson = restTemplate.getForObject(
-                    UriComponentsBuilder.fromHttpUrl("https://api.weixin.qq.com/sns/userinfo")
-                            .queryParam("access_token", accessToken)
-                            .queryParam("openid", openId)
-                            .queryParam("lang", "zh_CN")
-                            .build()
-                            .toUriString(),
-                    String.class
-            );
-            profileJson = JSON.parseObject(userInfoJson);
+        if (StrUtil.isBlank(openId) || StrUtil.isBlank(accessToken)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeChat token exchange failed");
         }
+        String userInfoJson = restTemplate.getForObject(
+                UriComponentsBuilder.fromHttpUrl("https://api.weixin.qq.com/sns/userinfo")
+                        .queryParam("access_token", accessToken)
+                        .queryParam("openid", openId)
+                        .queryParam("lang", "zh_CN")
+                        .build()
+                        .toUriString(),
+                String.class
+        );
+        JSONObject profileJson = JSON.parseObject(userInfoJson);
+        assertWechatOk(profileJson, "WeChat userinfo failed");
+        String unionId = firstNotBlank(profileJson.getString("unionid"), token.getString("unionid"));
 
         ExternalProfile profile = new ExternalProfile();
         profile.setProvider("wechat");
         profile.setSubject(openId);
         profile.setDisplayName(StrUtil.blankToDefault(profileJson.getString("nickname"), openId));
         profile.setAvatarUrl(profileJson.getString("headimgurl"));
-        profile.setExternalTenantKey(token.getString("unionid"));
+        profile.setExternalTenantKey(unionId);
         profile.setEmailVerified(Boolean.FALSE);
-        profile.setRawJson(profileJson.isEmpty() ? token.toJSONString() : profileJson.toJSONString());
+        profile.setRawJson(sanitizedWechatRawProfile(openId, unionId, profileJson).toJSONString());
         validateProfile(profile);
         return profile;
+    }
+
+    private void assertWechatOk(JSONObject response, String message) {
+        if (response == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, message);
+        }
+        Integer errorCode = response.getInteger("errcode");
+        if (errorCode != null && errorCode != 0) {
+            String errorMessage = response.getString("errmsg");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                    StrUtil.isBlank(errorMessage) ? message : message + ": " + errorMessage);
+        }
+    }
+
+    private JSONObject sanitizedWechatRawProfile(String openId, String unionId, JSONObject profileJson) {
+        JSONObject rawProfile = new JSONObject();
+        rawProfile.put("openid", openId);
+        rawProfile.put("unionid", unionId);
+        rawProfile.put("nickname", profileJson.getString("nickname"));
+        rawProfile.put("headimgurl", profileJson.getString("headimgurl"));
+        rawProfile.put("sex", profileJson.getInteger("sex"));
+        rawProfile.put("province", profileJson.getString("province"));
+        rawProfile.put("city", profileJson.getString("city"));
+        rawProfile.put("country", profileJson.getString("country"));
+        rawProfile.put("privilege", profileJson.get("privilege"));
+        return rawProfile;
     }
 
     private ExternalAuthIdentity autoProvisionWecomIdentity(ExternalProfile profile) {
@@ -795,6 +841,9 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
         if (StrUtil.isBlank(email)) {
             if ("wecom".equals(profile.getProvider())) {
                 email = syntheticWecomEmail(profile.getExternalTenantKey(), profile.getSubject());
+            } else if ("wechat".equals(profile.getProvider())) {
+                profile.setEmail(null);
+                return null;
             }
         }
         if (StrUtil.isBlank(email)) {
@@ -802,6 +851,14 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
         }
         profile.setEmail(email);
         return email;
+    }
+
+    private String resolveWechatRegistrationUsername(ExternalProfile profile) {
+        if (StrUtil.isBlank(profile.getSubject())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "External identity subject is missing");
+        }
+        return WECHAT_USERNAME_PREFIX
+                + SecureUtil.sha256(profile.getSubject()).substring(0, WECHAT_USERNAME_HASH_LENGTH);
     }
 
     private String resolveWecomCompanyName(ExternalProfile profile, String requestedCompanyName) {
@@ -860,7 +917,7 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
         return switch (provider) {
             case "google" -> "Google";
             case "outlook" -> "Outlook";
-            case "wechat" -> "WeChat";
+            case "wechat" -> "微信";
             case "wecom" -> "企业微信";
             default -> provider;
         };

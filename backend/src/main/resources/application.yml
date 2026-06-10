@@ -119,6 +119,11 @@ external-auth:
     client-secret: ${EXTERNAL_AUTH_OUTLOOK_CLIENT_SECRET:${MAIL_OUTLOOK_CLIENT_SECRET:}}
     tenant: ${EXTERNAL_AUTH_OUTLOOK_TENANT:${MAIL_OUTLOOK_TENANT:common}}
     redirect-uri: ${EXTERNAL_AUTH_OUTLOOK_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/auth/external/outlook/callback}
+  wechat:
+    enabled: ${EXTERNAL_AUTH_WECHAT_ENABLED:true}
+    client-id: ${EXTERNAL_AUTH_WECHAT_CLIENT_ID:}
+    client-secret: ${EXTERNAL_AUTH_WECHAT_CLIENT_SECRET:}
+    redirect-uri: ${EXTERNAL_AUTH_WECHAT_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/auth/external/wechat/callback}
 wecom:
   open-platform:
     enabled: ${WECOM_OPEN_PLATFORM_ENABLED:true}

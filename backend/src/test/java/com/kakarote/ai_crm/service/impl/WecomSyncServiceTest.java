@@ -49,6 +49,13 @@ import static org.mockito.Mockito.when;
 class WecomSyncServiceTest {
 
     @Test
+    void runSyncShouldNotWrapArchiveDrainInSingleTransaction() throws Exception {
+        assertThat(WecomSyncServiceImpl.class
+                .getMethod("runSync", WecomCorpConfig.class, WecomSyncRunBO.class)
+                .getAnnotation(org.springframework.transaction.annotation.Transactional.class)).isNull();
+    }
+
+    @Test
     void runSyncShouldSaveArchiveMessagesAndAdvanceCursor() {
         WecomSyncServiceImpl service = newService();
         WecomFinanceArchiveGateway archiveGateway = mapper(service, "archiveGateway");
@@ -339,6 +346,57 @@ class WecomSyncServiceTest {
         ArgumentCaptor<WecomSyncCursor> cursorCaptor = ArgumentCaptor.forClass(WecomSyncCursor.class);
         verify(cursorMapper).insert(cursorCaptor.capture());
         assertThat(cursorCaptor.getValue().getSeq()).isEqualTo(8L);
+    }
+
+    @Test
+    void runSyncShouldReportFetchedArchiveMessagesEvenWhenAllAreSkipped() {
+        WecomSyncServiceImpl service = newService();
+        WecomFinanceArchiveGateway archiveGateway = mapper(service, "archiveGateway");
+        WecomSyncCursorMapper cursorMapper = mapper(service, "cursorMapper");
+        WecomSyncLogMapper syncLogMapper = mapper(service, "syncLogMapper");
+
+        WecomCorpConfig config = config();
+        config.setArchiveEnabled(true);
+        WecomSyncRunBO runBO = archiveOnlyRunBO();
+        JSONObject skippedMessage = new JSONObject()
+                .fluentPut("seq", 8L)
+                .fluentPut(WecomFinanceSdkClient.SKIP_MESSAGE_FIELD, true)
+                .fluentPut(WecomFinanceSdkClient.SKIP_REASON_FIELD,
+                        WecomFinanceSdkClient.SKIP_REASON_PUBLIC_KEY_VERSION_MISMATCH);
+
+        when(cursorMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(archiveGateway.fetchMessages(eq(config), eq(0L), eq(10))).thenReturn(List.of(skippedMessage));
+
+        WecomSyncStatusVO status = service.runSync(config, runBO);
+
+        assertThat(status.getFetchedCount()).isEqualTo(1);
+        assertThat(status.getSavedCount()).isZero();
+        ArgumentCaptor<WecomSyncLog> logCaptor = ArgumentCaptor.forClass(WecomSyncLog.class);
+        verify(syncLogMapper).updateById(logCaptor.capture());
+        assertThat(logCaptor.getValue().getFetchedCount()).isEqualTo(1);
+        assertThat(logCaptor.getValue().getSavedCount()).isZero();
+    }
+
+    @Test
+    void runSyncShouldUseLargeDefaultArchiveLimitForManualConversationSync() {
+        WecomSyncServiceImpl service = newService();
+        WecomFinanceArchiveGateway archiveGateway = mapper(service, "archiveGateway");
+        WecomSyncCursorMapper cursorMapper = mapper(service, "cursorMapper");
+
+        WecomCorpConfig config = config();
+        config.setArchiveEnabled(true);
+        WecomSyncRunBO runBO = new WecomSyncRunBO();
+        runBO.setSyncEmployees(false);
+        runBO.setSyncCustomers(false);
+        runBO.setSyncConversations(true);
+
+        when(cursorMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(archiveGateway.fetchMessages(eq(config), eq(0L), eq(1000))).thenReturn(List.of());
+
+        WecomSyncStatusVO status = service.runSync(config, runBO);
+
+        assertThat(status.getLastSyncStatus()).isEqualTo("success");
+        verify(archiveGateway).fetchMessages(eq(config), eq(0L), eq(1000));
     }
 
     @Test

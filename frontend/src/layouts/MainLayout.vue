@@ -3045,6 +3045,46 @@ function handleMobilePrimaryNavClick(item: MainNavItem) {
   mobileNavigate(item.route)
 }
 
+function routeQueryString(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : ''
+  return ''
+}
+
+function externalProviderName(provider: string): string {
+  if (provider === 'wechat') return '微信'
+  if (provider === 'wecom') return '企业微信'
+  if (provider === 'google') return 'Google'
+  if (provider === 'outlook') return 'Microsoft'
+  return '第三方'
+}
+
+async function clearExternalAuthReturnQuery() {
+  const query = { ...route.query }
+  delete query.externalBind
+  delete query.externalAuthError
+  delete query.provider
+  delete query.message
+  await router.replace({ path: route.path, query, hash: route.hash })
+}
+
+async function handleExternalAuthBindingReturn() {
+  const bindResult = routeQueryString(route.query.externalBind)
+  const authError = routeQueryString(route.query.externalAuthError)
+  if (!bindResult && !authError) return
+
+  const provider = routeQueryString(route.query.provider)
+  const providerName = externalProviderName(provider)
+  const message = routeQueryString(route.query.message)
+  if (bindResult === 'success') {
+    ElMessage.success(`${providerName}绑定成功`)
+  } else {
+    ElMessage.error(message ? `${providerName}绑定失败：${message}` : `${providerName}绑定失败`)
+  }
+  showAccountSettingsModal.value = true
+  await clearExternalAuthReturnQuery()
+}
+
 watch(
   () => route.fullPath,
   () => {
@@ -3058,6 +3098,7 @@ watch(
     if (route.path === '/settings/team' && scope === 'profile') {
       selectedPrimaryKey.value = ''
     }
+    void handleExternalAuthBindingReturn()
   }
 )
 
@@ -3224,6 +3265,7 @@ function updatePrimaryNavScrollbar() {
 onMounted(() => {
   enterpriseStore.loadConfig()
   void chatStore.fetchSessions()
+  void handleExternalAuthBindingReturn()
   if (showSidebarCustomers.value) {
     void fetchSidebarCustomers({ reset: true })
   }

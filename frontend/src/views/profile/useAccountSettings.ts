@@ -192,14 +192,15 @@ export function useAccountSettings() {
 
   async function handleUnbindExternal(provider: ExternalAuthProviderCode) {
     try {
-      await ElMessageBox.confirm('Confirm unbind this external login?', 'Unbind external login', {
-        confirmButtonText: 'Unbind',
-        cancelButtonText: 'Cancel',
+      const providerName = externalProviderName(provider)
+      await ElMessageBox.confirm(`确定要解绑${providerName}登录吗？`, '解绑第三方登录', {
+        confirmButtonText: '解绑',
+        cancelButtonText: '取消',
         type: 'warning'
       })
       externalBindingProvider.value = provider
       await unbindExternalAuth(provider)
-      ElMessage.success('External login unbound')
+      ElMessage.success(`${providerName}登录已解绑`)
       await loadExternalBindings()
     } catch (error) {
       if (error !== 'cancel' && error !== 'close') {
@@ -208,6 +209,14 @@ export function useAccountSettings() {
     } finally {
       externalBindingProvider.value = ''
     }
+  }
+
+  function externalProviderName(provider: ExternalAuthProviderCode): string {
+    if (provider === 'wechat') return '微信'
+    if (provider === 'wecom') return '企业微信'
+    if (provider === 'google') return 'Google'
+    if (provider === 'outlook') return 'Microsoft'
+    return '第三方'
   }
 
   return {

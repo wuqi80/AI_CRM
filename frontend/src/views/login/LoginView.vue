@@ -176,7 +176,7 @@
 
                     <div v-if="enabledExternalProviders.length" class="external-auth-panel">
                       <div class="external-auth-divider">
-                        <span>External login</span>
+                        <span>第三方登录</span>
                       </div>
                       <div class="external-auth-grid">
                         <button
@@ -937,6 +937,8 @@ function providerMark(provider: ExternalAuthProviderCode): string {
 function providerDisplayName(provider: ExternalAuthProvider): string {
   if (provider.provider === 'google') return 'Google'
   if (provider.provider === 'outlook') return 'Microsoft'
+  if (provider.provider === 'wechat') return '微信'
+  if (provider.provider === 'wecom') return '企业微信'
   return provider.name
 }
 
@@ -985,7 +987,9 @@ async function handleExternalAuthQuery() {
 
   const externalError = typeof route.query.externalAuthError === 'string' ? route.query.externalAuthError : ''
   if (externalError) {
-    ElMessage.error('External login failed')
+    const provider = typeof route.query.provider === 'string' ? route.query.provider : ''
+    const providerName = provider === 'wechat' ? '微信' : provider === 'wecom' ? '企业微信' : '第三方'
+    ElMessage.error(`${providerName}登录失败`)
     await clearExternalAuthQuery()
     return
   }

@@ -34,7 +34,6 @@ import com.kakarote.ai_crm.utils.UserUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -112,7 +111,6 @@ public class WecomSyncServiceImpl {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Transactional(rollbackFor = Exception.class)
     public WecomSyncStatusVO runSync(WecomCorpConfig config, WecomSyncRunBO runBO) {
         WecomSyncLog log = new WecomSyncLog();
         log.setCorpId(config.getCorpId());
@@ -144,7 +142,9 @@ public class WecomSyncServiceImpl {
                 appendError(errorMessage, customerResult.errorMessage());
             }
             if (Boolean.TRUE.equals(runBO.getSyncConversations())) {
-                saved += syncArchiveMessages(config, runBO.getArchiveLimit()).saved();
+                ArchiveSyncResult archiveResult = syncArchiveMessages(config, runBO.getArchiveLimit());
+                fetched += archiveResult.fetched();
+                saved += archiveResult.saved();
             }
             log.setStatus(SYNC_STATUS_SUCCESS);
         } catch (Exception e) {
@@ -1391,7 +1391,7 @@ public class WecomSyncServiceImpl {
 
     private int resolveArchiveLimit(Integer limit) {
         if (limit == null || limit <= 0) {
-            return 100;
+            return 1000;
         }
         return Math.min(limit, 1000);
     }

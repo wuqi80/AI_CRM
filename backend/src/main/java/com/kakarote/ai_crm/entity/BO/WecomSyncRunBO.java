@@ -11,5 +11,5 @@ public class WecomSyncRunBO {
 
     private Boolean syncConversations = Boolean.TRUE;
 
-    private Integer archiveLimit = 100;
+    private Integer archiveLimit = 1000;
 }
