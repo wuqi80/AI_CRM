@@ -164,17 +164,9 @@
                   {{ projectStatusLabel(project.status) }}
                 </span>
                 <button
-                  type="button"
-                  class="wk-project-chat-enter-button ml-auto"
-                  @click="switchProjectView('board')"
-                >
-                  <span>进入项目</span>
-                  <span class="material-symbols-outlined text-[16px] leading-none">arrow_forward</span>
-                </button>
-                <button
                   v-if="showProjectLanePanelShell"
                   type="button"
-                  class="group/sb-toggle relative flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef]"
+                  class="group/sb-toggle relative ml-auto flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef]"
                   :aria-label="projectLanePanelVisible ? '收起项目侧栏' : '显示项目侧栏'"
                   @click="projectLanePanelVisible = !projectLanePanelVisible"
                 >
@@ -427,10 +419,18 @@
               <span></span>
             </div>
             <div class="wk-project-chat-lanes-panel__header">
-              <div class="min-w-0">
-                <h2 class="truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">任务泳道图</h2>
+              <div class="flex min-w-0 items-center gap-2">
+                <h2 class="min-w-0 truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">任务泳道图</h2>
+                <span class="wk-project-chat-lanes-panel__count">{{ projectChatTaskCount }}</span>
               </div>
-              <span class="wk-project-chat-lanes-panel__count">{{ projectChatTaskCount }}</span>
+              <button
+                type="button"
+                class="wk-project-chat-enter-button wk-project-chat-lane-board-switch"
+                @click="switchProjectView('board')"
+              >
+                <span>切换至泳道视图</span>
+                <span class="material-symbols-outlined text-[16px] leading-none">arrow_forward</span>
+              </button>
             </div>
 
             <div class="wk-project-chat-lanes-panel__body">
@@ -834,10 +834,10 @@
                     <article
                       v-for="attachment in currentTaskConversation.attachments"
                       :key="attachment.attachmentId"
-                      class="group cursor-pointer rounded-lg border border-[#ececec] bg-white px-3 py-2 text-sm transition-colors hover:border-[#e0e0e0] hover:bg-[#fafafa]"
+                      class="group cursor-pointer rounded-2xl border border-[#e5e5e5] bg-[#FFFEFA] px-3 py-2.5 text-sm transition-colors hover:bg-[#f7f7f2]"
                       @click="openTaskAttachmentPreview(attachment)"
                     >
-                      <div class="flex items-start gap-2.5">
+                      <div class="flex items-start gap-3">
                         <FileTypeIcon
                           :file-name="attachment.name"
                           :mime-type="attachment.mimeType"
@@ -853,14 +853,14 @@
                               >
                                 {{ attachment.name || '-' }}
                               </h5>
-                              <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-4 text-[#8f8f8f]">
+                              <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-4 text-[#8f8f8f]">
                                 <span>{{ getTaskAttachmentTypeLabel(attachment) }}</span>
                                 <span aria-hidden="true">·</span>
                                 <span>{{ getTaskAttachmentFileSizeText(attachment) }}</span>
-                                <span v-if="attachment.createdByName" aria-hidden="true">·</span>
-                                <span v-if="attachment.createdByName">{{ attachment.createdByName }}</span>
-                                <span v-if="attachment.createTime" aria-hidden="true">·</span>
-                                <span v-if="attachment.createTime">上传 {{ formatDateTime(attachment.createTime) }}</span>
+                                <span v-if="getTaskAttachmentOwnerTimeText(attachment)" aria-hidden="true">·</span>
+                                <span v-if="getTaskAttachmentOwnerTimeText(attachment)" class="whitespace-nowrap">
+                                  {{ getTaskAttachmentOwnerTimeText(attachment) }}
+                                </span>
                               </div>
                             </div>
                             <button
@@ -1658,6 +1658,12 @@ function getTaskAttachmentTypeLabel(attachment: ProjectTaskAttachment): string {
   return '文档'
 }
 
+function getTaskAttachmentOwnerTimeText(attachment: ProjectTaskAttachment): string {
+  return [attachment.createdByName, attachment.createTime ? formatDateTime(attachment.createTime) : '']
+    .filter(Boolean)
+    .join(' ')
+}
+
 function resizeProjectChatTextarea(el: HTMLTextAreaElement | null) {
   if (!el) return
   el.style.height = 'auto'
@@ -2376,6 +2382,29 @@ function memberActionLabel(action: string) {
 
 .wk-project-chat-enter-button:active {
   transform: scale(0.98);
+}
+
+.wk-project-chat-lane-board-switch {
+  height: 30px;
+  border: 1px solid var(--wk-input-border);
+  background: var(--wk-input-bg);
+  padding: 0 10px;
+  color: var(--wk-primary);
+  white-space: nowrap;
+  font-size: 12px;
+  box-shadow: none;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.wk-project-chat-lane-board-switch:hover {
+  border-color: var(--wk-input-border-hover);
+  background: var(--wk-input-bg);
+  color: var(--wk-primary);
+  box-shadow: none;
 }
 
 @media (min-width: 768px) {
