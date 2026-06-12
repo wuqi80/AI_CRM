@@ -19,6 +19,8 @@ import 'material-symbols/outlined.css'
 import WkIcon from '@/components/common/WkIcon.vue'
 import { useTheme } from '@/composables/useTheme'
 import { scheduleCapacitorUpdateCheck, scheduleLiveUpdateHealthReport } from '@/utils/capacitorUpdate'
+import { configureNativeKeyboard } from '@/utils/capacitorKeyboard'
+import '@capacitor-community/safe-area'
 
 import App from './App.vue'
 import router from './router'
@@ -57,5 +59,6 @@ router.isReady().then(() => {
   if (isNativeMobileRuntime()) {
     scheduleLiveUpdateHealthReport()
     scheduleCapacitorUpdateCheck()
+    configureNativeKeyboard()
   }
 })

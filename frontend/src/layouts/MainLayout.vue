@@ -927,7 +927,7 @@
       </aside>
     </Transition>
 
-    <div v-if="showMobileTopBar" class="fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-4">
+    <div v-if="showMobileTopBar" class="wk-mobile-top-bar fixed left-0 right-0 top-0 z-50 flex items-center gap-2 border-b border-slate-200 bg-white px-4">
       <button
         @click="openMobileDrawer"
         class="flex size-10 shrink-0 items-center justify-center rounded-lg text-[#0d0d0d] hover:bg-slate-100"
@@ -942,7 +942,7 @@
             v-model="globalSearchKeyword"
             type="text"
             class="w-full rounded-lg border-none bg-slate-100 py-2 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/50"
-            placeholder="搜索客户、关系、任务、日程、知识库..."
+            placeholder="搜索客户1、关系、任务、日程、知识库..."
             @focus="handleGlobalSearchFocus"
             @keydown.enter.prevent="handleGlobalSearchEnter"
             @keydown.down.prevent="handleGlobalSearchArrow(1)"
@@ -1035,14 +1035,14 @@
       <Transition name="drawer-panel">
         <aside
           v-if="mobileDrawerRendered"
-          class="fixed inset-y-0 left-0 right-0 z-[101] flex w-screen max-w-none touch-pan-y flex-col bg-white shadow-2xl"
+          class="wk-mobile-drawer-panel fixed inset-y-0 left-0 right-0 z-[101] flex w-screen max-w-none touch-pan-y flex-col bg-white shadow-2xl"
           :style="mobileDrawerPanelStyle"
           @touchstart.passive="handleMobileDrawerTouchStart"
           @touchmove="handleMobileDrawerTouchMove"
           @touchend.passive="handleMobileDrawerTouchEnd"
           @touchcancel.passive="handleMobileDrawerTouchCancel"
         >
-          <div class="flex items-center justify-between gap-4 px-4 pb-4 pt-8">
+          <div class="wk-mobile-drawer-header flex items-center justify-between gap-4 px-4 pb-4">
             <div class="flex min-w-0 flex-1 items-center gap-3">
               <div v-if="enterpriseStore.hasLogo" class="size-9 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent">
                 <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
@@ -1074,7 +1074,7 @@
               </button>
             </div>
           </div>
-          <nav class="wk-scrollbar-gutter-stable flex-1 space-y-2 overflow-y-auto px-3 pb-[112px] pt-2">
+          <nav class="wk-mobile-drawer-nav wk-scrollbar-gutter-stable flex-1 space-y-2 overflow-y-auto px-3 pt-2">
             <template v-for="group in mobileMainNavGroups" :key="group.title || 'default'">
               <div v-if="group.title" class="pb-2.5 pt-5">
                 <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">{{ group.title }}</p>
@@ -1392,7 +1392,7 @@
               v-if="recentChatSessionsMoreVisible"
               class="absolute inset-0 z-50 flex flex-col bg-white"
             >
-              <div class="flex min-h-[calc(56px_+_env(safe-area-inset-top))] shrink-0 items-center justify-between border-b border-[#ececec] px-4 pt-[env(safe-area-inset-top)]">
+              <div class="flex min-h-[calc(56px_+_var(--safe-area-inset-top))] shrink-0 items-center justify-between border-b border-[#ececec] px-4 pt-[var(--safe-area-inset-top)]">
                 <button
                   type="button"
                   class="flex items-center gap-2 rounded-lg px-2 py-2 text-[15px] font-semibold text-[#0d0d0d] transition-colors active:bg-[#f5f5f5]"
@@ -1418,7 +1418,7 @@
                   placeholder="搜索对话"
                 />
               </div>
-              <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(18px_+_env(safe-area-inset-bottom))]">
+              <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(18px_+_var(--safe-area-inset-bottom))]">
                 <div v-if="filteredHistorySessions.length === 0" class="px-3 py-8 text-center text-sm text-slate-400">
                   暂无匹配对话
                 </div>
@@ -1476,7 +1476,7 @@
                 </button>
               </div>
 
-              <div class="flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <div class="flex-1 overflow-y-auto px-4 pb-[calc(1rem+var(--safe-area-inset-bottom))]">
                 <section class="flex flex-col items-center pb-6 pt-5 text-center">
                   <div class="flex size-20 items-center justify-center overflow-hidden rounded-full bg-[#a5ab87] text-[28px] font-medium text-white">
                     <img v-if="userStore.avatar" :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
@@ -1550,7 +1550,7 @@
           v-if="isMobile && !drawerVisible && showUserMenu"
           class="fixed bottom-0 left-0 right-0 z-[111] overflow-hidden rounded-t-2xl border-t border-slate-200 bg-white shadow-[0_-8px_30px_rgb(0,0,0,0.12)]"
         >
-          <div class="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <div class="p-4 pb-[calc(1rem+var(--safe-area-inset-bottom))]">
             <div class="space-y-1">
               <div class="flex items-center justify-between px-3 py-2">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">个人账户</p>
@@ -1624,7 +1624,7 @@
     <div
       ref="mainContentColumnRef"
       class="flex flex-1 flex-col overflow-hidden"
-      :class="{ 'pt-14': showMobileTopBar }"
+      :class="{ 'wk-mobile-top-bar-spacer': showMobileTopBar }"
     >
       <header
         v-if="showDesktopHeader"
@@ -1749,7 +1749,7 @@
           >
             <div
               v-if="isMobile"
-              class="flex shrink-0 items-center gap-3 px-4 pb-2 pt-[calc(1rem+env(safe-area-inset-top))]"
+              class="flex shrink-0 items-center gap-3 px-4 pb-2 pt-[calc(1rem+var(--safe-area-inset-top))]"
             >
               <div class="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-full bg-white px-4 shadow-[0_10px_28px_rgba(15,23,42,0.12)]">
                 <span class="material-symbols-outlined shrink-0 text-[30px] leading-none text-[#0d0d0d]">search</span>
@@ -1809,7 +1809,7 @@
             <div
               ref="customerSearchScrollRef"
               class="flex-1 overflow-y-auto"
-              :class="isMobile ? 'min-h-0 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2' : 'min-h-[320px] px-4 py-3'"
+              :class="isMobile ? 'min-h-0 px-5 pb-[calc(1rem+var(--safe-area-inset-bottom))] pt-2' : 'min-h-[320px] px-4 py-3'"
               @scroll="handleCustomerSearchScroll"
               @touchstart.passive="handleCustomerSearchTouchStart"
               @touchmove="handleCustomerSearchTouchMove"
@@ -4511,10 +4511,36 @@ async function handleCreateProject(payload: {
 </script>
 
 <style scoped>
+.wk-mobile-top-bar {
+  box-sizing: border-box;
+  height: calc(3.5rem + var(--safe-area-inset-top));
+  padding-top: var(--safe-area-inset-top);
+}
+
+.wk-mobile-top-bar-spacer {
+  padding-top: 3.5rem;
+}
+
+.wk-mobile-drawer-panel {
+  box-sizing: border-box;
+  padding-right: var(--safe-area-inset-right);
+  padding-left: var(--safe-area-inset-left);
+}
+
+.wk-mobile-drawer-header {
+  box-sizing: border-box;
+  min-height: calc(64px + var(--safe-area-inset-top));
+  padding-top: calc(12px + var(--safe-area-inset-top));
+}
+
+.wk-mobile-drawer-nav {
+  padding-bottom: calc(112px + var(--safe-area-inset-bottom));
+}
+
 .wk-mobile-customer-search-keyboard-proxy {
   position: fixed;
   left: 16px;
-  top: calc(1rem + env(safe-area-inset-top));
+  top: calc(1rem + var(--safe-area-inset-top));
   z-index: 0;
   width: 1px;
   height: 1px;

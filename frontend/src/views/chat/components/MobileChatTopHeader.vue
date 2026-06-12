@@ -90,10 +90,10 @@ const avatarClass = computed(() =>
 .wk-mobile-chat-top-header {
   position: fixed;
   top: 0;
-  right: env(safe-area-inset-right, 0px);
-  left: env(safe-area-inset-left, 0px);
+  right: var(--safe-area-inset-right);
+  left: var(--safe-area-inset-left);
   z-index: 90;
-  padding-top: max(8px, env(safe-area-inset-top));
+  padding-top: max(8px, var(--safe-area-inset-top));
   border-color: var(--wk-border-subtle);
   background: color-mix(in srgb, var(--wk-bg-surface) 92%, transparent);
   backdrop-filter: blur(14px);

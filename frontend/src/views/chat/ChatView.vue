@@ -2338,6 +2338,8 @@ import {
   getAssistantMessageStatusLabel,
   normalizeAssistantMessageContent
 } from '@/utils/chatMessage'
+import { hideCapacitorKeyboard } from '@/utils/capacitorKeyboard'
+import { shouldRefocusChatComposerAfterSend } from '@/utils/chatComposerFocus'
 import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
@@ -3262,7 +3264,7 @@ const showMobileSummaryVoiceAction = computed(() =>
 )
 const mobileCustomerSummarySheetStyle = computed(() => ({
   height: `${customerSummarySheetHeight.value}vh`,
-  maxHeight: 'calc(100dvh - max(12px, env(safe-area-inset-top)))',
+  maxHeight: 'calc(100dvh - max(12px, var(--safe-area-inset-top)))',
 }))
 const chatMessagesAreaClass = computed(() => {
   if (!isChatEmpty.value) return 'wk-chat-messages--scrollable flex-1 overflow-y-auto pb-4 pt-6 md:pt-8'
@@ -3383,6 +3385,12 @@ function handleMessagesScroll() {
 
 function dismissMobileKeyboardForConversationScroll() {
   if (!isMobile.value || !isMobileComposerFocused()) return
+  dismissMobileKeyboardAfterSend()
+}
+
+function dismissMobileKeyboardAfterSend() {
+  if (!isMobile.value) return
+  hideCapacitorKeyboard()
   mobileChatInputRef.value?.blur()
   clearMobileKeyboardInsetTracking()
   mobileKeyboardInset.value = 0
@@ -4353,6 +4361,7 @@ async function handleSend() {
     clearTimeout(composerDraftSaveTimer)
     composerDraftSaveTimer = null
   }
+  dismissMobileKeyboardAfterSend()
 
   const knowledgeIdsPayload = hasKnowledge
     ? selectedKnowledgeItems.value.map((k) => k.knowledgeId)
@@ -4420,7 +4429,9 @@ async function handleSend() {
     knowledgeIdsPayload
   )
   await nextTick()
-  focusChatTextarea()
+  if (shouldRefocusChatComposerAfterSend(isMobile.value)) {
+    focusChatTextarea()
+  }
   const completedSessionId = await sendPromise
   await refreshCrmContextAfterSend(effectiveAppCode, completedSessionId)
   await sendPromise
@@ -5520,12 +5531,12 @@ void sendQuickMessage
     right: 0;
     left: 0;
     z-index: 40;
-    padding-top: max(8px, env(safe-area-inset-top));
+    padding-top: max(8px, var(--safe-area-inset-top));
   }
 
   .wk-chat-customer-header-spacer {
     display: block;
-    height: calc(45px + max(8px, env(safe-area-inset-top)));
+    height: calc(45px + max(8px, var(--safe-area-inset-top)));
   }
 }
 
@@ -5535,7 +5546,7 @@ void sendQuickMessage
   right: 0;
   left: 0;
   z-index: 89;
-  height: calc(64px + max(8px, env(safe-area-inset-top)) + var(--wk-mobile-viewport-top-offset, 0px));
+  height: calc(64px + max(8px, var(--safe-area-inset-top)) + var(--wk-mobile-viewport-top-offset, 0px));
   pointer-events: none;
   background: var(--wk-bg-surface);
 }
@@ -5573,9 +5584,9 @@ void sendQuickMessage
 .wk-mobile-chat-floating-bar {
   display: flex;
   position: fixed;
-  top: var(--wk-safe-top);
-  right: var(--wk-safe-right);
-  left: var(--wk-safe-left);
+  top: var(--safe-area-inset-top);
+  right: var(--safe-area-inset-right);
+  left: var(--safe-area-inset-left);
   z-index: 90;
   align-items: center;
   justify-content: space-between;
@@ -5828,17 +5839,17 @@ void sendQuickMessage
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  padding-bottom: max(20px, var(--safe-area-inset-bottom));
 }
 
 .wk-mobile-customer-summary__sheet.has-voice-action .wk-mobile-customer-summary__body {
-  padding-bottom: max(92px, calc(env(safe-area-inset-bottom) + 92px));
+  padding-bottom: max(92px, calc(var(--safe-area-inset-bottom) + 92px));
 }
 
 .wk-mobile-customer-summary__voice {
   position: absolute;
   right: 18px;
-  bottom: max(22px, env(safe-area-inset-bottom));
+  bottom: max(22px, var(--safe-area-inset-bottom));
   z-index: 2;
   display: inline-flex;
   height: 52px;
@@ -5989,11 +6000,11 @@ void sendQuickMessage
 }
 
 .wk-chat-messages--mobile-floating-actions {
-  scroll-padding-top: calc(92px + max(0px, env(safe-area-inset-top)));
+  scroll-padding-top: calc(92px + max(0px, var(--safe-area-inset-top)));
 }
 
 .wk-chat-messages--mobile-floating-actions .wk-chat-messages__inner {
-  padding-top: calc(92px + max(0px, env(safe-area-inset-top)));
+  padding-top: calc(92px + max(0px, var(--safe-area-inset-top)));
 }
 
 .wk-chat-messages--empty-chat .wk-chat-messages__inner {
@@ -6171,7 +6182,7 @@ void sendQuickMessage
 }
 
 .wk-chat-upload-menu--mobile {
-  padding: 12px 8px max(12px, env(safe-area-inset-bottom));
+  padding: 12px 8px max(12px, var(--safe-area-inset-bottom));
 }
 
 .wk-chat-upload-menu__mobile-handle {
@@ -6370,7 +6381,7 @@ void sendQuickMessage
   position: fixed !important;
   left: 16px !important;
   right: 16px !important;
-  bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  bottom: max(16px, var(--safe-area-inset-bottom)) !important;
   top: auto !important;
   width: auto !important;
   max-width: none !important;

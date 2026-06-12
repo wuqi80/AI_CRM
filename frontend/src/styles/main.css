@@ -20,8 +20,9 @@ html, body, #app {
 
 /*
  * Native mobile (Capacitor) safe-area.
- * `capacitor-plugin-safe-area` injects: --safe-area-inset-top/right/bottom/left
- * We scope padding to native mobile only to avoid impacting PC layout.
+ * `@capacitor-community/safe-area` keeps iOS/Web aligned with native env()
+ * insets and patches Android WebView edge-to-edge behavior. Define app-level
+ * custom properties so Vue components can use var(--safe-area-inset-*) directly.
  */
 :root {
   --wk-primary-rgb: 31 30 28;
@@ -76,10 +77,14 @@ html, body, #app {
   --el-text-color-regular: var(--wk-text-secondary);
   --el-text-color-secondary: var(--wk-text-muted);
   --el-text-color-placeholder: var(--wk-text-faint);
-  --wk-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
-  --wk-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
-  --wk-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  --wk-safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  --wk-safe-top: var(--safe-area-inset-top);
+  --wk-safe-right: var(--safe-area-inset-right);
+  --wk-safe-bottom: var(--safe-area-inset-bottom);
+  --wk-safe-left: var(--safe-area-inset-left);
 }
 
 html.dark {

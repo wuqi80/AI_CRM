@@ -84,7 +84,9 @@ function loadLiveUpdateModule(): Promise<LiveUpdateModule> {
 async function sendLiveUpdateReadySignal(): Promise<void> {
   if (!liveUpdateReadyPromise) {
     liveUpdateReadyPromise = loadLiveUpdateModule()
-      .then(({ LiveUpdate }) => LiveUpdate.ready())
+      .then(async ({ LiveUpdate }) => {
+        await LiveUpdate.ready()
+      })
       .catch((error) => {
         liveUpdateReadyPromise = null
         throw error
