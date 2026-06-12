@@ -24,6 +24,20 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false }
   },
   {
+    path: '/legal/user-agreement',
+    name: 'UserAgreement',
+    component: () => import('@/views/legal/LegalDocumentView.vue'),
+    props: { documentType: 'agreement' },
+    meta: { requiresAuth: false, title: '用户协议' }
+  },
+  {
+    path: '/legal/privacy-policy',
+    name: 'PrivacyPolicy',
+    component: () => import('@/views/legal/LegalDocumentView.vue'),
+    props: { documentType: 'privacy' },
+    meta: { requiresAuth: false, title: '隐私声明' }
+  },
+  {
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
     children: [

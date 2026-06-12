@@ -91,6 +91,7 @@ public class SecurityConfig {
                         .requestMatchers("/", "/index", "/static/**", "/assets/**").anonymous()
                         .requestMatchers("/index.html", "/doc.html", "/swagger-resources/**", "/webjars/**", "/v3/api-docs/**", "/instrument/callback").anonymous()
                         .requestMatchers("/tokenPurchase/notify/**").permitAll()
+                        .requestMatchers("/legal-document/**").permitAll()
                         .requestMatchers("/mail/oauth/*/callback", "/email/oauth/*/callback", "/tencent-meeting/oauth/callback", "/tencent-meeting/webhook").permitAll()
                         .requestMatchers("/api/enum/**").permitAll() // 枚举值接口允许访问
                         .requestMatchers("/cloud/**").permitAll() // saas版本接口

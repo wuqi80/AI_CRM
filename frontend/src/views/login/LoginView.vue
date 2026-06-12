@@ -74,7 +74,10 @@
         <!-- Forms -->
         <div class="auth-form-panel lg:w-[54%]">
           <div ref="formScrollRef" class="auth-form-scroll">
-            <div class="auth-form-content">
+            <div
+              class="auth-form-content"
+              :class="{ 'auth-form-content--with-fixed-consent': isLogin && loginStep === 'credentials' }"
+            >
               <!-- Mobile brand -->
               <div class="mb-8 flex items-center justify-center gap-3 lg:hidden">
                 <img
@@ -466,6 +469,29 @@
       </div>
     </div>
 
+    <div v-if="isLogin && loginStep === 'credentials'" class="mobile-agreement-consent lg:hidden">
+      <label class="mobile-agreement-consent__check">
+        <input
+          v-model="agreementAccepted"
+          type="checkbox"
+          aria-label="同意用户协议和隐私声明"
+        />
+        <span class="mobile-agreement-consent__box" aria-hidden="true">
+          <el-icon v-if="agreementAccepted" :size="13"><Check /></el-icon>
+        </span>
+      </label>
+      <p class="mobile-agreement-consent__text">
+        点击登录即表示您已同意并接受
+        <a :href="userAgreementHref">
+          《用户协议》
+        </a>
+        和
+        <a :href="privacyPolicyHref">
+          《隐私声明》
+        </a>
+      </p>
+    </div>
+
     <el-dialog
       v-model="showForgotPasswordDialog"
       title="找回密码"
@@ -626,6 +652,58 @@
       </template>
     </el-dialog>
 
+    <Teleport to="body">
+      <div
+        v-if="showAgreementDialog"
+        class="agreement-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="agreement-modal-title"
+      >
+        <div class="agreement-modal__backdrop" aria-hidden="true" />
+        <div class="agreement-modal__panel">
+          <div class="agreement-modal__header">
+            <span class="agreement-modal__icon" aria-hidden="true">
+              <el-icon :size="22"><Lock /></el-icon>
+            </span>
+            <div class="agreement-modal__heading">
+              <p class="agreement-modal__eyebrow">登录前确认</p>
+              <h2 id="agreement-modal-title" class="agreement-modal__title">用户协议与隐私保护</h2>
+            </div>
+          </div>
+          <p class="agreement-modal__copy">
+            感谢您选择悟空CRM。为保障您的个人权益，请先阅读并同意
+            <a :href="userAgreementHref">
+              《悟空CRM用户协议》
+            </a>
+            与
+            <a :href="privacyPolicyHref">
+              《悟空CRM隐私声明》
+            </a>
+            ，了解我们对个人信息的收集、保存、使用、对外提供和保护方式。
+          </p>
+          <p class="agreement-modal__hint">同意后将继续为您登录当前账号。</p>
+          <div class="agreement-modal__actions">
+            <button type="button" class="agreement-modal__button agreement-modal__button--ghost" @click="handleAgreementReject">
+              拒绝
+            </button>
+            <button
+              type="button"
+              class="agreement-modal__button agreement-modal__button--primary"
+              :disabled="loading"
+              @click="handleAgreementAgreeLogin"
+            >
+              <span
+                v-if="loading"
+                class="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
+              />
+              <span>同意并登录</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <SliderCaptchaDialog v-model="showCaptchaDialog" @verified="handleCaptchaVerified" />
   </div>
 </template>
@@ -635,6 +713,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { useRouter, useRoute } from 'vue-router'
 import {
   ArrowLeft,
+  Check,
   CircleCheck,
   Lock,
   MagicStick,
@@ -677,6 +756,7 @@ const externalRegisterLoading = ref(false)
 const sendingCode = ref(false)
 const forgotSendingCode = ref(false)
 const showCaptchaDialog = ref(false)
+const showAgreementDialog = ref(false)
 const showForgotPasswordDialog = ref(false)
 const showExternalRegisterDialog = ref(false)
 const formScrollRef = ref<HTMLElement>()
@@ -697,6 +777,7 @@ let countdownTimer: number | undefined
 let forgotCountdownTimer: number | undefined
 
 const LAST_LOGIN_USERNAME_STORAGE_KEY = 'wk_ai_crm:last_login_username:v1'
+const AGREEMENT_ACCEPTED_STORAGE_KEY = 'wk_ai_crm:agreement_accepted:v1'
 
 function readLastLoginUsername(): string {
   if (typeof window === 'undefined') return ''
@@ -712,6 +793,24 @@ function rememberSuccessfulLoginUsername() {
   if (!username || typeof window === 'undefined') return
   try {
     window.localStorage.setItem(LAST_LOGIN_USERNAME_STORAGE_KEY, username)
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function readAgreementAccepted(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(AGREEMENT_ACCEPTED_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function persistAgreementAccepted(accepted: boolean) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(AGREEMENT_ACCEPTED_STORAGE_KEY, accepted ? '1' : '0')
   } catch {
     // Ignore storage failures.
   }
@@ -780,6 +879,8 @@ const loginForm = reactive({
   password: ''
 })
 
+const agreementAccepted = ref(readAgreementAccepted())
+
 const registerForm = reactive({
   companyName: '',
   realname: '',
@@ -803,6 +904,8 @@ const forgotPasswordForm = reactive({
 })
 
 const enabledExternalProviders = computed(() => externalProviders.value.filter((provider) => provider.enabled))
+const userAgreementHref = computed(() => router.resolve({ name: 'UserAgreement' }).href)
+const privacyPolicyHref = computed(() => router.resolve({ name: 'PrivacyPolicy' }).href)
 
 const loginRules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
@@ -926,6 +1029,10 @@ watch(
     resetTenantSelection()
   }
 )
+
+watch(agreementAccepted, (accepted) => {
+  persistAgreementAccepted(accepted)
+})
 
 function providerMark(provider: ExternalAuthProviderCode): string {
   if (provider === 'google') return 'G'
@@ -1097,6 +1204,22 @@ async function handleLogin() {
 
   try {
     await loginFormRef.value.validate()
+  } catch {
+    return
+  }
+
+  if (resolveLoginType() === 'MOBILE' && !agreementAccepted.value) {
+    showAgreementDialog.value = true
+    return
+  }
+
+  await submitCredentialsLogin()
+}
+
+async function submitCredentialsLogin() {
+  if (loading.value) return
+
+  try {
     loading.value = true
     pendingTenantId.value = ''
 
@@ -1119,6 +1242,17 @@ async function handleLogin() {
   } finally {
     loading.value = false
   }
+}
+
+async function handleAgreementAgreeLogin() {
+  if (loading.value) return
+  agreementAccepted.value = true
+  showAgreementDialog.value = false
+  await submitCredentialsLogin()
+}
+
+function handleAgreementReject() {
+  showAgreementDialog.value = false
 }
 
 function openForgotPasswordDialog() {
@@ -1890,6 +2024,212 @@ onBeforeUnmount(() => {
   background: #ffb900;
 }
 
+.mobile-agreement-consent {
+  display: none;
+}
+
+.mobile-agreement-consent__check {
+  position: relative;
+  display: inline-flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.mobile-agreement-consent__check input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.mobile-agreement-consent__box {
+  display: inline-flex;
+  width: 1.05rem;
+  height: 1.05rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  background: #fff;
+  color: #137fec;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.mobile-agreement-consent__check input:checked + .mobile-agreement-consent__box {
+  border-color: #137fec;
+  background: #eef6ff;
+}
+
+.mobile-agreement-consent__check input:focus-visible + .mobile-agreement-consent__box {
+  box-shadow: 0 0 0 3px rgba(19, 127, 236, 0.14);
+}
+
+.mobile-agreement-consent__text {
+  margin: 0;
+  color: #8f96a3;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.mobile-agreement-consent__text a,
+.agreement-modal__copy a {
+  color: #1d5fc4;
+  text-decoration: none;
+}
+
+.mobile-agreement-consent__text a:hover,
+.agreement-modal__copy a:hover {
+  text-decoration: underline;
+}
+
+.agreement-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.agreement-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(2px);
+}
+
+.agreement-modal__panel {
+  position: relative;
+  width: min(100%, 27rem);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1.5rem;
+  background: #fff;
+  padding: 1.75rem;
+  color: #0f172a;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
+}
+
+.agreement-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 0.95rem;
+}
+
+.agreement-modal__icon {
+  display: inline-flex;
+  width: 3rem;
+  height: 3rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(19, 127, 236, 0.14), rgba(19, 127, 236, 0.06));
+  color: #137fec;
+  box-shadow: 0 12px 24px rgba(19, 127, 236, 0.12);
+}
+
+.agreement-modal__heading {
+  min-width: 0;
+}
+
+.agreement-modal__eyebrow {
+  margin: 0 0 0.2rem;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.agreement-modal__title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.18rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.agreement-modal__copy {
+  margin: 1.35rem 0 0;
+  color: #334155;
+  font-size: 0.96rem;
+  font-weight: 500;
+  line-height: 1.8;
+}
+
+.agreement-modal__hint {
+  margin: 0.8rem 0 0;
+  color: #94a3b8;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.agreement-modal__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.9rem;
+  margin-top: 1.5rem;
+}
+
+.agreement-modal__button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 1rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.agreement-modal__button--ghost {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+}
+
+.agreement-modal__button--ghost:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.agreement-modal__button--primary {
+  border: 1px solid #0f172a;
+  background: #0f172a;
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
+}
+
+.agreement-modal__button--primary:hover:not(:disabled) {
+  border-color: #1e293b;
+  background: #1e293b;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.24);
+}
+
+.agreement-modal__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 @media (min-width: 1024px) {
   .auth-card {
     min-height: 620px;
@@ -1938,6 +2278,54 @@ onBeforeUnmount(() => {
 
   .tenant-option-card__title-row {
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 767px) {
+  .auth-form-content--with-fixed-consent {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  .mobile-agreement-consent {
+    position: fixed;
+    z-index: 40;
+    left: 50%;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    display: flex;
+    width: min(calc(100% - 2rem), 480px);
+    align-items: flex-start;
+    gap: 0.55rem;
+    margin-top: 0;
+    transform: translateX(-50%);
+  }
+
+  .agreement-modal {
+    padding: 1.75rem 1.35rem;
+  }
+
+  .agreement-modal__panel {
+    width: min(100%, 23.5rem);
+    border-radius: 1.25rem;
+    padding: 1.4rem;
+  }
+
+  .agreement-modal__icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.9rem;
+  }
+
+  .agreement-modal__title {
+    font-size: 1.12rem;
+  }
+
+  .agreement-modal__copy {
+    font-size: 0.92rem;
+    line-height: 1.75;
+  }
+
+  .agreement-modal__actions {
+    gap: 0.75rem;
   }
 }
 </style>

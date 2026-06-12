@@ -23,6 +23,7 @@ export type { AppUpdateInfo, SupportedPlatform } from '@/utils/capacitorUpdateCo
 export const DEFAULT_UPDATE_CHECK_DELAY_MS = 2000
 export const DEFAULT_UPDATE_CHECK_RETRY_DELAY_MS = 5000
 export const DEFAULT_UPDATE_CHECK_MAX_ATTEMPTS = 2
+export const DEFAULT_LIVE_UPDATE_HEALTH_DELAY_MS = 3000
 export const DEFAULT_CURRENT_VERSION = '1.0.0'
 export const DEFAULT_UPDATE_VERSION_URL = 'https://www.72crm.ai/version.json'
 
@@ -51,6 +52,7 @@ export type ScheduleCapacitorUpdateCheckOptions = {
 
 let browserPlugin: BrowserPlugin | null = null
 let isDownloadUpdateDialogVisible = false
+let liveUpdateReadyPromise: Promise<void> | null = null
 
 function getBrowserPlugin(): BrowserPlugin {
   if (!browserPlugin) {
@@ -79,6 +81,19 @@ function loadLiveUpdateModule(): Promise<LiveUpdateModule> {
   return import('@capawesome/capacitor-live-update')
 }
 
+async function sendLiveUpdateReadySignal(): Promise<void> {
+  if (!liveUpdateReadyPromise) {
+    liveUpdateReadyPromise = loadLiveUpdateModule()
+      .then(({ LiveUpdate }) => LiveUpdate.ready())
+      .catch((error) => {
+        liveUpdateReadyPromise = null
+        throw error
+      })
+  }
+
+  await liveUpdateReadyPromise
+}
+
 export async function getCurrentVersion(): Promise<string> {
   return getConfiguredAppVersion()
 }
@@ -87,11 +102,29 @@ export async function markLiveUpdateReady(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
 
   try {
-    const { LiveUpdate } = await loadLiveUpdateModule()
-    await LiveUpdate.ready()
+    await sendLiveUpdateReadySignal()
   } catch (error) {
     console.warn('热更新 ready 失败:', error)
   }
+}
+
+export async function reportLiveUpdateHealth(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return
+
+  try {
+    await sendLiveUpdateReadySignal()
+    console.log('[HotUpdate] Health signal sent, version confirmed')
+  } catch (error) {
+    console.error('[HotUpdate] Failed to report health:', error)
+  }
+}
+
+export function scheduleLiveUpdateHealthReport(delayMs = DEFAULT_LIVE_UPDATE_HEALTH_DELAY_MS): void {
+  if (!Capacitor.isNativePlatform() || typeof window === 'undefined') return
+
+  window.setTimeout(() => {
+    void reportLiveUpdateHealth()
+  }, delayMs)
 }
 
 export async function performHotUpdate(updateInfo: AppUpdateInfo): Promise<void> {
