@@ -89,9 +89,10 @@
             reserve-keyword
             clearable
             default-first-option
-            placeholder="搜索并选择客户"
+            :placeholder="customerSelectPlaceholder"
             :remote-method="searchCustomers"
             :loading="customerSearchLoading"
+            :disabled="!canQueryCustomers || submitting"
             size="large"
             class="w-full wk-crm-el-field-select"
             @focus="loadRecentCustomers"
@@ -198,6 +199,12 @@ import { useResponsive } from '@/composables/useResponsive'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import { normalizeRelationTypeOptions } from '@/views/relation/constants'
 import { useEnumStore } from '@/stores/enums'
+import { useUserStore } from '@/stores/user'
+import {
+  canQueryRelationCustomers,
+  getRelationCustomerSelectPlaceholder,
+  shouldLoadRelationCustomerOptions
+} from '@/views/relation/components/relationCustomerSelect'
 import type { CustomerListVO } from '@/types/customer'
 import type { RelationAddBO, RelationUpdateBO, RelationVO } from '@/types/relation'
 
@@ -220,6 +227,7 @@ const emit = defineEmits<{
 
 const { isMobile } = useResponsive()
 const enumStore = useEnumStore()
+const userStore = useUserStore()
 enumStore.ensureRelationType()
 const relationTypeChoices = computed(() =>
   normalizeRelationTypeOptions(enumStore.relationType)
@@ -248,6 +256,8 @@ const visible = computed({
   set: (value: boolean) => emit('update:modelValue', value)
 })
 
+const canQueryCustomers = computed(() => canQueryRelationCustomers(userStore.hasPermission))
+const customerSelectPlaceholder = computed(() => getRelationCustomerSelectPlaceholder(canQueryCustomers.value))
 const isEdit = computed(() => Boolean(props.editingRelation?.relationId))
 const editingRelationId = computed(() => props.editingRelation?.relationId || '')
 const canSave = computed(() => Boolean(form.name.trim()) && !submitting.value)
@@ -325,6 +335,16 @@ function setCustomerOptions(customers: CustomerListVO[]) {
 }
 
 async function loadCustomerOptions(keyword: string, limit: number) {
+  if (!shouldLoadRelationCustomerOptions({
+    canQueryCustomers: canQueryCustomers.value,
+    loading: customerSearchLoading.value
+  })) {
+    if (!canQueryCustomers.value) {
+      customerOptions.value = []
+    }
+    return
+  }
+
   customerSearchLoading.value = true
   try {
     const response = await queryCustomerList({ keyword: keyword || undefined, page: 1, limit })
