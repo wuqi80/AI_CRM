@@ -368,8 +368,8 @@
             <el-option label="商务邀约" value="invite" />
           </el-select>
           <el-button size="small" :icon="MagicStick" @click="generateMailWithAi">生成</el-button>
-          <el-dropdown trigger="click" @command="optimizeMail">
-            <el-button size="small">
+          <el-dropdown trigger="click" :disabled="optimizingMail" @command="optimizeMail">
+            <el-button size="small" :disabled="optimizingMail" :loading="optimizingMail">
               AI优化
               <span class="material-symbols-outlined ml-1 text-[16px]">expand_more</span>
             </el-button>
@@ -547,6 +547,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { EditPen, MagicStick, Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { createSession, deleteSession, sendMessageSync } from '@/api/chat'
 import { useResponsive } from '@/composables/useResponsive'
 import {
   connectImapMailbox,
@@ -582,6 +583,12 @@ import {
   type MailTemplate,
   type MailTemplatePayload,
 } from '@/api/mail'
+import {
+  buildMailOptimizePrompt,
+  getMailOptimizeLabel,
+  normalizeAiOptimizedMailBody,
+  resolveMailOptimizeFailureMessage,
+} from './mailAiOptimize'
 import { buildAccountScopedMailQuery, isMailSyncRunning } from './mailListQuery'
 
 type MailTab = 'drafts' | 'sent' | 'inbox' | 'templates'
@@ -616,6 +623,7 @@ const connecting = ref(false)
 const testingConnection = ref(false)
 const savingDraft = ref(false)
 const sending = ref(false)
+const optimizingMail = ref(false)
 const savingTemplate = ref(false)
 const composeVisible = ref(false)
 const connectDialogVisible = ref(false)
@@ -1421,16 +1429,51 @@ function generateMailWithAi() {
   syncEditorFromForm()
 }
 
-function optimizeMail(command: string) {
-  const prefixMap: Record<string, string> = {
-    professional: '以下内容已按更专业的商务语气整理：',
-    polite: '以下内容已按更礼貌的表达整理：',
-    concise: '以下内容已按更简洁的表达整理：',
-    sales: '以下内容已按更强调价值和下一步行动的表达整理：',
+async function optimizeMail(command: string) {
+  if (optimizingMail.value) return
+  const bodyHtml = composeForm.bodyText || editorRef.value?.innerHTML || ''
+  if (!stripHtml(bodyHtml).trim()) {
+    ElMessage.warning('请先输入邮件正文，再使用 AI 优化')
+    return
   }
-  const text = composeForm.bodyText || ''
-  composeForm.bodyText = `<p>${prefixMap[command] || '优化后的邮件内容：'}</p>${text}`
-  syncEditorFromForm()
+
+  optimizingMail.value = true
+  let aiSessionId: string | null = null
+  try {
+    aiSessionId = await createSession({
+      title: '邮件AI优化',
+      appCode: 'general',
+    })
+    const response = await sendMessageSync(
+      aiSessionId,
+      buildMailOptimizePrompt(command, bodyHtml, composeForm.subject),
+      undefined,
+      'general'
+    )
+    const failureMessage = resolveMailOptimizeFailureMessage(response || '')
+    if (failureMessage) {
+      ElMessage.warning(failureMessage)
+      return
+    }
+    const optimizedBody = normalizeAiOptimizedMailBody(response || '')
+    if (!stripHtml(optimizedBody).trim()) {
+      ElMessage.warning('AI 没有返回可用的优化内容，请稍后重试')
+      return
+    }
+    composeForm.bodyText = optimizedBody
+    syncEditorFromForm()
+    ElMessage.success(`已完成${getMailOptimizeLabel(command)}`)
+  } catch (error) {
+    console.error('AI optimize mail failed:', error)
+    ElMessage.error('AI 优化失败，请稍后重试')
+  } finally {
+    optimizingMail.value = false
+    if (aiSessionId) {
+      void deleteSession(aiSessionId).catch(error => {
+        console.warn('Failed to delete temporary mail AI session:', error)
+      })
+    }
+  }
 }
 
 function replaceTemplateVariables(value: string) {

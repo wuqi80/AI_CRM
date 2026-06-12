@@ -121,12 +121,8 @@ public class TencentMeetingSyncServiceImpl {
                             log.debug("Tencent Meeting participants fetch start: syncLogId={}, meetingId={}, openId={}",
                                     syncLog.getId(), meeting.getMeetingId(), mapping.getMeetingUserId());
                             List<JSONObject> participants = apiGateway.getMeetingParticipants(credential, meeting.getMeetingId());
-                            List<TencentMeetingParticipant> savedParticipants = new ArrayList<>();
-                            for (JSONObject rawParticipant : participants) {
-                                savedParticipants.add(saveParticipant(config, meeting, rawParticipant));
-                                saved++;
-                            }
-                            applyParticipantSummary(meeting, savedParticipants);
+                            List<TencentMeetingParticipant> savedParticipants = replaceParticipants(config, meeting, participants);
+                            saved += savedParticipants.size();
                             log.debug("Tencent Meeting participants saved: syncLogId={}, meetingId={}, openId={}, participantCount={}",
                                     syncLog.getId(), meeting.getMeetingId(), mapping.getMeetingUserId(), savedParticipants.size());
                         } catch (Exception detailException) {
@@ -475,13 +471,7 @@ public class TencentMeetingSyncServiceImpl {
             if (participants.isEmpty()) {
                 return;
             }
-            participantMapper.delete(Wrappers.<TencentMeetingParticipant>lambdaQuery()
-                    .eq(TencentMeetingParticipant::getMeetingDbId, meeting.getId()));
-            List<TencentMeetingParticipant> saved = new ArrayList<>();
-            for (JSONObject rawParticipant : participants) {
-                saved.add(saveParticipant(config, meeting, rawParticipant));
-            }
-            applyParticipantSummary(meeting, saved);
+            List<TencentMeetingParticipant> saved = replaceParticipants(config, meeting, participants);
             log.info("Tencent Meeting participants refreshed via webhook: meetingId={}, count={}", meeting.getMeetingId(), saved.size());
         } catch (Exception e) {
             log.warn("Tencent Meeting webhook participant refresh failed: meetingId={}, error={}", meeting.getMeetingId(), e.getMessage());
@@ -607,6 +597,19 @@ public class TencentMeetingSyncServiceImpl {
         return meeting;
     }
 
+    private List<TencentMeetingParticipant> replaceParticipants(TencentMeetingCorpConfig config,
+                                                               TencentMeeting meeting,
+                                                               List<JSONObject> participants) {
+        participantMapper.delete(Wrappers.<TencentMeetingParticipant>lambdaQuery()
+                .eq(TencentMeetingParticipant::getMeetingDbId, meeting.getId()));
+        List<TencentMeetingParticipant> savedParticipants = new ArrayList<>();
+        for (JSONObject rawParticipant : participants) {
+            savedParticipants.add(saveParticipant(config, meeting, rawParticipant));
+        }
+        applyParticipantSummary(meeting, savedParticipants);
+        return savedParticipants;
+    }
+
     private TencentMeetingParticipant saveParticipant(TencentMeetingCorpConfig config, TencentMeeting meeting, JSONObject raw) {
         TencentMeetingParticipant participant = new TencentMeetingParticipant();
         participant.setAppId(config.getAppId());
@@ -627,6 +630,9 @@ public class TencentMeetingSyncServiceImpl {
 
     private void applyParticipantSummary(TencentMeeting meeting, List<TencentMeetingParticipant> participants) {
         if (participants == null || participants.isEmpty()) {
+            meeting.setParticipantCount(0);
+            meeting.setParticipantNames(null);
+            meetingMapper.updateById(meeting);
             return;
         }
         Date firstJoin = null;

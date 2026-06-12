@@ -28,6 +28,7 @@ import com.kakarote.ai_crm.mapper.TencentMeetingUserMappingMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -39,6 +40,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -118,6 +120,52 @@ class TencentMeetingSyncServiceTest {
         ArgumentCaptor<TencentMeetingSyncLog> logCaptor = ArgumentCaptor.forClass(TencentMeetingSyncLog.class);
         verify(syncLogMapper).updateById(logCaptor.capture());
         assertThat(logCaptor.getValue().getStatus()).isEqualTo("success");
+    }
+
+    @Test
+    void runSyncShouldReplaceExistingParticipantsBeforeSavingFreshParticipants() {
+        mockLoginUser();
+        TencentMeetingSyncServiceImpl service = newService();
+        TencentMeetingApiGateway apiGateway = mapper(service, "apiGateway");
+        TencentMeetingOAuthTokenProvider tokenProvider = mapper(service, "tokenProvider");
+        TencentMeetingUserMappingMapper userMappingMapper = mapper(service, "userMappingMapper");
+        TencentMeetingMapper meetingMapper = mapper(service, "meetingMapper");
+        TencentMeetingParticipantMapper participantMapper = mapper(service, "participantMapper");
+
+        TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
+        config.setId(1L);
+        config.setAppId("app-1");
+
+        TencentMeetingUserMapping mapping = new TencentMeetingUserMapping();
+        mapping.setMeetingUserId("host-1");
+        mapping.setCrmUserId(9L);
+        mapping.setAuthStatus("ACTIVE");
+        mapping.setStatus(1);
+
+        TencentMeeting existingMeeting = new TencentMeeting();
+        existingMeeting.setId(300L);
+        existingMeeting.setAppId("app-1");
+        existingMeeting.setMeetingId("meeting-1");
+        existingMeeting.setMeetingCode("123456789");
+        existingMeeting.setSubject("Old subject");
+
+        TencentMeetingOAuthCredential credential = new TencentMeetingOAuthCredential(config, mapping, "access-token");
+        when(userMappingMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(mapping));
+        when(tokenProvider.credential(config, mapping)).thenReturn(credential);
+        when(apiGateway.listEndedMeetings(credential, 30)).thenReturn(List.of(meetingJson()));
+        when(apiGateway.getMeetingParticipants(credential, "meeting-1")).thenReturn(List.of(participantJson()));
+        when(meetingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(existingMeeting);
+
+        TencentMeetingSyncRunBO runBO = new TencentMeetingSyncRunBO();
+        runBO.setSyncDays(30);
+        runBO.setSyncRecordings(false);
+        TencentMeetingSyncStatusVO status = service.runSync(config, runBO);
+
+        assertThat(status.getLastSyncStatus()).isEqualTo("success");
+
+        InOrder inOrder = inOrder(participantMapper);
+        inOrder.verify(participantMapper).delete(any(LambdaQueryWrapper.class));
+        inOrder.verify(participantMapper).insert(any(TencentMeetingParticipant.class));
     }
 
     @Test
