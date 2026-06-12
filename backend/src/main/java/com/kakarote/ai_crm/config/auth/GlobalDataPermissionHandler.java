@@ -30,6 +30,7 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
             Map.entry("FollowUpMapper", "followup"),
             Map.entry("KnowledgeMapper", "knowledge"),
             Map.entry("RelationMapper", "relation"),
+            Map.entry("ProductMapper", "product"),
             Map.entry("WecomEmployeeMapper", "wecomEmployeeSession"),
             Map.entry("WecomExternalCustomerMapper", "wecomCustomer"),
             Map.entry("WecomCustomerBindingMapper", "wecomCustomer"),
@@ -154,6 +155,9 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
                     + " OR (" + qualifiedColumn(table, "customer_id") + " IS NULL AND "
                     + qualifiedColumn(table, "employee_id") + " IS NULL AND "
                     + qualifiedColumn(table, "upload_user_id") + " IN (" + inClause + ")))"
+                    : null;
+            case "product" -> "crm_product".equals(tableName)
+                    ? qualifiedColumn(table, "owner_id") + " IN (" + inClause + ")"
                     : null;
             case "wecomEmployeeSession" -> "crm_wecom_employee".equals(tableName)
                     ? qualifiedColumn(table, "crm_user_id") + " IN (" + inClause + ")"

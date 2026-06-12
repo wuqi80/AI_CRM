@@ -10,6 +10,7 @@ export function createSession(data: {
   customerId?: string
   employeeId?: string
   relationId?: string
+  productId?: string
   projectId?: string
   projectTaskId?: string
   appCode?: string
@@ -72,6 +73,7 @@ export async function sendMessageStream(
   knowledgeIds?: string[],
   projectId?: string,
   projectTaskId?: string,
+  productId?: string,
   signal?: AbortSignal
 ): Promise<void> {
   const token = getToken()
@@ -107,6 +109,7 @@ export async function sendMessageStream(
         modelProvider: modelProvider || undefined,
         modelName: modelName || undefined,
         modelSource: modelSource || undefined,
+        productId: productId || undefined,
         projectId: projectId || undefined,
         projectTaskId: projectTaskId || undefined,
         knowledgeIds:
@@ -209,7 +212,8 @@ export function sendMessageSync(
   modelSource?: string,
   knowledgeIds?: string[],
   projectId?: string,
-  projectTaskId?: string
+  projectTaskId?: string,
+  productId?: string
 ): Promise<string> {
   return post('/chat/sendSync', {
     sessionId,
@@ -220,6 +224,7 @@ export function sendMessageSync(
     modelProvider: modelProvider || undefined,
     modelName: modelName || undefined,
     modelSource: modelSource || undefined,
+    productId: productId || undefined,
     projectId: projectId || undefined,
     projectTaskId: projectTaskId || undefined,
     knowledgeIds:

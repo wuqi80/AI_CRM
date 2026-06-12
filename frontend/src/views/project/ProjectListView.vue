@@ -122,7 +122,7 @@
               </p>
             </div>
             <button
-              v-if="canEditProject(project)"
+              v-if="canEditProject(project) && !isArchivedProject(project)"
               type="button"
               class="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-50 hover:text-primary"
               title="编辑项目"
@@ -154,14 +154,33 @@
             </div>
           </div>
 
-          <div class="mt-5 flex items-center justify-end">
+          <div class="mt-5 flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+              class="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
+              :class="isArchivedProject(project)
+                ? 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                : 'bg-slate-900 text-white hover:bg-slate-700'"
               @click.stop="goToProject(project.projectId)"
             >
               进入项目
               <span class="material-symbols-outlined text-[16px] leading-none">arrow_forward</span>
+            </button>
+            <button
+              v-if="isArchivedProject(project) && canRestoreProject(project)"
+              type="button"
+              class="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+              @click.stop="handleRestoreProject(project)"
+            >
+              恢复项目
+            </button>
+            <button
+              v-if="isArchivedProject(project) && canDeleteProject(project)"
+              type="button"
+              class="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100"
+              @click.stop="handleDeleteProject(project)"
+            >
+              删除项目
             </button>
           </div>
         </article>
@@ -214,13 +233,31 @@
                       <span class="material-symbols-outlined text-[18px] leading-none">open_in_new</span>
                     </button>
                     <button
-                      v-if="canEditProject(project)"
+                      v-if="canEditProject(project) && !isArchivedProject(project)"
                       type="button"
                       class="flex size-8 items-center justify-center rounded-lg text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-bg-surface-hover)] hover:text-primary"
                       title="编辑项目"
                       @click.stop="openEditDialog(project)"
                     >
                       <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
+                    </button>
+                    <button
+                      v-if="isArchivedProject(project) && canRestoreProject(project)"
+                      type="button"
+                      class="flex size-8 items-center justify-center rounded-lg text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-bg-surface-hover)] hover:text-primary"
+                      title="恢复项目"
+                      @click.stop="handleRestoreProject(project)"
+                    >
+                      <span class="material-symbols-outlined text-[18px] leading-none">restore</span>
+                    </button>
+                    <button
+                      v-if="isArchivedProject(project) && canDeleteProject(project)"
+                      type="button"
+                      class="flex size-8 items-center justify-center rounded-lg text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                      title="删除项目"
+                      @click.stop="handleDeleteProject(project)"
+                    >
+                      <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
                     </button>
                   </div>
                 </td>
@@ -267,7 +304,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { queryProjectPageList } from '@/api/project'
 import ProjectRolePermissionDialog from '@/views/project/components/ProjectRolePermissionDialog.vue'
 import ProjectUpsertDialog from '@/views/project/components/ProjectUpsertDialog.vue'
@@ -276,6 +313,7 @@ import type {
   ProjectEntity,
   ProjectListStats,
   ProjectListStatusFilter,
+  ProjectPermission,
   ProjectListViewMode
 } from '@/types/project'
 import {
@@ -298,7 +336,8 @@ const total = ref(0)
 const stats = ref<ProjectListStats>({
   all: 0,
   inProgress: 0,
-  completed: 0
+  completed: 0,
+  archived: 0
 })
 const showDialog = ref(false)
 const showRolePermissionDialog = ref(false)
@@ -323,11 +362,11 @@ const visiblePages = computed(() => {
 const statusFilters = computed(() => [
   { value: 'all' as const, label: '全部', icon: 'folder', count: stats.value.all },
   { value: 'IN_PROGRESS' as const, label: '进行中', icon: 'play_circle', count: stats.value.inProgress },
-  { value: 'COMPLETED' as const, label: '已完成', icon: 'check_circle', count: stats.value.completed }
+  { value: 'COMPLETED' as const, label: '已完成', icon: 'check_circle', count: stats.value.completed },
+  { value: 'ARCHIVED' as const, label: '已归档', icon: 'archive', count: stats.value.archived }
 ])
 
 onMounted(() => {
-  hydrateProjectsFromStore(true)
   void loadProjects()
 })
 
@@ -338,34 +377,54 @@ onBeforeUnmount(() => {
 watch(
   () => projectStore.accessibleProjectSummaries,
   () => {
-    if (!loading.value || projects.value.length > 0) return
-    hydrateProjectsFromStore()
+    if (keyword.value.trim()) return
+    applyProjectsFromStore()
   }
 )
 
-function isDefaultProjectListQuery() {
-  return keyword.value.trim() === '' && statusFilter.value === 'all' && page.value === 1
+function buildProjectStats(source: ProjectEntity[]): ProjectListStats {
+  const activeProjects = source.filter(project => project.status !== 'ARCHIVED')
+  return {
+    all: activeProjects.length,
+    inProgress: source.filter(project => project.status === 'IN_PROGRESS').length,
+    completed: source.filter(project => project.status === 'COMPLETED').length,
+    archived: source.filter(project => project.status === 'ARCHIVED').length
+  }
 }
 
-function hydrateProjectsFromStore(force = false) {
-  if (!isDefaultProjectListQuery()) return false
-  if (!force && projects.value.length > 0) return true
+function matchesStatusFilter(project: ProjectEntity) {
+  if (statusFilter.value === 'all') return project.status !== 'ARCHIVED'
+  return project.status === statusFilter.value
+}
 
+function applyProjectsFromStore() {
   const cachedProjects = projectStore.accessibleProjectSummaries
-  if (cachedProjects.length === 0) return false
+  stats.value = buildProjectStats(cachedProjects)
 
-  projects.value = cachedProjects.slice(0, limit.value)
-  total.value = cachedProjects.length
-  stats.value = {
-    all: cachedProjects.length,
-    inProgress: cachedProjects.filter(project => project.status === 'IN_PROGRESS').length,
-    completed: cachedProjects.filter(project => project.status === 'COMPLETED').length
+  const filteredProjects = cachedProjects.filter(matchesStatusFilter)
+  total.value = filteredProjects.length
+
+  const lastPage = Math.max(1, Math.ceil(total.value / limit.value))
+  if (page.value > lastPage) {
+    page.value = lastPage
   }
-  return true
+
+  const start = (page.value - 1) * limit.value
+  projects.value = filteredProjects.slice(start, start + limit.value)
 }
 
 async function loadProjects() {
-  hydrateProjectsFromStore()
+  if (!keyword.value.trim()) {
+    loading.value = !projectStore.initialized
+    try {
+      await projectStore.ensureInitialized()
+      applyProjectsFromStore()
+    } finally {
+      loading.value = false
+    }
+    return
+  }
+
   loading.value = true
   try {
     const result = await queryProjectPageList({
@@ -393,7 +452,8 @@ function normalizeStats(extraData: unknown): ProjectListStats {
   return {
     all: Number(raw.all ?? 0),
     inProgress: Number(raw.inProgress ?? 0),
-    completed: Number(raw.completed ?? 0)
+    completed: Number(raw.completed ?? 0),
+    archived: Number(raw.archived ?? 0)
   }
 }
 
@@ -460,12 +520,41 @@ async function handleSubmitProject(payload: {
 }
 
 function canEditProject(project: ProjectEntity) {
+  return hasProjectActionPermission(project, 'EDIT_PROJECT')
+}
+
+function canRestoreProject(project: ProjectEntity) {
+  return hasProjectActionPermission(project, 'ARCHIVE_PROJECT')
+}
+
+function canDeleteProject(project: ProjectEntity) {
+  return hasProjectActionPermission(project, 'DELETE_PROJECT')
+}
+
+function hasProjectActionPermission(project: ProjectEntity, permission: ProjectPermission) {
   return Boolean(
     project.systemAdmin
-    || project.currentUserPermissions?.includes('EDIT_PROJECT')
+    || project.currentUserPermissions?.includes(permission)
     || project.currentUserRole === 'OWNER'
     || project.currentUserRole === 'ADMIN'
   )
+}
+
+function isArchivedProject(project: ProjectEntity) {
+  return project.status === 'ARCHIVED'
+}
+
+async function handleRestoreProject(project: ProjectEntity) {
+  await projectStore.restoreProject(project.projectId)
+  ElMessage.success('项目已恢复')
+  await loadProjects()
+}
+
+async function handleDeleteProject(project: ProjectEntity) {
+  await ElMessageBox.confirm(`确定删除项目“${project.name}”吗？删除后项目及任务将不可恢复。`, '提示', { type: 'warning' })
+  await projectStore.deleteProject(project.projectId)
+  ElMessage.success('项目已删除')
+  await loadProjects()
 }
 
 function goToProject(projectId: string) {

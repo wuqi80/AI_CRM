@@ -489,6 +489,97 @@
           </div>
 
           <div
+            v-if="!sidebarSortMode && showSidebarProducts"
+            class="wk-sidebar-product-section space-y-1 pt-1"
+            :style="{ order: getSidebarModuleRenderOrder('product') }"
+          >
+            <div
+              class="wk-customer-header-row group/product-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
+              :style="{ backgroundColor: productHeaderHovered ? '#f9f9f9' : 'transparent' }"
+              :title="sidebarProductsExpanded ? '收起产品列表' : '展开产品列表'"
+              @mouseenter="productHeaderHovered = true"
+              @mouseleave="productHeaderHovered = false"
+            >
+              <button
+                type="button"
+                class="wk-customer-header-toggle group flex min-w-0 flex-1 items-center gap-1 text-left"
+                :aria-expanded="sidebarProductsExpanded"
+                aria-controls="sidebar-products-panel"
+                @click="sidebarProductsExpanded = !sidebarProductsExpanded"
+              >
+                <span class="min-w-0 truncate text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">产品列表</span>
+                <span class="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150" aria-hidden="true">
+                  <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none text-[#c9c9c9]">
+                    {{ sidebarProductsExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
+                  </span>
+                </span>
+              </button>
+              <div class="ml-auto flex shrink-0 items-center justify-end gap-1">
+                <button
+                  type="button"
+                  class="wk-customer-header-action group/product-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
+                  aria-label="查看产品列表"
+                  @click.stop="navigateTo('/product')"
+                >
+                  <span class="material-symbols-outlined text-[18px] leading-none">format_list_bulleted</span>
+                  <span
+                    class="pointer-events-none absolute right-0 top-full z-[200] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/product-action:opacity-100"
+                    role="tooltip"
+                  >
+                    查看产品列表
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div id="sidebar-products-panel" v-show="sidebarProductsExpanded">
+              <div v-if="sidebarProductsLoading && sidebarProducts.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="sidebarProducts.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">
+                暂无产品数据
+              </div>
+              <template v-else>
+                <button
+                  v-for="product in sidebarProducts"
+                  :key="product.productId"
+                  type="button"
+                  class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
+                  :class="isProductActive(product.productId) ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]'"
+                  @click="handleSelectProductChat(product)"
+                >
+                  <div class="flex min-w-0 w-full items-center gap-2" style="height: 24px !important">
+                    <div class="flex size-[20px] shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white">
+                      <img
+                        v-if="product.mainImageUrl"
+                        :src="product.mainImageUrl"
+                        :alt="productName(product)"
+                        class="size-full object-cover"
+                      />
+                      <span v-else class="material-symbols-outlined flex size-full items-center justify-center bg-amber-50 text-[15px] leading-none text-amber-600">
+                        inventory_2
+                      </span>
+                    </div>
+                    <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="productName(product)">
+                      {{ productName(product) }}
+                    </span>
+                  </div>
+                </button>
+                <div v-if="sidebarProductsLoading" class="flex justify-center py-3">
+                  <span class="material-symbols-outlined animate-spin text-[18px] leading-none text-slate-300">progress_activity</span>
+                </div>
+                <button
+                  v-else-if="sidebarProductsHasMore"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center justify-center rounded-[8px] py-[7px] text-left text-[13px] text-[#8f8f8f] transition-all hover:bg-[#f9f9f9] hover:text-[#5f5f5f]"
+                  @click="loadMoreSidebarProducts"
+                >
+                  加载更多
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <div
             v-if="!sidebarSortMode && showSidebarAddressBook"
             class="wk-sidebar-address-section space-y-1 pt-1"
             :style="{ order: getSidebarModuleRenderOrder('addressBook') }"
@@ -1265,6 +1356,59 @@
               </template>
             </div>
 
+            <div v-if="showSidebarProducts" class="pt-3">
+              <div class="flex items-center gap-3 px-3 pb-2.5">
+                <p class="min-w-0 flex-1 text-[1rem] font-bold leading-7 text-[#0d0d0d]">产品列表</p>
+                <button
+                  type="button"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100 active:text-[#0d0d0d]"
+                  aria-label="移动端查看产品列表"
+                  title="查看产品列表"
+                  @click.stop="mobileNavigate('/product')"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">format_list_bulleted</span>
+                </button>
+              </div>
+              <div v-if="sidebarProductsLoading && sidebarProducts.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="sidebarProducts.length === 0" class="px-3 py-[6px] text-sm text-slate-400">
+                暂无产品数据
+              </div>
+              <template v-else>
+                <button
+                  v-for="product in sidebarProducts"
+                  :key="product.productId"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] px-3 py-[9px] text-left transition-colors"
+                  :class="isProductActive(product.productId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
+                  @click="handleMobileSelectProductChat(product)"
+                >
+                  <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <img
+                      v-if="product.mainImageUrl"
+                      :src="product.mainImageUrl"
+                      :alt="productName(product)"
+                      class="size-full object-cover"
+                    />
+                    <span v-else class="material-symbols-outlined flex size-full items-center justify-center bg-amber-50 text-[18px] leading-none text-amber-600">
+                      inventory_2
+                    </span>
+                  </div>
+                  <span class="block min-w-0 flex-1 truncate text-[1rem] leading-6">{{ productName(product) }}</span>
+                </button>
+                <button
+                  v-if="sidebarProductsHasMore"
+                  type="button"
+                  class="mt-1 flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium text-[#8f8f8f] transition-colors active:bg-slate-100"
+                  :disabled="sidebarProductsLoading"
+                  @click="loadMoreSidebarProducts"
+                >
+                  {{ sidebarProductsLoading ? '加载中...' : '加载更多产品' }}
+                </button>
+              </template>
+            </div>
+
             <div v-if="showSidebarAddressBook" class="pt-3">
               <p class="px-3 pb-2.5 text-[1rem] font-bold leading-7 text-[#0d0d0d]">通讯录</p>
               <div v-if="sidebarEmployeesLoading && sidebarEmployees.length === 0" class="flex justify-center py-6">
@@ -1906,6 +2050,7 @@ import ProjectUpsertDialog from '@/views/project/components/ProjectUpsertDialog.
 import type { WkIconName } from '@/components/common/wkIcon'
 import { queryGlobalSearch, type GlobalSearchResult } from '@/api/search'
 import { queryCustomerList } from '@/api/customer'
+import { queryProductList } from '@/api/product'
 import { queryAddressBook } from '@/api/addressBook'
 import { queryRelationList } from '@/api/relation'
 import { useChatDrawer } from '@/composables/useChatDrawer'
@@ -1919,7 +2064,7 @@ import { useEnumStore } from '@/stores/enums'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { shouldCloseMobileDrawerFromSwipe, type SwipePoint } from '@/utils/mobileDrawerSwipe'
-import { checkForUpdates, DEFAULT_CURRENT_VERSION, getCurrentVersion } from '@/utils/capacitorUpdate'
+import { isNativeMobileRuntime } from '@/utils/nativeMobileRuntime'
 import {
   DEFAULT_SIDEBAR_MODULE_ORDER,
   normalizeSidebarModuleOrder,
@@ -1929,9 +2074,16 @@ import {
 } from '@/utils/sidebarModuleOrder'
 import type { ChatSession } from '@/types/common'
 import type { CustomerListVO } from '@/types/customer'
+import type { ProductVO } from '@/types/product'
 import type { ProjectEntity } from '@/types/project'
 import type { AddressBookEmployee } from '@/types/addressBook'
 import type { RelationVO } from '@/types/relation'
+
+const DEFAULT_CURRENT_VERSION = '1.0.0'
+
+type CapacitorUpdateModule = {
+  checkForUpdates: () => Promise<'updated' | 'none' | 'unsupported' | 'failed'>
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -1967,6 +2119,7 @@ const SIDEBAR_STORAGE_KEYS = {
   sidebarProjectsExpanded: 'wk_ai_crm:main_layout:sidebar_projects_expanded:v1',
   sidebarProjectCache: 'wk_ai_crm:main_layout:sidebar_project_cache:v1',
   sidebarCustomersExpanded: 'wk_ai_crm:main_layout:sidebar_customers_expanded:v1',
+  sidebarProductsExpanded: 'wk_ai_crm:main_layout:sidebar_products_expanded:v1',
   sidebarAddressBookExpanded: 'wk_ai_crm:main_layout:sidebar_address_book_expanded:v1',
   sidebarRelationsExpanded: 'wk_ai_crm:main_layout:sidebar_relations_expanded:v1'
 } as const
@@ -1974,6 +2127,7 @@ const SIDEBAR_STORAGE_KEYS = {
 const SIDEBAR_MODULE_LABELS: Record<SidebarModuleKey, string> = {
   recent: '最近',
   customer: '客户',
+  product: '产品',
   project: '项目',
   relation: '关系',
   addressBook: '通讯录'
@@ -1982,6 +2136,7 @@ const SIDEBAR_MODULE_LABELS: Record<SidebarModuleKey, string> = {
 const SIDEBAR_MODULE_ICONS: Record<SidebarModuleKey, string> = {
   recent: 'forum',
   customer: 'business_center',
+  product: 'inventory_2',
   project: 'folder',
   relation: 'account_tree',
   addressBook: 'contacts'
@@ -2630,10 +2785,12 @@ const recentChatSessionsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.re
 const recentHistoryKeyword = ref('')
 const sidebarProjectsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarProjectsExpanded, true))
 const sidebarCustomersExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, true))
+const sidebarProductsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarProductsExpanded, true))
 const projectHeaderHovered = ref(false)
 const sidebarAddressBookExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarAddressBookExpanded, true))
 const sidebarRelationsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarRelationsExpanded, true))
 const customerHeaderHovered = ref(false)
+const productHeaderHovered = ref(false)
 const addressBookHeaderHovered = ref(false)
 const relationHeaderHovered = ref(false)
 const sidebarCustomerKeyword = ref('')
@@ -2641,6 +2798,7 @@ const recentChatSessionsMoreVisible = ref(false)
 const RECENT_CHAT_SESSION_LIMIT = 5
 const MOBILE_RECENT_CHAT_SESSION_LIMIT = 8
 const SIDEBAR_CUSTOMER_LIMIT = 10
+const SIDEBAR_PRODUCT_LIMIT = 10
 const SIDEBAR_EMPLOYEE_LIMIT = 10
 const SIDEBAR_RELATION_LIMIT = 10
 const CUSTOMER_SEARCH_LIMIT = 10
@@ -2653,6 +2811,11 @@ const sidebarCustomersLoading = ref(false)
 const sidebarCustomersPage = ref(1)
 const sidebarCustomersTotal = ref(0)
 const sidebarCustomersHasMore = ref(true)
+const sidebarProducts = ref<ProductVO[]>([])
+const sidebarProductsLoading = ref(false)
+const sidebarProductsPage = ref(1)
+const sidebarProductsTotal = ref(0)
+const sidebarProductsHasMore = ref(true)
 const sidebarEmployees = ref<AddressBookEmployee[]>([])
 const sidebarEmployeesLoading = ref(false)
 const sidebarEmployeesPage = ref(1)
@@ -2702,6 +2865,7 @@ let customerSearchFocusRequestId = 0
 let removeChatComposerNarrowListener: (() => void) | null = null
 let removeCustomerListRefreshListener: (() => void) | null = null
 let removeCustomerSidebarRefreshListener: (() => void) | null = null
+let removeProductSidebarRefreshListener: (() => void) | null = null
 let removeRelationSidebarRefreshListener: (() => void) | null = null
 let removeProjectSidebarRefreshListener: (() => void) | null = null
 let removeMobileMainMenuOpenListener: (() => void) | null = null
@@ -2737,6 +2901,10 @@ function refreshSidebarCustomersFromEvent(payload?: SidebarRefreshPayload) {
 
 function refreshSidebarRelationsFromEvent(payload?: SidebarRefreshPayload) {
   void fetchSidebarRelations({ reset: true, preserveScroll: payload?.preserveScroll !== false })
+}
+
+function refreshSidebarProductsFromEvent(payload?: SidebarRefreshPayload) {
+  void fetchSidebarProducts({ reset: true, preserveScroll: payload?.preserveScroll !== false })
 }
 
 function refreshSidebarProjectsFromEvent(payload?: ProjectSidebarRefreshPayload) {
@@ -2814,6 +2982,7 @@ const sidebarProjects = computed<SidebarProjectItem[]>(() =>
   liveSidebarProjects.value.length > 0 ? liveSidebarProjects.value : sidebarProjectCache.value
 )
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
+const showSidebarProducts = computed(() => userStore.hasPermission('product:view'))
 const showSidebarAddressBook = computed(() => userStore.hasPermission('addressBook:list'))
 const showSidebarRelations = computed(() => true)
 
@@ -2829,6 +2998,15 @@ watch(showSidebarCustomers, visible => {
   }
   if (!visible) {
     resetSidebarCustomers()
+  }
+})
+
+watch(showSidebarProducts, visible => {
+  if (visible && sidebarProducts.value.length === 0) {
+    void fetchSidebarProducts({ reset: true })
+  }
+  if (!visible) {
+    resetSidebarProducts()
   }
 })
 
@@ -2952,12 +3130,30 @@ const userDisplayName = computed(() => userStore.realname || userStore.username 
 const userAccountName = computed(() => userStore.username || userStore.userInfo?.email || userStore.userInfo?.mobile || '用户')
 const userAvatarInitials = computed(() => userDisplayName.value.trim().slice(0, 2).toUpperCase() || 'U')
 
+function getConfiguredCurrentVersion(): string {
+  const appVersion = import.meta.env.VITE_APP_VERSION
+  return typeof appVersion === 'string' && appVersion.trim()
+    ? appVersion.trim()
+    : DEFAULT_CURRENT_VERSION
+}
+
 async function loadCurrentAppVersion() {
   try {
-    currentAppVersion.value = await getCurrentVersion()
+    currentAppVersion.value = getConfiguredCurrentVersion()
   } catch (error) {
     console.warn('获取当前版本号失败:', error)
     currentAppVersion.value = DEFAULT_CURRENT_VERSION
+  }
+}
+
+async function loadCapacitorUpdateModule(): Promise<CapacitorUpdateModule | null> {
+  if (!isNativeMobileRuntime()) return null
+
+  try {
+    return await import('@/utils/capacitorUpdate')
+  } catch (error) {
+    console.warn('Failed to load Capacitor update module:', error)
+    return null
   }
 }
 
@@ -2967,7 +3163,13 @@ async function handleManualUpdateCheck() {
   checkingAppUpdate.value = true
   try {
     await loadCurrentAppVersion()
-    const result = await checkForUpdates()
+    const capacitorUpdateModule = await loadCapacitorUpdateModule()
+    if (!capacitorUpdateModule) {
+      ElMessage.info('当前环境暂不支持应用内更新检查')
+      return
+    }
+
+    const result = await capacitorUpdateModule.checkForUpdates()
 
     if (result === 'none') {
       ElMessage.success('当前已是最新版本')
@@ -3021,6 +3223,7 @@ const customerSearchPullLabel = computed(() => {
 const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/customer')) return '/customer'
+  if (path.startsWith('/product')) return '/product'
   if (path.startsWith('/scrm')) return '/scrm'
   if (path.startsWith('/tencent-meetings')) return '/tencent-meetings'
   if (path.startsWith('/address-book')) return '/address-book'
@@ -3221,6 +3424,10 @@ watch(sidebarCustomersExpanded, expanded => {
   writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, expanded)
 })
 
+watch(sidebarProductsExpanded, expanded => {
+  writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarProductsExpanded, expanded)
+})
+
 watch(sidebarAddressBookExpanded, expanded => {
   writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarAddressBookExpanded, expanded)
 })
@@ -3326,6 +3533,9 @@ onMounted(() => {
   if (showSidebarCustomers.value) {
     void fetchSidebarCustomers({ reset: true })
   }
+  if (showSidebarProducts.value) {
+    void fetchSidebarProducts({ reset: true })
+  }
   if (showSidebarAddressBook.value) {
     void fetchSidebarEmployees({ reset: true })
   }
@@ -3348,6 +3558,10 @@ onMounted(() => {
   removeCustomerSidebarRefreshListener = appEvents.on<SidebarRefreshPayload>(
     APP_EVENT.CUSTOMER_SIDEBAR_REFRESH,
     refreshSidebarCustomersFromEvent
+  )
+  removeProductSidebarRefreshListener = appEvents.on<SidebarRefreshPayload>(
+    APP_EVENT.PRODUCT_SIDEBAR_REFRESH,
+    refreshSidebarProductsFromEvent
   )
   removeRelationSidebarRefreshListener = appEvents.on<SidebarRefreshPayload>(
     APP_EVENT.RELATION_SIDEBAR_REFRESH,
@@ -3405,6 +3619,8 @@ onBeforeUnmount(() => {
   removeCustomerListRefreshListener = null
   removeCustomerSidebarRefreshListener?.()
   removeCustomerSidebarRefreshListener = null
+  removeProductSidebarRefreshListener?.()
+  removeProductSidebarRefreshListener = null
   removeRelationSidebarRefreshListener?.()
   removeRelationSidebarRefreshListener = null
   removeProjectSidebarRefreshListener?.()
@@ -3447,6 +3663,7 @@ watch(
     primarySidebarCollapsed.value,
     recentChatSessionsExpanded.value,
     sidebarCustomersExpanded.value,
+    sidebarProductsExpanded.value,
     sidebarAddressBookExpanded.value,
     sidebarRelationsExpanded.value,
     pcMainNavGroups.value.length,
@@ -3456,6 +3673,8 @@ watch(
     projectStore.loading,
     sidebarCustomers.value.length,
     sidebarCustomersLoading.value,
+    sidebarProducts.value.length,
+    sidebarProductsLoading.value,
     sidebarEmployees.value.length,
     sidebarEmployeesLoading.value,
     sidebarRelations.value.length,
@@ -3549,6 +3768,7 @@ function isUnboundChatSession(session: ChatSession): boolean {
   return !String(session.customerId || '').trim()
     && !String(session.employeeId || '').trim()
     && !String(session.relationId || '').trim()
+    && !String(session.productId || '').trim()
     && !chatStore.isProjectContextSession(session)
 }
 
@@ -3571,7 +3791,8 @@ const filteredHistorySessions = computed(() => {
     const title = (session.title || '').toLowerCase()
     const customerName = (session.customerName || '').toLowerCase()
     const relationName = (session.relationName || '').toLowerCase()
-    return title.includes(keyword) || customerName.includes(keyword) || relationName.includes(keyword)
+    const productName = (session.productName || '').toLowerCase()
+    return title.includes(keyword) || customerName.includes(keyword) || relationName.includes(keyword) || productName.includes(keyword)
   })
 })
 
@@ -3582,6 +3803,15 @@ function resetSidebarCustomers(options: { keepItems?: boolean } = {}) {
   sidebarCustomersPage.value = 1
   sidebarCustomersTotal.value = 0
   sidebarCustomersHasMore.value = true
+}
+
+function resetSidebarProducts(options: { keepItems?: boolean } = {}) {
+  if (!options.keepItems) {
+    sidebarProducts.value = []
+  }
+  sidebarProductsPage.value = 1
+  sidebarProductsTotal.value = 0
+  sidebarProductsHasMore.value = true
 }
 
 function resetSidebarEmployees(options: { keepItems?: boolean } = {}) {
@@ -3611,6 +3841,7 @@ function shouldLoadMoreSidebarCustomers(): boolean {
 
 function maybeLoadMoreSidebarObjects() {
   maybeLoadMoreSidebarCustomers()
+  maybeLoadMoreSidebarProducts()
   maybeLoadMoreSidebarEmployees()
   maybeLoadMoreSidebarRelations()
 }
@@ -3620,6 +3851,13 @@ function maybeLoadMoreSidebarCustomers() {
   if (sidebarCustomersLoading.value || !sidebarCustomersHasMore.value) return
   if (!shouldLoadMoreSidebarCustomers()) return
   void fetchSidebarCustomers()
+}
+
+function maybeLoadMoreSidebarProducts() {
+  if (!showSidebarProducts.value || !sidebarProductsExpanded.value || primarySidebarContentCollapsed.value) return
+  if (sidebarProductsLoading.value || !sidebarProductsHasMore.value) return
+  if (!shouldLoadMoreSidebarCustomers()) return
+  void fetchSidebarProducts()
 }
 
 function maybeLoadMoreSidebarEmployees() {
@@ -3638,6 +3876,10 @@ function maybeLoadMoreSidebarRelations() {
 
 function loadMoreSidebarCustomers() {
   void fetchSidebarCustomers()
+}
+
+function loadMoreSidebarProducts() {
+  void fetchSidebarProducts()
 }
 
 function loadMoreSidebarEmployees() {
@@ -3698,6 +3940,59 @@ async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?
     queueMicrotask(() => {
       updatePrimaryNavScrollbar()
       maybeLoadMoreSidebarCustomers()
+    })
+  }
+}
+
+async function fetchSidebarProducts(options: { reset?: boolean; preserveScroll?: boolean } = {}) {
+  if (sidebarProductsLoading.value) return
+  const preservedScrollTop = options.preserveScroll ? getPrimaryNavScrollTop() : null
+  if (!showSidebarProducts.value) {
+    resetSidebarProducts()
+    if (preservedScrollTop != null) {
+      void restorePrimaryNavScrollTop(preservedScrollTop)
+    }
+    return
+  }
+  if (options.reset) {
+    resetSidebarProducts({ keepItems: options.preserveScroll })
+  }
+  if (!sidebarProductsHasMore.value) return
+
+  const page = sidebarProductsPage.value
+  sidebarProductsLoading.value = true
+  try {
+    const result = await queryProductList({
+      page,
+      limit: SIDEBAR_PRODUCT_LIMIT
+    })
+    const nextProducts = result.list || []
+    if (page === 1) {
+      sidebarProducts.value = nextProducts
+    } else {
+      const existingIds = new Set(sidebarProducts.value.map(product => String(product.productId)))
+      sidebarProducts.value = [
+        ...sidebarProducts.value,
+        ...nextProducts.filter(product => !existingIds.has(String(product.productId))),
+      ]
+    }
+    sidebarProductsTotal.value = result.totalRow || sidebarProducts.value.length
+    sidebarProductsPage.value = page + 1
+    sidebarProductsHasMore.value = nextProducts.length > 0 && sidebarProducts.value.length < sidebarProductsTotal.value
+  } catch (error) {
+    console.error('Load sidebar products failed:', error)
+    sidebarProductsHasMore.value = false
+    if (page === 1) {
+      sidebarProducts.value = []
+    }
+  } finally {
+    sidebarProductsLoading.value = false
+    if (preservedScrollTop != null) {
+      await restorePrimaryNavScrollTop(preservedScrollTop)
+    }
+    queueMicrotask(() => {
+      updatePrimaryNavScrollbar()
+      maybeLoadMoreSidebarObjects()
     })
   }
 }
@@ -3916,6 +4211,12 @@ function isCustomerActive(customerId: string): boolean {
   return route.path.startsWith('/chat') && String(current) === String(customerId)
 }
 
+function isProductActive(productId: string): boolean {
+  const raw = route.query.productId
+  const current = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  return route.path.startsWith('/chat') && String(current) === String(productId)
+}
+
 function isProjectActive(projectId: string): boolean {
   return route.path.startsWith('/project') && String(route.params.id || '') === String(projectId)
 }
@@ -3953,6 +4254,24 @@ async function handleSelectCustomerChat(customer: CustomerListVO) {
 async function handleMobileSelectCustomerChat(customer: CustomerListVO) {
   closeMobileDrawer()
   await handleSelectCustomerChat(customer)
+}
+
+async function handleSelectProductChat(product: ProductVO) {
+  selectedPrimaryKey.value = ''
+  const productId = String(product.productId)
+  await chatStore.openProductChat({
+    productId,
+    productName: product.productName
+  })
+  await router.push({ path: '/chat', query: { productId } })
+  if (!isMobile.value) {
+    chatStore.requestComposerFocus()
+  }
+}
+
+async function handleMobileSelectProductChat(product: ProductVO) {
+  closeMobileDrawer()
+  await handleSelectProductChat(product)
 }
 
 async function handleSelectEmployeeChat(employee: AddressBookEmployee) {
@@ -3999,6 +4318,10 @@ function relationName(relation: RelationVO): string {
 
 function relationInitial(relation: RelationVO): string {
   return relationName(relation).trim().charAt(0) || '?'
+}
+
+function productName(product: ProductVO): string {
+  return product.productName || '未命名产品'
 }
 
 function relationAvatarUrl(relation: RelationVO): string {
@@ -4431,6 +4754,8 @@ function getSearchResultIcon(entityType: GlobalSearchResult['entityType']): WkIc
       return 'profile'
     case 'relation':
       return 'customer'
+    case 'product':
+      return 'crm'
     case 'task':
       return 'task'
     case 'schedule':

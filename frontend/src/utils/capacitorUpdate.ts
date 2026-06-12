@@ -1,7 +1,12 @@
-import { Capacitor } from '@capacitor/core'
-import type { DownloadBundleOptions, LiveUpdatePlugin } from '@capawesome/capacitor-live-update'
 import { ElMessageBox } from 'element-plus'
 import { h } from 'vue'
+import {
+  getNativeCapacitor,
+  getNativePlatform,
+  isNativePlatform,
+  isNativePluginAvailable,
+  registerNativePlugin
+} from '@/utils/nativeMobileRuntime'
 import {
   HOT_UPDATE_STATUS,
   type AppUpdateInfo,
@@ -33,8 +38,21 @@ type BrowserPlugin = {
   open(options: { url: string }): Promise<void>
 }
 
+type DownloadBundleOptions = {
+  bundleId: string
+  url: string
+  artifactType?: string
+  checksum?: string
+  signature?: string
+}
+
 type LiveUpdateModule = {
-  LiveUpdate: LiveUpdatePlugin
+  LiveUpdate: {
+    ready(): Promise<void>
+    downloadBundle(options: DownloadBundleOptions): Promise<void>
+    setNextBundle(options: { bundleId: string }): Promise<void>
+    reload(): Promise<void>
+  }
 }
 
 export type CheckForUpdatesOptions = {
@@ -56,7 +74,10 @@ let liveUpdateReadyPromise: Promise<void> | null = null
 
 function getBrowserPlugin(): BrowserPlugin {
   if (!browserPlugin) {
-    browserPlugin = Capacitor.registerPlugin<BrowserPlugin>('Browser')
+    browserPlugin = registerNativePlugin<BrowserPlugin>('Browser')
+    if (!browserPlugin) {
+      throw new Error('Capacitor Browser plugin is unavailable')
+    }
   }
   return browserPlugin
 }
@@ -78,7 +99,7 @@ function getConfiguredAppVersion(): string {
 }
 
 function loadLiveUpdateModule(): Promise<LiveUpdateModule> {
-  return import('@capawesome/capacitor-live-update')
+  return import('@/utils/capacitorLiveUpdateNative')
 }
 
 async function sendLiveUpdateReadySignal(): Promise<void> {
@@ -101,17 +122,17 @@ export async function getCurrentVersion(): Promise<string> {
 }
 
 export async function markLiveUpdateReady(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return
+  if (!isNativePlatform()) return
 
   try {
     await sendLiveUpdateReadySignal()
   } catch (error) {
-    console.warn('热更新 ready 失败:', error)
+    console.warn('Live update ready signal failed:', error)
   }
 }
 
 export async function reportLiveUpdateHealth(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return
+  if (!isNativePlatform()) return
 
   try {
     await sendLiveUpdateReadySignal()
@@ -122,7 +143,7 @@ export async function reportLiveUpdateHealth(): Promise<void> {
 }
 
 export function scheduleLiveUpdateHealthReport(delayMs = DEFAULT_LIVE_UPDATE_HEALTH_DELAY_MS): void {
-  if (!Capacitor.isNativePlatform() || typeof window === 'undefined') return
+  if (!isNativePlatform() || typeof window === 'undefined') return
 
   window.setTimeout(() => {
     void reportLiveUpdateHealth()
@@ -153,7 +174,7 @@ export async function performHotUpdate(updateInfo: AppUpdateInfo): Promise<void>
 }
 
 export async function performDownloadUpdate(updateUrl: string): Promise<void> {
-  if (Capacitor.isPluginAvailable('Browser')) {
+  if (isNativePluginAvailable('Browser')) {
     await getBrowserPlugin().open({ url: updateUrl })
     return
   }
@@ -163,33 +184,36 @@ export async function performDownloadUpdate(updateUrl: string): Promise<void> {
   }
 }
 
-export async function showDownloadUpdateDialog(updateInfo: AppUpdateInfo, currentVersion: string): Promise<void> {
+export async function showDownloadUpdateDialog(
+  updateInfo: AppUpdateInfo,
+  currentVersion: string
+): Promise<void> {
   if (isDownloadUpdateDialogVisible) return
 
   isDownloadUpdateDialogVisible = true
 
-  const note = updateInfo.note || '暂无更新说明'
+  const note = updateInfo.note || 'No update notes'
   const noteLines = note.split(/\r?\n/).filter((line) => line.trim())
 
   try {
     await ElMessageBox.confirm(
       h('div', { class: 'space-y-3 text-left' }, [
-        h('p', { class: 'text-sm text-slate-600' }, `检测到新版本 ${updateInfo.version},当前版本为 ${currentVersion}`),
+        h('p', { class: 'text-sm text-slate-600' }, `New version ${updateInfo.version} is available. Current version: ${currentVersion}`),
         h('div', { class: 'rounded bg-slate-50 p-3 text-sm leading-6 text-slate-700' }, [
-          h('div', { class: 'mb-1 font-medium text-slate-900 w-full' }, '更新内容'),
+          h('div', { class: 'mb-1 font-medium text-slate-900 w-full' }, 'Update notes'),
           noteLines.length
             ? h(
                 'div',
                 { class: 'space-y-1 whitespace-pre-wrap break-words' },
                 noteLines.map((line) => h('p', line))
               )
-            : h('p', '暂无更新说明')
+            : h('p', 'No update notes')
         ])
       ]),
-      '发现新版本',
+      'New Version',
       {
-        confirmButtonText: '立即更新',
-        cancelButtonText: '稍后',
+        confirmButtonText: 'Update',
+        cancelButtonText: 'Later',
         closeOnClickModal: false,
         closeOnPressEscape: false,
         distinguishCancelAndClose: true,
@@ -198,14 +222,14 @@ export async function showDownloadUpdateDialog(updateInfo: AppUpdateInfo, curren
     )
     await performDownloadUpdate(updateInfo.url)
   } catch {
-    // 用户选择稍后更新时不需要提示。
+    // User chose to update later.
   } finally {
     isDownloadUpdateDialogVisible = false
   }
 }
 
 export async function checkForUpdates(options: CheckForUpdatesOptions = {}): Promise<CheckForUpdatesResult> {
-  if (!Capacitor.isNativePlatform()) return 'unsupported'
+  if (!getNativeCapacitor()) return 'unsupported'
 
   const manifestUrl = options.manifestUrl || getUpdateManifestUrl()
   if (!manifestUrl) return 'unsupported'
@@ -216,10 +240,10 @@ export async function checkForUpdates(options: CheckForUpdatesOptions = {}): Pro
     const response = await fetcher(manifestUrl, { cache: 'no-store' })
 
     if (!response.ok) {
-      throw new Error(`版本检查接口请求失败: ${response.status}`)
+      throw new Error(`Version check request failed: ${response.status}`)
     }
 
-    const platform = Capacitor.getPlatform()
+    const platform = getNativePlatform()
     if (!isSupportedPlatform(platform)) return 'unsupported'
 
     const payload = await response.json()
@@ -235,7 +259,7 @@ export async function checkForUpdates(options: CheckForUpdatesOptions = {}): Pro
     await showDownloadUpdateDialog(updateInfo, currentVersion)
     return 'updated'
   } catch (error) {
-    console.error('检查更新失败:', error)
+    console.error('Update check failed:', error)
     return 'failed'
   }
 }
@@ -243,7 +267,7 @@ export async function checkForUpdates(options: CheckForUpdatesOptions = {}): Pro
 export function scheduleCapacitorUpdateCheck(
   options: number | ScheduleCapacitorUpdateCheckOptions = DEFAULT_UPDATE_CHECK_DELAY_MS
 ): void {
-  if (!Capacitor.isNativePlatform() || typeof window === 'undefined') return
+  if (!isNativePlatform() || typeof window === 'undefined') return
 
   const delayMs = typeof options === 'number'
     ? options

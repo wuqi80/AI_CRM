@@ -21,6 +21,8 @@ public interface IProjectService {
 
     ProjectVO archiveProject(Long projectId);
 
+    ProjectVO restoreProject(Long projectId);
+
     void deleteProject(Long projectId);
 
     ProjectVO.ProjectRolePermissionConfigVO getProjectRolePermissionConfig();

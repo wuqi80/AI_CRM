@@ -56,6 +56,9 @@ public class ChatSession implements Serializable {
     @Schema(description = "关联关系人ID")
     private Long relationId;
 
+    @Schema(description = "关联产品ID")
+    private Long productId;
+
     @Schema(description = "关联项目ID")
     private Long projectId;
 
@@ -68,7 +71,7 @@ public class ChatSession implements Serializable {
     @Schema(description = "会话标题")
     private String title;
 
-    @Schema(description = "聊天应用编码: general/crm/knowledge/address_book/relation")
+    @Schema(description = "聊天应用编码: general/crm/knowledge/address_book/relation/product")
     private String appCode;
 
     @Schema(description = "Whether the session is pinned")

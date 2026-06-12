@@ -8,12 +8,13 @@ export type ProjectViewMode = 'ai' | 'board' | 'list' | 'members' | 'task_ai'
 
 export type ProjectListViewMode = 'card' | 'table'
 
-export type ProjectListStatusFilter = 'all' | 'IN_PROGRESS' | 'COMPLETED'
+export type ProjectListStatusFilter = 'all' | 'IN_PROGRESS' | 'COMPLETED' | 'ARCHIVED'
 
 export interface ProjectListStats {
   all: number
   inProgress: number
   completed: number
+  archived: number
 }
 
 export interface ProjectListQuery {

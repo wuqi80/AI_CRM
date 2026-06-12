@@ -26,7 +26,8 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
     private static final Map<String, String> TABLE_MAPPING = Map.of(
             "customer", "crm_customer",
             "contact", "crm_contact",
-            "relation", "crm_relation"
+            "relation", "crm_relation",
+            "product", "crm_product"
     );
 
     /**
@@ -35,13 +36,14 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
     private static final Map<String, String> ID_COLUMN_MAPPING = Map.of(
             "customer", "customer_id",
             "contact", "contact_id",
-            "relation", "relation_id"
+            "relation", "relation_id",
+            "product", "product_id"
     );
 
     /**
      * 支持的实体类型集合
      */
-    public static final Set<String> SUPPORTED_ENTITIES = Set.of("customer", "contact", "relation");
+    public static final Set<String> SUPPORTED_ENTITIES = Set.of("customer", "contact", "relation", "product");
 
     /**
      * 允许的列名正则（防止 SQL 注入）

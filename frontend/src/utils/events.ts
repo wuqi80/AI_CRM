@@ -19,6 +19,7 @@ export const appEvents = new AppEventBus()
 export const APP_EVENT = {
   CUSTOMER_LIST_REFRESH: 'customer:list:refresh',
   CUSTOMER_SIDEBAR_REFRESH: 'customer:sidebar:refresh',
+  PRODUCT_SIDEBAR_REFRESH: 'product:sidebar:refresh',
   PROJECT_SIDEBAR_REFRESH: 'project:sidebar:refresh',
   CUSTOMER_DETAIL_REFRESH: 'customer:detail:refresh',
   RELATION_SIDEBAR_REFRESH: 'relation:sidebar:refresh',

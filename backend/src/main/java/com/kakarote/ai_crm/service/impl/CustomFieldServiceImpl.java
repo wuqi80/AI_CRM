@@ -123,6 +123,34 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                             option("manual", "手动创建"),
                             option("customer_contact", "客户联系人")
                     ), 90)
+            ),
+            "product", List.of(
+                    systemField("productName", "产品名称", "text", "product_name", "VARCHAR(255)", null, "请输入产品名称", true, true, true, null, 10),
+                    systemField("productCode", "产品编码", "text", "product_code", "VARCHAR(100)", null, "请输入产品编码", false, true, true, null, 20),
+                    systemField("categoryId", "产品类目", "number", "category_id", "BIGINT", null, null, false, false, true, null, 30),
+                    systemField("productType", "产品类型", "select", "product_type", "VARCHAR(50)", "goods", null, false, true, true, List.of(
+                            option("goods", "实物"),
+                            option("service", "服务"),
+                            option("subscription", "订阅"),
+                            option("other", "其他")
+                    ), 40),
+                    systemField("unit", "单位", "select", "unit", "VARCHAR(50)", null, "请选择单位", false, true, true, List.of(
+                            option("个", "个"),
+                            option("套", "套"),
+                            option("台", "台"),
+                            option("件", "件"),
+                            option("年", "年"),
+                            option("月", "月"),
+                            option("次", "次")
+                    ), 50),
+                    systemField("standardPrice", "标准价", "number", "standard_price", "DECIMAL(18,2)", null, null, false, false, true, null, 60),
+                    systemField("costPrice", "成本价", "number", "cost_price", "DECIMAL(18,2)", null, null, false, false, false, null, 70),
+                    systemField("ownerId", "负责人", "number", "owner_id", "BIGINT", null, null, true, false, true, null, 80),
+                    systemField("status", "状态", "select", "status", "VARCHAR(20)", "active", null, false, true, true, List.of(
+                            option("active", "启用"),
+                            option("inactive", "停用")
+                    ), 90),
+                    systemField("description", "描述", "textarea", "description", "TEXT", null, "请输入描述", false, true, false, null, 100)
             )
     );
     /*
@@ -753,14 +781,25 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }
 
         synchronized (SYSTEM_FIELD_INIT_LOCK) {
-            Set<String> existingFieldNames = list(new LambdaQueryWrapper<CustomField>()
-                    .eq(CustomField::getEntityType, entityType))
-                    .stream()
+            List<CustomField> existingFields = list(new LambdaQueryWrapper<CustomField>()
+                    .eq(CustomField::getEntityType, entityType));
+            Set<String> existingFieldNames = existingFields.stream()
                     .map(CustomField::getFieldName)
                     .filter(StrUtil::isNotBlank)
                     .collect(Collectors.toSet());
+            Map<String, CustomField> existingSystemFields = existingFields.stream()
+                    .filter(this::isSystemField)
+                    .filter(field -> StrUtil.isNotBlank(field.getFieldName()))
+                    .collect(Collectors.toMap(CustomField::getFieldName, field -> field, (left, right) -> left));
 
             definitions.stream()
+                    .peek(definition -> {
+                        CustomField existingSystemField = existingSystemFields.get(definition.fieldName());
+                        if (existingSystemField != null) {
+                            syncSystemFieldMetadata(existingSystemField, definition);
+                        }
+                    })
+                    .filter(definition -> !existingSystemFields.containsKey(definition.fieldName()))
                     .filter(definition -> !existingFieldNames.contains(definition.fieldName()))
                     .map(definition -> buildSystemField(entityType, definition))
                     .forEach(field -> {
@@ -771,6 +810,48 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                                     entityType, field.getFieldName(), exception.getMessage());
                         }
                     });
+        }
+    }
+
+    /**
+     * 同步已有系统字段元数据，不覆盖用户维护的标签和非空选项。
+     */
+    private void syncSystemFieldMetadata(CustomField field, SystemFieldDefinition definition) {
+        boolean changed = false;
+        boolean fieldTypeChanged = false;
+
+        if (!StrUtil.equals(field.getFieldType(), definition.fieldType())) {
+            field.setFieldType(definition.fieldType());
+            changed = true;
+            fieldTypeChanged = true;
+        }
+        if (!StrUtil.equals(field.getColumnName(), definition.columnName())) {
+            field.setColumnName(definition.columnName());
+            changed = true;
+        }
+        if (!StrUtil.equals(field.getColumnType(), definition.columnType())) {
+            field.setColumnType(definition.columnType());
+            changed = true;
+        }
+        if ((fieldTypeChanged || StrUtil.isBlank(field.getPlaceholder()))
+                && StrUtil.isNotBlank(definition.placeholder())
+                && !StrUtil.equals(field.getPlaceholder(), definition.placeholder())) {
+            field.setPlaceholder(definition.placeholder());
+            changed = true;
+        }
+        if (definition.options() != null && StrUtil.isBlank(field.getOptions())) {
+            field.setOptions(JSON.toJSONString(definition.options()));
+            changed = true;
+        }
+
+        if (changed) {
+            try {
+                updateById(field);
+                evictOptionsCache(TenantContextHolder.getTenantId());
+            } catch (Exception exception) {
+                log.warn("Sync system field metadata failed. entityType={}, fieldName={}, error={}",
+                        field.getEntityType(), field.getFieldName(), exception.getMessage());
+            }
         }
     }
 

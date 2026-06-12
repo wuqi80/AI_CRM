@@ -32,6 +32,7 @@ import com.kakarote.ai_crm.entity.PO.ChatMessage;
 import com.kakarote.ai_crm.entity.PO.ChatSession;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
+import com.kakarote.ai_crm.entity.PO.Product;
 import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.AiModelOptionVO;
@@ -155,6 +156,12 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private IProjectService projectService;
+
+    @Autowired
+    private IProductService productService;
+
+    @Autowired
+    private ICustomFieldService customFieldService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -345,6 +352,7 @@ public class ChatServiceImpl implements IChatService {
         Customer boundCustomer = validateVisibleCustomer(sessionCreateBO.getCustomerId());
         ManagerUser boundEmployee = validateVisibleEmployee(sessionCreateBO.getEmployeeId());
         Relation boundRelation = validateVisibleRelation(sessionCreateBO.getRelationId());
+        Product boundProduct = validateVisibleProduct(sessionCreateBO.getProductId());
         ProjectVO boundProject = validateVisibleProject(sessionCreateBO.getProjectId());
         ProjectVO.ProjectTaskVO boundProjectTask = validateVisibleProjectTask(boundProject, sessionCreateBO.getProjectTaskId());
         int boundObjectCount = 0;
@@ -355,6 +363,9 @@ public class ChatServiceImpl implements IChatService {
             boundObjectCount++;
         }
         if (boundRelation != null) {
+            boundObjectCount++;
+        }
+        if (boundProduct != null) {
             boundObjectCount++;
         }
         if (boundProject != null) {
@@ -373,6 +384,9 @@ public class ChatServiceImpl implements IChatService {
         if (boundRelation != null && StrUtil.isBlank(appCode)) {
             appCode = ChatApplicationCodes.RELATION;
         }
+        if (boundProduct != null && StrUtil.isBlank(appCode)) {
+            appCode = ChatApplicationCodes.PRODUCT;
+        }
         if (boundProject != null) {
             appCode = ChatApplicationCodes.PROJECT;
         }
@@ -382,6 +396,7 @@ public class ChatServiceImpl implements IChatService {
             boundCustomer != null ? boundCustomer.getCompanyName()
                 : boundEmployee != null ? StrUtil.blankToDefault(boundEmployee.getRealname(), boundEmployee.getUsername())
                 : boundRelation != null ? boundRelation.getName()
+                : boundProduct != null ? boundProduct.getProductName()
                 : boundProjectTask != null ? boundProjectTask.getTitle()
                 : boundProject != null ? boundProject.getName()
                 : sessionCreateBO.getTitle()));
@@ -389,6 +404,7 @@ public class ChatServiceImpl implements IChatService {
         session.setCustomerId(sessionCreateBO.getCustomerId());
         session.setEmployeeId(sessionCreateBO.getEmployeeId());
         session.setRelationId(sessionCreateBO.getRelationId());
+        session.setProductId(sessionCreateBO.getProductId());
         session.setProjectId(sessionCreateBO.getProjectId());
         session.setProjectTaskId(sessionCreateBO.getProjectTaskId());
         session.setAppCode(chatApplicationRegistry.normalize(appCode));
@@ -417,6 +433,7 @@ public class ChatServiceImpl implements IChatService {
         populateSessionCustomerFields(voList);
         populateSessionEmployeeFields(voList);
         populateSessionRelationFields(voList);
+        populateSessionProductFields(voList);
         populateSessionProjectFields(voList);
         return voList;
     }
@@ -553,21 +570,23 @@ public class ChatServiceImpl implements IChatService {
         Long currentTenantId = UserUtil.getTenantId();
         ChatSession session = getRequiredSession(sessionId);
         ChatApplicationDefinition application = resolveChatApplication(sendBO, session);
+        session = bindProductContextFromSendIfNeeded(sendBO, session, application);
         session = bindProjectContextFromSendIfNeeded(sendBO, session, application);
         persistSessionAppCodeIfNeeded(session, application.code());
         Customer boundCustomer = resolveSessionCustomer(session);
         ManagerUser boundEmployee = resolveSessionEmployee(session);
         Relation boundRelation = resolveSessionRelation(session);
+        Product boundProduct = resolveSessionProduct(session);
         ProjectVO boundProject = resolveSessionProject(session);
         ProjectVO.ProjectTaskVO boundProjectTask = resolveSessionProjectTask(boundProject, session.getProjectTaskId());
         if (currentUserId != null) {
             // Spring Security 上下文不会自动透传到 Reactor 线程，这里先把会话级上下文放进自定义 Holder 供工具调用读取。
             AiContextHolder.setContext(sessionId, currentUserId, currentTenantId,
                 session.getCustomerId(), session.getEmployeeId(), session.getRelationId(),
-                session.getProjectId(), session.getProjectTaskId());
-            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}, projectId={}, projectTaskId={}",
+                session.getProductId(), session.getProjectId(), session.getProjectTaskId());
+            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}, productId={}, projectId={}, projectTaskId={}",
                 sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(),
-                session.getProjectId(), session.getProjectTaskId());
+                session.getProductId(), session.getProjectId(), session.getProjectTaskId());
         }
 
         Long messageId = saveMessage(sessionId, "user", content);
@@ -620,6 +639,10 @@ public class ChatServiceImpl implements IChatService {
         String relationContext = buildBoundRelationContext(boundRelation);
         if (StrUtil.isNotBlank(relationContext)) {
             enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + relationContext;
+        }
+        String productContext = buildBoundProductContext(boundProduct);
+        if (StrUtil.isNotBlank(productContext)) {
+            enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + productContext;
         }
         String projectContext = buildBoundProjectContext(boundProject, boundProjectTask);
         if (StrUtil.isNotBlank(projectContext)) {
@@ -807,20 +830,22 @@ public class ChatServiceImpl implements IChatService {
         Long currentTenantId = UserUtil.getTenantId();
         ChatSession session = getRequiredSession(sessionId);
         ChatApplicationDefinition application = resolveChatApplication(sendBO, session);
+        session = bindProductContextFromSendIfNeeded(sendBO, session, application);
         session = bindProjectContextFromSendIfNeeded(sendBO, session, application);
         persistSessionAppCodeIfNeeded(session, application.code());
         Customer boundCustomer = resolveSessionCustomer(session);
         ManagerUser boundEmployee = resolveSessionEmployee(session);
         Relation boundRelation = resolveSessionRelation(session);
+        Product boundProduct = resolveSessionProduct(session);
         ProjectVO boundProject = resolveSessionProject(session);
         ProjectVO.ProjectTaskVO boundProjectTask = resolveSessionProjectTask(boundProject, session.getProjectTaskId());
         if (currentUserId != null) {
             AiContextHolder.setContext(sessionId, currentUserId, currentTenantId,
                 session.getCustomerId(), session.getEmployeeId(), session.getRelationId(),
-                session.getProjectId(), session.getProjectTaskId());
-            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}, projectId={}, projectTaskId={}",
+                session.getProductId(), session.getProjectId(), session.getProjectTaskId());
+            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}, productId={}, projectId={}, projectTaskId={}",
                 sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(),
-                session.getProjectId(), session.getProjectTaskId());
+                session.getProductId(), session.getProjectId(), session.getProjectTaskId());
         }
 
         Long messageId = saveMessage(sessionId, "user", content);
@@ -869,6 +894,10 @@ public class ChatServiceImpl implements IChatService {
         String relationContext = buildBoundRelationContext(boundRelation);
         if (StrUtil.isNotBlank(relationContext)) {
             enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + relationContext;
+        }
+        String productContext = buildBoundProductContext(boundProduct);
+        if (StrUtil.isNotBlank(productContext)) {
+            enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + productContext;
         }
         String projectContext = buildBoundProjectContext(boundProject, boundProjectTask);
         if (StrUtil.isNotBlank(projectContext)) {
@@ -1516,6 +1545,21 @@ public class ChatServiceImpl implements IChatService {
         return session == null ? null : validateVisibleRelation(session.getRelationId());
     }
 
+    private Product validateVisibleProduct(Long productId) {
+        if (productId == null) {
+            return null;
+        }
+        Product product = productService.getVisibleProduct(productId);
+        if (product == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品不存在或无权限访问");
+        }
+        return product;
+    }
+
+    private Product resolveSessionProduct(ChatSession session) {
+        return session == null ? null : validateVisibleProduct(session.getProductId());
+    }
+
     private ProjectVO validateVisibleProject(Long projectId) {
         if (projectId == null) {
             return null;
@@ -1624,6 +1668,30 @@ public class ChatServiceImpl implements IChatService {
             }
             session.setRelationName(relation.getName());
             session.setRelationAvatarUrl(resolveRelationAvatarUrl(relation));
+        }
+    }
+
+    private void populateSessionProductFields(List<ChatSessionVO> sessions) {
+        if (CollUtil.isEmpty(sessions)) {
+            return;
+        }
+        Set<Long> productIds = sessions.stream()
+            .map(ChatSessionVO::getProductId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (productIds.isEmpty()) {
+            return;
+        }
+
+        Map<Long, Product> productMap = productService.listByIds(productIds).stream()
+            .collect(Collectors.toMap(Product::getProductId, product -> product, (left, right) -> left));
+        for (ChatSessionVO session : sessions) {
+            Product product = productMap.get(session.getProductId());
+            if (product == null) {
+                continue;
+            }
+            session.setProductName(product.getProductName());
+            session.setProductCode(product.getProductCode());
         }
     }
 
@@ -1761,6 +1829,70 @@ public class ChatServiceImpl implements IChatService {
         return builder.toString();
     }
 
+    private String buildBoundProductContext(Product product) {
+        if (product == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append("[当前绑定产品]\n")
+            .append("- productId: ").append(product.getProductId()).append("\n")
+            .append("- 产品名称: ").append(StrUtil.blankToDefault(product.getProductName(), "未命名产品")).append("\n");
+        appendCustomerContextLine(builder, "产品编码", product.getProductCode());
+        appendCustomerContextLine(builder, "产品类型", productTypeLabel(product.getProductType()));
+        appendCustomerContextLine(builder, "单位", product.getUnit());
+        appendCustomerContextLine(builder, "标准价", product.getStandardPrice() == null ? null : product.getStandardPrice().toPlainString());
+        appendCustomerContextLine(builder, "成本价", product.getCostPrice() == null ? null : product.getCostPrice().toPlainString());
+        appendCustomerContextLine(builder, "状态", productStatusLabel(product.getStatus()));
+        appendCustomerContextLine(builder, "描述", product.getDescription());
+        if (product.getCategoryId() != null) {
+            builder.append("- categoryId: ").append(product.getCategoryId()).append("\n");
+        }
+        builder.append("当用户未显式指定其他产品时，产品查询、更新和停用工具默认围绕该 productId 执行。产品新增、更新、停用必须调用 ProductTools，只有工具结果确认成功后才能回复成功。");
+        return builder.toString();
+    }
+
+    private String productTypeLabel(String value) {
+        String text = StrUtil.blankToDefault(value, "").trim();
+        if (StrUtil.isBlank(text)) {
+            return null;
+        }
+        String label = customFieldService.resolveOptionLabel("product", "productType", text);
+        if (!StrUtil.equals(label, text)) {
+            return label;
+        }
+        if ("goods".equalsIgnoreCase(text)) {
+            return "商品";
+        }
+        if ("service".equalsIgnoreCase(text)) {
+            return "服务";
+        }
+        if ("subscription".equalsIgnoreCase(text)) {
+            return "订阅";
+        }
+        if ("other".equalsIgnoreCase(text)) {
+            return "其他";
+        }
+        return text;
+    }
+
+    private String productStatusLabel(String value) {
+        String text = StrUtil.blankToDefault(value, "").trim();
+        if (StrUtil.isBlank(text)) {
+            return null;
+        }
+        String label = customFieldService.resolveOptionLabel("product", "status", text);
+        if (!StrUtil.equals(label, text)) {
+            return label;
+        }
+        if ("active".equalsIgnoreCase(text)) {
+            return "启用";
+        }
+        if ("inactive".equalsIgnoreCase(text)) {
+            return "停用";
+        }
+        return text;
+    }
+
     private String buildBoundProjectContext(ProjectVO project, ProjectVO.ProjectTaskVO task) {
         if (project == null) {
             return "";
@@ -1890,6 +2022,9 @@ public class ChatServiceImpl implements IChatService {
         if (StrUtil.isBlank(requestedAppCode) && sendBO.getProjectId() != null) {
             requestedAppCode = ChatApplicationCodes.PROJECT;
         }
+        if (StrUtil.isBlank(requestedAppCode) && sendBO.getProductId() != null) {
+            requestedAppCode = ChatApplicationCodes.PRODUCT;
+        }
         if (StrUtil.isBlank(requestedAppCode) && session != null && StrUtil.isNotBlank(session.getAppCode())) {
             requestedAppCode = session.getAppCode();
         }
@@ -1902,7 +2037,35 @@ public class ChatServiceImpl implements IChatService {
         if (StrUtil.isBlank(requestedAppCode) && session != null && session.getRelationId() != null) {
             requestedAppCode = ChatApplicationCodes.RELATION;
         }
+        if (StrUtil.isBlank(requestedAppCode) && session != null && session.getProductId() != null) {
+            requestedAppCode = ChatApplicationCodes.PRODUCT;
+        }
         return chatApplicationRegistry.resolve(requestedAppCode);
+    }
+
+    private ChatSession bindProductContextFromSendIfNeeded(ChatSendBO sendBO, ChatSession session, ChatApplicationDefinition application) {
+        if (sendBO.getProductId() == null || session == null || application == null
+            || !ChatApplicationCodes.PRODUCT.equals(application.code())) {
+            return session;
+        }
+        if (session.getCustomerId() != null || session.getEmployeeId() != null || session.getRelationId() != null
+            || session.getProjectId() != null || session.getProjectTaskId() != null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前会话已绑定其他业务对象，不能切换为产品对话");
+        }
+
+        Product product = validateVisibleProduct(sendBO.getProductId());
+        if (product == null) {
+            return session;
+        }
+        if (Objects.equals(session.getProductId(), sendBO.getProductId())) {
+            return session;
+        }
+
+        session.setProductId(sendBO.getProductId());
+        session.setTitle(StrUtil.blankToDefault(session.getTitle(), product.getProductName()));
+        session.setAppCode(ChatApplicationCodes.PRODUCT);
+        chatSessionMapper.updateById(session);
+        return session;
     }
 
     private ChatSession bindProjectContextFromSendIfNeeded(ChatSendBO sendBO, ChatSession session, ChatApplicationDefinition application) {
@@ -1910,7 +2073,8 @@ public class ChatServiceImpl implements IChatService {
             || !ChatApplicationCodes.PROJECT.equals(application.code())) {
             return session;
         }
-        if (session.getCustomerId() != null || session.getEmployeeId() != null || session.getRelationId() != null) {
+        if (session.getCustomerId() != null || session.getEmployeeId() != null || session.getRelationId() != null
+            || session.getProductId() != null) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前会话已绑定其他业务对象，不能切换为项目对话");
         }
 

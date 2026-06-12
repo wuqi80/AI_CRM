@@ -20,7 +20,12 @@ public class ChatSessionSchemaInitializer implements ApplicationRunner {
             jdbcTemplate.execute("""
                 ALTER TABLE crm_chat_session
                     ADD COLUMN IF NOT EXISTS project_id BIGINT,
-                    ADD COLUMN IF NOT EXISTS project_task_id BIGINT
+                    ADD COLUMN IF NOT EXISTS project_task_id BIGINT,
+                    ADD COLUMN IF NOT EXISTS product_id BIGINT
+                """);
+            jdbcTemplate.execute("""
+                CREATE INDEX IF NOT EXISTS idx_chat_session_product_id
+                    ON crm_chat_session (product_id)
                 """);
             jdbcTemplate.execute("""
                 CREATE INDEX IF NOT EXISTS idx_chat_session_project_id

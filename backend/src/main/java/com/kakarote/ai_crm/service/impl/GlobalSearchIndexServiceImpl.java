@@ -15,6 +15,8 @@ import com.kakarote.ai_crm.entity.PO.GlobalSearchIndex;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
+import com.kakarote.ai_crm.entity.PO.Product;
+import com.kakarote.ai_crm.entity.PO.ProductCategory;
 import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.PO.Schedule;
 import com.kakarote.ai_crm.entity.PO.Task;
@@ -28,6 +30,8 @@ import com.kakarote.ai_crm.mapper.GlobalSearchIndexMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
 import com.kakarote.ai_crm.mapper.ManageUserMapper;
+import com.kakarote.ai_crm.mapper.ProductCategoryMapper;
+import com.kakarote.ai_crm.mapper.ProductMapper;
 import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.mapper.ScheduleMapper;
 import com.kakarote.ai_crm.mapper.TaskMapper;
@@ -61,6 +65,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
     private static final String ENTITY_CUSTOMER = "customer";
     private static final String ENTITY_CONTACT = "contact";
     private static final String ENTITY_RELATION = "relation";
+    private static final String ENTITY_PRODUCT = "product";
     private static final String ENTITY_TASK = "task";
     private static final String ENTITY_SCHEDULE = "schedule";
     private static final String ENTITY_KNOWLEDGE = "knowledge";
@@ -83,6 +88,12 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
 
     @Autowired
     private RelationMapper relationMapper;
+
+    @Autowired
+    private ProductMapper productMapper;
+
+    @Autowired
+    private ProductCategoryMapper productCategoryMapper;
 
     @Autowired
     private TaskMapper taskMapper;
@@ -313,6 +324,52 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
      * 刷新任务索引。
      */
     @Override
+    public void refreshProductIndex(Long productId) {
+        if (productId == null) {
+            return;
+        }
+
+        Product product = productMapper.selectByIdIgnoreDataPermission(productId);
+        if (product == null || Objects.equals(product.getDelFlag(), 1)) {
+            deleteByEntity(ENTITY_PRODUCT, productId);
+            return;
+        }
+
+        ProductCategory category = product.getCategoryId() == null
+                ? null
+                : productCategoryMapper.selectById(product.getCategoryId());
+        Map<Long, String> userNameMap = getUserDisplayNames(collectUserIds(product.getOwnerId()));
+        Map<String, Object> customFields = customFieldService.getCustomFieldValues(ENTITY_PRODUCT, productId);
+
+        GlobalSearchIndex index = new GlobalSearchIndex();
+        index.setTenantId(product.getTenantId());
+        index.setEntityType(ENTITY_PRODUCT);
+        index.setEntityId(product.getProductId());
+        index.setTitle(product.getProductName());
+        index.setSubtitle(buildSubtitle("产品", firstNonBlank(
+                product.getProductCode(),
+                category != null ? category.getCategoryPath() : null,
+                product.getProductType()
+        )));
+        index.setSummary(truncateSummary(firstNonBlank(product.getDescription(), product.getUnit(), product.getProductType())));
+        index.setOwnerUserId(product.getOwnerId());
+        index.setRoutePath("/product?openProductId=" + product.getProductId());
+        index.setSortTime(firstNonNull(product.getUpdateTime(), product.getCreateTime()));
+        index.setSearchText(normalizeSearchText(joinFragments(
+                product.getProductName(),
+                product.getProductCode(),
+                category != null ? category.getCategoryName() : null,
+                category != null ? category.getCategoryPath() : null,
+                product.getProductType(),
+                product.getUnit(),
+                userNameMap.get(product.getOwnerId()),
+                product.getDescription(),
+                extractSearchableCustomFieldText(ENTITY_PRODUCT, customFields)
+        )));
+        baseMapper.upsert(fillSearchFallback(index));
+    }
+
+    @Override
     public void refreshTaskIndex(Long taskId) {
         if (taskId == null) {
             return;
@@ -491,6 +548,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         applyScopedModule(queryBO, ENTITY_CUSTOMER, "customer:view");
         applyScopedModule(queryBO, ENTITY_CONTACT, "contact:view");
         applyRelationScope(queryBO);
+        applyScopedModule(queryBO, ENTITY_PRODUCT, "product:view");
         applyScopedModule(queryBO, ENTITY_TASK, "task:view");
         applyScheduleScope(queryBO);
         applyScopedModule(queryBO, ENTITY_KNOWLEDGE, "knowledge:view");
@@ -520,6 +578,11 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
                 queryBO.setTaskEnabled(enabled);
                 queryBO.setTaskAllData(allData);
                 queryBO.setTaskUserIds(userIds);
+            }
+            case ENTITY_PRODUCT -> {
+                queryBO.setProductEnabled(enabled);
+                queryBO.setProductAllData(allData);
+                queryBO.setProductUserIds(userIds);
             }
             case ENTITY_KNOWLEDGE -> {
                 queryBO.setKnowledgeEnabled(enabled);
@@ -553,6 +616,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         return Boolean.TRUE.equals(queryBO.getCustomerEnabled())
                 || Boolean.TRUE.equals(queryBO.getContactEnabled())
                 || Boolean.TRUE.equals(queryBO.getRelationEnabled())
+                || Boolean.TRUE.equals(queryBO.getProductEnabled())
                 || Boolean.TRUE.equals(queryBO.getTaskEnabled())
                 || Boolean.TRUE.equals(queryBO.getScheduleEnabled())
                 || Boolean.TRUE.equals(queryBO.getKnowledgeEnabled());
@@ -569,6 +633,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
             case ENTITY_CUSTOMER -> !Boolean.TRUE.equals(queryBO.getCustomerEnabled());
             case ENTITY_CONTACT -> !Boolean.TRUE.equals(queryBO.getContactEnabled());
             case ENTITY_RELATION -> !Boolean.TRUE.equals(queryBO.getRelationEnabled());
+            case ENTITY_PRODUCT -> !Boolean.TRUE.equals(queryBO.getProductEnabled());
             case ENTITY_TASK -> !Boolean.TRUE.equals(queryBO.getTaskEnabled());
             case ENTITY_SCHEDULE -> !Boolean.TRUE.equals(queryBO.getScheduleEnabled());
             case ENTITY_KNOWLEDGE -> !Boolean.TRUE.equals(queryBO.getKnowledgeEnabled());

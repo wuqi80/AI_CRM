@@ -16,6 +16,7 @@ import type { CustomerListVO } from '@/types/customer'
 import type { AddressBookEmployee } from '@/types/addressBook'
 import type { RelationVO } from '@/types/relation'
 import type { ProjectEntity, ProjectTask } from '@/types/project'
+import type { ProductVO } from '@/types/product'
 
 interface LocalMessage {
   id: string
@@ -42,6 +43,7 @@ interface PendingNewSessionDraft {
   customerId?: string
   employeeId?: string
   relationId?: string
+  productId?: string
   projectId?: string
   projectTaskId?: string
   appCode: string
@@ -65,6 +67,7 @@ export const useChatStore = defineStore('chat', () => {
   const KNOWLEDGE_APP_CODE = 'knowledge'
   const ADDRESS_BOOK_APP_CODE = 'address_book'
   const RELATION_APP_CODE = 'relation'
+  const PRODUCT_APP_CODE = 'product'
   const STREAM_IDLE_THINKING_DELAY_MS = 3000
 
   function loadSessionAppCodeBySessionId(): Record<string, string> {
@@ -73,7 +76,7 @@ export const useChatStore = defineStore('chat', () => {
       if (!raw) return {}
       const parsed = JSON.parse(raw) as Record<string, unknown>
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-      const allowed = new Set([GENERAL_APP_CODE, CRM_APP_CODE, PROJECT_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE])
+      const allowed = new Set([GENERAL_APP_CODE, CRM_APP_CODE, PROJECT_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE, PRODUCT_APP_CODE])
       const out: Record<string, string> = {}
       for (const [k, v] of Object.entries(parsed)) {
         if (typeof v === 'string' && k.length > 0) {
@@ -328,7 +331,8 @@ export const useChatStore = defineStore('chat', () => {
     employeeId?: string,
     relationId?: string,
     projectId?: string,
-    projectTaskId?: string
+    projectTaskId?: string,
+    productId?: string
   ): Promise<string> {
     const normalizedAppCode = normalizeAppCode(appCode)
     const sessionId = await createSession({
@@ -337,6 +341,7 @@ export const useChatStore = defineStore('chat', () => {
       customerId,
       employeeId,
       relationId,
+      productId,
       projectId,
       projectTaskId,
       appCode: normalizedAppCode
@@ -360,7 +365,8 @@ export const useChatStore = defineStore('chat', () => {
     employeeId?: string,
     relationId?: string,
     projectId?: string,
-    projectTaskId?: string
+    projectTaskId?: string,
+    productId?: string
   ) {
     const normalizedAppCode = normalizeAppCode(appCode)
     currentSessionId.value = null
@@ -370,6 +376,7 @@ export const useChatStore = defineStore('chat', () => {
       customerId,
       employeeId,
       relationId,
+      productId,
       projectId,
       projectTaskId,
       appCode: normalizedAppCode
@@ -385,9 +392,10 @@ export const useChatStore = defineStore('chat', () => {
     employeeId?: string,
     relationId?: string,
     projectId?: string,
-    projectTaskId?: string
+    projectTaskId?: string,
+    productId?: string
   ): Promise<void> {
-    beginNewSessionDraft(title, agentId, customerId, appCode, employeeId, relationId, projectId, projectTaskId)
+    beginNewSessionDraft(title, agentId, customerId, appCode, employeeId, relationId, projectId, projectTaskId, productId)
   }
 
   async function selectSession(sessionId: string) {
@@ -471,6 +479,27 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const sessionId = await startNewSession(`与${relation.name || '关系人'}对话`, undefined, undefined, RELATION_APP_CODE, undefined, relationId)
+    requestComposerFocus()
+    return sessionId
+  }
+
+  async function openProductChat(product: Pick<ProductVO, 'productId' | 'productName'>): Promise<string> {
+    const productId = String(product.productId)
+    if (sessions.value.length === 0) {
+      await fetchSessions()
+    }
+    const existingSession = sessions.value
+      .filter(session => String(session.productId || '') === productId)
+      .sort((a, b) => new Date(b.updateTime || b.createTime).getTime() - new Date(a.updateTime || a.createTime).getTime())[0]
+
+    if (existingSession) {
+      await selectSession(existingSession.sessionId)
+      setSelectedAppCode(PRODUCT_APP_CODE)
+      requestComposerFocus()
+      return existingSession.sessionId
+    }
+
+    const sessionId = await startNewSession(product.productName || '产品对话', undefined, undefined, PRODUCT_APP_CODE, undefined, undefined, undefined, undefined, productId)
     requestComposerFocus()
     return sessionId
   }
@@ -604,6 +633,9 @@ export const useChatStore = defineStore('chat', () => {
     const projectContext = effectiveAppCode === PROJECT_APP_CODE
       ? getProjectSessionContext(sessions.value.find(session => session.sessionId === sessionId) || { sessionId })
       : null
+    const productId = effectiveAppCode === PRODUCT_APP_CODE
+      ? String(sessions.value.find(session => session.sessionId === sessionId)?.productId || '')
+      : ''
     // Allow other sessions to stream concurrently; only block double-send on this session.
     if (streamingTasks.value[sessionId]) return sessionId
 
@@ -672,6 +704,7 @@ export const useChatStore = defineStore('chat', () => {
         knowledgeIds,
         projectContext?.projectId,
         projectContext?.projectTaskId,
+        productId || undefined,
         abortController.signal
       )
     } catch (error) {
@@ -689,6 +722,9 @@ export const useChatStore = defineStore('chat', () => {
     const projectContext = effectiveAppCode === PROJECT_APP_CODE
       ? getProjectSessionContext(sessions.value.find(session => session.sessionId === sessionId) || { sessionId })
       : null
+    const productId = effectiveAppCode === PRODUCT_APP_CODE
+      ? String(sessions.value.find(session => session.sessionId === sessionId)?.productId || '')
+      : ''
 
     if (streamingTasks.value[sessionId]) {
       return ''
@@ -714,7 +750,8 @@ export const useChatStore = defineStore('chat', () => {
         selectedModel.value?.modelSource,
         undefined,
         projectContext?.projectId,
-        projectContext?.projectTaskId
+        projectContext?.projectTaskId,
+        productId || undefined
       )
 
       appendSessionMessage(sessionId, {
@@ -1005,7 +1042,8 @@ export const useChatStore = defineStore('chat', () => {
         draft?.employeeId,
         draft?.relationId,
         draft?.projectId,
-        draft?.projectTaskId
+        draft?.projectTaskId,
+        draft?.productId
       )
     }
 
@@ -1018,7 +1056,7 @@ export const useChatStore = defineStore('chat', () => {
     const code = (appCode || GENERAL_APP_CODE).trim().toLowerCase()
     const knownCodes = appOptions.value.map(option => option.code)
     if (knownCodes.length === 0) {
-      return [GENERAL_APP_CODE, CRM_APP_CODE, PROJECT_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
+      return [GENERAL_APP_CODE, CRM_APP_CODE, PROJECT_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE, PRODUCT_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
     }
     return knownCodes.includes(code) ? code : GENERAL_APP_CODE
   }
@@ -1070,6 +1108,7 @@ export const useChatStore = defineStore('chat', () => {
     openCustomerChat,
     openEmployeeChat,
     openRelationChat,
+    openProductChat,
     openProjectChat,
     openProjectTaskChat,
     isProjectContextSession,

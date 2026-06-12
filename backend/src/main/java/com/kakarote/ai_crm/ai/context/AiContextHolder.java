@@ -44,6 +44,8 @@ public class AiContextHolder {
 
     private static final Map<Long, Long> SESSION_RELATION_MAP = new ConcurrentHashMap<>();
 
+    private static final Map<Long, Long> SESSION_PRODUCT_MAP = new ConcurrentHashMap<>();
+
     private static final Map<Long, Long> SESSION_PROJECT_MAP = new ConcurrentHashMap<>();
 
     private static final Map<Long, Long> SESSION_PROJECT_TASK_MAP = new ConcurrentHashMap<>();
@@ -65,6 +67,8 @@ public class AiContextHolder {
     private static final ThreadLocal<Long> CURRENT_EMPLOYEE_ID = new ThreadLocal<>();
 
     private static final ThreadLocal<Long> CURRENT_RELATION_ID = new ThreadLocal<>();
+
+    private static final ThreadLocal<Long> CURRENT_PRODUCT_ID = new ThreadLocal<>();
 
     private static final ThreadLocal<Long> CURRENT_PROJECT_ID = new ThreadLocal<>();
 
@@ -109,6 +113,12 @@ public class AiContextHolder {
     public static void setContext(Long sessionId, Long userId, Long tenantId,
                                   Long customerId, Long employeeId, Long relationId,
                                   Long projectId, Long projectTaskId) {
+        setContext(sessionId, userId, tenantId, customerId, employeeId, relationId, null, projectId, projectTaskId);
+    }
+
+    public static void setContext(Long sessionId, Long userId, Long tenantId,
+                                  Long customerId, Long employeeId, Long relationId,
+                                  Long productId, Long projectId, Long projectTaskId) {
         if (sessionId != null && userId != null) {
             // 存储到 Map 中（线程安全，全局可访问）
             SESSION_USER_MAP.put(sessionId, userId);
@@ -141,6 +151,13 @@ public class AiContextHolder {
                 SESSION_RELATION_MAP.remove(sessionId);
                 CURRENT_RELATION_ID.remove();
             }
+            if (productId != null) {
+                SESSION_PRODUCT_MAP.put(sessionId, productId);
+                CURRENT_PRODUCT_ID.set(productId);
+            } else {
+                SESSION_PRODUCT_MAP.remove(sessionId);
+                CURRENT_PRODUCT_ID.remove();
+            }
             if (projectId != null) {
                 SESSION_PROJECT_MAP.put(sessionId, projectId);
                 CURRENT_PROJECT_ID.set(projectId);
@@ -155,8 +172,8 @@ public class AiContextHolder {
                 SESSION_PROJECT_TASK_MAP.remove(sessionId);
                 CURRENT_PROJECT_TASK_ID.remove();
             }
-            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}, projectId={}, projectTaskId={}, 线程={}",
-                sessionId, userId, tenantId, customerId, employeeId, relationId, projectId, projectTaskId, Thread.currentThread().getName());
+            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}, productId={}, projectId={}, projectTaskId={}, 线程={}",
+                sessionId, userId, tenantId, customerId, employeeId, relationId, productId, projectId, projectTaskId, Thread.currentThread().getName());
         }
     }
 
@@ -169,6 +186,7 @@ public class AiContextHolder {
         CURRENT_CUSTOMER_ID.remove();
         CURRENT_EMPLOYEE_ID.remove();
         CURRENT_RELATION_ID.remove();
+        CURRENT_PRODUCT_ID.remove();
         CURRENT_PROJECT_ID.remove();
         CURRENT_PROJECT_TASK_ID.remove();
         if (userId == null) {
@@ -231,6 +249,12 @@ public class AiContextHolder {
         } else {
             CURRENT_RELATION_ID.remove();
         }
+        Long productId = SESSION_PRODUCT_MAP.get(sessionId);
+        if (productId != null) {
+            CURRENT_PRODUCT_ID.set(productId);
+        } else {
+            CURRENT_PRODUCT_ID.remove();
+        }
         Long projectId = SESSION_PROJECT_MAP.get(sessionId);
         if (projectId != null) {
             CURRENT_PROJECT_ID.set(projectId);
@@ -243,8 +267,8 @@ public class AiContextHolder {
         } else {
             CURRENT_PROJECT_TASK_ID.remove();
         }
-        log.trace("恢复 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}, projectId={}, projectTaskId={}",
-            sessionId, userId, tenantId, customerId, employeeId, relationId, projectId, projectTaskId);
+        log.trace("恢复 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}, productId={}, projectId={}, projectTaskId={}",
+            sessionId, userId, tenantId, customerId, employeeId, relationId, productId, projectId, projectTaskId);
     }
 
     /**
@@ -309,6 +333,17 @@ public class AiContextHolder {
         return CURRENT_RELATION_ID.get();
     }
 
+    public static Long getCurrentProductId() {
+        Long sessionId = CURRENT_SESSION_ID.get();
+        if (sessionId != null) {
+            Long productId = SESSION_PRODUCT_MAP.get(sessionId);
+            if (productId != null) {
+                return productId;
+            }
+        }
+        return CURRENT_PRODUCT_ID.get();
+    }
+
     public static Long getCurrentProjectId() {
         Long sessionId = CURRENT_SESSION_ID.get();
         if (sessionId != null) {
@@ -355,6 +390,7 @@ public class AiContextHolder {
         CURRENT_CUSTOMER_ID.remove();
         CURRENT_EMPLOYEE_ID.remove();
         CURRENT_RELATION_ID.remove();
+        CURRENT_PRODUCT_ID.remove();
         CURRENT_PROJECT_ID.remove();
         CURRENT_PROJECT_TASK_ID.remove();
     }
@@ -369,6 +405,7 @@ public class AiContextHolder {
         CURRENT_CUSTOMER_ID.remove();
         CURRENT_EMPLOYEE_ID.remove();
         CURRENT_RELATION_ID.remove();
+        CURRENT_PRODUCT_ID.remove();
         CURRENT_PROJECT_ID.remove();
         CURRENT_PROJECT_TASK_ID.remove();
         TenantContextHolder.clear();
@@ -387,6 +424,7 @@ public class AiContextHolder {
             SESSION_CUSTOMER_MAP.remove(sessionId);
             SESSION_EMPLOYEE_MAP.remove(sessionId);
             SESSION_RELATION_MAP.remove(sessionId);
+            SESSION_PRODUCT_MAP.remove(sessionId);
             SESSION_PROJECT_MAP.remove(sessionId);
             SESSION_PROJECT_TASK_MAP.remove(sessionId);
             log.trace("移除会话: sessionId={}", sessionId);

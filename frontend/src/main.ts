@@ -4,8 +4,6 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
-import { Capacitor } from '@capacitor/core'
-// 本地字体
 import '@fontsource/inter/300.css'
 import '@fontsource/inter/400.css'
 import '@fontsource/inter/500.css'
@@ -14,13 +12,10 @@ import '@fontsource/inter/700.css'
 import '@fontsource/inter/800.css'
 import '@fontsource/inter/900.css'
 import '@fontsource-variable/noto-sans-sc'
-// 本地图标
 import 'material-symbols/outlined.css'
 import WkIcon from '@/components/common/WkIcon.vue'
 import { useTheme } from '@/composables/useTheme'
-import { scheduleCapacitorUpdateCheck, scheduleLiveUpdateHealthReport } from '@/utils/capacitorUpdate'
-import { configureNativeKeyboard } from '@/utils/capacitorKeyboard'
-import '@capacitor-community/safe-area'
+import { isNativeMobileRuntime } from '@/utils/nativeMobileRuntime'
 
 import App from './App.vue'
 import router from './router'
@@ -30,19 +25,36 @@ import './styles/wk-crm-el-field-skin.css'
 
 useTheme()
 
-function isNativeMobileRuntime(): boolean {
-  if (typeof window === 'undefined') return false
+const nativeMobileRuntime = isNativeMobileRuntime()
 
-  const isMobile =
-    window.innerWidth < 768 ||
-    (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches)
-
-  return isMobile && Capacitor.isNativePlatform()
+if (nativeMobileRuntime) {
+  document.documentElement.classList.add('wk-native-mobile')
+  void import('@/utils/capacitorSafeArea').catch((error) => {
+    console.warn('Failed to load native safe area plugin:', error)
+  })
 }
 
-// Capacitor iOS safe-area: only enable for native mobile shell
-if (isNativeMobileRuntime()) {
-  document.documentElement.classList.add('wk-native-mobile')
+async function scheduleNativeMobileRuntime(): Promise<void> {
+  if (!nativeMobileRuntime) return
+
+  try {
+    const {
+      scheduleCapacitorUpdateCheck,
+      scheduleLiveUpdateHealthReport
+    } = await import('@/utils/capacitorUpdate')
+
+    scheduleLiveUpdateHealthReport()
+    scheduleCapacitorUpdateCheck()
+  } catch (error) {
+    console.warn('Failed to load Capacitor update module:', error)
+  }
+
+  try {
+    const { configureNativeKeyboard } = await import('@/utils/capacitorKeyboard')
+    configureNativeKeyboard()
+  } catch (error) {
+    console.warn('Failed to load Capacitor keyboard module:', error)
+  }
 }
 
 const app = createApp(App)
@@ -52,13 +64,7 @@ app.use(router)
 app.use(ElementPlus, { locale: zhCn })
 app.component('WkIcon', WkIcon)
 
-// Wait for router to be ready before mounting to prevent duplicate initial navigation
 router.isReady().then(() => {
   app.mount('#app')
-
-  if (isNativeMobileRuntime()) {
-    scheduleLiveUpdateHealthReport()
-    scheduleCapacitorUpdateCheck()
-    configureNativeKeyboard()
-  }
+  void scheduleNativeMobileRuntime()
 })

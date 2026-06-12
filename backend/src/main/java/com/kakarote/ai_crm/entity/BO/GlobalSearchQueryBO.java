@@ -15,7 +15,7 @@ public class GlobalSearchQueryBO extends PageEntity {
     @Schema(description = "Keyword")
     private String keyword;
 
-    @Schema(description = "Entity type: customer/contact/relation/task/schedule/knowledge")
+    @Schema(description = "Entity type: customer/contact/relation/product/task/schedule/knowledge")
     private String entityType;
 
     @Schema(hidden = true)
@@ -44,6 +44,15 @@ public class GlobalSearchQueryBO extends PageEntity {
 
     @Schema(hidden = true)
     private Boolean relationEnabled;
+
+    @Schema(hidden = true)
+    private Boolean productEnabled;
+
+    @Schema(hidden = true)
+    private Boolean productAllData;
+
+    @Schema(hidden = true)
+    private List<Long> productUserIds;
 
     @Schema(hidden = true)
     private Boolean taskEnabled;

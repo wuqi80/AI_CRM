@@ -80,6 +80,12 @@ public class ProjectController {
         return Result.ok(projectService.archiveProject(projectId));
     }
 
+    @PostMapping("/restore/{projectId}")
+    @Operation(summary = "恢复项目")
+    public Result<ProjectVO> restore(@PathVariable Long projectId) {
+        return Result.ok(projectService.restoreProject(projectId));
+    }
+
     @PostMapping("/delete/{projectId}")
     @Operation(summary = "删除项目")
     public Result<String> delete(@PathVariable Long projectId) {

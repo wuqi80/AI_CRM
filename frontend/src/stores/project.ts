@@ -30,6 +30,7 @@ import {
   getProjectDetail,
   moveProjectTask,
   queryProjectList,
+  restoreProject as apiRestoreProject,
   sendProjectAiCommand,
   sendTaskAiCommand,
   updateLane as apiUpdateLane,
@@ -120,6 +121,12 @@ export const useProjectStore = defineStore('project', () => {
 
   async function archiveProject(projectId: string) {
     const project = await apiArchiveProject(projectId)
+    upsertProject(project)
+    return project
+  }
+
+  async function restoreProject(projectId: string) {
+    const project = await apiRestoreProject(projectId)
     upsertProject(project)
     return project
   }
@@ -327,6 +334,7 @@ export const useProjectStore = defineStore('project', () => {
     updateProject,
     deleteProject,
     archiveProject,
+    restoreProject,
     getProjectById,
     getTaskById,
     createTask,

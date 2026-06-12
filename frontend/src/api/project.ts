@@ -253,6 +253,10 @@ export function archiveProject(projectId: string): Promise<ProjectEntity> {
   return unwrapProject(post(`/project/archive/${projectId}`))
 }
 
+export function restoreProject(projectId: string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/restore/${projectId}`))
+}
+
 export function deleteProject(projectId: string): Promise<void> {
   return post(`/project/delete/${projectId}`)
 }

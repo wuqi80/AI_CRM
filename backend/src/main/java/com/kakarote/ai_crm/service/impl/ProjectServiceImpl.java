@@ -220,7 +220,11 @@ public class ProjectServiceImpl implements IProjectService {
                     return result;
                 },
                 baseParams.toArray());
-        long allCount = statusCounts.values().stream().mapToLong(Long::longValue).sum();
+        long archivedCount = statusCounts.getOrDefault("ARCHIVED", 0L);
+        long allCount = statusCounts.entrySet().stream()
+                .filter(entry -> !"ARCHIVED".equals(entry.getKey()))
+                .mapToLong(Map.Entry::getValue)
+                .sum();
         long inProgressCount = statusCounts.getOrDefault("IN_PROGRESS", 0L);
         long completedCount = statusCounts.getOrDefault("COMPLETED", 0L);
 
@@ -229,6 +233,8 @@ public class ProjectServiceImpl implements IProjectService {
         if (status != null) {
             filteredSql.append(" AND p.status = ? ");
             filteredParams.add(status);
+        } else {
+            filteredSql.append(" AND p.status <> 'ARCHIVED' ");
         }
 
         Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) " + filteredSql, Long.class, filteredParams.toArray());
@@ -254,6 +260,7 @@ public class ProjectServiceImpl implements IProjectService {
         stats.put("all", allCount);
         stats.put("inProgress", inProgressCount);
         stats.put("completed", completedCount);
+        stats.put("archived", archivedCount);
         page.setExtraData(stats);
         return page;
     }
@@ -366,6 +373,14 @@ public class ProjectServiceImpl implements IProjectService {
     public ProjectVO archiveProject(Long projectId) {
         ensureProjectPermission(projectId, PERMISSION_ARCHIVE_PROJECT);
         updateProjectStatus(projectId, "ARCHIVED");
+        return buildProjectVO(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO restoreProject(Long projectId) {
+        ensureProjectPermission(projectId, PERMISSION_ARCHIVE_PROJECT);
+        updateProjectStatus(projectId, "NOT_STARTED");
         return buildProjectVO(projectId);
     }
 

@@ -12,10 +12,11 @@ export interface PresignedUploadVO {
 /**
  * 获取预签名上传URL
  */
-export function getPresignedUploadUrl(fileName: string, contentType?: string): Promise<PresignedUploadVO> {
+export function getPresignedUploadUrl(fileName: string, contentType?: string, prefix?: string): Promise<PresignedUploadVO> {
   return post('/file/presigned-upload', {
     fileName,
-    contentType: contentType || 'application/octet-stream'
+    contentType: contentType || 'application/octet-stream',
+    prefix
   })
 }
 

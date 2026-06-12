@@ -214,6 +214,9 @@ export interface ChatSession {
   relationId?: string
   relationName?: string
   relationAvatarUrl?: string
+  productId?: string
+  productName?: string
+  productCode?: string
   projectId?: string
   projectName?: string
   projectTaskId?: string
@@ -283,6 +286,7 @@ export interface ChatSendBO {
   attachments?: ChatAttachmentDTO[]
   appCode?: string
   ragEnabled?: boolean
+  productId?: string
   modelProvider?: string
   modelName?: string
   /** 知识库文档 ID，服务端按 ID 限定 RAG，不经过文件下载上传 */

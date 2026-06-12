@@ -33,6 +33,8 @@ public interface IGlobalSearchIndexService extends IService<GlobalSearchIndex> {
      */
     void refreshRelationIndex(Long relationId);
 
+    void refreshProductIndex(Long productId);
+
     /**
      * 刷新任务索引。
      */

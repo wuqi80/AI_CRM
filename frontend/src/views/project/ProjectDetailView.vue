@@ -10,13 +10,13 @@
           <div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
             <div class="min-w-0">
               <button
-                v-if="isTaskConversation"
+                v-if="isTaskConversation || isProjectMembersView"
                 type="button"
                 class="inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
                 @click="handleBackClick"
               >
                 <span class="material-symbols-outlined text-[16px]">arrow_back</span>
-                {{ isTaskConversation ? '返回项目' : '返回项目列表' }}
+                返回项目
               </button>
 
               <div class="mt-1.5 flex flex-wrap items-center gap-2">
@@ -108,7 +108,7 @@
                       <template #dropdown>
                         <el-dropdown-menu>
                           <el-dropdown-item
-                            v-if="canEditProject"
+                            v-if="canEditProject && !isArchivedProject"
                             command="edit-project"
                           >
                             <span class="inline-flex items-center gap-2">
@@ -116,19 +116,28 @@
                               <span>编辑项目</span>
                             </span>
                           </el-dropdown-item>
-                          <el-dropdown-item command="members">
+                          <el-dropdown-item v-if="!isArchivedProject" command="members">
                             <span class="inline-flex items-center gap-2">
                               <span class="material-symbols-outlined text-[16px]">group</span>
                               <span>项目成员</span>
                             </span>
                           </el-dropdown-item>
                           <el-dropdown-item
-                            v-if="canArchiveProject && project.status !== 'ARCHIVED'"
+                            v-if="canArchiveProject && !isArchivedProject"
                             command="archive-project"
                           >
                             <span class="inline-flex items-center gap-2">
                               <span class="material-symbols-outlined text-[16px]">inventory_2</span>
                               <span>归档项目</span>
+                            </span>
+                          </el-dropdown-item>
+                          <el-dropdown-item
+                            v-if="canArchiveProject && isArchivedProject"
+                            command="restore-project"
+                          >
+                            <span class="inline-flex items-center gap-2">
+                              <span class="material-symbols-outlined text-[16px]">restore</span>
+                              <span>恢复项目</span>
                             </span>
                           </el-dropdown-item>
                           <el-dropdown-item
@@ -163,21 +172,78 @@
                 <span class="inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-normal" :class="projectStatusClass(project.status)">
                   {{ projectStatusLabel(project.status) }}
                 </span>
-                <button
-                  v-if="showProjectLanePanelShell"
-                  type="button"
-                  class="group/sb-toggle relative ml-auto flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef]"
-                  :aria-label="projectLanePanelVisible ? '收起项目侧栏' : '显示项目侧栏'"
-                  @click="projectLanePanelVisible = !projectLanePanelVisible"
-                >
-                  <WkIcon name="fold" :size="18" class="shrink-0" />
-                  <span
-                    class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
-                    role="tooltip"
+                <div class="ml-auto flex shrink-0 items-center gap-2">
+                  <el-dropdown trigger="click" @command="handleProjectMoreAction">
+                    <button
+                      type="button"
+                      class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] hover:text-[#0d0d0d]"
+                      aria-label="更多项目操作"
+                    >
+                      <span class="material-symbols-outlined text-[20px]">more_horiz</span>
+                    </button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item
+                          v-if="canEditProject && !isArchivedProject"
+                          command="edit-project"
+                        >
+                          <span class="inline-flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[16px]">edit</span>
+                            <span>编辑项目</span>
+                          </span>
+                        </el-dropdown-item>
+                        <el-dropdown-item v-if="!isArchivedProject" command="members">
+                          <span class="inline-flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[16px]">group</span>
+                            <span>项目成员</span>
+                          </span>
+                        </el-dropdown-item>
+                        <el-dropdown-item
+                          v-if="canArchiveProject && !isArchivedProject"
+                          command="archive-project"
+                        >
+                          <span class="inline-flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[16px]">inventory_2</span>
+                            <span>归档项目</span>
+                          </span>
+                        </el-dropdown-item>
+                        <el-dropdown-item
+                          v-if="canArchiveProject && isArchivedProject"
+                          command="restore-project"
+                        >
+                          <span class="inline-flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[16px]">restore</span>
+                            <span>恢复项目</span>
+                          </span>
+                        </el-dropdown-item>
+                        <el-dropdown-item
+                          v-if="canDeleteProject"
+                          command="delete-project"
+                        >
+                          <span class="inline-flex items-center gap-2 text-red-600">
+                            <span class="material-symbols-outlined text-[16px]">delete</span>
+                            <span>删除项目</span>
+                          </span>
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                  <button
+                    v-if="showProjectLanePanelShell"
+                    type="button"
+                    class="group/sb-toggle relative flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef]"
+                    :aria-label="projectLanePanelVisible ? '收起项目侧栏' : '显示项目侧栏'"
+                    @click="projectLanePanelVisible = !projectLanePanelVisible"
                   >
-                    {{ projectLanePanelVisible ? '收起项目侧栏' : '显示项目侧栏' }}
-                  </span>
-                </button>
+                    <WkIcon name="fold" :size="18" class="shrink-0" />
+                    <span
+                      class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
+                      role="tooltip"
+                    >
+                      {{ projectLanePanelVisible ? '收起项目侧栏' : '显示项目侧栏' }}
+                    </span>
+                  </button>
+                </div>
               </div>
               <div class="flex min-w-0 items-center gap-2">
                 <span class="material-symbols-outlined inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#f4f4f4] text-[18px] text-[#5d5d5d]">
@@ -982,7 +1048,7 @@
                       v-for="task in tasksByLane(lane.laneId)"
                       :key="task.taskId"
                       :draggable="canMoveTask(task)"
-                      class="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                      class="relative cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
                       :class="[
                         draggingTaskId === task.taskId ? 'opacity-60 ring-1 ring-primary/20' : '',
                         canMoveTask(task) ? 'cursor-grab active:cursor-grabbing' : ''
@@ -998,7 +1064,7 @@
                         </span>
                       </div>
 
-                      <div class="mt-3 space-y-2 text-xs text-slate-500">
+                      <div class="mt-3 space-y-2 text-xs text-slate-500" :class="task.generatedByAi ? 'pr-7' : ''">
                         <p class="inline-flex items-center gap-1.5">
                           <span class="material-symbols-outlined text-[14px]">schedule</span>
                           {{ task.dueDate ? formatDateTime(task.dueDate) : '未设置截止时间' }}
@@ -1017,12 +1083,14 @@
                         </p>
                       </div>
 
-                      <div v-if="task.generatedByAi" class="mt-4 flex justify-end">
-                        <span class="inline-flex items-center gap-1 text-primary">
-                          <span class="material-symbols-outlined text-[14px]">auto_awesome</span>
-                          AI
-                        </span>
-                      </div>
+                      <span
+                        v-if="task.generatedByAi"
+                        class="absolute bottom-3 right-3 inline-flex size-5 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/15"
+                        title="AI 创建"
+                        aria-label="AI 创建"
+                      >
+                        <span class="material-symbols-outlined text-[13px] leading-none">auto_awesome</span>
+                      </span>
                     </article>
 
                     <div
@@ -1150,7 +1218,6 @@
                       <th class="px-5 py-3 font-semibold">成员姓名</th>
                       <th class="px-5 py-3 font-semibold">所属部门</th>
                       <th class="px-5 py-3 font-semibold">项目角色</th>
-                      <th class="px-5 py-3 font-semibold">权限范围</th>
                       <th class="px-5 py-3 font-semibold">加入时间</th>
                       <th class="px-5 py-3 font-semibold">最近操作时间</th>
                       <th class="px-5 py-3 font-semibold">状态</th>
@@ -1165,9 +1232,6 @@
                       </td>
                       <td class="px-5 py-4 text-slate-600">{{ member.deptName || '-' }}</td>
                       <td class="px-5 py-4 text-slate-600">{{ projectRoleLabel(member.role) }}</td>
-                      <td class="px-5 py-4 text-slate-600">
-                        <p class="max-w-md leading-6">{{ memberPermissionSummary(member) }}</p>
-                      </td>
                       <td class="px-5 py-4 text-slate-600">{{ formatDateTime(member.joinedAt) }}</td>
                       <td class="px-5 py-4 text-slate-600">{{ formatDateTime(member.lastActionTime) }}</td>
                       <td class="px-5 py-4">
@@ -1180,23 +1244,15 @@
                           <button
                             v-if="canModifyMemberPermission && member.role !== 'OWNER'"
                             type="button"
-                            class="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                            class="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-normal text-slate-700 transition-colors hover:bg-slate-50"
                             @click="openEditMember(member)"
                           >
-                            修改角色
+                            编辑
                           </button>
                           <button
                             v-if="canModifyMemberPermission && member.role !== 'OWNER'"
                             type="button"
-                            class="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                            @click="openEditMember(member)"
-                          >
-                            修改权限
-                          </button>
-                          <button
-                            v-if="canModifyMemberPermission && member.role !== 'OWNER'"
-                            type="button"
-                            class="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                            class="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-normal text-slate-700 transition-colors hover:bg-slate-50"
                             @click="toggleMemberStatus(member)"
                           >
                             {{ member.status === 'DISABLED' ? '启用成员' : '停用成员' }}
@@ -1204,7 +1260,7 @@
                           <button
                             v-if="canRemoveMember && member.role !== 'OWNER' && member.status !== 'REMOVED'"
                             type="button"
-                            class="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
+                            class="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-normal text-red-600 transition-colors hover:bg-red-100"
                             @click="removeMember(member)"
                           >
                             移除成员
@@ -1327,7 +1383,6 @@ import type {
 import type { ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
 import {
   formatDateTime,
-  memberPermissionSummary,
   projectMemberStatusClass,
   projectMemberStatusLabel,
   projectRoleLabel,
@@ -1522,6 +1577,7 @@ const filteredProjectTasks = computed(() => {
 const canEditProject = computed(() => projectStore.getUserProjectPermission(projectId.value, 'EDIT_PROJECT'))
 const canDeleteProject = computed(() => projectStore.getUserProjectPermission(projectId.value, 'DELETE_PROJECT'))
 const canArchiveProject = computed(() => projectStore.getUserProjectPermission(projectId.value, 'ARCHIVE_PROJECT'))
+const isArchivedProject = computed(() => project.value?.status === 'ARCHIVED')
 const canUseAiChat = computed(() => projectStore.getUserProjectPermission(projectId.value, 'USE_AI_CHAT'))
 const canCreateTask = computed(() => projectStore.getUserProjectPermission(projectId.value, 'CREATE_TASK'))
 const canDeleteTaskPermission = computed(() => projectStore.getUserProjectPermission(projectId.value, 'DELETE_TASK'))
@@ -1539,6 +1595,7 @@ const currentTaskConversation = computed(() =>
   project.value?.tasks.find(task => task.taskId === taskConversationId.value) || null
 )
 const isTaskConversation = computed(() => viewMode.value === 'task_ai')
+const isProjectMembersView = computed(() => viewMode.value === 'members')
 const isProjectChatView = computed(() => viewMode.value === 'ai' || viewMode.value === 'task_ai')
 const showTaskViewToolbar = computed(() => viewMode.value === 'board' || viewMode.value === 'list')
 const canUseCurrentTaskAi = computed(() =>
@@ -1745,16 +1802,24 @@ function syncTaskConversationFromRoute() {
   if (routeTaskId) {
     viewMode.value = 'task_ai'
   } else if (viewMode.value === 'task_ai') {
-    viewMode.value = resolveProjectViewFromRoute()
-    lastProjectViewMode.value = viewMode.value
+    const nextViewMode = resolveProjectViewFromRoute()
+    viewMode.value = nextViewMode
+    if (nextViewMode !== 'members') {
+      lastProjectViewMode.value = nextViewMode
+    }
   } else {
-    viewMode.value = resolveProjectViewFromRoute()
-    lastProjectViewMode.value = viewMode.value
+    const nextViewMode = resolveProjectViewFromRoute()
+    viewMode.value = nextViewMode
+    if (nextViewMode !== 'members') {
+      lastProjectViewMode.value = nextViewMode
+    }
   }
 }
 
 function switchProjectView(mode: Exclude<ProjectViewMode, 'task_ai'>) {
-  lastProjectViewMode.value = mode
+  if (mode !== 'members') {
+    lastProjectViewMode.value = mode
+  }
   viewMode.value = mode
   if (taskConversationId.value) {
     taskConversationId.value = ''
@@ -1778,6 +1843,10 @@ function handleProjectMoreAction(command: string | number) {
     void handleArchiveProject()
     return
   }
+  if (action === 'restore-project') {
+    void handleRestoreProject()
+    return
+  }
   if (action === 'delete-project') {
     void handleDeleteProject()
   }
@@ -1788,14 +1857,19 @@ function handleBackClick() {
     backToProject()
     return
   }
+  if (isProjectMembersView.value) {
+    backToProject()
+    return
+  }
   router.push({ name: 'ProjectList' })
 }
 
 function backToProject() {
-  viewMode.value = lastProjectViewMode.value
+  const targetViewMode = lastProjectViewMode.value === 'members' ? 'board' : lastProjectViewMode.value
+  viewMode.value = targetViewMode
   taskConversationId.value = ''
   taskAiInput.value = ''
-  router.replace({ query: { ...route.query, taskId: undefined, view: lastProjectViewMode.value } })
+  router.replace({ query: { ...route.query, taskId: undefined, view: targetViewMode } })
 }
 
 async function reloadProjectWithTaskSearch(keyword = projectTaskSearchKeyword.value) {
@@ -1924,6 +1998,13 @@ async function handleArchiveProject() {
   } catch {
     // noop
   }
+}
+
+async function handleRestoreProject() {
+  if (!project.value || !canArchiveProject.value) return
+  await projectStore.restoreProject(project.value.projectId)
+  appEvents.emit(APP_EVENT.PROJECT_SIDEBAR_REFRESH, { source: 'project-detail' })
+  ElMessage.success('项目已恢复')
 }
 
 async function handleDeleteProject() {

@@ -47,6 +47,24 @@
                         AND g.owner_user_id = #{query.currentUserId}
                     ) OR
                 </if>
+                <if test="query.productEnabled != null and query.productEnabled">
+                    (
+                        g.entity_type = 'product'
+                        <choose>
+                            <when test="query.productAllData != null and query.productAllData">
+                            </when>
+                            <when test="query.productUserIds != null and query.productUserIds.size() > 0">
+                                AND g.owner_user_id IN
+                                <foreach collection="query.productUserIds" item="userId" open="(" separator="," close=")">
+                                    #{userId}
+                                </foreach>
+                            </when>
+                            <otherwise>
+                                AND 1 = 0
+                            </otherwise>
+                        </choose>
+                    ) OR
+                </if>
                 <if test="query.taskEnabled != null and query.taskEnabled">
                     (
                         g.entity_type = 'task'

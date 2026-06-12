@@ -85,6 +85,16 @@
       @detail="openMobileObjectDetail('relation')"
     />
 
+    <MobileChatTopHeader
+      :visible="showMobileProductHeader"
+      kind="product"
+      :title="mobileProductHeaderName"
+      :fixed-style="mobileTopFixedLayerStyle"
+      @menu="openMobileMainMenu"
+      @title="openMobileObjectDetail('product')"
+      @detail="openMobileObjectDetail('product')"
+    />
+
     <!-- Internal Sidebar: Chat History -->
     <aside v-if="isMobile && mobilePanel === 'sessions'" class="flex flex-1 flex-col bg-slate-50/50">
       <!-- System Notifications Menu Item -->
@@ -239,7 +249,7 @@
               >
                 <span class="material-symbols-outlined text-[22px] leading-none">menu</span>
               </button>
-              <div class="flex min-w-0 flex-1 items-center gap-2">
+              <div class="flex min-w-0 flex-1 items-center gap-1">
                 <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                   <img
                     v-if="selectedCustomer?.logoUrl"
@@ -526,6 +536,57 @@
               </span>
             </button>
           </div>
+
+          <div
+            v-else-if="showProductHeader && !isMobile"
+            class="wk-chat-customer-header sticky top-0 z-20 shrink-0 border-b py-2 pl-4 pr-1 md:pl-8"
+          >
+            <div class="mx-auto flex h-9 w-full items-center justify-between gap-3 pr-20">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  <img v-if="selectedProduct?.mainImageUrl" :src="selectedProduct.mainImageUrl" :alt="mobileProductHeaderName" class="size-full object-cover" />
+                  <span v-else class="material-symbols-outlined text-[17px] leading-none text-slate-400">
+                    inventory_2
+                  </span>
+                </div>
+                <h2
+                  class="min-w-0 max-w-[240px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]"
+                  :title="mobileProductHeaderName"
+                >
+                  {{ mobileProductHeaderName }}
+                </h2>
+                <span
+                  v-if="selectedProductCodeText"
+                  class="inline-flex h-6 max-w-[140px] shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-1.5 text-[11px] font-medium text-[var(--wk-text-secondary)]"
+                  :title="selectedProductCodeText"
+                >
+                  <span class="min-w-0 truncate">{{ selectedProductCodeText }}</span>
+                </span>
+                <span
+                  v-if="selectedProductTypeText"
+                  class="hidden h-6 max-w-[120px] shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-1.5 text-[11px] font-medium text-[var(--wk-text-secondary)] md:inline-flex"
+                  :title="selectedProductTypeText"
+                >
+                  <span class="min-w-0 truncate">{{ selectedProductTypeText }}</span>
+                </span>
+              </div>
+            </div>
+            <button
+              v-if="showProductPanelShell && customerPanelVisible"
+              type="button"
+              class="group/sb-toggle absolute right-4 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] md:right-4"
+              aria-label="收起产品侧栏"
+              @click="customerPanelVisible = false"
+            >
+              <WkIcon name="fold" :size="18" class="shrink-0" />
+              <span
+                class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
+                role="tooltip"
+              >
+                收起产品侧栏
+              </span>
+            </button>
+          </div>
           <div
             v-if="showMobileObjectHeaderSpacer"
             class="wk-chat-customer-header-spacer shrink-0"
@@ -549,7 +610,7 @@
           >
             <div class="wk-chat-messages__inner px-4 md:px-8">
             <!-- Welcome Section (no messages) -->
-            <template v-if="chatStore.messages.length === 0 && !selectedCustomer && !selectedEmployee && !selectedRelation">
+            <template v-if="chatStore.messages.length === 0 && !selectedCustomer && !selectedEmployee && !selectedRelation && !selectedProduct">
               <div class="wk-chat-empty-welcome mx-auto flex max-w-3xl flex-col items-center space-y-5 py-6 text-center">
                 <!-- <div class="size-16 bg-primary/5 rounded-2xl flex items-center justify-center text-primary mb-2 border border-primary/10">
                   <WkIcon name="ai" class="text-4xl" />
@@ -1070,6 +1131,21 @@
                               <button
                                 type="button"
                                 class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                                @click="handleChatUploadMenuSelectApp('product')"
+                              >
+                                <span
+                                  class="wk-chat-upload-menu__icon material-symbols-outlined shrink-0"
+                                  :class="chatStore.selectedAppCode === 'product' ? '!text-[var(--wk-text-primary)]' : ''"
+                                >inventory_2</span>
+                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'product' ? 'text-[var(--wk-text-primary)]' : 'text-[#0d0d0d]'">产品</span>
+                                <span
+                                  v-if="chatStore.selectedAppCode === 'product'"
+                                  class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                                >check</span>
+                              </button>
+                              <button
+                                type="button"
+                                class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
                                 @click="handleChatUploadMenuSelectApp('project')"
                               >
                                 <WkIcon
@@ -1152,7 +1228,8 @@
                             <span
                               class="flex size-full items-center justify-center transition-opacity duration-150 max-sm:pointer-events-none max-sm:opacity-0 group-hover/crm-toolbar:pointer-events-none group-hover/crm-toolbar:opacity-0"
                             >
-                              <WkIcon :name="selectedChatAppIcon" :size="18" class="shrink-0" />
+                              <span v-if="selectedChatAppMaterialIcon" class="material-symbols-outlined text-[18px] leading-none">{{ selectedChatAppMaterialIcon }}</span>
+                              <WkIcon v-else :name="selectedChatAppIcon" :size="18" class="shrink-0" />
                             </span>
                             <span
                               class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-[var(--wk-bg-surface-active)] text-[var(--wk-text-primary)] opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
@@ -1424,6 +1501,22 @@
                           type="button"
                           class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
                           :disabled="isUploading"
+                          @click="handleChatUploadMenuSelectApp('product')"
+                        >
+                          <span
+                            class="wk-chat-upload-menu__icon material-symbols-outlined shrink-0"
+                            :class="chatStore.selectedAppCode === 'product' ? 'text-primary' : ''"
+                          >inventory_2</span>
+                          <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">产品</span>
+                          <span
+                            v-if="chatStore.selectedAppCode === 'product'"
+                            class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                          >check</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                          :disabled="isUploading"
                           @click="handleChatUploadMenuSelectApp('project')"
                         >
                           <WkIcon
@@ -1671,7 +1764,8 @@
                           <span
                             class="flex size-full items-center justify-center transition-opacity duration-150 max-sm:pointer-events-none max-sm:opacity-0 group-hover/crm-toolbar:pointer-events-none group-hover/crm-toolbar:opacity-0"
                           >
-                            <WkIcon :name="selectedChatAppIcon" :size="18" class="shrink-0" />
+                            <span v-if="selectedChatAppMaterialIcon" class="material-symbols-outlined text-[18px] leading-none">{{ selectedChatAppMaterialIcon }}</span>
+                            <WkIcon v-else :name="selectedChatAppIcon" :size="18" class="shrink-0" />
                           </span>
                           <span
                             class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-[var(--wk-bg-surface-active)] text-[var(--wk-text-primary)] opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
@@ -2179,6 +2273,16 @@
               <p class="text-sm font-semibold text-slate-700">暂无关系详情</p>
               <p class="mt-1 text-xs leading-relaxed text-slate-400">关系资料加载后会在这里展示。</p>
             </div>
+            <div
+              v-else-if="mobileObjectDetailKind === 'product' && !selectedProduct"
+              class="flex h-full flex-col items-center justify-center px-6 text-center"
+            >
+              <div class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-[#f5f5f5] text-slate-400">
+                <span class="material-symbols-outlined text-[24px] leading-none">inventory_2</span>
+              </div>
+              <p class="text-sm font-semibold text-slate-700">暂无产品详情</p>
+              <p class="mt-1 text-xs leading-relaxed text-slate-400">产品资料加载后会在这里展示。</p>
+            </div>
             <EmployeeChatInfoPanel
               v-else-if="mobileObjectDetailKind === 'employee' && selectedEmployee"
               :employee="selectedEmployee"
@@ -2202,6 +2306,11 @@
               @view-task="handleViewRelatedTask"
               @view-schedule="handleViewRelatedSchedule"
               @view-attachment="handleViewRelatedKnowledge"
+            />
+            <ProductChatInfoPanel
+              v-else-if="mobileObjectDetailKind === 'product' && selectedProduct"
+              :product="selectedProduct"
+              @edit="handleEditProduct"
             />
           </div>
         </section>
@@ -2239,10 +2348,10 @@
         <span class="absolute left-0 top-1/2 h-10 w-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-[#cfcfcf]"></span>
       </div>
       <div class="min-h-0 flex-1 overflow-hidden pb-4">
-        <div v-if="selectedCustomerLoading || selectedEmployeeLoading || selectedRelationLoading" class="flex h-full items-center justify-center">
+        <div v-if="selectedCustomerLoading || selectedEmployeeLoading || selectedRelationLoading || selectedProductLoading" class="flex h-full items-center justify-center">
           <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
         </div>
-        <div v-else-if="!selectedCustomer && !selectedEmployee && !selectedRelation" class="flex h-full flex-col items-center justify-center text-center">
+        <div v-else-if="!selectedCustomer && !selectedEmployee && !selectedRelation && !selectedProduct" class="flex h-full flex-col items-center justify-center text-center">
           <div class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-[#f5f5f5] text-slate-400">
             <WkIcon name="customer" :size="24" />
           </div>
@@ -2281,9 +2390,19 @@
           @view-schedule="handleViewRelatedSchedule"
           @view-attachment="handleViewRelatedKnowledge"
         />
+        <ProductChatInfoPanel
+          v-else-if="selectedProduct"
+          :product="selectedProduct"
+          @edit="handleEditProduct"
+        />
       </div>
     </aside>
 
+    <ProductEditDialog
+      v-model="productEditVisible"
+      :product="productEditTarget"
+      @saved="handleProductEditSaved"
+    />
   </div>
 </template>
 
@@ -2303,6 +2422,7 @@ import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig } from '@/api/systemConfig'
 import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerStage } from '@/api/customer'
+import { getProductDetail } from '@/api/product'
 import { getCustomerWecomConversationMessages, getCustomerWecomConversationTabs } from '@/api/wecom'
 import { bindTencentMeeting, getCustomerTencentMeetingCandidates } from '@/api/tencentMeeting'
 import CustomerDetailView from '@/views/customer/CustomerDetailView.vue'
@@ -2315,6 +2435,8 @@ import { getRelationDetail } from '@/api/relation'
 import MobileChatTopHeader from '@/views/chat/components/MobileChatTopHeader.vue'
 import EmployeeChatInfoPanel from '@/views/chat/components/EmployeeChatInfoPanel.vue'
 import RelationChatInfoPanel from '@/views/chat/components/RelationChatInfoPanel.vue'
+import ProductChatInfoPanel from '@/views/chat/components/ProductChatInfoPanel.vue'
+import ProductEditDialog from '@/views/product/components/ProductEditDialog.vue'
 import TaskDetailDrawer from '@/views/task/components/TaskDetailDrawer.vue'
 import TaskEditDialog from '@/views/task/components/TaskEditDialog.vue'
 import ScheduleDetailDrawer from '@/views/calendar/components/ScheduleDetailDrawer.vue'
@@ -2367,6 +2489,8 @@ import type { WecomConversationTabVO, WecomMessageVO } from '@/types/wecom'
 import type { TencentMeetingCandidateVO } from '@/types/tencentMeeting'
 import type { AddressBookDetail } from '@/types/addressBook'
 import type { RelationDetailVO } from '@/types/relation'
+import type { ProductVO } from '@/types/product'
+import { formatProductTypeLabel } from '@/utils/productDisplay'
 import { wkIconNames } from '@/components/common/wkIcon'
 import type { WkIconName } from '@/components/common/wkIcon'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
@@ -2522,7 +2646,7 @@ const mobileCustomerSummaryVisible = ref(false)
 const customerSummaryDetailRef = ref<InstanceType<typeof CustomerDetailView> | null>(null)
 const customerSummarySheetHeight = ref(58)
 const customerSummarySheetDragging = ref(false)
-type MobileObjectDetailKind = 'employee' | 'relation'
+type MobileObjectDetailKind = 'employee' | 'relation' | 'product'
 const mobileObjectDetailKind = ref<MobileObjectDetailKind | null>(null)
 const selectedEmployeeId = ref<string | null>(null)
 const selectedEmployee = ref<AddressBookDetail | null>(null)
@@ -2531,6 +2655,11 @@ const selectedRelationId = ref<string | null>(null)
 const selectedRelationDetail = ref<RelationDetailVO | null>(null)
 const selectedRelation = computed(() => selectedRelationDetail.value?.relation || null)
 const selectedRelationLoading = ref(false)
+const selectedProductId = ref<string | null>(null)
+const selectedProduct = ref<ProductVO | null>(null)
+const selectedProductLoading = ref(false)
+const productEditVisible = ref(false)
+const productEditTarget = ref<ProductVO | null>(null)
 const showRelatedTaskDialog = ref(false)
 const showRelatedScheduleDialog = ref(false)
 const showRelatedKnowledgeUploadDialog = ref(false)
@@ -2710,10 +2839,15 @@ const currentSessionRelationId = computed(() => {
   const relationId = chatStore.currentSession?.relationId
   return relationId ? String(relationId) : ''
 })
+const currentSessionProductId = computed(() => {
+  const productId = chatStore.currentSession?.productId
+  return productId ? String(productId) : ''
+})
 const showCustomerPanelShell = computed(() => !isMobile.value && Boolean(currentSessionCustomerId.value))
 const showEmployeePanelShell = computed(() => !isMobile.value && Boolean(currentSessionEmployeeId.value))
 const showRelationPanelShell = computed(() => !isMobile.value && Boolean(currentSessionRelationId.value))
-const showObjectPanelShell = computed(() => showCustomerPanelShell.value || showEmployeePanelShell.value || showRelationPanelShell.value)
+const showProductPanelShell = computed(() => !isMobile.value && Boolean(currentSessionProductId.value))
+const showObjectPanelShell = computed(() => showCustomerPanelShell.value || showEmployeePanelShell.value || showRelationPanelShell.value || showProductPanelShell.value)
 const customerPanelStyle = computed(() => ({
   width: `${customerPanelWidth.value}px`,
   minWidth: `min(${CUSTOMER_PANEL_MIN_WIDTH}px, ${CUSTOMER_PANEL_MAX_WIDTH_RATIO * 100}%)`,
@@ -2766,12 +2900,16 @@ const selectedChatAppLabel = computed(() => {
   if (chatStore.selectedAppCode === 'relation' && (selectedRelationId.value || currentSessionRelationId.value)) {
     return selectedRelation.value?.name || boundRelationName.value || '关系'
   }
+  if (chatStore.selectedAppCode === 'product' && (selectedProductId.value || currentSessionProductId.value)) {
+    return selectedProduct.value?.productName || chatStore.currentSession?.productName || '产品'
+  }
   if (chatStore.selectedApp?.label) {
     return chatStore.selectedApp.label == '知识库' ? '知识库检索' : chatStore.selectedApp.label
   }
   if (chatStore.selectedAppCode === 'crm') return 'CRM管理'
   if (chatStore.selectedAppCode === 'project') return '项目'
   if (chatStore.selectedAppCode === 'address_book') return '通讯录'
+  if (chatStore.selectedAppCode === 'product') return '产品'
   if (chatStore.selectedAppCode === 'relation') return '关系'
   if (chatStore.selectedAppCode === 'knowledge') return '知识库检索'
   return ''
@@ -2789,6 +2927,10 @@ const selectedChatAppIcon = computed<WkIconName>(() => {
   if (chatStore.selectedAppCode === 'knowledge') return 'knowledge-1'
   return 'application'
 })
+
+const selectedChatAppMaterialIcon = computed(() =>
+  chatStore.selectedAppCode === 'product' ? 'inventory_2' : ''
+)
 
 function isWkIconName(iconName: string): iconName is WkIconName {
   return (wkIconNames as readonly string[]).includes(iconName)
@@ -3155,8 +3297,11 @@ const isEmployeeContextChat = computed(() =>
 const isRelationContextChat = computed(() =>
   !chatStore.isNewSessionPending && Boolean(selectedRelationId.value || currentSessionRelationId.value)
 )
+const isProductContextChat = computed(() =>
+  !chatStore.isNewSessionPending && Boolean(selectedProductId.value || currentSessionProductId.value)
+)
 const isObjectContextChat = computed(() => Boolean(
-  isCustomerContextChat.value || isEmployeeContextChat.value || isRelationContextChat.value
+  isCustomerContextChat.value || isEmployeeContextChat.value || isRelationContextChat.value || isProductContextChat.value
 ))
 const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isObjectContextChat.value)
 const showMobileFloatingBar = computed(() =>
@@ -3211,6 +3356,15 @@ const mobileRelationHeaderName = computed(() =>
 const mobileRelationHeaderAvatarUrl = computed(() =>
   selectedRelation.value?.avatarUrl || ''
 )
+const mobileProductHeaderName = computed(() =>
+  selectedProduct.value?.productName || chatStore.currentSession?.productName || chatStore.currentSession?.title || '产品'
+)
+const selectedProductCodeText = computed(() =>
+  selectedProduct.value?.productCode || chatStore.currentSession?.productCode || ''
+)
+const selectedProductTypeText = computed(() =>
+  selectedProduct.value?.productType ? formatProductTypeLabel(selectedProduct.value.productType) : ''
+)
 const selectedRelationTypeLabel = computed(() =>
   resolveRelationTypeLabel(selectedRelation.value?.relationType, selectedRelation.value?.relationTypeName)
 )
@@ -3245,22 +3399,35 @@ const showMobileRelationHeader = computed(() =>
   && mobilePanel.value === 'chat'
   && showRelationHeader.value
 )
+const showProductHeader = computed(() =>
+  !chatStore.isNewSessionPending && Boolean(selectedProduct.value || (isMobile.value && isProductContextChat.value))
+)
+const showMobileProductHeader = computed(() =>
+  isMobile.value
+  && currentView.value === 'chat'
+  && mobilePanel.value === 'chat'
+  && showProductHeader.value
+)
 const showMobileCustomerHeaderSpacer = computed(() =>
   isMobile.value && showCustomerHeader.value
 )
 const showMobileObjectHeaderSpacer = computed(() =>
-  isMobile.value && (showEmployeeHeader.value || showRelationHeader.value)
+  isMobile.value && (showEmployeeHeader.value || showRelationHeader.value || showProductHeader.value)
 )
 const mobileObjectDetailTitle = computed(() =>
   mobileObjectDetailKind.value === 'employee'
     ? mobileEmployeeHeaderName.value
-    : mobileRelationHeaderName.value
+    : mobileObjectDetailKind.value === 'product'
+      ? mobileProductHeaderName.value
+      : mobileRelationHeaderName.value
 )
 const mobileObjectDetailLoading = computed(() =>
   mobileObjectDetailKind.value === 'employee'
     ? selectedEmployeeLoading.value
     : mobileObjectDetailKind.value === 'relation'
       ? selectedRelationLoading.value
+      : mobileObjectDetailKind.value === 'product'
+        ? selectedProductLoading.value
       : false
 )
 const showMobileSummaryVoiceAction = computed(() =>
@@ -3293,12 +3460,15 @@ watch(
     isMobile.value,
     isEmployeeContextChat.value,
     isRelationContextChat.value,
+    isProductContextChat.value,
     currentSessionEmployeeId.value,
     currentSessionRelationId.value,
+    currentSessionProductId.value,
     selectedEmployeeId.value,
     selectedRelationId.value,
+    selectedProductId.value,
   ] as const,
-  ([mobile, hasEmployee, hasRelation]) => {
+  ([mobile, hasEmployee, hasRelation, hasProduct]) => {
     if (!mobile) {
       closeMobileObjectDetail()
       return
@@ -3307,6 +3477,9 @@ watch(
       closeMobileObjectDetail()
     }
     if (mobileObjectDetailKind.value === 'relation' && !hasRelation) {
+      closeMobileObjectDetail()
+    }
+    if (mobileObjectDetailKind.value === 'product' && !hasProduct) {
       closeMobileObjectDetail()
     }
   }
@@ -3502,6 +3675,16 @@ function openMobileObjectDetail(kind: MobileObjectDetailKind) {
     mobileCustomerSummaryVisible.value = false
     mobileObjectDetailKind.value = 'employee'
     void ensureSelectedEmployeeDetail(employeeId, { silent: Boolean(selectedEmployee.value) })
+    return
+  }
+
+  if (kind === 'product') {
+    const productId = currentSessionProductId.value || selectedProductId.value
+    if (!productId) return
+    customerSummarySheetHeight.value = CUSTOMER_SUMMARY_SHEET_LEVELS[0]
+    mobileCustomerSummaryVisible.value = false
+    mobileObjectDetailKind.value = 'product'
+    void ensureSelectedProductDetail(productId, { silent: Boolean(selectedProduct.value) })
     return
   }
 
@@ -3763,6 +3946,28 @@ async function ensureSelectedRelationDetail(relationId: string, options: { silen
   }
 }
 
+async function ensureSelectedProductDetail(productId: string, options: { silent?: boolean } = {}) {
+  const requestProductId = String(productId)
+  const silent = Boolean(options.silent)
+  if (!silent) {
+    selectedProductLoading.value = true
+  }
+  try {
+    const detail = await getProductDetail(requestProductId)
+    if (selectedProductId.value && selectedProductId.value !== requestProductId) return
+    selectedProduct.value = detail
+  } catch (err) {
+    console.error('Load selected product detail failed:', err)
+    if (!isRequestErrorHandled(err)) {
+      ElMessage.warning('产品详情加载失败')
+    }
+  } finally {
+    if (!silent && (!selectedProductId.value || selectedProductId.value === requestProductId)) {
+      selectedProductLoading.value = false
+    }
+  }
+}
+
 function isCustomerAiAnalysisPending(customer: CustomerDetailVO | null) {
   return customer?.aiAnalysisStatus === 'pending' || customer?.aiAnalysisStatus === 'running'
 }
@@ -3846,6 +4051,8 @@ async function handleSelectCustomerById(customerId: string) {
   selectedEmployee.value = null
   selectedRelationId.value = null
   selectedRelationDetail.value = null
+  selectedProductId.value = null
+  selectedProduct.value = null
   currentView.value = 'chat'
   if (isMobile.value) {
     mobilePanel.value = 'chat'
@@ -3880,6 +4087,8 @@ async function handleSelectEmployeeById(employeeId: string) {
   selectedCustomer.value = null
   selectedRelationId.value = null
   selectedRelationDetail.value = null
+  selectedProductId.value = null
+  selectedProduct.value = null
   currentView.value = 'chat'
   isPinnedToBottom.value = true
   customerPanelVisible.value = true
@@ -3907,6 +4116,8 @@ async function handleSelectRelationById(relationId: string) {
   selectedCustomer.value = null
   selectedEmployeeId.value = null
   selectedEmployee.value = null
+  selectedProductId.value = null
+  selectedProduct.value = null
   currentView.value = 'chat'
   isPinnedToBottom.value = true
   customerPanelVisible.value = true
@@ -3926,6 +4137,47 @@ async function handleSelectRelationById(relationId: string) {
 
   await nextTick()
   focusChatTextarea()
+}
+
+async function handleSelectProductById(productId: string) {
+  selectedProductId.value = productId
+  selectedCustomerId.value = null
+  selectedCustomer.value = null
+  selectedEmployeeId.value = null
+  selectedEmployee.value = null
+  selectedRelationId.value = null
+  selectedRelationDetail.value = null
+  currentView.value = 'chat'
+  isPinnedToBottom.value = true
+  customerPanelVisible.value = true
+  chatStore.setSelectedAppCode('product')
+  await ensureSelectedProductDetail(productId)
+  const productName = selectedProduct.value?.productName || '产品'
+  if (chatStore.sessions.length === 0) {
+    await chatStore.fetchSessions()
+  }
+
+  const existingSession = chatStore.sessions.find(session => String(session.productId) === String(productId))
+  if (existingSession) {
+    await chatStore.selectSession(existingSession.sessionId)
+  } else {
+    await chatStore.startNewSession(productName, undefined, undefined, 'product', undefined, undefined, undefined, undefined, productId)
+  }
+
+  await nextTick()
+  focusChatTextarea()
+}
+
+async function handleEditProduct(product: ProductVO) {
+  if (!product?.productId) return
+  productEditTarget.value = await getProductDetail(String(product.productId))
+  productEditVisible.value = true
+}
+
+function handleProductEditSaved(product: ProductVO) {
+  selectedProduct.value = product
+  productEditTarget.value = product
+  appEvents.emit(APP_EVENT.PRODUCT_SIDEBAR_REFRESH, { preserveScroll: true })
 }
 
 const quickActions = [
@@ -4485,6 +4737,12 @@ function getSessionRelationId(sessionId?: string) {
   return session?.relationId ? String(session.relationId) : ''
 }
 
+function getSessionProductId(sessionId?: string) {
+  if (!sessionId) return ''
+  const session = chatStore.sessions.find(item => item.sessionId === sessionId)
+  return session?.productId ? String(session.productId) : ''
+}
+
 async function refreshCrmContextAfterSend(effectiveAppCode: string, completedSessionId?: string) {
   const employeeId = getSessionEmployeeId(completedSessionId) || currentSessionEmployeeId.value
   if (employeeId) {
@@ -4495,6 +4753,12 @@ async function refreshCrmContextAfterSend(effectiveAppCode: string, completedSes
   const relationId = getSessionRelationId(completedSessionId) || currentSessionRelationId.value
   if (relationId) {
     await ensureSelectedRelationDetail(relationId, { silent: Boolean(selectedRelationDetail.value) })
+    return
+  }
+
+  const productId = getSessionProductId(completedSessionId) || currentSessionProductId.value
+  if (productId) {
+    await ensureSelectedProductDetail(productId, { silent: Boolean(selectedProduct.value) })
     return
   }
 
@@ -5114,7 +5378,7 @@ function openMobileMainMenu() {
 async function handleNewSession() {
   isPinnedToBottom.value = true
   closeMobileDetailSheets()
-  if (route.query.customerId || route.query.employeeId || route.query.relationId || route.query.sessionId) {
+  if (route.query.customerId || route.query.employeeId || route.query.relationId || route.query.productId || route.query.sessionId) {
     await router.replace({ path: '/chat' })
   }
   chatStore.beginNewSessionDraft('新对话')
@@ -5210,6 +5474,21 @@ watch(
   { immediate: true }
 )
 
+async function applyProductRouteQuery() {
+  const raw = route.query.productId
+  const productId = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  if (!productId || selectedProductId.value === productId) return
+  await handleSelectProductById(productId)
+}
+
+watch(
+  () => route.query.productId,
+  () => {
+    void applyProductRouteQuery()
+  },
+  { immediate: true }
+)
+
 watch(
   currentSessionCustomerId,
   (customerId) => {
@@ -5230,6 +5509,8 @@ watch(
     selectedEmployee.value = null
     selectedRelationId.value = null
     selectedRelationDetail.value = null
+    selectedProductId.value = null
+    selectedProduct.value = null
     void ensureSelectedCustomerDetail(customerId)
   },
   { immediate: true }
@@ -5251,6 +5532,8 @@ watch(
     selectedCustomer.value = null
     selectedRelationId.value = null
     selectedRelationDetail.value = null
+    selectedProductId.value = null
+    selectedProduct.value = null
     void ensureSelectedEmployeeDetail(employeeId)
   },
   { immediate: true }
@@ -5272,7 +5555,32 @@ watch(
     selectedCustomer.value = null
     selectedEmployeeId.value = null
     selectedEmployee.value = null
+    selectedProductId.value = null
+    selectedProduct.value = null
     void ensureSelectedRelationDetail(relationId)
+  },
+  { immediate: true }
+)
+
+watch(
+  currentSessionProductId,
+  (productId) => {
+    if (!productId) {
+      selectedProductId.value = null
+      selectedProduct.value = null
+      selectedProductLoading.value = false
+      return
+    }
+
+    if (selectedProductId.value === productId && selectedProduct.value) return
+    selectedProductId.value = productId
+    selectedCustomerId.value = null
+    selectedCustomer.value = null
+    selectedEmployeeId.value = null
+    selectedEmployee.value = null
+    selectedRelationId.value = null
+    selectedRelationDetail.value = null
+    void ensureSelectedProductDetail(productId)
   },
   { immediate: true }
 )

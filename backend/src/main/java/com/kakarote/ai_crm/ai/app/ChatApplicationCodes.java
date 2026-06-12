@@ -11,6 +11,7 @@ public final class ChatApplicationCodes {
     public static final String KNOWLEDGE = "knowledge";
     public static final String ADDRESS_BOOK = "address_book";
     public static final String RELATION = "relation";
+    public static final String PRODUCT = "product";
 
     private ChatApplicationCodes() {
     }

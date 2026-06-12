@@ -1,10 +1,11 @@
-export const SIDEBAR_MODULE_KEYS = ['recent', 'customer', 'project', 'relation', 'addressBook'] as const
+export const SIDEBAR_MODULE_KEYS = ['recent', 'customer', 'product', 'project', 'relation', 'addressBook'] as const
 
 export type SidebarModuleKey = (typeof SIDEBAR_MODULE_KEYS)[number]
 
 export const DEFAULT_SIDEBAR_MODULE_ORDER: SidebarModuleKey[] = [
   'recent',
   'customer',
+  'product',
   'project',
   'relation',
   'addressBook'
@@ -29,9 +30,30 @@ export function normalizeSidebarModuleOrder(input?: unknown): SidebarModuleKey[]
     }
   }
 
-  for (const key of DEFAULT_SIDEBAR_MODULE_ORDER) {
+  for (let defaultIndex = 0; defaultIndex < DEFAULT_SIDEBAR_MODULE_ORDER.length; defaultIndex += 1) {
+    const key = DEFAULT_SIDEBAR_MODULE_ORDER[defaultIndex]
     if (!seen.has(key)) {
-      normalized.push(key)
+      let insertIndex = normalized.length
+      for (let index = defaultIndex - 1; index >= 0; index -= 1) {
+        const previousKey = DEFAULT_SIDEBAR_MODULE_ORDER[index]
+        const previousIndex = normalized.indexOf(previousKey)
+        if (previousIndex >= 0) {
+          insertIndex = previousIndex + 1
+          break
+        }
+      }
+      if (insertIndex === normalized.length) {
+        for (let index = defaultIndex + 1; index < DEFAULT_SIDEBAR_MODULE_ORDER.length; index += 1) {
+          const nextKey = DEFAULT_SIDEBAR_MODULE_ORDER[index]
+          const nextIndex = normalized.indexOf(nextKey)
+          if (nextIndex >= 0) {
+            insertIndex = nextIndex
+            break
+          }
+        }
+      }
+      normalized.splice(insertIndex, 0, key)
+      seen.add(key)
     }
   }
 

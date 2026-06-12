@@ -75,6 +75,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             "followup",
             "schedule",
             "knowledge",
+            "product",
             "wecomEmployeeSession",
             "wecomCustomerSession",
             "wecomGroupSession",
@@ -154,6 +155,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             customFieldService.initializeSystemFields("customer");
             customFieldService.initializeSystemFields("contact");
             customFieldService.initializeSystemFields("relation");
+            customFieldService.initializeSystemFields("product");
             initializeEnterpriseConfig(companyName);
 
             ManagerDept dept = new ManagerDept();

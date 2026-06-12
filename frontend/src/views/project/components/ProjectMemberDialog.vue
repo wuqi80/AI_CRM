@@ -98,10 +98,10 @@
           <label
             v-for="permission in PROJECT_PERMISSION_OPTIONS"
             :key="permission.value"
-            class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3"
+            class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2"
           >
             <el-checkbox :value="permission.value" :aria-label="permission.label" />
-            <span class="text-sm text-slate-700">{{ permission.label }}</span>
+            <span class="text-sm leading-5 text-slate-700">{{ permission.label }}</span>
           </label>
         </el-checkbox-group>
       </div>
@@ -320,16 +320,56 @@ function handleSubmit() {
 </script>
 
 <style scoped>
-.wk-project-member-dialog :deep(.el-dialog__header) {
+:global(.wk-project-member-dialog.el-dialog) {
+  display: flex;
+  max-height: min(760px, calc(100dvh - 32px)) !important;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0 auto !important;
+}
+
+:global(.wk-project-member-dialog.el-dialog .el-dialog__header) {
+  flex: 0 0 auto;
   padding: 22px 24px 14px;
   margin-right: 0;
 }
 
-.wk-project-member-dialog :deep(.el-dialog__body) {
-  padding: 0;
+:global(.wk-project-member-dialog.el-dialog .el-dialog__body) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 !important;
 }
 
-.wk-project-member-dialog :deep(.el-dialog__footer) {
-  padding: 14px 24px 22px;
+:global(.wk-project-member-dialog.el-dialog .el-dialog__footer) {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--wk-border-subtle);
+  background: #fff;
+  padding: 14px 24px 22px !important;
+}
+
+:global(.el-overlay:has(.wk-project-member-dialog)),
+:global(.el-overlay-dialog:has(.wk-project-member-dialog)) {
+  overflow: hidden;
+}
+
+:global(.el-overlay-dialog:has(.wk-project-member-dialog)) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 16px;
+}
+
+@media (max-width: 767px) {
+  :global(.wk-project-member-dialog.el-dialog) {
+    max-height: calc(100dvh - 24px) !important;
+    margin: 0 auto !important;
+  }
+
+  :global(.el-overlay-dialog:has(.wk-project-member-dialog)) {
+    padding: 12px;
+  }
 }
 </style>

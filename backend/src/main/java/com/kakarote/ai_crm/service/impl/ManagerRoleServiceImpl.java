@@ -47,6 +47,9 @@ import java.util.stream.Collectors;
 @Service
 public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, ManagerRole> implements IManagerRoleService {
 
+    private static final String PRODUCT_MODULE_REALM = "product";
+    private static final String PRODUCT_PERMISSION_PREFIX = "product:";
+
     @Autowired
     private IManagerUserRoleService userRoleService;
 
@@ -156,7 +159,11 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
     public JSONObject auth(Long userId) {
         String cacheKey = Const.USER_AUTH_CACHE_KET + userId;
         if (redis.exists(cacheKey)) {
-            return redis.get(cacheKey);
+            JSONObject cachedAuth = redis.get(cacheKey);
+            if (cachedAuth != null && !isProductAuthCacheStale(cachedAuth, userId)) {
+                return cachedAuth;
+            }
+            redis.del(cacheKey);
         }
         List<ManagerMenu> managerMenus = new ArrayList<>(menuService.queryMenuList(userId));
         // 收集用户有权限的菜单的 parentId，只添加对应的父模块
@@ -315,9 +322,16 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
                         "wecomGroupSession",
                         "wecomCustomer",
                         "tencentMeeting",
-                        "addressBook"
+                        "addressBook",
+                        "product"
                 );
-                ap.setHasScopeOption(dataScopeModules.contains(module.getRealm()) && !realm.endsWith(":create"));
+                Set<String> actionRealmsWithoutDataScope = Set.of(
+                        "product:category_manage",
+                        "product:settings"
+                );
+                ap.setHasScopeOption(dataScopeModules.contains(module.getRealm())
+                        && !realm.endsWith(":create")
+                        && !actionRealmsWithoutDataScope.contains(realm));
                 ManagerRoleMenu rm = roleMenuMap.get(action.getMenuId());
                 if (rm != null) {
                     ap.setEnabled(true);
@@ -386,5 +400,15 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
             }
         });
         return jsonObject;
+    }
+
+    private boolean isProductAuthCacheStale(JSONObject cachedAuth, Long userId) {
+        if (cachedAuth == null || cachedAuth.containsKey(PRODUCT_MODULE_REALM)) {
+            return false;
+        }
+        return menuService.queryMenuList(userId).stream()
+                .map(ManagerMenu::getRealm)
+                .filter(Objects::nonNull)
+                .anyMatch(realm -> PRODUCT_MODULE_REALM.equals(realm) || realm.startsWith(PRODUCT_PERMISSION_PREFIX));
     }
 }
