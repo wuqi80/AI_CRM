@@ -210,16 +210,6 @@
               配置 AI 服务
             </button>
           </div>
-          <p class="mt-3 text-xs font-bold text-primary uppercase tracking-wider mb-1">AI 模型状态</p>
-          <div class="flex items-center gap-2">
-            <div
-              class="size-1.5 rounded-full"
-              :class="hasAiApiKeyConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'"
-            ></div>
-            <span class="text-xs font-medium text-slate-600">
-              {{ hasAiApiKeyConfigured ? 'AI 模型已就绪' : '请先配置 AI 服务' }}
-            </span>
-          </div>
         </div>
       </div>
     </aside>
@@ -808,7 +798,6 @@ const activeQuickActions = computed(() => {
 })
 
 const aiReady = computed(() => Boolean(aiConfig.value?.ready))
-const hasAiApiKeyConfigured = computed(() => aiReady.value)
 const canManageAiConfig = computed(() => userStore.hasPermission('config:ai'))
 const aiStatusBadgeText = computed(() => {
   return aiReady.value ? '模型已就绪' : '待配置'
@@ -1500,8 +1489,4 @@ function resolveChatAppIcon(code: string): string {
   scroll-padding-top: calc(62px + max(8px, var(--safe-area-inset-top)));
 }
 
-.border-t.border-slate-100 .rounded-2xl > p.text-xs.font-bold.text-primary.uppercase.tracking-wider.mb-1,
-.border-t.border-slate-100 .rounded-2xl > p.text-xs.font-bold.text-primary.uppercase.tracking-wider.mb-1 + div.flex.items-center.gap-2 {
-  display: none;
-}
 </style>
