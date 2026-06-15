@@ -12,11 +12,11 @@
             u.post,
             u.mobile,
             u.email,
-            CASE
+            COALESCE(NULLIF(u.employee_status, ''), CASE
                 WHEN u.status = 1 THEN 'active'
                 WHEN u.status = 2 THEN 'resigned'
                 ELSE 'disabled'
-            END AS employee_status,
+            END) AS employee_status,
             (
                 SELECT MAX(COALESCE(t.completed_time, t.due_date, t.update_time, t.create_time))
                 FROM crm_task t
@@ -42,23 +42,21 @@
             </foreach>
         </if>
         <if test="query.employeeStatus != null and query.employeeStatus != ''">
-            <choose>
-                <when test="query.employeeStatus == 'active'">
-                    AND u.status = 1
-                </when>
-                <when test="query.employeeStatus == 'resigned'">
-                    AND u.status = 2
-                </when>
-                <otherwise>
-                    AND COALESCE(u.status, 0) NOT IN (1, 2)
-                </otherwise>
-            </choose>
+            AND COALESCE(NULLIF(u.employee_status, ''), CASE
+                WHEN u.status = 1 THEN 'active'
+                WHEN u.status = 2 THEN 'resigned'
+                ELSE 'disabled'
+            END) = #{query.employeeStatus}
         </if>
         ORDER BY
-            CASE COALESCE(u.status, 0)
-                WHEN 1 THEN 0
-                WHEN 0 THEN 1
-                WHEN 2 THEN 2
+            CASE COALESCE(NULLIF(u.employee_status, ''), CASE
+                WHEN u.status = 1 THEN 'active'
+                WHEN u.status = 2 THEN 'resigned'
+                ELSE 'disabled'
+            END)
+                WHEN 'active' THEN 0
+                WHEN 'disabled' THEN 1
+                WHEN 'resigned' THEN 2
                 ELSE 3
             END,
             u.create_time DESC
@@ -74,11 +72,11 @@
             u.post,
             u.mobile,
             u.email,
-            CASE
+            COALESCE(NULLIF(u.employee_status, ''), CASE
                 WHEN u.status = 1 THEN 'active'
                 WHEN u.status = 2 THEN 'resigned'
                 ELSE 'disabled'
-            END AS employee_status,
+            END) AS employee_status,
             u.parent_id,
             p.realname AS parent_name,
             (

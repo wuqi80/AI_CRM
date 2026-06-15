@@ -95,9 +95,17 @@ public class ManagerUser implements Serializable {
 	@Schema(description = "状态,0禁用,1正常,2未激活")
 	private Integer status;
 	/**
+	 * Employee status: active, resigned, disabled.
+	 */
+	@Schema(description = "Employee status")
+	private String employeeStatus;
+	/**
 	 * 直属上级ID
 	 */
 	@Schema(description = "直属上级ID")
 	private Long parentId;
+
+	@Schema(description = "User UI preferences JSON")
+	private String uiPreferences;
 
 }
