@@ -291,6 +291,9 @@
                   <p class="mt-0.5 text-xs text-slate-400">{{ formatFileSize(attachment.fileSize) }}</p>
                 </div>
                 <div class="flex shrink-0 items-center gap-1">
+                  <button class="project-icon-button" type="button" title="预览" @click="openTaskAttachmentPreview(attachment)">
+                    <span class="material-symbols-outlined text-[18px] leading-none">visibility</span>
+                  </button>
                   <button class="project-icon-button" type="button" title="下载" @click="handleDownloadTaskAttachment(attachment)">
                     <span class="material-symbols-outlined text-[18px] leading-none">download</span>
                   </button>
@@ -335,6 +338,13 @@
         </div>
       </template>
     </el-dialog>
+
+    <ProjectTaskAttachmentPreviewModal
+      v-model="taskAttachmentPreviewVisible"
+      :attachment="previewingTaskAttachment"
+      :project-id="currentProject?.projectId || ''"
+      :task-id="previewingTaskId"
+    />
   </div>
 </template>
 
@@ -360,6 +370,7 @@ import {
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { useResponsive } from '@/composables/useResponsive'
 import { isRequestErrorHandled } from '@/utils/requestError'
+import ProjectTaskAttachmentPreviewModal from './ProjectTaskAttachmentPreviewModal.vue'
 import type {
   ProjectCreate,
   ProjectStatus,
@@ -390,6 +401,9 @@ const editingTask = ref<ProjectTaskVO | null>(null)
 const taskAttachmentUploading = ref(false)
 const taskAttachmentInputRef = ref<HTMLInputElement | null>(null)
 const draftTaskAttachments = ref<ProjectTaskAttachmentPayload[]>([])
+const taskAttachmentPreviewVisible = ref(false)
+const previewingTaskAttachment = ref<ProjectTaskAttachment | null>(null)
+const previewingTaskId = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const projectForm = reactive<ProjectCreate & { projectId?: string }>({
@@ -690,6 +704,13 @@ async function handleDownloadTaskAttachment(attachment: ProjectTaskAttachment) {
       ElMessage.error('附件下载失败')
     }
   }
+}
+
+function openTaskAttachmentPreview(attachment: ProjectTaskAttachment) {
+  if (!currentProject.value || !editingTask.value) return
+  previewingTaskAttachment.value = attachment
+  previewingTaskId.value = editingTask.value.taskId
+  taskAttachmentPreviewVisible.value = true
 }
 
 async function handleDeleteTaskAttachment(attachment: ProjectTaskAttachment) {
