@@ -312,6 +312,12 @@ import { aiParseFollowUp, addFollowUp, uploadFollowUpAttachment } from '@/api/fo
 import type { AiFollowUpParseVO } from '@/api/followup'
 import type { FollowUpAttachmentDraft } from '@/types/customer'
 import type { Customer } from '@/types/customer'
+import {
+  canCaptureMobileAudioFile,
+  captureMobileAudioFile,
+  hasMobileAudioInputSupport,
+  requestMobileAudioStream
+} from '@/utils/mobileAudioRecording'
 
 const props = defineProps<{
   modelValue: boolean
@@ -450,8 +456,27 @@ function handleClose() {
 }
 
 async function handleStartRecording() {
+  const hasAudioInput = hasMobileAudioInputSupport()
+  const canUseFileCapture = canCaptureMobileAudioFile()
+    && (!hasAudioInput || typeof MediaRecorder === 'undefined')
+    && typeof window !== 'undefined'
+    && (window.innerWidth < 768 || window.matchMedia?.('(pointer: coarse)').matches)
+
+  if (canUseFileCapture) {
+    const capturedFile = await captureMobileAudioFile()
+    if (capturedFile) {
+      handleFile(capturedFile)
+    }
+    return
+  }
+
+  if (!hasAudioInput || typeof MediaRecorder === 'undefined') {
+    ElMessage.warning('当前浏览器不支持录音，请改用文字输入')
+    return
+  }
+
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const stream = await requestMobileAudioStream({ audio: true })
     audioChunks = []
     mediaRecorder = new MediaRecorder(stream)
 
