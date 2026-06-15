@@ -363,7 +363,6 @@ import { useChatDrawer } from '@/composables/useChatDrawer'
 import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
-import { getAiConfig } from '@/api/systemConfig'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
@@ -542,7 +541,6 @@ async function handleSend() {
   }
 
   await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs, chatStore.ragEnabled)
-  await getAiConfig()
 }
 
 function sendQuickMessage(text: string) {
