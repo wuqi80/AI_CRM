@@ -212,6 +212,23 @@ type PreviewKind =
   | 'unsupported'
   | 'none'
 
+const VueOfficeDocx = defineAsyncComponent(async () => {
+  await import('@vue-office/docx/lib/v3/index.css')
+  const module = await import('@vue-office/docx/lib/v3/index.js')
+  return module.default
+})
+
+const VueOfficeExcel = defineAsyncComponent(async () => {
+  await import('@vue-office/excel/lib/v3/index.css')
+  const module = await import('@vue-office/excel/lib/v3/index.js')
+  return module.default
+})
+
+const VueOfficePptx = defineAsyncComponent(async () => {
+  const module = await import('@vue-office/pptx/lib/v3/index.js')
+  return module.default
+})
+
 const KnowledgePdfPreview = defineAsyncComponent(async () => {
   const module = await import('@/components/knowledge/KnowledgePdfPreview.vue')
   return module.default
@@ -231,6 +248,7 @@ const emit = defineEmits<{
 const { isMobile } = useResponsive()
 
 const previewBlob = ref<Blob | null>(null)
+const officePreviewSource = ref<Blob | ArrayBuffer | null>(null)
 const mediaPreviewUrl = ref('')
 const previewKind = ref<PreviewKind>('none')
 const previewNotice = ref('')
@@ -242,13 +260,25 @@ const docIframeRef = ref<HTMLIFrameElement | null>(null)
 
 let previewLoadToken = 0
 
-const activePreviewComponent = computed(() => null)
-const previewSource = computed(() => undefined)
+const activePreviewComponent = computed(() => {
+  switch (previewKind.value) {
+    case 'docx':
+      return VueOfficeDocx
+    case 'excel':
+      return VueOfficeExcel
+    case 'pptx':
+      return VueOfficePptx
+    default:
+      return null
+  }
+})
+
+const previewSource = computed(() => officePreviewSource.value ?? undefined)
 const showImagePreview = computed(() => previewKind.value === 'image' && Boolean(mediaPreviewUrl.value) && !previewFailed.value)
 const showAudioPreview = computed(() => previewKind.value === 'audio' && Boolean(mediaPreviewUrl.value) && !previewFailed.value)
 const showVideoPreview = computed(() => previewKind.value === 'video' && Boolean(mediaPreviewUrl.value) && !previewFailed.value)
 const showPdfPreview = computed(() => previewKind.value === 'pdf' && Boolean(previewBlob.value) && !previewFailed.value)
-const showOfficePreview = computed(() => false)
+const showOfficePreview = computed(() => Boolean(activePreviewComponent.value && previewSource.value && !previewFailed.value))
 const showDocHtmlPreview = computed(() => previewKind.value === 'doc' && Boolean(docHtmlContent.value) && !previewFailed.value)
 const displayedText = computed(() => previewText.value)
 
@@ -282,6 +312,7 @@ const previewStatusLabel = computed(() => {
 
 function resetPreviewState() {
   previewBlob.value = null
+  officePreviewSource.value = null
   previewKind.value = 'none'
   previewNotice.value = ''
   previewText.value = ''
@@ -332,7 +363,7 @@ function resolvePreviewKind(filename?: string, mimeType?: string): PreviewKind {
     extension === 'docx' ||
     normalizedType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   ) {
-    return 'unsupported'
+    return 'docx'
   }
   if (
     extension === 'xlsx' ||
@@ -340,13 +371,13 @@ function resolvePreviewKind(filename?: string, mimeType?: string): PreviewKind {
     normalizedType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
     normalizedType === 'application/vnd.ms-excel'
   ) {
-    return 'unsupported'
+    return 'excel'
   }
   if (
     extension === 'pptx' ||
     normalizedType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
   ) {
-    return 'unsupported'
+    return 'pptx'
   }
   if (
     ['txt', 'md', 'markdown', 'json', 'xml', 'html', 'htm', 'csv'].includes(extension) ||
@@ -391,6 +422,7 @@ function handlePreviewRendered() {
 function handlePreviewError(error: unknown) {
   console.error('Project task attachment preview render failed:', error)
   previewBlob.value = null
+  officePreviewSource.value = null
   previewFailed.value = true
   previewNotice.value = previewNotice.value || '文件渲染失败，已切换为文本内容。'
 }
@@ -463,6 +495,11 @@ async function loadPreview(attachment: ProjectTaskAttachment) {
     }
 
     previewBlob.value = kind === 'pdf' ? fileBlob : null
+    officePreviewSource.value = kind === 'pdf'
+      ? null
+      : kind === 'pptx'
+        ? await fileBlob.arrayBuffer()
+        : fileBlob
   } catch (error) {
     console.error('Failed to load project task attachment preview:', error)
     if (currentToken !== previewLoadToken) return
