@@ -50,6 +50,32 @@ export interface ProjectTaskAttachmentPayload {
   mimeType?: string
 }
 
+export interface ProjectAttachment {
+  attachmentId: string
+  name: string
+  fileUrl?: string
+  createTime?: string
+  createdByName?: string
+}
+
+export interface ProjectSchedule {
+  scheduleId: string
+  title: string
+  scheduleTime?: string
+  createTime?: string
+  createdByName?: string
+}
+
+export interface ProjectAttachmentPayload {
+  name?: string
+  fileUrl?: string
+}
+
+export interface ProjectSchedulePayload {
+  title: string
+  scheduleTime?: string
+}
+
 export interface ProjectVO {
   projectId: string
   name: string
@@ -67,6 +93,8 @@ export interface ProjectVO {
   incompleteTaskCount?: number
   lanes?: ProjectLaneVO[]
   tasks?: ProjectTaskVO[]
+  attachments?: ProjectAttachment[]
+  schedules?: ProjectSchedule[]
 }
 
 export interface ProjectQuery {

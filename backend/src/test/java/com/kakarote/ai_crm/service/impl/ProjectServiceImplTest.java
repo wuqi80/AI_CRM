@@ -4,14 +4,18 @@ import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.BO.ProjectBO;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.Project;
+import com.kakarote.ai_crm.entity.PO.ProjectAttachment;
 import com.kakarote.ai_crm.entity.PO.ProjectLane;
+import com.kakarote.ai_crm.entity.PO.ProjectSchedule;
 import com.kakarote.ai_crm.entity.PO.ProjectTask;
 import com.kakarote.ai_crm.entity.PO.ProjectTaskAttachment;
 import com.kakarote.ai_crm.entity.VO.ProjectVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.ManageUserMapper;
+import com.kakarote.ai_crm.mapper.ProjectAttachmentMapper;
 import com.kakarote.ai_crm.mapper.ProjectLaneMapper;
 import com.kakarote.ai_crm.mapper.ProjectMapper;
+import com.kakarote.ai_crm.mapper.ProjectScheduleMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskAttachmentMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -48,6 +52,12 @@ class ProjectServiceImplTest {
     private ProjectTaskAttachmentMapper projectTaskAttachmentMapper;
 
     @Mock
+    private ProjectAttachmentMapper projectAttachmentMapper;
+
+    @Mock
+    private ProjectScheduleMapper projectScheduleMapper;
+
+    @Mock
     private ManageUserMapper manageUserMapper;
 
     @Mock
@@ -62,6 +72,8 @@ class ProjectServiceImplTest {
             projectLaneMapper,
             projectTaskMapper,
             projectTaskAttachmentMapper,
+            projectAttachmentMapper,
+            projectScheduleMapper,
             manageUserMapper,
             customerMapper
         );
@@ -131,6 +143,31 @@ class ProjectServiceImplTest {
         assertThat(saved.getFilePath()).isEqualTo("project/2001/proposal.pdf");
         assertThat(saved.getFileSize()).isEqualTo(1234L);
         assertThat(saved.getMimeType()).isEqualTo("application/pdf");
+        assertThat(saved.getCreateUserId()).isEqualTo(1001L);
+        assertThat(result.getProjectId()).isEqualTo(2001L);
+    }
+
+    @Test
+    void addProjectAttachmentStoresMetadataAndReturnsProjectDetail() {
+        when(projectMapper.selectById(2001L)).thenReturn(new Project());
+        when(projectMapper.getProjectById(2001L)).thenReturn(projectDetail(2001L));
+        when(projectLaneMapper.selectList(any())).thenReturn(List.of());
+        when(projectTaskMapper.selectProjectTasks(2001L, null)).thenReturn(List.of());
+        when(projectAttachmentMapper.selectList(any())).thenReturn(List.of());
+        when(projectScheduleMapper.selectList(any())).thenReturn(List.of());
+
+        ProjectBO.ProjectAttachmentSave attachment = new ProjectBO.ProjectAttachmentSave();
+        attachment.setName("charter.docx");
+        attachment.setFileUrl("project/2001/charter.docx");
+
+        ProjectVO result = projectService.addProjectAttachment(2001L, attachment);
+
+        ArgumentCaptor<ProjectAttachment> captor = ArgumentCaptor.forClass(ProjectAttachment.class);
+        verify(projectAttachmentMapper).insert(captor.capture());
+        ProjectAttachment saved = captor.getValue();
+        assertThat(saved.getProjectId()).isEqualTo(2001L);
+        assertThat(saved.getName()).isEqualTo("charter.docx");
+        assertThat(saved.getFileUrl()).isEqualTo("project/2001/charter.docx");
         assertThat(saved.getCreateUserId()).isEqualTo(1001L);
         assertThat(result.getProjectId()).isEqualTo(2001L);
     }

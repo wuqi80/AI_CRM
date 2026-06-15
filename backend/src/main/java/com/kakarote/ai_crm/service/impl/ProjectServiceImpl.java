@@ -11,14 +11,18 @@ import com.kakarote.ai_crm.entity.BO.ProjectBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.Project;
+import com.kakarote.ai_crm.entity.PO.ProjectAttachment;
 import com.kakarote.ai_crm.entity.PO.ProjectLane;
+import com.kakarote.ai_crm.entity.PO.ProjectSchedule;
 import com.kakarote.ai_crm.entity.PO.ProjectTask;
 import com.kakarote.ai_crm.entity.PO.ProjectTaskAttachment;
 import com.kakarote.ai_crm.entity.VO.ProjectVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.ManageUserMapper;
+import com.kakarote.ai_crm.mapper.ProjectAttachmentMapper;
 import com.kakarote.ai_crm.mapper.ProjectLaneMapper;
 import com.kakarote.ai_crm.mapper.ProjectMapper;
+import com.kakarote.ai_crm.mapper.ProjectScheduleMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskAttachmentMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
 import com.kakarote.ai_crm.service.IProjectService;
@@ -46,6 +50,8 @@ public class ProjectServiceImpl implements IProjectService {
     private final ProjectLaneMapper projectLaneMapper;
     private final ProjectTaskMapper projectTaskMapper;
     private final ProjectTaskAttachmentMapper projectTaskAttachmentMapper;
+    private final ProjectAttachmentMapper projectAttachmentMapper;
+    private final ProjectScheduleMapper projectScheduleMapper;
     private final ManageUserMapper manageUserMapper;
     private final CustomerMapper customerMapper;
 
@@ -53,12 +59,16 @@ public class ProjectServiceImpl implements IProjectService {
                               ProjectLaneMapper projectLaneMapper,
                               ProjectTaskMapper projectTaskMapper,
                               ProjectTaskAttachmentMapper projectTaskAttachmentMapper,
+                              ProjectAttachmentMapper projectAttachmentMapper,
+                              ProjectScheduleMapper projectScheduleMapper,
                               ManageUserMapper manageUserMapper,
                               CustomerMapper customerMapper) {
         this.projectMapper = projectMapper;
         this.projectLaneMapper = projectLaneMapper;
         this.projectTaskMapper = projectTaskMapper;
         this.projectTaskAttachmentMapper = projectTaskAttachmentMapper;
+        this.projectAttachmentMapper = projectAttachmentMapper;
+        this.projectScheduleMapper = projectScheduleMapper;
         this.manageUserMapper = manageUserMapper;
         this.customerMapper = customerMapper;
     }
@@ -99,6 +109,8 @@ public class ProjectServiceImpl implements IProjectService {
         List<ProjectVO.ProjectTaskVO> tasks = projectTaskMapper.selectProjectTasks(projectId, StrUtil.trimToNull(taskKeyword));
         tasks.forEach(this::fillTaskAttachments);
         project.setTasks(tasks);
+        project.setAttachments(loadProjectAttachments(projectId));
+        project.setSchedules(loadProjectSchedules(projectId));
         return project;
     }
 
@@ -184,8 +196,68 @@ public class ProjectServiceImpl implements IProjectService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public ProjectVO addProjectAttachment(Long projectId, ProjectBO.ProjectAttachmentSave attachmentBO) {
+        getProjectEntity(projectId);
+        if (attachmentBO == null || StrUtil.isAllBlank(attachmentBO.getName(), attachmentBO.getFileUrl())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment is required");
+        }
+        ProjectAttachment attachment = new ProjectAttachment();
+        attachment.setProjectId(projectId);
+        attachment.setName(StrUtil.blankToDefault(normalizeOptional(attachmentBO.getName()), normalizeOptional(attachmentBO.getFileUrl())));
+        attachment.setFileUrl(normalizeOptional(attachmentBO.getFileUrl()));
+        attachment.setCreateUserId(UserUtil.getUserId());
+        attachment.setCreateUserName(currentUserDisplayName());
+        projectAttachmentMapper.insert(attachment);
+        return getProject(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO deleteProjectAttachment(Long projectId, Long attachmentId) {
+        ProjectAttachment attachment = projectAttachmentMapper.selectById(attachmentId);
+        if (attachment == null || !Objects.equals(attachment.getProjectId(), projectId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Project attachment does not exist");
+        }
+        projectAttachmentMapper.deleteById(attachmentId);
+        return getProject(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO addProjectSchedule(Long projectId, ProjectBO.ProjectScheduleSave scheduleBO) {
+        getProjectEntity(projectId);
+        if (scheduleBO == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Schedule is required");
+        }
+        ProjectSchedule schedule = new ProjectSchedule();
+        schedule.setProjectId(projectId);
+        schedule.setTitle(requireName(scheduleBO.getTitle()));
+        schedule.setScheduleTime(scheduleBO.getScheduleTime());
+        schedule.setCreateUserId(UserUtil.getUserId());
+        schedule.setCreateUserName(currentUserDisplayName());
+        projectScheduleMapper.insert(schedule);
+        return getProject(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO deleteProjectSchedule(Long projectId, Long scheduleId) {
+        ProjectSchedule schedule = projectScheduleMapper.selectById(scheduleId);
+        if (schedule == null || !Objects.equals(schedule.getProjectId(), projectId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Project schedule does not exist");
+        }
+        projectScheduleMapper.deleteById(scheduleId);
+        return getProject(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteProject(Long projectId) {
         getProjectEntity(projectId);
+        projectAttachmentMapper.delete(Wrappers.<ProjectAttachment>lambdaQuery()
+                .eq(ProjectAttachment::getProjectId, projectId));
+        projectScheduleMapper.delete(Wrappers.<ProjectSchedule>lambdaQuery()
+                .eq(ProjectSchedule::getProjectId, projectId));
         projectTaskAttachmentMapper.delete(Wrappers.<ProjectTaskAttachment>lambdaQuery()
                 .eq(ProjectTaskAttachment::getProjectId, projectId));
         projectTaskMapper.delete(Wrappers.<ProjectTask>lambdaQuery().eq(ProjectTask::getProjectId, projectId));
@@ -324,6 +396,47 @@ public class ProjectServiceImpl implements IProjectService {
         task.setCustomerId(taskBO.getCustomerId());
         task.setCustomerName(resolveCustomerName(taskBO.getCustomerId(), taskBO.getCustomerName()));
         task.setAiSourceText(normalizeOptional(taskBO.getAiSourceText()));
+    }
+
+    private List<ProjectVO.ProjectAttachmentVO> loadProjectAttachments(Long projectId) {
+        return projectAttachmentMapper.selectList(Wrappers.<ProjectAttachment>lambdaQuery()
+                        .eq(ProjectAttachment::getProjectId, projectId)
+                        .orderByDesc(ProjectAttachment::getCreateTime)
+                        .orderByDesc(ProjectAttachment::getAttachmentId))
+                .stream()
+                .map(this::toProjectAttachmentVO)
+                .toList();
+    }
+
+    private List<ProjectVO.ProjectScheduleVO> loadProjectSchedules(Long projectId) {
+        return projectScheduleMapper.selectList(Wrappers.<ProjectSchedule>lambdaQuery()
+                        .eq(ProjectSchedule::getProjectId, projectId)
+                        .orderByDesc(ProjectSchedule::getScheduleTime)
+                        .orderByDesc(ProjectSchedule::getCreateTime)
+                        .orderByDesc(ProjectSchedule::getScheduleId))
+                .stream()
+                .map(this::toProjectScheduleVO)
+                .toList();
+    }
+
+    private ProjectVO.ProjectAttachmentVO toProjectAttachmentVO(ProjectAttachment attachment) {
+        ProjectVO.ProjectAttachmentVO vo = new ProjectVO.ProjectAttachmentVO();
+        vo.setAttachmentId(attachment.getAttachmentId());
+        vo.setName(attachment.getName());
+        vo.setFileUrl(attachment.getFileUrl());
+        vo.setCreatedByName(attachment.getCreateUserName());
+        vo.setCreateTime(attachment.getCreateTime());
+        return vo;
+    }
+
+    private ProjectVO.ProjectScheduleVO toProjectScheduleVO(ProjectSchedule schedule) {
+        ProjectVO.ProjectScheduleVO vo = new ProjectVO.ProjectScheduleVO();
+        vo.setScheduleId(schedule.getScheduleId());
+        vo.setTitle(schedule.getTitle());
+        vo.setScheduleTime(schedule.getScheduleTime());
+        vo.setCreatedByName(schedule.getCreateUserName());
+        vo.setCreateTime(schedule.getCreateTime());
+        return vo;
     }
 
     private void saveTaskAttachments(Long projectId, Long taskId, List<ProjectBO.TaskAttachmentSave> attachments) {

@@ -71,6 +71,34 @@ public class ProjectController {
         return Result.ok(projectService.restoreProject(projectId));
     }
 
+    @PostMapping("/{projectId}/attachment/add")
+    @Operation(summary = "Add project attachment")
+    public Result<ProjectVO> addProjectAttachment(@PathVariable Long projectId,
+                                                  @RequestBody ProjectBO.ProjectAttachmentSave attachmentBO) {
+        return Result.ok(projectService.addProjectAttachment(projectId, attachmentBO));
+    }
+
+    @PostMapping("/{projectId}/attachment/delete/{attachmentId}")
+    @Operation(summary = "Delete project attachment")
+    public Result<ProjectVO> deleteProjectAttachment(@PathVariable Long projectId,
+                                                     @PathVariable Long attachmentId) {
+        return Result.ok(projectService.deleteProjectAttachment(projectId, attachmentId));
+    }
+
+    @PostMapping("/{projectId}/schedule/add")
+    @Operation(summary = "Add project schedule")
+    public Result<ProjectVO> addProjectSchedule(@PathVariable Long projectId,
+                                                @Valid @RequestBody ProjectBO.ProjectScheduleSave scheduleBO) {
+        return Result.ok(projectService.addProjectSchedule(projectId, scheduleBO));
+    }
+
+    @PostMapping("/{projectId}/schedule/delete/{scheduleId}")
+    @Operation(summary = "Delete project schedule")
+    public Result<ProjectVO> deleteProjectSchedule(@PathVariable Long projectId,
+                                                   @PathVariable Long scheduleId) {
+        return Result.ok(projectService.deleteProjectSchedule(projectId, scheduleId));
+    }
+
     @PostMapping("/delete/{projectId}")
     @Operation(summary = "Delete project")
     public Result<String> delete(@PathVariable Long projectId) {

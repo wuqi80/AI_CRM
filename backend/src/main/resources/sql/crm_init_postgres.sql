@@ -297,6 +297,8 @@ COMMENT ON COLUMN crm_product.status IS 'active=enabled, inactive=disabled';
 -- ============================================
 DROP TABLE IF EXISTS crm_project_task CASCADE;
 DROP TABLE IF EXISTS crm_project_task_attachment CASCADE;
+DROP TABLE IF EXISTS crm_project_schedule CASCADE;
+DROP TABLE IF EXISTS crm_project_attachment CASCADE;
 DROP TABLE IF EXISTS crm_project_lane CASCADE;
 DROP TABLE IF EXISTS crm_project CASCADE;
 CREATE TABLE crm_project (
@@ -324,6 +326,34 @@ CREATE INDEX idx_crm_project_status ON crm_project(status);
 CREATE TRIGGER trg_project_update_time
     BEFORE UPDATE ON crm_project
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE crm_project_attachment (
+    attachment_id BIGINT NOT NULL,
+    project_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    file_url TEXT,
+    create_user_id BIGINT,
+    create_user_name VARCHAR(100),
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (attachment_id)
+);
+
+CREATE INDEX idx_crm_project_attachment_project_time
+    ON crm_project_attachment(project_id, create_time DESC);
+
+CREATE TABLE crm_project_schedule (
+    schedule_id BIGINT NOT NULL,
+    project_id BIGINT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    schedule_time TIMESTAMP,
+    create_user_id BIGINT,
+    create_user_name VARCHAR(100),
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (schedule_id)
+);
+
+CREATE INDEX idx_crm_project_schedule_project_time
+    ON crm_project_schedule(project_id, COALESCE(schedule_time, create_time) DESC);
 
 CREATE TABLE crm_project_lane (
     lane_id BIGINT NOT NULL,
@@ -400,6 +430,8 @@ CREATE INDEX idx_crm_project_task_attachment_task
     ON crm_project_task_attachment(task_id, create_time DESC);
 
 COMMENT ON TABLE crm_project IS 'Project board';
+COMMENT ON TABLE crm_project_attachment IS 'Project attachments';
+COMMENT ON TABLE crm_project_schedule IS 'Project schedules';
 COMMENT ON TABLE crm_project_lane IS 'Project board lanes';
 COMMENT ON TABLE crm_project_task IS 'Project board tasks';
 COMMENT ON TABLE crm_project_task_attachment IS 'Project task attachments';

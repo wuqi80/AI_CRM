@@ -72,6 +72,19 @@ public class ProjectBO {
     }
 
     @Data
+    public static class ProjectAttachmentSave {
+        private String name;
+        private String fileUrl;
+    }
+
+    @Data
+    public static class ProjectScheduleSave {
+        @NotBlank(message = "Schedule title is required")
+        private String title;
+        private Date scheduleTime;
+    }
+
+    @Data
     public static class TaskMove {
         @NotNull(message = "Task ID is required")
         private Long taskId;

@@ -30,6 +30,8 @@ public class ProjectVO {
     private Integer incompleteTaskCount;
     private List<ProjectLaneVO> lanes = new ArrayList<>();
     private List<ProjectTaskVO> tasks = new ArrayList<>();
+    private List<ProjectAttachmentVO> attachments = new ArrayList<>();
+    private List<ProjectScheduleVO> schedules = new ArrayList<>();
 
     @Data
     public static class ProjectLaneVO {
@@ -77,6 +79,26 @@ public class ProjectVO {
         private String filePath;
         private Long fileSize;
         private String mimeType;
+        private Date createTime;
+        private String createdByName;
+    }
+
+    @Data
+    public static class ProjectAttachmentVO {
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long attachmentId;
+        private String name;
+        private String fileUrl;
+        private Date createTime;
+        private String createdByName;
+    }
+
+    @Data
+    public static class ProjectScheduleVO {
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long scheduleId;
+        private String title;
+        private Date scheduleTime;
         private Date createTime;
         private String createdByName;
     }

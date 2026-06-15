@@ -1,9 +1,11 @@
 import { get, post } from '@/utils/request'
 import type {
   ProjectCreate,
+  ProjectAttachmentPayload,
   ProjectLaneSave,
   ProjectPageResult,
   ProjectQuery,
+  ProjectSchedulePayload,
   ProjectTaskAttachmentPayload,
   ProjectTaskMove,
   ProjectTaskSave,
@@ -33,6 +35,22 @@ export function archiveProject(projectId: string): Promise<ProjectVO> {
 
 export function restoreProject(projectId: string): Promise<ProjectVO> {
   return post(`/project/restore/${projectId}`)
+}
+
+export function addProjectAttachment(projectId: string, data: ProjectAttachmentPayload): Promise<ProjectVO> {
+  return post(`/project/${projectId}/attachment/add`, data)
+}
+
+export function deleteProjectAttachment(projectId: string, attachmentId: string): Promise<ProjectVO> {
+  return post(`/project/${projectId}/attachment/delete/${attachmentId}`)
+}
+
+export function addProjectSchedule(projectId: string, data: ProjectSchedulePayload): Promise<ProjectVO> {
+  return post(`/project/${projectId}/schedule/add`, data)
+}
+
+export function deleteProjectSchedule(projectId: string, scheduleId: string): Promise<ProjectVO> {
+  return post(`/project/${projectId}/schedule/delete/${scheduleId}`)
 }
 
 export function deleteProject(projectId: string): Promise<void> {

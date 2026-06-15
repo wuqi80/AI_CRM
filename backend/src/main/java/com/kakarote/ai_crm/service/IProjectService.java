@@ -24,6 +24,14 @@ public interface IProjectService {
 
     ProjectVO restoreProject(Long projectId);
 
+    ProjectVO addProjectAttachment(Long projectId, ProjectBO.ProjectAttachmentSave attachmentBO);
+
+    ProjectVO deleteProjectAttachment(Long projectId, Long attachmentId);
+
+    ProjectVO addProjectSchedule(Long projectId, ProjectBO.ProjectScheduleSave scheduleBO);
+
+    ProjectVO deleteProjectSchedule(Long projectId, Long scheduleId);
+
     void deleteProject(Long projectId);
 
     ProjectVO addLane(Long projectId, ProjectBO.LaneSave laneBO);
