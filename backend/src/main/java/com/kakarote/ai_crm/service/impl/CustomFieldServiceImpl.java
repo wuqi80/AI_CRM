@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +53,44 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
      * 单个实体最大自定义字段数
      */
     private static final int MAX_FIELDS_PER_ENTITY = 50;
+    private static final long OPTIONS_CACHE_TTL_MS = 60_000L;
+
+    private final Map<String, OptionsCacheEntry> optionsCache = new ConcurrentHashMap<>();
+
+    private record OptionsCacheEntry(long expireAt, List<FieldOption> options) {
+    }
+
+    private static final Map<String, List<FieldOption>> BUILTIN_FIELD_OPTIONS = Map.of(
+            optionKey("customer", "stage"), List.of(
+                    option("lead", "线索"),
+                    option("qualified", "资格审核"),
+                    option("proposal", "方案报价"),
+                    option("negotiation", "谈判中"),
+                    option("closed", "已成交"),
+                    option("lost", "已流失")
+            ),
+            optionKey("customer", "level"), List.of(
+                    option("A", "A级客户"),
+                    option("B", "B级客户"),
+                    option("C", "C级客户")
+            ),
+            optionKey("relation", "relation_type"), List.of(
+                    option("friend", "朋友"),
+                    option("family", "家人"),
+                    option("relative", "亲戚"),
+                    option("partner", "合作伙伴"),
+                    option("customer_contact", "客户联系人"),
+                    option("supplier", "供应商"),
+                    option("investor", "投资人"),
+                    option("other", "其他")
+            ),
+            optionKey("relation", "source"), List.of(
+                    option("manual", "手动创建"),
+                    option("customer", "客户转化"),
+                    option("import", "导入"),
+                    option("other", "其他")
+            )
+    );
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -91,6 +130,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         field.setSortOrder(bo.getSortOrder() != null ? bo.getSortOrder() : 0);
         field.setStatus(1);
         save(field);
+        evictOptionsCache();
 
         return field.getFieldId();
     }
@@ -136,6 +176,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }
 
         updateById(field);
+        evictOptionsCache();
     }
 
     @Override
@@ -170,6 +211,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
 
         // 仅删除元数据，物理列保留在字段池中供其他租户或未来复用
         removeById(fieldId);
+        evictOptionsCache();
 
         // 清理该字段的所有用户排序记录
         customFieldSortService.removeByFieldId(fieldId);
@@ -331,6 +373,45 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         validateUniqueCustomFieldValues(entityType, entityId, values);
     }
 
+    @Override
+    public List<FieldOption> getFieldOptions(String entityType, String fieldName) {
+        if (StrUtil.isBlank(entityType) || StrUtil.isBlank(fieldName)) {
+            return Collections.emptyList();
+        }
+        String key = optionKey(entityType, fieldName);
+        OptionsCacheEntry cached = optionsCache.get(key);
+        if (cached != null && cached.expireAt() >= System.currentTimeMillis()) {
+            return cached.options();
+        }
+
+        CustomField field = getOne(new LambdaQueryWrapper<CustomField>()
+                .eq(CustomField::getEntityType, entityType)
+                .eq(CustomField::getFieldName, fieldName)
+                .eq(CustomField::getStatus, 1)
+                .last("LIMIT 1"), false);
+        List<FieldOption> options = field != null && StrUtil.isNotBlank(field.getOptions())
+                ? JSON.parseArray(field.getOptions(), FieldOption.class)
+                : builtinOptions(entityType, fieldName);
+        if (options == null) {
+            options = Collections.emptyList();
+        }
+        optionsCache.put(key, new OptionsCacheEntry(System.currentTimeMillis() + OPTIONS_CACHE_TTL_MS, options));
+        return options;
+    }
+
+    @Override
+    public String resolveOptionLabel(String entityType, String fieldName, String value) {
+        if (StrUtil.isBlank(value)) {
+            return value;
+        }
+        for (FieldOption option : getFieldOptions(entityType, fieldName)) {
+            if (option != null && StrUtil.equals(option.getValue(), value)) {
+                return StrUtil.blankToDefault(option.getLabel(), value);
+            }
+        }
+        return value;
+    }
+
     private void validateUniqueCustomFieldValue(String tableName,
                                                 String idColumn,
                                                 Long entityId,
@@ -456,6 +537,25 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             log.warn("自定义字段值转换失败: field={}, type={}, value={}, error={}", fieldName, fieldType, val, e.getMessage());
             return null;
         }
+    }
+
+    private List<FieldOption> builtinOptions(String entityType, String fieldName) {
+        return BUILTIN_FIELD_OPTIONS.getOrDefault(optionKey(entityType, fieldName), Collections.emptyList());
+    }
+
+    private void evictOptionsCache() {
+        optionsCache.clear();
+    }
+
+    private static String optionKey(String entityType, String fieldName) {
+        return StrUtil.blankToDefault(entityType, "") + ":" + StrUtil.blankToDefault(fieldName, "");
+    }
+
+    private static FieldOption option(String value, String label) {
+        FieldOption option = new FieldOption();
+        option.setValue(value);
+        option.setLabel(label);
+        return option;
     }
 
     /**

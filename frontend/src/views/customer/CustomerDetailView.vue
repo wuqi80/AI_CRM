@@ -341,7 +341,7 @@
                       'bg-blue-50 text-blue-600': customer.level === 'B',
                       'bg-slate-100 text-slate-500': customer.level === 'C'
                     }"
-                  >{{ customer.level }}级</span>
+                  >{{ getLevelLabel(customer.level) }}</span>
                 </div>
                 <div>
                   <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">主要联系人</p>
@@ -884,6 +884,7 @@
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
+import { useEnumStore } from '@/stores/enums'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
@@ -910,6 +911,7 @@ import { appEvents, APP_EVENT } from '@/utils/events'
 const route = useRoute()
 const router = useRouter()
 const customerStore = useCustomerStore()
+const enumStore = useEnumStore()
 const userStore = useUserStore()
 const { isMobile } = useResponsive()
 const CUSTOMER_DETAIL_REQUEST_LIMIT = 100
@@ -1126,6 +1128,8 @@ onMounted(async () => {
     followUpForm.customerId = customerId
 
     const fetchTasks: Promise<any>[] = [
+      enumStore.ensureCustomerLevel(),
+      enumStore.ensureCustomerStage(),
       customerStore.fetchCustomerDetail(customerId).catch(err => {
         console.error('Failed to fetch customer detail:', err)
       }),
@@ -1608,11 +1612,11 @@ function getStageBadgeClass(stage: string): string {
 }
 
 function getStageLabel(stage: string): string {
-  const labels: Record<string, string> = {
-    lead: '线索', qualified: '已验证', proposal: '方案',
-    negotiation: '谈判', closed: '成交', lost: '流失'
-  }
-  return labels[stage] || stage
+  return enumStore.stageLabel(stage) || stage
+}
+
+function getLevelLabel(level?: string): string {
+  return level ? enumStore.levelLabel(level) || level : '-'
 }
 
 function getStageIndex(stage: string): number {
@@ -1642,7 +1646,7 @@ const STEPPER_CHEVRON_SIZE = 12
 const STEPPER_END_RADIUS = STEPPER_SEGMENT_HEIGHT / 2
 
 function getStageLabelFull(stage: string): string {
-  return stageOptions.find(s => s.value === stage)?.label || stage
+  return enumStore.stageLabel(stage) || stageOptions.find(s => s.value === stage)?.label || stage
 }
 
 function getStepperClipPath(idx: number): string {

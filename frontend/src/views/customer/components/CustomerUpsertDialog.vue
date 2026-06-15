@@ -139,20 +139,23 @@
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">客户级别</label>
                       <el-select v-model="formData.level" class="w-full wk-crm-el-field-select" size="large">
-                        <el-option label="A级客户" value="A" />
-                        <el-option label="B级客户" value="B" />
-                        <el-option label="C级客户" value="C" />
+                        <el-option
+                          v-for="option in enumStore.customerLevel"
+                          :key="option.value"
+                          :label="option.label"
+                          :value="option.value"
+                        />
                       </el-select>
                     </div>
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">商机阶段</label>
                       <el-select v-model="formData.stage" class="w-full wk-crm-el-field-select" size="large">
-                        <el-option label="线索" value="lead" />
-                        <el-option label="资格审查" value="qualified" />
-                        <el-option label="方案报价" value="proposal" />
-                        <el-option label="谈判中" value="negotiation" />
-                        <el-option label="已成交" value="closed" />
-                        <el-option label="已流失" value="lost" />
+                        <el-option
+                          v-for="option in enumStore.customerStage"
+                          :key="option.value"
+                          :label="option.label"
+                          :value="option.value"
+                        />
                       </el-select>
                     </div>
                     <div class="space-y-1.5">
@@ -261,10 +264,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { useCustomerStore } from '@/stores/customer'
+import { useEnumStore } from '@/stores/enums'
 import { aiParseCustomer, uploadCustomerLogo } from '@/api/customer'
 import type { CustomerAiParseVO } from '@/api/customer'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
@@ -290,6 +294,7 @@ const emit = defineEmits<{
 
 const { isMobile } = useResponsive()
 const customerStore = useCustomerStore()
+const enumStore = useEnumStore()
 
 const isEdit = computed(() => props.mode === 'edit')
 
@@ -323,6 +328,11 @@ const aiParsing = ref(false)
 const aiParseResult = ref<CustomerAiParseVO | null>(null)
 const aiImageFile = ref<File | null>(null)
 const aiImagePreview = ref<string | null>(null)
+
+onMounted(() => {
+  void enumStore.ensureCustomerLevel()
+  void enumStore.ensureCustomerStage()
+})
 
 function getPrimaryContactFromCustomer(c: CustomerLike): { name?: string; phone?: string; email?: string } {
   if (!c) return {}
@@ -474,8 +484,12 @@ async function handleAiExtract() {
 
     if (result.companyName) formData.companyName = result.companyName
     if (result.industry) formData.industry = result.industry
-    if (result.level && ['A', 'B', 'C'].includes(result.level)) formData.level = result.level as CustomerLevel
-    if (result.stage && ['lead', 'qualified', 'proposal', 'negotiation', 'closed', 'lost'].includes(result.stage)) formData.stage = result.stage as CustomerStage
+    if (result.level && enumStore.customerLevel.some(option => option.value === result.level)) {
+      formData.level = result.level as CustomerLevel
+    }
+    if (result.stage && enumStore.customerStage.some(option => option.value === result.stage)) {
+      formData.stage = result.stage as CustomerStage
+    }
     if (result.source) formData.source = result.source
     if (result.remark) formData.remark = result.remark
     if (result.contactName) formData.contactName = result.contactName

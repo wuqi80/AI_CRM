@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.entity.BO.CustomFieldAddBO;
 import com.kakarote.ai_crm.entity.BO.CustomFieldUpdateBO;
+import com.kakarote.ai_crm.entity.BO.FieldOption;
 import com.kakarote.ai_crm.entity.BO.FieldSortBO;
 import com.kakarote.ai_crm.entity.PO.CustomField;
 import com.kakarote.ai_crm.entity.VO.CustomFieldVO;
@@ -95,6 +96,10 @@ public interface ICustomFieldService extends IService<CustomField> {
     void validateUniqueCustomFieldValues(String entityType, Long entityId, Map<String, Object> values);
 
     void validateUniqueFieldValue(String entityType, Long entityId, String fieldName, Object value);
+
+    List<FieldOption> getFieldOptions(String entityType, String fieldName);
+
+    String resolveOptionLabel(String entityType, String fieldName, String value);
 
     /**
      * 批量获取实体的自定义字段值

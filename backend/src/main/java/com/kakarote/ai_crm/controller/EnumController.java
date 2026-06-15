@@ -1,15 +1,19 @@
 package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.result.Result;
+import com.kakarote.ai_crm.entity.BO.FieldOption;
 import com.kakarote.ai_crm.entity.VO.EnumVO;
+import com.kakarote.ai_crm.service.ICustomFieldService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 枚举值控制器
@@ -19,27 +23,46 @@ import java.util.List;
 @Tag(name = "枚举值接口")
 public class EnumController {
 
+    private static final String DEFAULT_COLOR = "#6b7280";
+    private static final Map<String, String> STAGE_COLORS = Map.of(
+            "lead", "#6b7280",
+            "qualified", "#3b82f6",
+            "proposal", "#f59e0b",
+            "negotiation", "#8b5cf6",
+            "closed", "#22c55e",
+            "lost", "#ef4444"
+    );
+    private static final Map<String, String> LEVEL_COLORS = Map.of(
+            "A", "#22c55e",
+            "B", "#3b82f6",
+            "C", "#6b7280"
+    );
+
+    @Autowired
+    private ICustomFieldService customFieldService;
+
     @GetMapping("/customerStage")
     @Operation(summary = "客户阶段枚举")
     public Result<List<EnumVO>> customerStage() {
-        return Result.ok(Arrays.asList(
-            new EnumVO("lead", "线索", "新获取的潜在客户", "#6b7280"),
-            new EnumVO("qualified", "已验证", "经过初步沟通确认有意向", "#3b82f6"),
-            new EnumVO("proposal", "方案阶段", "已提供解决方案或报价", "#f59e0b"),
-            new EnumVO("negotiation", "商务谈判", "正在进行商务条款协商", "#8b5cf6"),
-            new EnumVO("closed", "已成交", "成功签约的客户", "#22c55e"),
-            new EnumVO("lost", "已流失", "未能成交或终止合作", "#ef4444")
-        ));
+        return Result.ok(toEnumList("customer", "stage", STAGE_COLORS));
     }
 
     @GetMapping("/customerLevel")
     @Operation(summary = "客户级别枚举")
     public Result<List<EnumVO>> customerLevel() {
-        return Result.ok(Arrays.asList(
-            new EnumVO("A", "A级客户", "重要战略客户", "#22c55e"),
-            new EnumVO("B", "B级客户", "普通合作客户", "#3b82f6"),
-            new EnumVO("C", "C级客户", "一般潜在客户", "#6b7280")
-        ));
+        return Result.ok(toEnumList("customer", "level", LEVEL_COLORS));
+    }
+
+    @GetMapping("/relationType")
+    @Operation(summary = "关系类型枚举")
+    public Result<List<EnumVO>> relationType() {
+        return Result.ok(toEnumList("relation", "relation_type", Map.of()));
+    }
+
+    @GetMapping("/relationSource")
+    @Operation(summary = "关系来源枚举")
+    public Result<List<EnumVO>> relationSource() {
+        return Result.ok(toEnumList("relation", "source", Map.of()));
     }
 
     @GetMapping("/taskStatus")
@@ -86,5 +109,22 @@ public class EnumController {
             new EnumVO("proposal", "方案", "解决方案文档", "#f59e0b"),
             new EnumVO("contract", "合同", "合同文档", "#ef4444")
         ));
+    }
+
+    private List<EnumVO> toEnumList(String entityType, String fieldName, Map<String, String> colors) {
+        return customFieldService.getFieldOptions(entityType, fieldName).stream()
+                .filter(option -> option != null && option.getValue() != null)
+                .map(option -> toEnum(option, colors))
+                .toList();
+    }
+
+    private EnumVO toEnum(FieldOption option, Map<String, String> colors) {
+        String value = option.getValue();
+        return new EnumVO(
+                value,
+                option.getLabel() == null ? value : option.getLabel(),
+                null,
+                colors.getOrDefault(value, DEFAULT_COLOR)
+        );
     }
 }

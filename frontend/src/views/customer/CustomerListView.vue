@@ -204,7 +204,7 @@
                       'bg-blue-50 text-blue-600': row.level === 'B',
                       'bg-slate-100 text-slate-500': row.level === 'C'
                     }"
-                  >{{ row.level }}级</span>
+                  >{{ getLevelLabel(row.level) }}</span>
                   <span v-else class="text-slate-300">-</span>
                 </template>
               </el-table-column>
@@ -413,6 +413,7 @@
 import { ref, computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
+import { useEnumStore } from '@/stores/enums'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type {
@@ -444,6 +445,7 @@ import { formatCustomFieldValue, getCustomFieldCheckboxState } from '@/utils/cus
 const router = useRouter()
 const route = useRoute()
 const customerStore = useCustomerStore()
+const enumStore = useEnumStore()
 const { isMobile } = useResponsive()
 const pageRootRef = ref<HTMLElement | null>(null)
 const tableCardRef = ref<HTMLElement | null>(null)
@@ -856,6 +858,8 @@ onMounted(async () => {
   customerStore.queryParams.page = getCustomerListPageFromRouteQuery()
 
   await Promise.all([
+    enumStore.ensureCustomerLevel(),
+    enumStore.ensureCustomerStage(),
     loadListCustomFields(),
     customerStore.fetchCustomerList(false)
   ])
@@ -936,15 +940,11 @@ function handleRowClick(row: CustomerListVO) {
 }
 
 function getStageLabel(stage: string): string {
-  const labels: Record<string, string> = {
-    lead: '线索',
-    qualified: '资格审查',
-    proposal: '方案报价',
-    negotiation: '谈判中',
-    closed: '已成交',
-    lost: '已流失'
-  }
-  return labels[stage] || stage
+  return enumStore.stageLabel(stage) || stage
+}
+
+function getLevelLabel(level: string): string {
+  return enumStore.levelLabel(level) || level
 }
 
 function getStageBadgeClass(stage: string): string {
