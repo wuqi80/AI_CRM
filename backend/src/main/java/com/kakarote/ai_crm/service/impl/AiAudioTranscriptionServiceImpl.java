@@ -11,6 +11,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
@@ -23,9 +24,15 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalDouble;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -33,14 +40,23 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
 
     private static final String OPENAI_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
     private static final String DASHSCOPE_TRANSCRIPTION_MODEL = "qwen3-asr-flash";
+    private static final long DASHSCOPE_MAX_AUDIO_SECONDS = 300L;
     private static final String OPENAI_TRANSCRIPTION_PROMPT =
         "Please transcribe the audio accurately as Simplified Chinese text. Return only the transcript.";
     private static final String UNSUPPORTED_PROVIDER_MESSAGE =
         "The current model does not support audio transcription. Please configure OpenAI or DashScope.";
+    private static final String DASHSCOPE_DURATION_UNSUPPORTED_MESSAGE =
+        "仅支持 5 分钟以内音频的AI分析";
 
     @Lazy
     @Autowired
     private DynamicChatClientProvider chatClientProvider;
+
+    @Value("${media-analysis.ffprobe.path:ffprobe}")
+    private String ffprobePath;
+
+    @Value("${media-analysis.audio.probe-timeout-seconds:10}")
+    private long audioProbeTimeoutSeconds;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final WebClient webClient = WebClient.builder().build();
@@ -82,7 +98,7 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
         try {
             String transcript = switch (providerCode) {
                 case "openai" -> transcribeWithOpenAi(runtimeConfig, audioBytes, filename, contentType);
-                case "dashscope" -> transcribeWithDashscope(runtimeConfig, audioBytes, contentType);
+                case "dashscope" -> transcribeWithDashscope(runtimeConfig, audioBytes, filename, contentType);
                 default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, UNSUPPORTED_PROVIDER_MESSAGE);
             };
             if (StrUtil.isBlank(transcript)) {
@@ -126,7 +142,10 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
 
     private String transcribeWithDashscope(DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig,
                                            byte[] audioBytes,
+                                           String filename,
                                            String contentType) {
+        ensureDashscopeAudioWithinDuration(audioBytes, filename);
+
         String endpoint = DynamicChatClientProvider.resolveActualRequestBaseUrl(
             runtimeConfig.providerCode(),
             runtimeConfig.apiUrl()
@@ -159,6 +178,75 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
             .block();
 
         return extractDashscopeTranscript(response);
+    }
+
+    private void ensureDashscopeAudioWithinDuration(byte[] audioBytes, String filename) {
+        OptionalDouble durationSeconds = probeAudioDurationSeconds(audioBytes, filename);
+        if (durationSeconds.isPresent() && durationSeconds.getAsDouble() > DASHSCOPE_MAX_AUDIO_SECONDS) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, DASHSCOPE_DURATION_UNSUPPORTED_MESSAGE);
+        }
+    }
+
+    private OptionalDouble probeAudioDurationSeconds(byte[] audioBytes, String filename) {
+        Path tempFile = null;
+        try {
+            tempFile = Files.createTempFile("aicrm-asr-", resolveAudioSuffix(filename));
+            Files.write(tempFile, audioBytes);
+            List<String> command = List.of(
+                StrUtil.blankToDefault(ffprobePath, "ffprobe").trim(),
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                tempFile.toString()
+            );
+            Process process = new ProcessBuilder(command)
+                .redirectErrorStream(true)
+                .start();
+            Duration timeout = Duration.ofSeconds(Math.max(1L, audioProbeTimeoutSeconds));
+            boolean finished = process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                log.warn("Audio duration probe timed out: file={}", filename);
+                return OptionalDouble.empty();
+            }
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+            if (process.exitValue() != 0) {
+                log.warn("Audio duration probe failed: file={}, output={}", filename, output);
+                return OptionalDouble.empty();
+            }
+            double seconds = Double.parseDouble(output);
+            return seconds > 0 ? OptionalDouble.of(seconds) : OptionalDouble.empty();
+        } catch (IOException ex) {
+            log.warn("Audio duration probe unavailable, skip pre-check: {}", ex.getMessage());
+            return OptionalDouble.empty();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Audio duration probe interrupted");
+        } catch (Exception ex) {
+            log.warn("Audio duration probe failed, skip pre-check: {}", ex.getMessage());
+            return OptionalDouble.empty();
+        } finally {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (IOException ex) {
+                    log.debug("Failed to delete temporary audio probe file: {}", tempFile, ex);
+                }
+            }
+        }
+    }
+
+    private String resolveAudioSuffix(String filename) {
+        if (StrUtil.isBlank(filename)) {
+            return ".audio";
+        }
+        String actualFilename = filename.trim();
+        int dotIndex = actualFilename.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == actualFilename.length() - 1) {
+            return ".audio";
+        }
+        String extension = actualFilename.substring(dotIndex + 1).replaceAll("[^A-Za-z0-9]", "");
+        return StrUtil.isBlank(extension) ? ".audio" : "." + extension;
     }
 
     private ByteArrayResource asResource(byte[] data, String filename) {
