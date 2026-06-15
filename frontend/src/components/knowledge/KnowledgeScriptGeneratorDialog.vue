@@ -263,7 +263,10 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
-import { queryKnowledgeList, streamKnowledgeTargetedScript } from '@/api/knowledge'
+import {
+  queryKnowledgeList,
+  streamKnowledgeTargetedScript
+} from '@/api/knowledge'
 import { queryCustomerList } from '@/api/customer'
 import type { Knowledge } from '@/types/common'
 import type { CustomerListVO } from '@/types/customer'
@@ -316,7 +319,9 @@ const generateDisabled = computed(() => {
     || !selectedCustomerId.value
 })
 
-const renderedResult = computed(() => renderMarkdown(result.value?.content || ''))
+const renderedResult = computed(() => renderMarkdown(result.value?.content || '', {
+  streaming: generating.value
+}))
 
 watch(
   () => props.modelValue,
@@ -562,54 +567,8 @@ function formatDate(value?: string): string {
 <style scoped>
 .line-clamp-2 {
   display: -webkit-box;
-  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.wk-markdown :deep(p) {
-  margin: 0 0 0.75rem;
-}
-
-.wk-markdown :deep(p:last-child) {
-  margin-bottom: 0;
-}
-
-.wk-markdown :deep(ul),
-.wk-markdown :deep(ol) {
-  margin: 0.5rem 0 0.75rem;
-  padding-left: 1.25rem;
-}
-
-.wk-markdown :deep(ul) {
-  list-style: disc;
-}
-
-.wk-markdown :deep(ol) {
-  list-style: decimal;
-}
-
-.wk-markdown :deep(strong) {
-  color: #0f172a;
-  font-weight: 700;
-}
-
-.fade-enter-active,
-.fade-leave-active,
-.scale-fade-enter-active,
-.scale-fade-leave-active {
-  transition: all 0.18s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.scale-fade-enter-from,
-.scale-fade-leave-to {
-  opacity: 0;
-  transform: scale(0.98);
 }
 </style>

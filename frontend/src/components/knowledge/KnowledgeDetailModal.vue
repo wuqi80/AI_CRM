@@ -1,85 +1,90 @@
 <template>
   <Teleport to="body">
-    <!-- Backdrop -->
     <Transition name="fade">
       <div
         v-if="modelValue"
-        class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150]"
+        class="fixed inset-0 z-[3600] bg-slate-900/60 backdrop-blur-sm"
         @click="close"
       />
     </Transition>
 
-    <!-- Modal -->
     <Transition name="scale-fade">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[151] flex items-center justify-center p-4"
+        class="fixed inset-0 z-[3601] flex items-center justify-center p-4"
       >
         <div
           :class="[
-            'w-full bg-white shadow-2xl overflow-hidden flex',
-            isMobile ? 'h-full rounded-none' : 'max-w-5xl h-[90vh] rounded-[2.5rem]'
+            'flex w-full overflow-hidden bg-white shadow-2xl',
+            isMobile ? 'h-full rounded-none' : 'h-[90vh] max-w-5xl rounded-[2.5rem]'
           ]"
           @click.stop
         >
-          <!-- Mobile Tab Bar -->
-          <div v-if="isMobile" class="absolute top-0 left-0 right-0 z-10 flex items-center bg-white border-b border-slate-200 px-4 h-12">
-            <div class="flex gap-1 flex-1">
+          <div
+            v-if="isMobile"
+            class="absolute left-0 right-0 top-0 z-10 flex h-12 items-center border-b border-slate-200 bg-white px-4"
+          >
+            <div class="flex flex-1 gap-1">
               <button
-                v-for="tab in [{ key: 'document', label: '文档内容' }, { key: 'ai', label: 'AI 助手' }]"
+                v-for="tab in mobileTabs"
                 :key="tab.key"
                 :class="[
-                  'px-4 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  'rounded-full px-4 py-1.5 text-xs font-medium transition-colors',
                   mobileTab === tab.key
                     ? 'bg-primary text-white'
                     : 'text-slate-500 hover:bg-slate-100'
                 ]"
-                @click="mobileTab = tab.key as 'document' | 'ai'"
+                @click="mobileTab = tab.key"
               >
                 {{ tab.label }}
               </button>
             </div>
             <button
-              class="size-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400"
+              class="flex size-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
               @click="close"
             >
               <span class="material-symbols-outlined text-lg">close</span>
             </button>
           </div>
 
-          <!-- Left Panel: Document Preview -->
           <div
             v-show="!isMobile || mobileTab === 'document'"
             :class="[
-              'flex flex-col overflow-hidden border-r border-slate-100',
-              isMobile ? 'flex-1 pt-12' : 'flex-1'
+              'flex flex-1 flex-col overflow-hidden border-r border-slate-100',
+              isMobile ? 'pt-12' : ''
             ]"
           >
-            <!-- Header -->
-            <div class="flex items-center justify-between p-6 pb-4 border-b border-slate-100 shrink-0">
-              <div class="flex items-center gap-3 min-w-0">
+            <div class="flex shrink-0 items-center justify-between border-b border-slate-100 p-6 pb-4">
+              <div class="flex min-w-0 items-center gap-3">
                 <div
                   :class="[
-                    'size-10 rounded-xl flex items-center justify-center shrink-0',
+                    'flex size-10 shrink-0 items-center justify-center rounded-xl',
                     getTypeIconBg(knowledge?.type)
                   ]"
                 >
-                  <span class="material-symbols-outlined text-lg" :style="{ color: getTypeIconColor(knowledge?.type) }">
+                  <span
+                    class="material-symbols-outlined text-lg"
+                    :style="{ color: getTypeIconColor(knowledge?.type) }"
+                  >
                     {{ getTypeIcon(knowledge?.type) }}
                   </span>
                 </div>
                 <div class="min-w-0">
-                  <h3 class="text-base font-bold text-slate-900 truncate">{{ knowledge?.name || '加载中...' }}</h3>
-                  <p class="text-xs text-slate-400 font-medium tracking-wide">
+                  <h3 class="truncate text-base font-bold text-slate-900">
+                    {{ knowledge?.name || '加载中...' }}
+                  </h3>
+                  <p class="text-xs font-medium tracking-wide text-slate-400">
                     更新于 {{ formatDate(knowledge?.createTime) }}
-                    <span v-if="knowledge?.fileSize" class="ml-2">{{ formatFileSize(knowledge.fileSize) }}</span>
+                    <span v-if="knowledge?.fileSize" class="ml-2">
+                      {{ formatFileSize(knowledge.fileSize) }}
+                    </span>
                   </p>
                 </div>
               </div>
-              <div class="flex items-center gap-2 shrink-0">
+              <div class="flex shrink-0 items-center gap-2">
                 <button
                   v-if="knowledge"
-                  class="size-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                  class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100"
                   title="下载文件"
                   @click="handleDownload"
                 >
@@ -87,7 +92,7 @@
                 </button>
                 <button
                   v-if="!isMobile"
-                  class="size-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                  class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100"
                   @click="close"
                 >
                   <span class="material-symbols-outlined text-lg">close</span>
@@ -95,47 +100,124 @@
               </div>
             </div>
 
-            <!-- Document Content -->
-            <div class="flex-1 overflow-hidden relative">
-              <!-- Loading -->
-              <div v-if="loadingDetail" class="absolute inset-0 flex items-center justify-center bg-white">
-                <span class="material-symbols-outlined text-3xl text-slate-300 animate-spin">progress_activity</span>
+            <div class="relative flex-1 overflow-hidden">
+              <div
+                v-if="loadingDetail"
+                class="absolute inset-0 flex items-center justify-center bg-white"
+              >
+                <span class="material-symbols-outlined animate-spin text-3xl text-slate-300">
+                  progress_activity
+                </span>
               </div>
 
-              <!-- Native video preview -->
-              <video
-                v-else-if="previewUrl && !previewFailed && isVideoPreview()"
-                :src="previewUrl"
-                class="size-full bg-black object-contain"
-                controls
-                playsinline
-                @error="previewFailed = true"
-              />
+              <div
+                v-else-if="showImagePreview"
+                class="media-preview-shell media-preview-shell--image h-full overflow-auto bg-slate-950"
+              >
+                <img
+                  :src="mediaPreviewUrl || undefined"
+                  :alt="knowledge?.name"
+                  class="media-preview-image"
+                >
+              </div>
 
-              <!-- Iframe preview -->
-              <iframe
-                v-else-if="previewUrl && !previewFailed"
-                :src="previewUrl"
-                class="w-full h-full border-0"
-                @error="previewFailed = true"
-              />
+              <div
+                v-else-if="showAudioPreview"
+                class="media-preview-shell flex h-full items-center justify-center bg-slate-950 p-6"
+              >
+                <audio
+                  :src="mediaPreviewUrl || undefined"
+                  controls
+                  preload="metadata"
+                  class="w-full max-w-3xl"
+                  @error="handleMediaPreviewError"
+                />
+              </div>
 
-              <!-- Fallback: plain text -->
+              <div
+                v-else-if="showVideoPreview"
+                class="media-preview-shell flex h-full items-center justify-center bg-slate-950 p-6"
+              >
+                <video
+                  :src="mediaPreviewUrl || undefined"
+                  controls
+                  preload="metadata"
+                  class="media-preview-video"
+                  @error="handleMediaPreviewError"
+                />
+              </div>
+
+              <div
+                v-else-if="showPdfPreview"
+                class="pdf-preview-shell h-full overflow-auto bg-white"
+              >
+                <KnowledgePdfPreview
+                  :blob="previewBlob"
+                  class="pdf-preview-viewer min-h-full"
+                  @rendered="handlePreviewRendered"
+                  @error="handlePreviewError"
+                />
+              </div>
+
+              <div
+                v-else-if="showOfficePreview"
+                :class="[
+                  'office-preview-shell h-full overflow-auto',
+                  'bg-slate-100',
+                  previewKind === 'pptx' ? 'office-preview-shell--pptx' : ''
+                ]"
+              >
+                <component
+                  :is="activePreviewComponent"
+                  :src="previewSource"
+                  :class="[
+                    'office-preview-viewer min-h-full',
+                    previewKind === 'pptx' ? 'office-preview-viewer--pptx' : ''
+                  ]"
+                  @rendered="handlePreviewRendered"
+                  @error="handlePreviewError"
+                />
+              </div>
+
+              <div
+                v-else-if="showDocHtmlPreview"
+                class="doc-html-preview-shell h-full overflow-auto bg-white"
+              >
+                <iframe
+                  ref="docIframeRef"
+                  sandbox="allow-same-origin"
+                  class="h-full w-full border-0"
+                  title="Document preview"
+                />
+              </div>
+
               <div v-else class="h-full overflow-y-auto p-6">
-                <div v-if="previewFailed" class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2">
-                  <span class="material-symbols-outlined text-amber-500 text-sm">info</span>
-                  <span class="text-xs text-amber-700">预览服务不可用，显示文本内容</span>
-                </div>
                 <div
-                  v-if="knowledge?.contentText"
-                  class="text-slate-700 leading-relaxed whitespace-pre-wrap text-sm"
-                >{{ knowledge.contentText }}</div>
-                <div v-else class="flex flex-col items-center justify-center h-full text-slate-400">
-                  <span class="material-symbols-outlined text-4xl mb-2">description</span>
-                  <p class="text-sm">暂无可预览的文本内容</p>
+                  v-if="previewNotice || previewFailed"
+                  class="mb-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3"
+                >
+                  <span class="material-symbols-outlined text-sm text-amber-500">info</span>
+                  <span class="text-xs text-amber-700">
+                    {{ previewNotice || '预览不可用，已显示可读取的文本内容。' }}
+                  </span>
+                </div>
+
+                <div
+                  v-if="displayedText"
+                  class="whitespace-pre-wrap text-sm leading-relaxed text-slate-700"
+                >
+                  {{ displayedText }}
+                </div>
+
+                <div
+                  v-else
+                  class="flex h-full flex-col items-center justify-center text-slate-400"
+                >
+                  <span class="material-symbols-outlined mb-2 text-4xl">description</span>
+                  <p class="text-sm">当前文件暂无可直接展示的内容</p>
                   <button
                     v-if="knowledge"
-                    class="mt-3 px-4 py-2 bg-primary text-white rounded-xl text-xs hover:bg-primary/90 transition-colors"
+                    class="mt-3 rounded-xl bg-primary px-4 py-2 text-xs text-white transition-colors hover:bg-primary/90"
                     @click="handleDownload"
                   >
                     下载文件查看
@@ -145,81 +227,112 @@
             </div>
           </div>
 
-          <!-- Right Panel: AI Assistant -->
           <div
             v-show="!isMobile || mobileTab === 'ai'"
             :class="[
-              'bg-slate-50 flex flex-col',
+              'flex flex-col bg-slate-50',
               isMobile ? 'flex-1 pt-12' : 'w-80'
             ]"
           >
-            <!-- AI Header -->
-            <div class="p-5 border-b border-slate-200 bg-white shrink-0">
-              <div class="flex items-center gap-2 text-primary mb-1">
+            <div class="shrink-0 border-b border-slate-200 bg-white p-5">
+              <div class="mb-1 flex items-center gap-2 text-primary">
                 <WkIcon name="ai" class="text-sm" />
                 <span class="text-xs font-bold uppercase tracking-widest">AI 智能助手</span>
               </div>
-              <p class="text-xs text-slate-400 font-medium">
-                {{ loadingAnalysis ? '正在为您分析文档内容...' : (isStreaming ? '正在思考中...' : '分析完成，可向AI提问') }}
+              <p class="text-xs font-medium text-slate-400">
+                {{ analysisStatusText }}
+              </p>
+              <button
+                v-if="knowledge"
+                class="mt-3 rounded-full border border-primary/15 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="loadingAnalysis"
+                @click="handleAnalyze"
+              >
+                {{ analysis ? '重新分析' : '开始分析' }}
+              </button>
+              <p v-if="false" class="text-xs font-medium text-slate-400">
+                {{ loadingAnalysis ? '正在为您分析文档内容...' : (isStreaming ? '正在思考中...' : '分析完成，可向 AI 提问') }}
               </p>
             </div>
 
-            <!-- Scrollable Analysis + Chat -->
-            <div ref="scrollContainerRef" class="flex-1 overflow-y-auto p-5 space-y-6">
-              <!-- Loading skeleton -->
+            <div ref="scrollContainerRef" class="flex-1 space-y-6 overflow-y-auto p-5">
               <div v-if="loadingAnalysis" class="space-y-6">
                 <div v-for="i in 3" :key="i" class="space-y-3">
-                  <div class="h-3 w-16 bg-slate-200 rounded animate-pulse"></div>
-                  <div class="p-4 bg-white border border-slate-200 rounded-2xl space-y-2">
-                    <div class="h-3 bg-slate-100 rounded animate-pulse"></div>
-                    <div class="h-3 bg-slate-100 rounded animate-pulse w-3/4"></div>
+                  <div class="h-3 w-16 animate-pulse rounded bg-slate-200" />
+                  <div class="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+                    <div class="h-3 animate-pulse rounded bg-slate-100" />
+                    <div class="h-3 w-3/4 animate-pulse rounded bg-slate-100" />
                   </div>
                 </div>
               </div>
 
               <template v-else>
-                <!-- Core Highlights -->
-                <section>
-                  <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">核心提炼</h4>
-                  <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
-                    <p class="text-xs text-slate-600 leading-relaxed italic">
+                <div
+                  v-if="analysisError"
+                  class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-700"
+                >
+                  {{ analysisError }}
+                </div>
+
+                <section v-if="analysis">
+                  <h4 class="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">
+                    核心提炼
+                  </h4>
+                  <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p class="text-xs italic leading-relaxed text-slate-600">
                       "{{ analysis?.coreHighlights || knowledge?.summary || '暂无摘要' }}"
                     </p>
                   </div>
                 </section>
 
-                <!-- Talking Points -->
+                <section
+                  v-else
+                  class="rounded-2xl border border-dashed border-slate-200 bg-white p-5 text-xs leading-relaxed text-slate-500"
+                >
+                  <div class="mb-3 flex items-center gap-2 text-slate-700">
+                    <span class="material-symbols-outlined text-base text-primary">auto_awesome</span>
+                    <span class="font-semibold">尚未生成 AI 分析</span>
+                  </div>
+                  <p>
+                    打开文档后默认不会自动调用分析接口。需要时点击上方“开始分析”按钮，再生成核心提炼、推荐话术和关联商机。
+                  </p>
+                </section>
+
                 <section v-if="analysis?.talkingPoints?.length">
-                  <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">推荐话术</h4>
+                  <h4 class="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">
+                    推荐话术
+                  </h4>
                   <div class="space-y-2">
                     <div
                       v-for="(point, idx) in analysis.talkingPoints"
                       :key="idx"
-                      class="p-3 bg-primary/5 border border-primary/10 rounded-xl"
+                      class="rounded-xl border border-primary/10 bg-primary/5 p-3"
                     >
-                      <p class="text-xs text-slate-700 leading-relaxed">"{{ point }}"</p>
+                      <p class="text-xs leading-relaxed text-slate-700">"{{ point }}"</p>
                     </div>
                   </div>
                 </section>
 
-                <!-- Related Entities -->
                 <section v-if="analysis?.relatedEntities?.length">
-                  <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">关联商机</h4>
+                  <h4 class="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">
+                    关联商机
+                  </h4>
                   <div class="space-y-2">
                     <div
                       v-for="(entity, idx) in analysis.relatedEntities"
                       :key="idx"
-                      class="flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg"
+                      class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2"
                     >
-                      <span class="material-symbols-outlined text-amber-500 text-sm">trending_up</span>
+                      <span class="material-symbols-outlined text-sm text-amber-500">trending_up</span>
                       <span class="text-xs font-medium text-slate-700">{{ entity.name }}</span>
                     </div>
                   </div>
                 </section>
 
-                <!-- Chat History -->
-                <section v-if="chatMessages.length > 0" class="pt-4 border-t border-slate-200">
-                  <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">对话详情</h4>
+                <section v-if="chatMessages.length > 0" class="border-t border-slate-200 pt-4">
+                  <h4 class="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">
+                    对话详情
+                  </h4>
                   <div class="space-y-3">
                     <div
                       v-for="(msg, idx) in chatMessages"
@@ -228,45 +341,46 @@
                     >
                       <div
                         :class="[
-                          'max-w-[90%] p-3 rounded-2xl text-xs leading-relaxed',
+                          'max-w-[90%] rounded-2xl p-3 text-xs leading-relaxed',
                           msg.role === 'user'
-                            ? 'bg-primary text-white rounded-tr-none'
-                            : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'
+                            ? 'rounded-tr-none bg-primary text-white'
+                            : 'rounded-tl-none border border-slate-200 bg-white text-slate-700'
                         ]"
                       >
                         <span class="whitespace-pre-wrap">{{ msg.content }}</span>
-                        <span v-if="msg.isStreaming" class="inline-block w-1 h-3 bg-slate-400 ml-0.5 animate-pulse"></span>
+                        <span
+                          v-if="msg.isStreaming"
+                          class="ml-0.5 inline-block h-3 w-1 animate-pulse bg-slate-400"
+                        />
                       </div>
                     </div>
                   </div>
                 </section>
 
-                <!-- Streaming indicator -->
                 <div v-if="isStreaming && chatMessages.length === 0" class="flex items-start">
-                  <div class="bg-white border border-slate-200 p-3 rounded-2xl rounded-tl-none">
+                  <div class="rounded-2xl rounded-tl-none border border-slate-200 bg-white p-3">
                     <div class="flex gap-1">
-                      <div class="size-1.5 bg-slate-300 rounded-full animate-bounce"></div>
-                      <div class="size-1.5 bg-slate-300 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                      <div class="size-1.5 bg-slate-300 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                      <div class="size-1.5 animate-bounce rounded-full bg-slate-300" />
+                      <div class="size-1.5 animate-bounce rounded-full bg-slate-300" style="animation-delay: 0.2s" />
+                      <div class="size-1.5 animate-bounce rounded-full bg-slate-300" style="animation-delay: 0.4s" />
                     </div>
                   </div>
                 </div>
               </template>
             </div>
 
-            <!-- Chat Input -->
-            <div class="p-4 border-t border-slate-200 bg-white shrink-0">
+            <div class="shrink-0 border-t border-slate-200 bg-white p-4">
               <div class="relative">
                 <input
                   v-model="chatInput"
                   type="text"
                   placeholder="向 AI 提问文档细节..."
-                  class="w-full pl-4 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-colors"
+                  class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-4 pr-10 text-xs outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
                   :disabled="isStreaming"
                   @keydown.enter="handleSendQuestion"
                 />
                 <button
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-primary disabled:opacity-30 transition-opacity"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-primary transition-opacity disabled:opacity-30"
                   :disabled="isStreaming || !chatInput.trim()"
                   @click="handleSendQuestion"
                 >
@@ -275,7 +389,7 @@
               </div>
               <button
                 v-if="chatMessages.length > 0"
-                class="w-full mt-2 text-xs text-slate-400 hover:text-primary transition-colors text-center"
+                class="mt-2 w-full text-center text-xs text-slate-400 transition-colors hover:text-primary"
                 @click="chatMessages = []"
               >
                 清空对话历史
@@ -289,10 +403,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import DOMPurify from 'dompurify'
 import { useResponsive } from '@/composables/useResponsive'
-import { getKnowledgeDetail, getKnowledgePreview, aiAnalyzeKnowledge, askKnowledgeQuestion, downloadKnowledge } from '@/api/knowledge'
+import {
+  aiAnalyzeKnowledge,
+  askKnowledgeQuestion,
+  downloadKnowledge,
+  getKnowledgeDetail,
+  getKnowledgeFileBlob,
+  getKnowledgePreviewHtml,
+  getKnowledgePreviewToken
+} from '@/api/knowledge'
 import type { Knowledge, KnowledgeAiAnalyzeVO } from '@/types/common'
+import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
+
+type PreviewKind =
+  | 'image'
+  | 'audio'
+  | 'video'
+  | 'doc'
+  | 'docx'
+  | 'excel'
+  | 'pdf'
+  | 'pptx'
+  | 'text'
+  | 'unsupported'
+  | 'none'
+
+const KnowledgePdfPreview = defineAsyncComponent(async () => {
+  const module = await import('@/components/knowledge/KnowledgePdfPreview.vue')
+  return module.default
+})
 
 const props = defineProps<{
   modelValue: boolean
@@ -306,46 +448,221 @@ const emit = defineEmits<{
 
 const { isMobile } = useResponsive()
 
-// State
+const mobileTabs = [
+  { key: 'document' as const, label: '文档内容' },
+  { key: 'ai' as const, label: 'AI 助手' }
+]
+
 const knowledge = ref<Knowledge | null>(null)
 const analysis = ref<KnowledgeAiAnalyzeVO | null>(null)
-const previewUrl = ref('')
+const previewBlob = ref<Blob | null>(null)
+const mediaPreviewUrl = ref('')
+const mediaPreviewObjectUrl = ref(false)
+const previewKind = ref<PreviewKind>('none')
+const previewNotice = ref('')
+const previewText = ref('')
 const previewFailed = ref(false)
 const loadingDetail = ref(false)
 const loadingAnalysis = ref(false)
+const analysisError = ref('')
 const mobileTab = ref<'document' | 'ai'>('document')
 const chatMessages = ref<Array<{ role: string; content: string; isStreaming?: boolean }>>([])
 const chatInput = ref('')
 const isStreaming = ref(false)
 const scrollContainerRef = ref<HTMLElement | null>(null)
+const docHtmlContent = ref('')
+const docIframeRef = ref<HTMLIFrameElement | null>(null)
 
-function revokePreviewUrl() {
-  if (previewUrl.value.startsWith('blob:')) {
-    URL.revokeObjectURL(previewUrl.value)
+const activePreviewComponent = computed(() => null)
+const previewSource = computed(() => undefined)
+
+const showImagePreview = computed(() => {
+  return previewKind.value === 'image' && Boolean(mediaPreviewUrl.value) && !previewFailed.value
+})
+
+const showAudioPreview = computed(() => {
+  return previewKind.value === 'audio' && Boolean(mediaPreviewUrl.value) && !previewFailed.value
+})
+
+const showVideoPreview = computed(() => {
+  return previewKind.value === 'video' && Boolean(mediaPreviewUrl.value) && !previewFailed.value
+})
+
+const showPdfPreview = computed(() => {
+  return previewKind.value === 'pdf' && Boolean(previewBlob.value) && !previewFailed.value
+})
+
+const showOfficePreview = computed(() => false)
+
+const showDocHtmlPreview = computed(() => {
+  return previewKind.value === 'doc' && Boolean(docHtmlContent.value) && !previewFailed.value
+})
+
+const displayedText = computed(() => {
+  return previewText.value || knowledge.value?.contentText || ''
+})
+
+const analysisStatusText = computed(() => {
+  if (loadingAnalysis.value) {
+    return '正在为您分析文档内容...'
   }
-  previewUrl.value = ''
+  if (isStreaming.value) {
+    return '正在思考中...'
+  }
+  if (analysis.value) {
+    return '分析完成，可向 AI 提问'
+  }
+  return '默认不自动分析，可点击按钮按需生成'
+})
+
+function resetPreviewState() {
+  previewBlob.value = null
+  previewKind.value = 'none'
+  previewNotice.value = ''
+  previewText.value = ''
+  previewFailed.value = false
+  docHtmlContent.value = ''
+
+  if (mediaPreviewUrl.value && mediaPreviewObjectUrl.value) {
+    URL.revokeObjectURL(mediaPreviewUrl.value)
+  }
+  mediaPreviewUrl.value = ''
+  mediaPreviewObjectUrl.value = false
 }
 
 function close() {
   emit('update:modelValue', false)
 }
 
+function getFileExtension(filename?: string): string {
+  const normalized = filename?.trim().toLowerCase() || ''
+  const lastDotIndex = normalized.lastIndexOf('.')
+  return lastDotIndex >= 0 ? normalized.slice(lastDotIndex + 1) : ''
+}
+
+function normalizeContentType(contentType?: string): string {
+  return (contentType || '').split(';', 1)[0]?.trim().toLowerCase() || ''
+}
+
+function isImageType(extension: string, mimeType: string): boolean {
+  return mimeType.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'avif'].includes(extension)
+}
+
+function isAudioType(extension: string, mimeType: string): boolean {
+  return mimeType.startsWith('audio/') || ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(extension)
+}
+
+function isVideoType(extension: string, mimeType: string): boolean {
+  return mimeType.startsWith('video/') || ['mp4', 'webm', 'mov', 'm4v', 'avi', 'mkv', 'ogv', '3gp'].includes(extension)
+}
+
+function resolvePreviewKind(filename?: string, mimeType?: string): PreviewKind {
+  const extension = getFileExtension(filename)
+  const normalizedType = normalizeContentType(mimeType)
+
+  if (isImageType(extension, normalizedType)) {
+    return 'image'
+  }
+  if (isAudioType(extension, normalizedType)) {
+    return 'audio'
+  }
+  if (isVideoType(extension, normalizedType)) {
+    return 'video'
+  }
+  if (extension === 'pdf' || normalizedType === 'application/pdf') {
+    return 'pdf'
+  }
+  if (
+    extension === 'docx' ||
+    normalizedType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ) {
+    return 'docx'
+  }
+  if (
+    extension === 'xlsx' ||
+    extension === 'xls' ||
+    normalizedType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    normalizedType === 'application/vnd.ms-excel'
+  ) {
+    return 'excel'
+  }
+  if (
+    extension === 'pptx' ||
+    normalizedType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  ) {
+    return 'pptx'
+  }
+  if (
+    ['txt', 'md', 'markdown', 'json', 'xml', 'html', 'htm'].includes(extension) ||
+    normalizedType.startsWith('text/')
+  ) {
+    return 'text'
+  }
+  if (extension === 'doc') {
+    return 'doc'
+  }
+  if (extension === 'ppt') {
+    return 'unsupported'
+  }
+  return 'unsupported'
+}
+
+async function tryReadJsonBlob(blob: Blob): Promise<{ msg?: string } | null> {
+  const contentType = normalizeContentType(blob.type)
+  if (contentType !== 'application/json') {
+    return null
+  }
+
+  try {
+    return JSON.parse(await blob.text()) as { msg?: string }
+  } catch (error) {
+    console.warn('Failed to parse JSON blob response:', error)
+    return null
+  }
+}
+
+function getUnsupportedNotice(filename?: string): string {
+  const extension = getFileExtension(filename)
+  if (extension === 'ppt') {
+    return '当前旧版 Office 格式暂不支持纯前端预览，请下载后查看。'
+  }
+  if (extension === 'xls') {
+    return '当前 Excel 文件渲染兼容性有限，如预览异常请下载后查看。'
+  }
+  return '当前文件类型暂不支持纯前端预览，请下载后查看。'
+}
+
+function handlePreviewRendered() {
+  previewFailed.value = false
+}
+
+function handlePreviewError(error: unknown) {
+  console.error('Knowledge preview render failed:', error)
+  previewBlob.value = null
+  previewFailed.value = true
+  previewNotice.value = previewNotice.value || '文件渲染失败，请下载后查看。'
+}
+
+function handleMediaPreviewError(error: Event) {
+  console.error('Knowledge media preview failed:', error)
+  previewFailed.value = true
+  previewNotice.value = '浏览器无法播放该音视频格式，请下载后查看。'
+}
+
 onBeforeUnmount(() => {
-  revokePreviewUrl()
+  resetPreviewState()
 })
 
-// Watch for modal open
 watch(
   () => [props.modelValue, props.knowledgeId],
   async ([visible, id]) => {
     if (visible && id) {
       await loadDocument(id as string)
     } else if (!visible) {
-      // Reset state on close
       knowledge.value = null
       analysis.value = null
-      revokePreviewUrl()
-      previewFailed.value = false
+      analysisError.value = ''
+      resetPreviewState()
       chatMessages.value = []
       chatInput.value = ''
       mobileTab.value = 'document'
@@ -354,90 +671,163 @@ watch(
   { immediate: true }
 )
 
-async function loadPreviewUrl(id: string): Promise<string | null> {
-  try {
-    const blob = await getKnowledgePreview(id)
-    if (!blob || blob.size === 0) {
-      return null
+watch(
+  [showDocHtmlPreview, docHtmlContent],
+  ([show, html]) => {
+    if (show && html) {
+      nextTick(() => {
+        const iframe = docIframeRef.value
+        if (!iframe) return
+        const sanitized = DOMPurify.sanitize(html, {
+          WHOLE_DOCUMENT: true,
+          ADD_TAGS: ['style', 'link'],
+          ADD_ATTR: ['style', 'class', 'color', 'face', 'size'],
+          ALLOW_DATA_ATTR: false
+        })
+        const doc = iframe.contentDocument
+        if (doc) {
+          doc.open()
+          doc.write(sanitized)
+          doc.close()
+          const baseStyle = doc.createElement('style')
+          baseStyle.textContent =
+            'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; ' +
+            'padding: 24px 32px; line-height: 1.6; max-width: 100%; overflow-wrap: break-word; }' +
+            'img { max-width: 100%; height: auto; }' +
+            'table { border-collapse: collapse; width: 100%; margin: 1em 0; }' +
+            'td, th { border: 1px solid #e2e8f0; padding: 6px 10px; }'
+          if (doc.head) {
+            doc.head.insertBefore(baseStyle, doc.head.firstChild)
+          } else {
+            doc.documentElement?.prepend(baseStyle)
+          }
+        }
+      })
     }
-
-    const contentType = (blob.type || '').toLowerCase()
-    if (contentType.includes('application/json')) {
-      const payload = JSON.parse(await blob.text())
-      console.warn('Knowledge preview returned JSON payload:', payload)
-      return null
-    }
-
-    return URL.createObjectURL(blob)
-  } catch (error) {
-    console.error('Failed to load knowledge preview:', error)
-    return null
-  }
-}
+  },
+  { immediate: true }
+)
 
 async function loadDocument(id: string) {
   loadingDetail.value = true
-  loadingAnalysis.value = true
-  revokePreviewUrl()
-  previewFailed.value = false
+  loadingAnalysis.value = false
+  analysis.value = null
+  analysisError.value = ''
+  resetPreviewState()
 
   try {
-    const [detailResult, previewResult] = await Promise.allSettled([
-      getKnowledgeDetail(id),
-      loadPreviewUrl(id)
-    ])
+    const detail = await getKnowledgeDetail(id)
+    knowledge.value = detail
+    analysis.value = detail.aiAnalyzeResult ?? null
 
-    if (detailResult.status !== 'fulfilled') {
-      if (previewResult.status === 'fulfilled' && previewResult.value) {
-        URL.revokeObjectURL(previewResult.value)
-      }
-      throw detailResult.reason
-    }
+    const kind = resolvePreviewKind(detail.name, detail.mimeType)
+    previewKind.value = kind
 
-    knowledge.value = detailResult.value
-
-    if (previewResult.status === 'fulfilled' && previewResult.value) {
-      previewUrl.value = previewResult.value
-    } else {
+    if (kind === 'unsupported') {
       previewFailed.value = true
+      previewNotice.value = getUnsupportedNotice(detail.name)
+      return
     }
+
+    if (kind === 'doc') {
+      try {
+        const html = await getKnowledgePreviewHtml(id)
+        docHtmlContent.value = html
+      } catch {
+        previewFailed.value = true
+        previewNotice.value = '文档转换失败，已显示可读取的文本内容。'
+      }
+      return
+    }
+
+    if (kind === 'audio' || kind === 'video') {
+      const previewToken = await getKnowledgePreviewToken(id)
+      if (!previewToken.url) {
+        throw new Error('Missing knowledge media preview URL')
+      }
+      mediaPreviewUrl.value = previewToken.url
+      mediaPreviewObjectUrl.value = false
+      return
+    }
+
+    const fileBlob = await getKnowledgeFileBlob(id)
+    const errorPayload = await tryReadJsonBlob(fileBlob)
+    if (errorPayload) {
+      previewFailed.value = true
+      previewNotice.value = errorPayload.msg || '文件内容读取失败，无法加载预览。'
+      return
+    }
+
+    if (kind === 'text') {
+      previewText.value = await fileBlob.text()
+      if (!previewText.value && !detail.contentText) {
+        previewFailed.value = true
+        previewNotice.value = '当前文本文件暂无可展示的内容。'
+      }
+      return
+    }
+
+    if (kind === 'image') {
+      mediaPreviewUrl.value = URL.createObjectURL(fileBlob)
+      mediaPreviewObjectUrl.value = true
+      return
+    }
+
+    if (kind !== 'pdf') {
+      previewFailed.value = true
+      previewNotice.value = '当前文件暂不支持在线预览，请下载后查看。'
+      return
+    }
+
+    previewBlob.value = fileBlob
   } catch (error) {
     console.error('Failed to load knowledge detail:', error)
-    revokePreviewUrl()
     previewFailed.value = true
+    previewNotice.value = '文件预览加载失败，请稍后重试。'
   } finally {
     loadingDetail.value = false
   }
 
-  // Load AI analysis (non-blocking)
+}
+
+async function handleAnalyze() {
+  if (!props.knowledgeId || loadingAnalysis.value) return
+
+  loadingAnalysis.value = true
+  analysisError.value = ''
+
   try {
-    analysis.value = await aiAnalyzeKnowledge(id)
-    notifySummaryUpdated(id, analysis.value?.coreHighlights)
+    analysis.value = await aiAnalyzeKnowledge(props.knowledgeId, Boolean(analysis.value))
+    const summary = analysis.value?.coreHighlights?.trim()
+    if (summary) {
+      if (knowledge.value) {
+        knowledge.value.summary = summary
+      }
+      emit('summary-updated', {
+        knowledgeId: props.knowledgeId,
+        summary
+      })
+    }
   } catch (error) {
     console.error('AI analysis failed:', error)
-    // Fallback: use existing summary
-    if (knowledge.value) {
-      analysis.value = {
-        coreHighlights: knowledge.value.summary || '暂无摘要',
-        talkingPoints: [],
-        relatedEntities: []
-      }
-    }
+    analysisError.value = resolveAnalysisErrorMessage(error)
   } finally {
     loadingAnalysis.value = false
   }
 }
 
-function notifySummaryUpdated(knowledgeId: string, summary?: string) {
-  const normalizedSummary = summary?.trim()
-  if (!normalizedSummary) return
-  if (knowledge.value) {
-    knowledge.value.summary = normalizedSummary
+function resolveAnalysisErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const maybeError = error as { message?: unknown; response?: { data?: { msg?: unknown } } }
+    const responseMessage = maybeError.response?.data?.msg
+    if (typeof responseMessage === 'string' && responseMessage.trim()) {
+      return responseMessage.trim()
+    }
+    if (typeof maybeError.message === 'string' && maybeError.message.trim()) {
+      return maybeError.message.trim()
+    }
   }
-  emit('summary-updated', {
-    knowledgeId,
-    summary: normalizedSummary
-  })
+  return 'AI 分析失败，请稍后重试。'
 }
 
 async function handleSendQuestion() {
@@ -447,45 +837,39 @@ async function handleSendQuestion() {
   chatInput.value = ''
   isStreaming.value = true
 
-  // Add user message
   chatMessages.value.push({ role: 'user', content: question })
 
-  // Add placeholder for assistant response
   const assistantIdx = chatMessages.value.length
   chatMessages.value.push({ role: 'assistant', content: '', isStreaming: true })
 
-  // Scroll to bottom
   await nextTick()
   scrollToBottom()
 
-  // Build history (exclude current streaming message)
   const history = chatMessages.value
-    .slice(0, -1) // exclude current streaming placeholder
-    .map(m => ({ role: m.role, content: m.content }))
+    .slice(0, -1)
+    .map(message => ({ role: message.role, content: message.content }))
 
   try {
     await askKnowledgeQuestion(
       props.knowledgeId,
       question,
       history,
-      (chunk) => {
-        // Append chunk to assistant message
+      chunk => {
         if (chatMessages.value[assistantIdx]) {
           chatMessages.value[assistantIdx].content += chunk
           scrollToBottom()
         }
       },
       () => {
-        // Complete
         if (chatMessages.value[assistantIdx]) {
           chatMessages.value[assistantIdx].isStreaming = false
         }
         isStreaming.value = false
       },
-      (error) => {
+      error => {
         console.error('Ask document question failed:', error)
         if (chatMessages.value[assistantIdx]) {
-          chatMessages.value[assistantIdx].content = '抱歉，处理您的请求时发生错误。请稍后重试。'
+          chatMessages.value[assistantIdx].content = '抱歉，处理您的请求时发生错误，请稍后重试。'
           chatMessages.value[assistantIdx].isStreaming = false
         }
         isStreaming.value = false
@@ -510,24 +894,14 @@ function handleDownload() {
   }
 }
 
-// Helpers
-function isVideoPreview(): boolean {
-  const mimeType = (knowledge.value?.mimeType || '').toLowerCase()
-  const fileName = (knowledge.value?.name || '').toLowerCase()
-  return mimeType.startsWith('video/')
-    || /\.(mp4|webm|mov|m4v|ogg|ogv)$/i.test(fileName)
-}
-
 function formatDate(dateStr?: string): string {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleDateString('zh-CN')
 }
 
-function formatFileSize(bytes?: number): string {
-  if (!bytes) return ''
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+function formatFileSize(bytes?: number | string | null): string {
+  if (resolveKnowledgeFileSizeBytes(bytes) <= 0) return ''
+  return formatFileSizeBytes(bytes)
 }
 
 function getTypeIcon(type?: string): string {
@@ -543,7 +917,7 @@ function getTypeIcon(type?: string): string {
 }
 
 function getTypeIconBg(type?: string): string {
-  const bgs: Record<string, string> = {
+  const backgrounds: Record<string, string> = {
     meeting: 'bg-blue-50',
     email: 'bg-green-50',
     recording: 'bg-purple-50',
@@ -551,7 +925,7 @@ function getTypeIconBg(type?: string): string {
     proposal: 'bg-orange-50',
     contract: 'bg-red-50'
   }
-  return bgs[type || ''] || 'bg-slate-50'
+  return backgrounds[type || ''] || 'bg-slate-50'
 }
 
 function getTypeIconColor(type?: string): string {
@@ -572,6 +946,7 @@ function getTypeIconColor(type?: string): string {
 .fade-leave-active {
   transition: opacity 0.3s ease;
 }
+
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
@@ -580,15 +955,145 @@ function getTypeIconColor(type?: string): string {
 .scale-fade-enter-active {
   transition: all 0.3s ease-out;
 }
+
 .scale-fade-leave-active {
   transition: all 0.2s ease-in;
 }
+
 .scale-fade-enter-from {
   opacity: 0;
   transform: scale(0.95);
 }
+
 .scale-fade-leave-to {
   opacity: 0;
   transform: scale(0.95);
+}
+
+.media-preview-shell {
+  overscroll-behavior: contain;
+}
+
+.media-preview-shell--image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.media-preview-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 24px;
+}
+
+.media-preview-video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 16px;
+  background: #020617;
+}
+
+.office-preview-shell {
+  overscroll-behavior: contain;
+}
+
+:deep(.office-preview-viewer) {
+  min-height: 100%;
+  max-width: 100%;
+}
+
+.office-preview-shell :deep(.vue-office-docx) {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.office-preview-shell :deep(.vue-office-docx-main),
+.office-preview-shell :deep(.docx-wrapper) {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.office-preview-shell :deep(.docx-wrapper > section.docx) {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  overflow-wrap: anywhere;
+  box-sizing: border-box !important;
+}
+
+.office-preview-shell :deep(.vue-office-docx table) {
+  max-width: 100% !important;
+  table-layout: fixed;
+}
+
+.office-preview-shell :deep(.vue-office-docx td),
+.office-preview-shell :deep(.vue-office-docx th),
+.office-preview-shell :deep(.vue-office-docx p) {
+  overflow-wrap: anywhere;
+}
+
+.office-preview-shell :deep(.vue-office-docx img),
+.office-preview-shell :deep(.vue-office-docx svg),
+.office-preview-shell :deep(.vue-office-docx canvas),
+.office-preview-shell :deep(.vue-office-docx video) {
+  max-width: 100% !important;
+  height: auto !important;
+  object-fit: contain;
+}
+
+.office-preview-shell :deep(.vue-office-docx [style*="inline-block"]) {
+  max-width: 100% !important;
+}
+
+.office-preview-shell--pptx {
+  background: #edf3fb;
+}
+
+.office-preview-shell--pptx :deep(.office-preview-viewer--pptx) {
+  min-height: auto;
+}
+
+.office-preview-shell--pptx :deep(.vue-office-pptx) {
+  min-height: 100%;
+  padding: 12px 0 16px;
+}
+
+.office-preview-shell--pptx :deep(.vue-office-pptx-main) {
+  height: auto !important;
+  min-height: 100%;
+}
+
+.office-preview-shell--pptx :deep(.pptx-preview-wrapper) {
+  background: transparent !important;
+  width: 100% !important;
+  height: auto !important;
+  overflow: visible !important;
+  padding: 0 12px 16px;
+  box-sizing: border-box;
+}
+
+.office-preview-shell--pptx :deep(.pptx-preview-slide-wrapper) {
+  margin: 0 auto 16px !important;
+  max-width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.office-preview-shell--pptx :deep(.pptx-preview-slide-wrapper:last-child) {
+  margin-bottom: 0 !important;
+}
+
+.pdf-preview-shell {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.doc-html-preview-shell {
+  overscroll-behavior: contain;
 }
 </style>

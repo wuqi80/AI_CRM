@@ -84,6 +84,8 @@ export interface Knowledge {
   mimeType?: string
   summary?: string
   contentText?: string
+  aiAnalyzeResult?: KnowledgeAiAnalyzeVO
+  aiAnalysisTime?: string
   typeName?: string
   weKnoraParseStatus?: 'pending' | 'processing' | 'completed' | 'failed' | 'unsupported'
   createUserId: string

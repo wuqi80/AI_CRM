@@ -31,6 +31,32 @@ export interface MailAuthStatus {
   accounts: MailAccount[]
 }
 
+export interface MailSyncResult {
+  accountId: string
+  logId?: string
+  fetchedCount: number
+  savedCount: number
+  skippedCount: number
+  failedCount: number
+  status?: string
+  errorMessage?: string
+}
+
+export interface MailSyncLog {
+  logId: string
+  accountId: string
+  userId?: string
+  syncType?: string
+  status: string
+  fetchedCount?: number
+  savedCount?: number
+  skippedCount?: number
+  failedCount?: number
+  startedAt?: string
+  finishedAt?: string
+  errorMessage?: string
+}
+
 export interface MailOAuthStart {
   provider: string
   authorizeUrl: string
@@ -97,32 +123,6 @@ export interface MailTemplate {
   isCommon?: boolean
   createTime?: string
   updateTime?: string
-}
-
-export interface MailSyncResult {
-  accountId: string
-  logId?: string
-  fetchedCount: number
-  savedCount: number
-  skippedCount: number
-  failedCount: number
-  status?: string
-  errorMessage?: string
-}
-
-export interface MailSyncLog {
-  logId: string
-  accountId: string
-  userId?: string
-  syncType?: string
-  status: string
-  fetchedCount?: number
-  savedCount?: number
-  skippedCount?: number
-  failedCount?: number
-  startedAt?: string
-  finishedAt?: string
-  errorMessage?: string
 }
 
 export interface MailListQuery {
