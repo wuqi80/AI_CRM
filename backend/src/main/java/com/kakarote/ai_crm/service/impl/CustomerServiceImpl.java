@@ -634,12 +634,21 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (StrUtil.isBlank(filePath)) {
             return null;
         }
+        if (isExternalUrl(filePath)) {
+            return filePath.trim();
+        }
         try {
             return fileStorageService.getUrl(filePath);
         } catch (Exception e) {
             log.warn("Resolve customer logo URL failed: {}", e.getMessage());
             return null;
         }
+    }
+
+    private boolean isExternalUrl(String value) {
+        String normalized = StrUtil.trim(value);
+        return StrUtil.startWithIgnoreCase(normalized, "http://")
+            || StrUtil.startWithIgnoreCase(normalized, "https://");
     }
 
     @Override
