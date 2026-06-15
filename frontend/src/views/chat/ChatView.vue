@@ -227,6 +227,7 @@
             ref="messagesContainer"
             class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth pb-4"
             :class="{ 'wk-chat-messages--mobile-header': showMobileChatHeader }"
+            @scroll="handleMessagesScroll"
           >
             <!-- Welcome Section (no messages) -->
             <template v-if="chatStore.messages.length === 0">
@@ -376,6 +377,20 @@
               </div>
             </template>
           </div>
+
+          <Transition name="scroll-to-bottom">
+            <button
+              v-if="showScrollToBottomButton"
+              type="button"
+              class="wk-scroll-to-bottom-button absolute left-1/2 z-20 flex items-center justify-center rounded-full border bg-white text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900"
+              :class="isMobile ? 'bottom-[118px]' : 'bottom-[196px]'"
+              aria-label="滚动到底部"
+              title="滚动到底部"
+              @click="scrollToBottomSmooth"
+            >
+              <span class="material-symbols-outlined text-[22px] leading-none">arrow_downward</span>
+            </button>
+          </Transition>
 
           <!-- Input Area -->
           <div class="shrink-0 p-4 md:p-8 bg-gradient-to-t from-white via-white to-transparent">
@@ -716,6 +731,7 @@ const { isMobile } = useResponsive()
 
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
+const showScrollToBottomButton = ref(false)
 const mobilePanel = ref<'sessions' | 'chat'>('chat')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const chatInputRef = ref<HTMLInputElement | null>(null)
@@ -748,6 +764,7 @@ const DEFAULT_CHAT_AI_CONFIG: AiConfigUpdateBO = {
   temperature: 0.7,
   maxTokens: 4096
 }
+const SCROLL_TO_BOTTOM_THRESHOLD_PX = 100
 
 // Notifications mock data
 // const notifications = ref([
@@ -897,26 +914,76 @@ onMounted(async () => {
   ])
 })
 
-// Auto scroll to bottom when new messages arrive or during streaming
+// Auto scroll to bottom when new messages arrive or during streaming while the user stays near the bottom.
 let scrollTimer: ReturnType<typeof setTimeout> | null = null
+const isPinnedToBottom = ref(true)
+
+function getMessagesDistanceToBottom(el: HTMLElement) {
+  return el.scrollHeight - (el.scrollTop + el.clientHeight)
+}
+
+function updateScrollToBottomVisibility() {
+  const el = messagesContainer.value
+  if (!el || chatStore.messages.length === 0) {
+    showScrollToBottomButton.value = false
+    return
+  }
+
+  showScrollToBottomButton.value = getMessagesDistanceToBottom(el) > SCROLL_TO_BOTTOM_THRESHOLD_PX
+}
+
+function handleMessagesScroll() {
+  const el = messagesContainer.value
+  if (el) {
+    isPinnedToBottom.value = getMessagesDistanceToBottom(el) <= SCROLL_TO_BOTTOM_THRESHOLD_PX
+  }
+  updateScrollToBottomVisibility()
+}
+
 function scrollToBottom() {
+  if (!isPinnedToBottom.value) {
+    updateScrollToBottomVisibility()
+    return
+  }
   if (scrollTimer) return
+  const delayMs = chatStore.currentSessionIsStreaming ? 100 : 0
   scrollTimer = setTimeout(() => {
     scrollTimer = null
-    if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    if (!isPinnedToBottom.value) return
+
+    const el = messagesContainer.value
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'auto' })
+      updateScrollToBottomVisibility()
     }
-  }, 100)
+  }, delayMs)
+}
+
+function scrollToBottomSmooth() {
+  const el = messagesContainer.value
+  if (!el) return
+
+  isPinnedToBottom.value = true
+  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  showScrollToBottomButton.value = false
 }
 
 watch(
   () => {
     const msgs = chatStore.messages
     const last = msgs[msgs.length - 1]
-    return { length: msgs.length, content: last?.content?.length ?? 0 }
+    return {
+      length: msgs.length,
+      content: last?.content?.length ?? 0,
+      isStreaming: Boolean(last?.isStreaming),
+      isThinking: Boolean(last?.isThinking)
+    }
   },
   () => {
-    nextTick(scrollToBottom)
+    nextTick(() => {
+      scrollToBottom()
+      updateScrollToBottomVisibility()
+    })
   }
 )
 
@@ -1158,6 +1225,7 @@ async function handleSend() {
   const content = text || (hasKnowledge ? '请结合选中的知识库文件回答' : '请分析这些文件')
   const selectedKnowledgeSnapshot = [...selectedKnowledgeItems.value]
   inputText.value = ''
+  isPinnedToBottom.value = true
 
   let attachmentDTOs: ChatAttachmentDTO[] | undefined
   let attachmentVOs: ChatAttachmentVO[] | undefined
@@ -1366,6 +1434,8 @@ function formatFileSize(bytes: number): string {
 }
 
 async function handleNewSession() {
+  isPinnedToBottom.value = true
+  showScrollToBottomButton.value = false
   chatStore.clearMessages()
   await chatStore.startNewSession('新对话', undefined, undefined, chatStore.currentAppCode)
   currentView.value = 'chat'
@@ -1376,6 +1446,8 @@ async function handleNewSession() {
 
 async function handleSelectSession(sessionId: string) {
   if (chatStore.currentSessionId === sessionId && currentView.value === 'chat') return
+  isPinnedToBottom.value = true
+  showScrollToBottomButton.value = false
   currentView.value = 'chat'
   await chatStore.selectSession(sessionId)
   if (isMobile.value) {
@@ -1624,6 +1696,32 @@ function resolveChatAppIcon(code: string): string {
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+.wk-scroll-to-bottom-button {
+  width: 44px;
+  height: 44px;
+  border-color: #d4d4d8;
+  box-shadow:
+    0 12px 34px rgb(15 23 42 / 0.11),
+    0 0 18px 8px rgb(203 213 225 / 0.12);
+}
+
+.scroll-to-bottom-enter-active,
+.scroll-to-bottom-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.scroll-to-bottom-enter-from,
+.scroll-to-bottom-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 10px);
+}
+
+.scroll-to-bottom-enter-to,
+.scroll-to-bottom-leave-from {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 /* Material Symbols fill variant */
