@@ -34,10 +34,6 @@ public class UpdateAccountStatusBO {
         @Schema(description = "用户ID")
         private Long userId;
 
-        @Schema(description = "默认积分")
-        private Long defaultToken = 0L;
-
-
     }
 
 }
