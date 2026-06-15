@@ -83,6 +83,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         跟进内容:
         %s
 
+        不要臆造沟通渠道：如果内容只表达报价、完成报价或完成事项，没有明确电话、会议、邮件、拜访等渠道词，type 必须使用 other。
         请严格按照以下 JSON 格式返回，不要包含任何其他文字、代码块标记或解释：
         {
           "summary": "简明扼要的摘要，1-2句话",

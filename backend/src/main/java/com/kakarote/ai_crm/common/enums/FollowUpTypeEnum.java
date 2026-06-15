@@ -10,7 +10,8 @@ public enum FollowUpTypeEnum {
     CALL("call", "电话"),
     MEETING("meeting", "会议"),
     EMAIL("email", "邮件"),
-    VISIT("visit", "拜访");
+    VISIT("visit", "拜访"),
+    OTHER("other", "其他");
 
     private final String code;
     private final String name;

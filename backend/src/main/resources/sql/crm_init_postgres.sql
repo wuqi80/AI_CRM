@@ -689,7 +689,7 @@ CREATE INDEX idx_follow_up_relation_id ON crm_follow_up (relation_id);
 CREATE INDEX idx_follow_up_follow_time ON crm_follow_up (follow_time);
 
 COMMENT ON TABLE crm_follow_up IS '跟进记录表';
-COMMENT ON COLUMN crm_follow_up.type IS '类型: call, meeting, email, visit';
+COMMENT ON COLUMN crm_follow_up.type IS '类型: call, meeting, email, visit, other';
 
 -- ============================================
 -- 7. 知识库项目表 (crm_knowledge)
