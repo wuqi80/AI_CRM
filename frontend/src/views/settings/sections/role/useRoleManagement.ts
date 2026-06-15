@@ -15,6 +15,42 @@ import {
 import type { PermItem, RolePermissionVO, RoleVO } from '@/types/role'
 import { ROLE_AVATAR_COLORS, ROLE_DATA_SCOPE_OPTIONS } from './constants'
 
+const ROLE_PERMISSION_MODULE_ORDER = [
+  'customer',
+  'contact',
+  'followup',
+  'task',
+  'schedule',
+  'project',
+  'product',
+  'relation',
+  'addressBook',
+  'mail',
+  'knowledge',
+  'chat',
+  'agent',
+  'user',
+  'dept',
+  'role',
+  'config',
+  'customField'
+]
+
+function sortRolePermissions(permissionList: RolePermissionVO[]): RolePermissionVO[] {
+  return [...permissionList].sort((left, right) => {
+    const leftIndex = ROLE_PERMISSION_MODULE_ORDER.indexOf(left.module)
+    const rightIndex = ROLE_PERMISSION_MODULE_ORDER.indexOf(right.module)
+    const normalizedLeft = leftIndex === -1 ? ROLE_PERMISSION_MODULE_ORDER.length : leftIndex
+    const normalizedRight = rightIndex === -1 ? ROLE_PERMISSION_MODULE_ORDER.length : rightIndex
+
+    if (normalizedLeft !== normalizedRight) {
+      return normalizedLeft - normalizedRight
+    }
+
+    return left.moduleName.localeCompare(right.moduleName, 'zh-CN')
+  })
+}
+
 export function useRoleManagement() {
   const { isMobile } = useResponsive()
 
@@ -87,7 +123,7 @@ export function useRoleManagement() {
     permissionRole.value = roleDrawerRole.value
     loadingPermissions.value = true
     try {
-      permissionList.value = await getRolePermissions(roleDrawerRole.value.roleId)
+      permissionList.value = sortRolePermissions(await getRolePermissions(roleDrawerRole.value.roleId))
     } catch {
       // Error handled by interceptor
     } finally {
@@ -193,7 +229,7 @@ export function useRoleManagement() {
     permissionRole.value = role
     loadingPermissions.value = true
     try {
-      permissionList.value = await getRolePermissions(role.roleId)
+      permissionList.value = sortRolePermissions(await getRolePermissions(role.roleId))
     } catch {
       // Error handled by interceptor
     } finally {
