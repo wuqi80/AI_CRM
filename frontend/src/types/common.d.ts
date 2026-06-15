@@ -246,7 +246,9 @@ export interface ChatMessage {
   content: string
   functionCall?: string
   functionResult?: string
+  tokensUsed?: number
   tokens?: number
+  modelName?: string
   attachments?: ChatAttachmentVO[]
   createTime: string
 }

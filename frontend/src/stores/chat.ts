@@ -25,6 +25,8 @@ interface LocalMessage {
   timestamp: Date
   isStreaming?: boolean
   isThinking?: boolean
+  tokensUsed?: number
+  modelName?: string
   attachments?: ChatAttachmentVO[]
 }
 
@@ -1009,6 +1011,8 @@ export const useChatStore = defineStore('chat', () => {
       content: message.content,
       timestamp: new Date(message.createTime),
       isStreaming: false,
+      tokensUsed: message.tokensUsed ?? message.tokens,
+      modelName: message.modelName,
       attachments: message.attachments
     }
   }
