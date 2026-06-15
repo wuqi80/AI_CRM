@@ -901,6 +901,7 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig, getAiConfigDetail, updateAiConfig } from '@/api/systemConfig'
+import { getCustomerDetail } from '@/api/customer'
 import { getAddressBookDetail } from '@/api/addressBook'
 import { getRelationDetail } from '@/api/relation'
 import { getProductDetail } from '@/api/product'
@@ -2172,6 +2173,59 @@ function focusComposerWhenReady() {
   }
 }
 
+async function openRouteCustomerChat(customerId: string) {
+  try {
+    const customer = await getCustomerDetail(customerId)
+    await chatStore.openCustomerChat({
+      customerId,
+      companyName: customer.companyName || '客户对话'
+    })
+  } catch (error) {
+    console.warn('Load route customer detail failed:', error)
+    await chatStore.openCustomerChat({ customerId, companyName: '客户对话' })
+  }
+}
+
+async function openRouteEmployeeChat(employeeId: string) {
+  try {
+    const employee = await getAddressBookDetail(employeeId)
+    await chatStore.openEmployeeChat({
+      userId: employee.userId || employeeId,
+      realname: employee.realname || '员工'
+    })
+  } catch (error) {
+    console.warn('Load route employee detail failed:', error)
+    await chatStore.openEmployeeChat({ userId: employeeId, realname: '员工' })
+  }
+}
+
+async function openRouteRelationChat(relationId: string) {
+  try {
+    const detail = await getRelationDetail(relationId)
+    const relation = detail.relation
+    await chatStore.openRelationChat({
+      relationId: relation?.relationId || relationId,
+      name: relation?.name || '关系人'
+    })
+  } catch (error) {
+    console.warn('Load route relation detail failed:', error)
+    await chatStore.openRelationChat({ relationId, name: '关系人' })
+  }
+}
+
+async function openRouteProductChat(productId: string) {
+  try {
+    const product = await getProductDetail(productId)
+    await chatStore.openProductChat({
+      productId: product.productId || productId,
+      productName: product.productName || '产品对话'
+    })
+  } catch (error) {
+    console.warn('Load route product detail failed:', error)
+    await chatStore.openProductChat({ productId, productName: '产品对话' })
+  }
+}
+
 async function applyChatRouteQuery() {
   if (applyingChatRouteQuery) return
 
@@ -2202,13 +2256,13 @@ async function applyChatRouteQuery() {
     activateChatPanel()
 
     if (customerId) {
-      await chatStore.openCustomerChat({ customerId, companyName: '客户对话' })
+      await openRouteCustomerChat(customerId)
     } else if (employeeId) {
-      await chatStore.openEmployeeChat({ userId: employeeId, realname: '员工' })
+      await openRouteEmployeeChat(employeeId)
     } else if (relationId) {
-      await chatStore.openRelationChat({ relationId, name: '关系人' })
+      await openRouteRelationChat(relationId)
     } else if (productId) {
-      await chatStore.openProductChat({ productId, productName: '产品对话' })
+      await openRouteProductChat(productId)
     }
 
     focusComposerWhenReady()
