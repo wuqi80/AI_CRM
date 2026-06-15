@@ -10,6 +10,7 @@ import com.kakarote.ai_crm.entity.PO.ProjectSchedule;
 import com.kakarote.ai_crm.entity.PO.ProjectTask;
 import com.kakarote.ai_crm.entity.PO.ProjectTaskAttachment;
 import com.kakarote.ai_crm.entity.VO.ProjectVO;
+import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.ManageUserMapper;
 import com.kakarote.ai_crm.mapper.ProjectAttachmentMapper;
@@ -83,6 +84,33 @@ class ProjectServiceImplTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void queryPageListExcludesArchivedProjectsByDefault() {
+        when(projectMapper.queryPageList(any(), any())).thenReturn(new BasePage<>(1, 15));
+
+        ProjectBO.Query query = new ProjectBO.Query();
+        projectService.queryPageList(query);
+
+        ArgumentCaptor<ProjectBO.Query> queryCaptor = ArgumentCaptor.forClass(ProjectBO.Query.class);
+        verify(projectMapper).queryPageList(any(), queryCaptor.capture());
+        assertThat(queryCaptor.getValue().getStatus()).isNull();
+        assertThat(queryCaptor.getValue().getIncludeArchived()).isFalse();
+    }
+
+    @Test
+    void queryPageListAllowsArchivedProjectsWhenExplicitlyFiltered() {
+        when(projectMapper.queryPageList(any(), any())).thenReturn(new BasePage<>(1, 15));
+
+        ProjectBO.Query query = new ProjectBO.Query();
+        query.setStatus("ARCHIVED");
+        projectService.queryPageList(query);
+
+        ArgumentCaptor<ProjectBO.Query> queryCaptor = ArgumentCaptor.forClass(ProjectBO.Query.class);
+        verify(projectMapper).queryPageList(any(), queryCaptor.capture());
+        assertThat(queryCaptor.getValue().getStatus()).isEqualTo("ARCHIVED");
+        assertThat(queryCaptor.getValue().getIncludeArchived()).isTrue();
     }
 
     @Test

@@ -14,6 +14,7 @@ public class ProjectBO {
     public static class Query extends PageEntity {
         private String keyword;
         private String status;
+        private Boolean includeArchived;
     }
 
     @Data

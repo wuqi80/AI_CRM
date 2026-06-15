@@ -85,6 +85,7 @@ public class ProjectServiceImpl implements IProjectService {
     public BasePage<ProjectVO> queryPageList(ProjectBO.Query queryBO) {
         ProjectBO.Query query = queryBO == null ? new ProjectBO.Query() : queryBO;
         query.setStatus(normalizeProjectQueryStatus(query.getStatus()));
+        query.setIncludeArchived(STATUS_ARCHIVED.equals(query.getStatus()));
         return projectMapper.queryPageList(query.parse(), query);
     }
 

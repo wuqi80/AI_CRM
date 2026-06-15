@@ -14,6 +14,9 @@
         <if test="query.status != null and query.status != ''">
             AND p.status = #{query.status}
         </if>
+        <if test="query.status == null and query.includeArchived != true">
+            AND p.status &lt;&gt; 'ARCHIVED'
+        </if>
     </sql>
 
     <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.ProjectVO">
