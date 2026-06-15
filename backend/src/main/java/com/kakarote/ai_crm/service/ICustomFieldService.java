@@ -92,6 +92,10 @@ public interface ICustomFieldService extends IService<CustomField> {
      */
     void updateCustomFieldValues(String entityType, Long entityId, Map<String, Object> values);
 
+    void validateUniqueCustomFieldValues(String entityType, Long entityId, Map<String, Object> values);
+
+    void validateUniqueFieldValue(String entityType, Long entityId, String fieldName, Object value);
+
     /**
      * 批量获取实体的自定义字段值
      *

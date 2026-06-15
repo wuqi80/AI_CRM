@@ -29,6 +29,7 @@ export interface CustomField {
   isRequired: boolean
   isSearchable: boolean
   isShowInList: boolean
+  isUnique: boolean
   options?: FieldOption[]
   validation?: FieldValidation
   sortOrder: number
@@ -58,6 +59,7 @@ export interface CustomFieldAddBO {
   isRequired?: boolean
   isSearchable?: boolean
   isShowInList?: boolean
+  isUnique?: boolean
   options?: FieldOption[]
   validation?: FieldValidation
   sortOrder?: number
@@ -71,6 +73,7 @@ export interface CustomFieldUpdateBO {
   isRequired?: boolean
   isSearchable?: boolean
   isShowInList?: boolean
+  isUnique?: boolean
   options?: FieldOption[]
   validation?: FieldValidation
   sortOrder?: number

@@ -60,4 +60,12 @@ public interface CustomFieldMapper extends BaseMapper<CustomField> {
             @Param("entityIds") List<Long> entityIds,
             @Param("columns") List<String> columns
     );
+
+    Long countDuplicateCustomFieldValue(
+            @Param("tableName") String tableName,
+            @Param("idColumn") String idColumn,
+            @Param("entityId") Long entityId,
+            @Param("columnName") String columnName,
+            @Param("value") Object value
+    );
 }

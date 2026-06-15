@@ -8,6 +8,13 @@ import type {
   EntityType
 } from '@/types/customField'
 
+export interface CustomFieldUniqueCheckBO {
+  entityType: EntityType
+  entityId?: string
+  fieldName: string
+  value?: unknown
+}
+
 /**
  * Add custom field
  */
@@ -83,4 +90,8 @@ export function getUserColumnsAll(entityType: EntityType): Promise<CustomField[]
  */
 export function saveUserSort(data: FieldSortUpdateBO): Promise<void> {
   return post('/custom-field/user-sort', data)
+}
+
+export function checkCustomFieldUnique(data: CustomFieldUniqueCheckBO): Promise<boolean> {
+  return post('/custom-field/unique/check', data)
 }

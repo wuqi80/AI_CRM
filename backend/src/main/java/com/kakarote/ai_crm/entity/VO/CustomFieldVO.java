@@ -48,6 +48,9 @@ public class CustomFieldVO {
     @Schema(description = "是否在列表显示")
     private Boolean isShowInList;
 
+    @Schema(description = "Whether values must be unique")
+    private Boolean isUnique;
+
     @Schema(description = "选项列表")
     private List<FieldOption> options;
 

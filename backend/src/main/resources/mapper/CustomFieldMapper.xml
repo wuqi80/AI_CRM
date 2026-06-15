@@ -36,4 +36,13 @@
         WHERE ${idColumn} = #{entityId}
     </update>
 
+    <select id="countDuplicateCustomFieldValue" resultType="java.lang.Long">
+        SELECT COUNT(1)
+        FROM ${tableName}
+        WHERE ${columnName} = #{value}
+        <if test="entityId != null">
+            AND ${idColumn} != #{entityId}
+        </if>
+    </select>
+
 </mapper>

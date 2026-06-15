@@ -4,6 +4,7 @@ import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.CustomFieldAddBO;
 import com.kakarote.ai_crm.entity.BO.CustomFieldUpdateBO;
+import com.kakarote.ai_crm.entity.BO.CustomFieldUniqueCheckBO;
 import com.kakarote.ai_crm.entity.BO.FieldSortBO;
 import com.kakarote.ai_crm.entity.BO.FieldSortUpdateBO;
 import com.kakarote.ai_crm.entity.VO.CustomFieldVO;
@@ -92,6 +93,13 @@ public class CustomFieldController {
     public Result<String> sort(@RequestBody List<FieldSortBO> sortList) {
         customFieldService.updateSortOrder(sortList);
         return Result.ok();
+    }
+
+    @PostMapping("/unique/check")
+    @Operation(summary = "Check unique custom field value")
+    public Result<Boolean> checkUnique(@Valid @RequestBody CustomFieldUniqueCheckBO bo) {
+        customFieldService.validateUniqueFieldValue(bo.getEntityType(), bo.getEntityId(), bo.getFieldName(), bo.getValue());
+        return Result.ok(Boolean.TRUE);
     }
 
     @GetMapping("/user-columns/{entityType}")

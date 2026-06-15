@@ -92,6 +92,9 @@ public class CustomField implements Serializable {
     @Schema(description = "是否在列表显示: 0否 1是")
     private Integer isShowInList;
 
+    @Schema(description = "Unique: 0 no, 1 yes")
+    private Integer isUnique;
+
     /**
      * 选项列表(JSON数组): [{"value":"v1","label":"选项1"}]
      */
