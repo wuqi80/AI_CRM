@@ -61,7 +61,7 @@ const routes: RouteRecordRaw[] = [
         path: 'address-book',
         name: 'AddressBook',
         component: () => import('@/views/addressBook/AddressBookListView.vue'),
-        meta: { title: '通讯录', icon: 'contacts' }
+        meta: { title: '通讯录', icon: 'contacts', permission: 'addressBook:list' }
       },
       {
         path: 'addressBook',
@@ -83,7 +83,7 @@ const routes: RouteRecordRaw[] = [
         path: 'product',
         name: 'ProductList',
         component: () => import('@/views/product/ProductListView.vue'),
-        meta: { title: '产品管理', icon: 'contract' }
+        meta: { title: '产品管理', icon: 'contract', permission: 'product:view' }
       },
       {
         path: 'project',
