@@ -427,34 +427,91 @@
               </div>
 
               <!-- Selected Attachments Preview -->
-              <div v-if="selectedFiles.length > 0 || selectedKnowledgeItems.length > 0" class="flex flex-wrap gap-2">
-                <div
-                  v-for="item in selectedKnowledgeItems"
-                  :key="item.knowledgeId"
-                  class="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-xl text-sm text-emerald-700 border border-emerald-100"
-                >
-                  <span class="material-symbols-outlined text-sm text-emerald-500">menu_book</span>
-                  <span class="truncate max-w-[140px]">{{ item.name }}</span>
-                  <span
-                    class="material-symbols-outlined text-sm text-emerald-400 hover:text-red-500 cursor-pointer"
-                    @click="removeSelectedKnowledge(item.knowledgeId)"
-                  >close</span>
-                </div>
-                <div
-                  v-for="(file, index) in selectedFiles"
-                  :key="index"
-                  class="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl text-sm text-slate-700 border border-slate-100"
-                >
-                  <span class="material-symbols-outlined text-sm" :class="file.type.startsWith('image/') ? 'text-blue-500' : 'text-slate-400'">
-                    {{ file.type.startsWith('image/') ? 'image' : 'description' }}
-                  </span>
-                  <span class="truncate max-w-[120px]">{{ file.name }}</span>
-                  <span class="text-xs text-slate-400">{{ formatFileSize(file.size) }}</span>
-                  <span
-                    class="material-symbols-outlined text-sm text-slate-400 hover:text-red-500 cursor-pointer"
-                    @click="removeSelectedFile(index)"
-                  >close</span>
-                </div>
+              <div
+                v-if="composerAttachmentPreviewItems.length > 0"
+                class="wk-chat-attachment-preview flex min-h-[54px] w-full flex-nowrap gap-2 overflow-x-auto overflow-y-hidden pb-1"
+              >
+                <template v-for="item in composerAttachmentPreviewItems" :key="item.key">
+                  <div
+                    v-if="item.kind === 'knowledge'"
+                    class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] pl-3 pr-[30px]"
+                  >
+                    <div
+                      class="flex size-10 shrink-0 items-center justify-center rounded-xl"
+                      :class="getKnowledgeDocIconMeta(item.knowledge).bg"
+                    >
+                      <span
+                        class="material-symbols-outlined text-[22px] leading-none"
+                        :class="getKnowledgeDocIconMeta(item.knowledge).color"
+                      >
+                        {{ getKnowledgeDocIconMeta(item.knowledge).icon }}
+                      </span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <div class="truncate text-[14px] leading-[18px] text-[#0d0d0d]">{{ item.knowledge.name }}</div>
+                      <div class="text-[12px] leading-[14px] text-[#909090]">{{ getKnowledgeCardSubtitle(item.knowledge) }}</div>
+                    </div>
+                    <button
+                      type="button"
+                      class="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-[#0d0d0d] text-white"
+                      aria-label="移除知识库文件"
+                      title="移除"
+                      @click="removeSelectedKnowledge(item.knowledge.knowledgeId)"
+                    >
+                      <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                    </button>
+                  </div>
+
+                  <div
+                    v-else-if="item.kind === 'file' && item.file.type.startsWith('image/')"
+                    class="relative h-[54px] w-[54px] shrink-0 overflow-hidden rounded-xl border border-[#0d0d0d0d] bg-white"
+                  >
+                    <img
+                      :src="getSelectedFilePreviewUrl(item.file)"
+                      :alt="item.file.name"
+                      class="size-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      class="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-[#0d0d0d] text-white"
+                      aria-label="移除图片"
+                      title="移除"
+                      @click="removeSelectedFile(item.fileIndex)"
+                    >
+                      <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                    </button>
+                  </div>
+
+                  <div
+                    v-else-if="item.kind === 'file'"
+                    class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] pl-3 pr-[30px]"
+                  >
+                    <div
+                      class="flex size-10 shrink-0 items-center justify-center rounded-xl"
+                      :class="getChatDocIconMeta(item.file).bg"
+                    >
+                      <span
+                        class="material-symbols-outlined text-[22px] leading-none"
+                        :class="getChatDocIconMeta(item.file).color"
+                      >
+                        {{ getChatDocIconMeta(item.file).icon }}
+                      </span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <div class="truncate text-[14px] leading-[18px] text-[#0d0d0d]">{{ item.file.name }}</div>
+                      <div class="text-[12px] leading-[14px] text-[#909090]">{{ getChatDocumentSubtitle(item.file) }}</div>
+                    </div>
+                    <button
+                      type="button"
+                      class="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-[#0d0d0d] text-white"
+                      aria-label="移除文件"
+                      title="移除"
+                      @click="removeSelectedFile(item.fileIndex)"
+                    >
+                      <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                    </button>
+                  </div>
+                </template>
               </div>
 
               <!-- Input Box -->
@@ -687,7 +744,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted, nextTick, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
@@ -723,6 +780,10 @@ import type { RelationDetailVO } from '@/types/relation'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, Task } from '@/types/common'
 import type { AiConfig, AiConfigUpdateBO, AiProvider, AiProviderPreset } from '@/types/systemConfig'
 
+type ComposerAttachmentPreviewItem =
+  | { kind: 'knowledge'; key: string; knowledge: Knowledge }
+  | { kind: 'file'; key: string; file: File; fileIndex: number }
+
 const chatStore = useChatStore()
 const agentStore = useAgentStore()
 const userStore = useUserStore()
@@ -737,6 +798,19 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const chatInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const selectedKnowledgeItems = ref<Knowledge[]>([])
+const composerAttachmentPreviewItems = computed<ComposerAttachmentPreviewItem[]>(() => {
+  const items: ComposerAttachmentPreviewItem[] = []
+
+  for (const item of selectedKnowledgeItems.value) {
+    items.push({ kind: 'knowledge', key: `knowledge-${item.knowledgeId}`, knowledge: item })
+  }
+
+  selectedFiles.value.forEach((file, index) => {
+    items.push({ kind: 'file', key: `file-${file.name}-${file.lastModified}-${index}`, file, fileIndex: index })
+  })
+
+  return items
+})
 const chatKnowledgePickerVisible = ref(false)
 const isUploading = ref(false)
 const currentView = ref<'chat' | 'notifications'>('chat')
@@ -912,6 +986,14 @@ onMounted(async () => {
     agentStore.fetchEnabledAgents(),
     loadAiConfig()
   ])
+})
+
+onBeforeUnmount(() => {
+  revokeAllSelectedFilePreviewUrls()
+  if (scrollTimer) {
+    clearTimeout(scrollTimer)
+    scrollTimer = null
+  }
 })
 
 // Auto scroll to bottom when new messages arrive or during streaming while the user stays near the bottom.
@@ -1235,6 +1317,7 @@ async function handleSend() {
     isUploading.value = true
     try {
       const files = [...selectedFiles.value]
+      revokeAllSelectedFilePreviewUrls()
       selectedFiles.value = []
 
       const results = await Promise.all(
@@ -1420,6 +1503,10 @@ function handlePaste(event: ClipboardEvent) {
 }
 
 function removeSelectedFile(index: number) {
+  const file = selectedFiles.value[index]
+  if (file) {
+    revokeSelectedFilePreviewUrl(file)
+  }
   selectedFiles.value.splice(index, 1)
 }
 
@@ -1431,6 +1518,88 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+const selectedFilePreviewUrlMap = new WeakMap<File, string>()
+
+function getSelectedFilePreviewUrl(file: File): string {
+  const cached = selectedFilePreviewUrlMap.get(file)
+  if (cached) return cached
+
+  const url = URL.createObjectURL(file)
+  selectedFilePreviewUrlMap.set(file, url)
+  return url
+}
+
+function revokeSelectedFilePreviewUrl(file: File) {
+  const url = selectedFilePreviewUrlMap.get(file)
+  if (!url) return
+
+  URL.revokeObjectURL(url)
+  selectedFilePreviewUrlMap.delete(file)
+}
+
+function revokeAllSelectedFilePreviewUrls() {
+  for (const file of selectedFiles.value) {
+    revokeSelectedFilePreviewUrl(file)
+  }
+}
+
+function getFileExtension(fileName?: string): string {
+  const name = fileName || ''
+  if (!name.includes('.')) return ''
+  return name.split('.').pop()?.toLowerCase() || ''
+}
+
+function getFriendlyFileKind(fileName: string, mimeType?: string): string {
+  const normalizedType = (mimeType || '').toLowerCase()
+  const extension = getFileExtension(fileName)
+  if (normalizedType.includes('spreadsheetml') || normalizedType.includes('ms-excel') || extension === 'xlsx' || extension === 'xls') return 'Excel'
+  if (normalizedType.includes('wordprocessingml') || normalizedType.includes('msword') || extension === 'docx' || extension === 'doc') return 'Word'
+  if (normalizedType === 'application/pdf' || extension === 'pdf') return 'PDF'
+  if (normalizedType.startsWith('text/') || extension === 'txt' || extension === 'md') return '文本'
+  if (normalizedType.startsWith('image/')) return '图片'
+  if (normalizedType.startsWith('audio/')) return '音频'
+  if (normalizedType.startsWith('video/')) return '视频'
+  return '文件'
+}
+
+function getDocumentIconMeta(fileName: string, mimeType?: string): { icon: string; bg: string; color: string } {
+  const normalizedType = (mimeType || '').toLowerCase()
+  const extension = getFileExtension(fileName)
+  if (normalizedType.includes('spreadsheetml') || normalizedType.includes('ms-excel') || extension === 'xlsx' || extension === 'xls') {
+    return { icon: 'table_chart', bg: 'bg-emerald-50', color: 'text-emerald-700' }
+  }
+  if (normalizedType.includes('wordprocessingml') || normalizedType.includes('msword') || extension === 'docx' || extension === 'doc') {
+    return { icon: 'article', bg: 'bg-blue-50', color: 'text-blue-700' }
+  }
+  if (normalizedType === 'application/pdf' || extension === 'pdf') {
+    return { icon: 'picture_as_pdf', bg: 'bg-red-50', color: 'text-red-600' }
+  }
+  if (normalizedType.startsWith('image/')) {
+    return { icon: 'image', bg: 'bg-violet-50', color: 'text-violet-700' }
+  }
+  return { icon: 'description', bg: 'bg-[#0d0d0d0d]', color: 'text-[#0d0d0d]' }
+}
+
+function getChatDocumentSubtitle(file: File): string {
+  return `${getFriendlyFileKind(file.name, file.type)} · ${formatFileSize(file.size)}`
+}
+
+function getChatDocIconMeta(file: File): { icon: string; bg: string; color: string } {
+  return getDocumentIconMeta(file.name, file.type)
+}
+
+function getKnowledgeDocIconMeta(item: Knowledge): { icon: string; bg: string; color: string } {
+  return getDocumentIconMeta(item.name, item.mimeType)
+}
+
+function getKnowledgeCardSubtitle(item: Knowledge): string {
+  const kind = getFriendlyFileKind(item.name, item.mimeType)
+  const formattedSize = item.fileSizeFormatted?.trim()
+  if (formattedSize) return `${kind} · ${formattedSize}`
+  if (item.fileSize && item.fileSize > 0) return `${kind} · ${formatFileSize(item.fileSize)}`
+  return kind
 }
 
 async function handleNewSession() {
