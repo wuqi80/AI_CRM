@@ -373,6 +373,9 @@ async function submitRelation() {
     ElMessage.warning(`请填写必填字段: ${missingFields.join(', ')}`)
     return
   }
+  const uniqueValid = await dynamicFieldFormRef.value?.validateUniqueFields()
+  if (uniqueValid === false) return
+
   submitting.value = true
   try {
     const payload = normalizeRelationPayload()

@@ -1,9 +1,20 @@
-import type { PageResult } from '@/types/api'
+import type { Task, Knowledge } from '@/types/common'
+import type { FollowUpVO } from '@/types/customer'
+import type { ScheduleVO } from '@/api/schedule'
 
-export type RelationType = 'decision_maker' | 'influencer' | 'partner' | 'customer_contact' | 'other' | string
+export type RelationType =
+  | 'friend'
+  | 'family'
+  | 'relative'
+  | 'partner'
+  | 'customer_contact'
+  | 'supplier'
+  | 'investor'
+  | 'other'
+
 export type RelationSource = 'manual' | 'customer_contact' | string
 
-export interface Relation {
+export interface RelationVO {
   relationId: string
   name: string
   avatar?: string
@@ -11,7 +22,7 @@ export interface Relation {
   phone?: string
   wechat?: string
   email?: string
-  relationType?: RelationType
+  relationType?: RelationType | string
   relationTypeName?: string
   company?: string
   customerId?: string
@@ -24,49 +35,43 @@ export interface Relation {
   sourceCustomerId?: string
   sourceCustomerName?: string
   sourceContactId?: string
-  customFields?: Record<string, any>
   createUserId?: string
   createTime?: string
   updateTime?: string
+  customFields?: Record<string, unknown>
 }
 
-export interface RelationDetail {
-  relation: Relation
-  tasks?: any[]
-  schedules?: any[]
-  attachments?: any[]
-  histories?: any[]
+export interface RelationDetailVO {
+  relation: RelationVO
+  tasks?: Task[]
+  schedules?: ScheduleVO[]
+  attachments?: Knowledge[]
+  histories?: FollowUpVO[]
 }
 
-export interface RelationQuery {
-  keyword?: string
-  relationType?: string
-  source?: string
-  sourceCustomerId?: string
-  customerId?: string
-  sourceContactId?: string
-  page?: number
-  limit?: number
-}
-
-export interface RelationForm {
-  relationId?: string
+export interface RelationAddBO {
   name: string
   avatar?: string
   phone?: string
   wechat?: string
   email?: string
-  relationType?: string
+  relationType?: RelationType | string
   customerId?: string
   remark?: string
-  customFields?: Record<string, any>
+  customFields?: Record<string, unknown>
 }
 
-export type RelationPageResult = PageResult<Relation>
-export type RelationVO = Relation
-export type RelationAddBO = RelationForm
-export interface RelationUpdateBO extends RelationForm {
+export interface RelationUpdateBO extends RelationAddBO {
   relationId: string
 }
-export type RelationDetailVO = RelationDetail
-export type RelationQueryBO = RelationQuery
+
+export interface RelationQueryBO {
+  keyword?: string
+  relationType?: RelationType | string
+  source?: RelationSource
+  customerId?: string
+  sourceCustomerId?: string
+  sourceContactId?: string
+  page?: number
+  limit?: number
+}

@@ -1,196 +1,219 @@
 <template>
-  <div class="flex h-full flex-col gap-5 bg-slate-50 px-4 py-5 md:px-8">
+  <div class="flex h-full flex-col gap-6 px-4 py-6 md:px-6">
     <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div class="min-w-0">
-        <h1 class="text-xl font-bold text-slate-900">通讯录</h1>
-        <p class="mt-1 text-sm text-slate-500">共 {{ total }} 人</p>
+        <h2 class="text-[22px] font-bold text-slate-900">通讯录</h2>
+        <p class="mt-1 text-[13px] text-slate-500">企业内部员工与员工对象工作记录</p>
       </div>
 
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div class="relative">
-          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+        <div class="relative group flex items-center">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-primary">search</span>
           <input
             v-model="keyword"
             type="text"
             placeholder="搜索姓名、部门、职位、手机或邮箱"
-            class="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 sm:w-80"
+            class="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 sm:w-80"
             @input="debouncedLoadEmployees"
             @keydown.enter="loadEmployees"
           />
         </div>
         <select
           v-model="employeeStatus"
-          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+          class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-600 shadow-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
           @change="loadEmployees"
         >
           <option value="">全部状态</option>
           <option value="active">在职</option>
-          <option value="resigned">未激活</option>
+          <option value="resigned">离职</option>
           <option value="disabled">停用</option>
         </select>
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white" v-loading="loading">
-      <el-table
-        v-if="!isMobile"
-        :data="employees"
-        height="100%"
-        row-key="userId"
-        table-layout="fixed"
-        empty-text="暂无员工数据"
-        @row-click="openEmployee"
-      >
-        <el-table-column label="员工" min-width="240">
-          <template #default="{ row }">
-            <div class="flex min-w-0 items-center gap-3">
-              <div class="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
-                <img v-if="row.imgUrl" :src="row.imgUrl" class="size-full object-cover" alt="avatar" />
-                <span v-else class="flex size-full items-center justify-center bg-primary/10 text-sm font-bold text-primary">
-                  {{ employeeInitial(row) }}
-                </span>
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" v-loading="loading">
+      <div class="min-h-0 flex-1">
+        <el-table
+          v-if="!isMobile"
+          :data="employees"
+          height="100%"
+          row-key="userId"
+          table-layout="fixed"
+          class="wk-customer-table wk-address-book-table"
+          empty-text="暂无员工数据"
+          @row-click="openEmployeeChat"
+        >
+          <el-table-column label="员工" min-width="240">
+            <template #header>
+              <span class="normal-case tracking-normal">员工</span>
+            </template>
+            <template #default="{ row }">
+              <div class="flex min-w-0 items-center gap-3">
+                <div class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white">
+                  <img v-if="row.imgUrl" :src="row.imgUrl" class="size-full object-cover" alt="avatar" />
+                  <span v-else class="flex size-full items-center justify-center bg-primary/10 text-xs font-bold text-primary">
+                    {{ employeeInitial(row) }}
+                  </span>
+                </div>
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-semibold text-slate-900 transition-colors hover:text-primary hover:underline hover:decoration-primary underline-offset-2">{{ employeeName(row) }}</p>
+                  <p class="truncate text-xs text-slate-400">{{ row.email || '-' }}</p>
+                </div>
               </div>
-              <div class="min-w-0">
-                <p class="truncate text-sm font-semibold text-slate-900">{{ employeeName(row) }}</p>
-                <p class="truncate text-xs text-slate-400">{{ row.email || '-' }}</p>
-              </div>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="部门" min-width="150">
-          <template #default="{ row }">
-            <span class="block truncate text-sm text-slate-600">{{ row.deptName || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="职位" min-width="150">
-          <template #default="{ row }">
-            <span class="block truncate text-sm text-slate-600">{{ row.post || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="手机号" min-width="150">
-          <template #default="{ row }">
-            <span class="block truncate font-mono text-sm text-slate-600">{{ row.mobile || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="120">
-          <template #default="{ row }">
-            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium" :class="employeeStatusClass(row)">
-              <span class="mr-1.5 size-1.5 rounded-full" :class="employeeStatusDotClass(row)"></span>
-              {{ employeeStatusLabel(row) }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="最近任务" min-width="160">
-          <template #default="{ row }">
-            <span class="text-sm text-slate-500">{{ formatDateTime(row.recentTaskTime) }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
+            </template>
+          </el-table-column>
+          <el-table-column label="部门" min-width="150">
+            <template #header>
+              <span class="normal-case tracking-normal">部门</span>
+            </template>
+            <template #default="{ row }">
+              <span class="block truncate text-sm text-slate-600">{{ row.deptName || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="职位" min-width="150">
+            <template #header>
+              <span class="normal-case tracking-normal">职位</span>
+            </template>
+            <template #default="{ row }">
+              <span class="block truncate text-sm text-slate-600">{{ row.post || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="手机号" min-width="150">
+            <template #header>
+              <span class="normal-case tracking-normal">手机号</span>
+            </template>
+            <template #default="{ row }">
+              <span class="block truncate text-sm font-mono text-slate-600">{{ row.mobile || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="120">
+            <template #header>
+              <span class="normal-case tracking-normal">状态</span>
+            </template>
+            <template #default="{ row }">
+              <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap" :class="employeeStatusClass(row)">
+                <span class="mr-1.5 size-1.5 rounded-full" :class="employeeStatusDotClass(row)"></span>
+                {{ employeeStatusLabel(row) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="最近相关任务" min-width="160">
+            <template #header>
+              <span class="normal-case tracking-normal">最近相关任务</span>
+            </template>
+            <template #default="{ row }">
+              <span class="text-sm text-slate-500">{{ formatDateTime(row.recentTaskTime) }}</span>
+            </template>
+          </el-table-column>
 
-      <div v-else class="h-full overflow-y-auto px-3 py-3">
-        <div v-if="employees.length === 0" class="py-16 text-center text-slate-400">
-          <span class="material-symbols-outlined text-5xl">contacts</span>
-          <p class="mt-3 text-sm">{{ keyword.trim() ? '未找到匹配员工' : '暂无员工数据' }}</p>
-        </div>
-        <div v-else class="flex flex-col gap-3">
-          <button
-            v-for="employee in employees"
-            :key="employee.userId"
-            type="button"
-            class="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-left transition active:bg-slate-100"
-            @click="openEmployee(employee)"
-          >
-            <div class="flex items-start gap-3">
-              <div class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
-                <img v-if="employee.imgUrl" :src="employee.imgUrl" class="size-full object-cover" alt="avatar" />
-                <span v-else class="flex size-full items-center justify-center bg-primary/10 text-sm font-bold text-primary">
-                  {{ employeeInitial(employee) }}
-                </span>
+          <template #empty>
+            <div class="text-center py-16">
+              <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-4">
+                <span class="material-symbols-outlined text-4xl">contacts</span>
               </div>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-start gap-2">
-                  <div class="min-w-0 flex-1">
-                    <div class="truncate text-sm font-bold text-slate-900">{{ employeeName(employee) }}</div>
-                    <p class="mt-0.5 truncate text-xs text-slate-400">{{ employee.post || '员工' }} · {{ employee.deptName || '-' }}</p>
-                  </div>
-                  <span class="material-symbols-outlined text-base leading-none text-slate-300">chevron_right</span>
-                </div>
-                <div class="mt-3 grid grid-cols-2 gap-3">
-                  <div class="min-w-0">
-                    <div class="text-[11px] font-bold text-slate-400">手机</div>
-                    <div class="truncate text-sm text-slate-600">{{ employee.mobile || '-' }}</div>
-                  </div>
-                  <div class="min-w-0">
-                    <div class="text-[11px] font-bold text-slate-400">状态</div>
-                    <span class="mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" :class="employeeStatusClass(employee)">
-                      {{ employeeStatusLabel(employee) }}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <p class="text-slate-400 text-sm font-medium">{{ keyword.trim() ? '未找到匹配员工' : '暂无员工数据' }}</p>
             </div>
+          </template>
+        </el-table>
+
+        <div v-else class="wk-customer-cards h-full overflow-y-auto px-3 py-3">
+          <div v-if="employees.length === 0" class="text-center py-16">
+            <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-4">
+              <span class="material-symbols-outlined text-4xl">contacts</span>
+            </div>
+            <p class="text-slate-400 text-sm font-medium">{{ keyword.trim() ? '未找到匹配员工' : '暂无员工数据' }}</p>
+          </div>
+
+          <div v-else class="flex flex-col gap-3">
+            <button
+              v-for="employee in employees"
+              :key="employee.userId"
+              type="button"
+              class="wk-customer-card w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:bg-slate-50 active:bg-slate-100"
+              @click="openEmployeeChat(employee)"
+            >
+              <div class="flex items-start gap-3">
+                <div class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                  <img v-if="employee.imgUrl" :src="employee.imgUrl" class="size-full object-cover" alt="avatar" />
+                  <span v-else class="flex size-full items-center justify-center bg-primary/10 text-sm font-bold text-primary">
+                    {{ employeeInitial(employee) }}
+                  </span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start gap-2">
+                    <div class="min-w-0 flex-1">
+                      <div class="truncate text-sm font-bold text-slate-900">{{ employeeName(employee) }}</div>
+                      <p class="mt-0.5 truncate text-xs text-slate-400">{{ employee.post || '员工' }} · {{ employee.deptName || '-' }}</p>
+                    </div>
+                    <span class="material-symbols-outlined pt-0.5 text-base leading-none text-slate-300">chevron_right</span>
+                  </div>
+
+                  <div class="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
+                    <div class="min-w-0">
+                      <div class="text-[11px] font-bold uppercase tracking-wide text-slate-400">手机</div>
+                      <div class="truncate text-sm text-slate-600">{{ employee.mobile || '-' }}</div>
+                    </div>
+                    <div class="min-w-0">
+                      <div class="text-[11px] font-bold uppercase tracking-wide text-slate-400">状态</div>
+                      <div class="mt-0.5">
+                        <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap" :class="employeeStatusClass(employee)">
+                          <span class="mr-1.5 size-1.5 rounded-full" :class="employeeStatusDotClass(employee)"></span>
+                          {{ employeeStatusLabel(employee) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="col-span-2 min-w-0">
+                      <div class="text-[11px] font-bold uppercase tracking-wide text-slate-400">邮箱</div>
+                      <div class="truncate text-sm text-slate-600">{{ employee.email || '-' }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="total > 0" class="flex shrink-0 items-center justify-between border-t border-slate-200 bg-slate-50/50 px-6 py-4 text-sm text-slate-500">
+        <span>共 {{ total }} 条<span class="hidden md:inline">员工数据</span></span>
+        <div class="flex items-center gap-1">
+          <button class="flex size-8 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 disabled:opacity-50" :disabled="page <= 1" @click="changePage(page - 1)">
+            <span class="material-symbols-outlined text-lg">chevron_left</span>
+          </button>
+          <template v-if="!isMobile">
+            <button
+              v-for="pageNum in visiblePages"
+              :key="pageNum"
+              class="flex size-8 items-center justify-center rounded border text-xs font-bold"
+              :class="pageNum === page
+                ? 'border-primary bg-primary text-white'
+                : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'"
+              @click="changePage(pageNum)"
+            >
+              {{ pageNum }}
+            </button>
+            <span v-if="totalPages > 5" class="px-1 text-xs text-slate-400">...</span>
+          </template>
+          <span v-else class="px-2">{{ page }} / {{ totalPages }}</span>
+          <button class="flex size-8 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 disabled:opacity-50" :disabled="page >= totalPages" @click="changePage(page + 1)">
+            <span class="material-symbols-outlined text-lg">chevron_right</span>
           </button>
         </div>
       </div>
     </div>
-
-    <div v-if="total > 0" class="flex items-center justify-between text-sm text-slate-500">
-      <span>第 {{ page }} / {{ totalPages }} 页</span>
-      <div class="flex items-center gap-2">
-        <button class="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40" :disabled="page <= 1" @click="changePage(page - 1)">上一页</button>
-        <button class="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40" :disabled="page >= totalPages" @click="changePage(page + 1)">下一页</button>
-      </div>
-    </div>
-
-    <el-drawer v-model="detailVisible" :size="isMobile ? '100%' : '420px'" title="员工详情" append-to-body>
-      <div v-loading="detailLoading" class="space-y-5">
-        <template v-if="selectedDetail">
-          <div class="flex items-center gap-3">
-            <div class="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <img v-if="selectedDetail.imgUrl" :src="selectedDetail.imgUrl" class="size-full object-cover" alt="avatar" />
-              <span v-else class="flex size-full items-center justify-center bg-primary/10 text-base font-bold text-primary">
-                {{ employeeInitial(selectedDetail) }}
-              </span>
-            </div>
-            <div class="min-w-0">
-              <h2 class="truncate text-lg font-bold text-slate-900">{{ employeeName(selectedDetail) }}</h2>
-              <p class="truncate text-sm text-slate-500">{{ selectedDetail.post || '员工' }} · {{ selectedDetail.deptName || '-' }}</p>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 gap-3 text-sm">
-            <div v-for="item in detailRows" :key="item.label" class="rounded-lg bg-slate-50 px-3 py-2">
-              <div class="text-xs font-medium text-slate-400">{{ item.label }}</div>
-              <div class="mt-1 break-words text-sm font-medium text-slate-700">{{ item.value || '-' }}</div>
-            </div>
-          </div>
-
-          <section v-if="selectedDetail.recentRecords?.length" class="space-y-2">
-            <h3 class="text-sm font-bold text-slate-900">最近记录</h3>
-            <div class="divide-y divide-slate-100 rounded-lg border border-slate-200">
-              <div v-for="record in selectedDetail.recentRecords" :key="`${record.type}-${record.title}-${record.recordTime}`" class="px-3 py-3">
-                <div class="flex items-center justify-between gap-3">
-                  <p class="truncate text-sm font-medium text-slate-800">{{ record.title || '-' }}</p>
-                  <span class="shrink-0 text-xs text-slate-400">{{ formatDateTime(record.recordTime) }}</span>
-                </div>
-                <p v-if="record.description" class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{{ record.description }}</p>
-              </div>
-            </div>
-          </section>
-        </template>
-      </div>
-    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getAddressBookDetail, queryAddressBook } from '@/api/addressBook'
+import { queryAddressBook } from '@/api/addressBook'
 import { useResponsive } from '@/composables/useResponsive'
 import { isRequestErrorHandled } from '@/utils/requestError'
-import type { AddressBookDetail, AddressBookEmployee } from '@/types/addressBook'
+import type { AddressBookEmployee } from '@/types/addressBook'
 
+const router = useRouter()
 const { isMobile } = useResponsive()
 
 const employees = ref<AddressBookEmployee[]>([])
@@ -200,21 +223,21 @@ const employeeStatus = ref('')
 const page = ref(1)
 const limit = ref(20)
 const total = ref(0)
-const detailVisible = ref(false)
-const detailLoading = ref(false)
-const selectedDetail = ref<AddressBookDetail | null>(null)
-let searchTimer: ReturnType<typeof setTimeout> | null = null
+let searchTimer: number | null = null
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
-const detailRows = computed(() => {
-  const detail = selectedDetail.value
-  if (!detail) return []
-  return [
-    { label: '手机', value: detail.mobile || '' },
-    { label: '邮箱', value: detail.email || '' },
-    { label: '直属上级', value: detail.parentName || '' },
-    { label: '状态', value: employeeStatusLabel(detail) }
-  ]
+const visiblePages = computed(() => {
+  const totalPageCount = totalPages.value
+  const current = page.value
+  const pages: number[] = []
+  const maxVisible = 5
+  let start = Math.max(1, current - Math.floor(maxVisible / 2))
+  const end = Math.min(totalPageCount, start + maxVisible - 1)
+  start = Math.max(1, end - maxVisible + 1)
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
 })
 
 onMounted(() => {
@@ -222,8 +245,8 @@ onMounted(() => {
 })
 
 function debouncedLoadEmployees() {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
+  if (searchTimer) window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(() => {
     page.value = 1
     void loadEmployees()
   }, 260)
@@ -257,21 +280,6 @@ function changePage(nextPage: number) {
   void loadEmployees()
 }
 
-async function openEmployee(employee: AddressBookEmployee) {
-  detailVisible.value = true
-  detailLoading.value = true
-  selectedDetail.value = null
-  try {
-    selectedDetail.value = await getAddressBookDetail(employee.userId)
-  } catch (error) {
-    if (!isRequestErrorHandled(error)) {
-      ElMessage.warning('员工详情加载失败')
-    }
-  } finally {
-    detailLoading.value = false
-  }
-}
-
 function employeeName(employee: AddressBookEmployee) {
   return employee.realname || '未命名员工'
 }
@@ -287,7 +295,7 @@ function normalizeStatus(status?: string) {
 function employeeStatusLabel(employee: AddressBookEmployee) {
   if (employee.employeeStatusName) return employee.employeeStatusName
   const status = normalizeStatus(employee.employeeStatus)
-  if (status === 'resigned') return '未激活'
+  if (status === 'resigned') return '离职'
   if (status === 'disabled') return '停用'
   return '在职'
 }
@@ -317,4 +325,62 @@ function formatDateTime(value?: string) {
     minute: '2-digit'
   })
 }
+
+function openEmployeeChat(employee: AddressBookEmployee) {
+  router.push({ path: '/chat', query: { employeeId: employee.userId } })
+}
 </script>
+
+<style scoped>
+.wk-customer-table :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.wk-customer-table {
+  --el-table-bg-color: var(--wk-bg-surface);
+  --el-table-tr-bg-color: var(--wk-bg-surface);
+  --el-table-header-bg-color: var(--wk-bg-surface-subtle);
+  --el-table-header-text-color: var(--wk-text-muted);
+  --el-table-text-color: var(--wk-text-secondary);
+  --el-table-border-color: var(--wk-border-subtle);
+  --el-table-row-hover-bg-color: transparent;
+  --wk-customer-table-row-hover-bg-color: color-mix(in srgb, var(--wk-primary) 11%, var(--wk-bg-surface));
+}
+
+.wk-customer-table :deep(.el-table__border-left-patch),
+.wk-customer-table :deep(.el-table__fixed-right-patch) {
+  background: var(--wk-bg-surface-subtle);
+}
+
+.wk-customer-table :deep(th.el-table__cell) {
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--wk-border-muted);
+}
+
+.wk-customer-table :deep(td.el-table__cell) {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--wk-border-subtle);
+}
+
+.wk-customer-table :deep(.el-table__row) {
+  cursor: pointer;
+}
+
+.wk-customer-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: var(--wk-customer-table-row-hover-bg-color);
+}
+
+.wk-customer-table :deep(.el-table__empty-block) {
+  min-height: 220px;
+}
+
+.wk-customer-card {
+  -webkit-tap-highlight-color: transparent;
+}
+</style>

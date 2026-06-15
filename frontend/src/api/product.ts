@@ -1,4 +1,4 @@
-import { download, get, post, upload } from '@/utils/request'
+import { get, post, upload } from '@/utils/request'
 import type { PageResult } from '@/types/api'
 import type {
   ProductAddBO,
@@ -8,6 +8,7 @@ import type {
   ProductCategoryVO,
   ProductImportPreviewVO,
   ProductImportResultVO,
+  ProductImportRow,
   ProductQueryBO,
   ProductSettingsUpdateBO,
   ProductSettingsVO,
@@ -53,21 +54,21 @@ export function updateProductSettings(data: ProductSettingsUpdateBO): Promise<vo
   return post('/product/settings', data)
 }
 
-export function exportProducts(query: ProductQueryBO, fileName = 'products.xlsx'): Promise<void> {
-  return download('/product/export', fileName, { method: 'post', data: query })
+export function exportProducts(query: ProductQueryBO): Promise<Blob> {
+  return post('/product/export', query, { responseType: 'blob' })
 }
 
-export function downloadProductImportTemplate(fileName = 'product_import_template.xlsx'): Promise<void> {
-  return download('/product/import/template', fileName)
+export function downloadProductImportTemplate(): Promise<Blob> {
+  return get('/product/import/template', { responseType: 'blob' })
 }
 
-export function previewProductImport(file: File): Promise<ProductImportPreviewVO> {
+export function importProductPreview(file: File): Promise<ProductImportPreviewVO> {
   const formData = new FormData()
   formData.append('file', file)
   return upload('/product/import/preview', formData)
 }
 
-export function confirmProductImport(rows: ProductImportPreviewVO['rows']): Promise<ProductImportResultVO> {
+export function confirmProductImport(rows: ProductImportRow[]): Promise<ProductImportResultVO> {
   return post('/product/import/confirm', rows)
 }
 

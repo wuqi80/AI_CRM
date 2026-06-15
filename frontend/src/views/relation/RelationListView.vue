@@ -1,34 +1,36 @@
 <template>
-  <div class="flex h-full flex-col gap-5 bg-slate-50 px-4 py-5 md:px-8">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+  <div class="flex h-full flex-col gap-6 px-4 py-6 md:px-6">
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div class="min-w-0">
-        <h1 class="text-xl font-bold text-slate-900">关系</h1>
-        <p class="mt-1 text-sm text-slate-500">共 {{ total }} 位外部联系人</p>
+        <h2 class="text-[22px] font-bold text-slate-900">关系</h2>
+        <p class="mt-1 text-[13px] text-slate-500">外部联系人与私人关系记录</p>
       </div>
 
-      <div class="flex flex-col gap-3 md:flex-row md:items-center">
-        <div class="relative">
-          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div class="relative group flex items-center">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-primary">search</span>
           <input
             v-model="keyword"
             type="text"
-            placeholder="搜索姓名、电话、微信、邮箱或客户"
-            class="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 md:w-80"
+            placeholder="搜索姓名、手机号、微信、邮箱或客户"
+            class="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 sm:w-80"
             @input="debouncedLoadRelations"
             @keydown.enter="loadRelations"
           />
         </div>
         <select
           v-model="relationType"
-          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+          class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-600 shadow-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
           @change="loadRelations"
         >
           <option value="">全部类型</option>
-          <option v-for="item in relationTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+          <option v-for="option in relationTypeChoices" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
         </select>
         <button
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-sm transition hover:bg-primary/90"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90"
           @click="openCreateDialog"
         >
           <span class="material-symbols-outlined text-[18px] leading-none">person_add</span>
@@ -37,250 +39,261 @@
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white" v-loading="loading">
-      <el-table
-        v-if="!isMobile"
-        :data="relations"
-        height="100%"
-        row-key="relationId"
-        table-layout="fixed"
-        empty-text="暂无关系人"
-        @row-click="openDetail"
-      >
-        <el-table-column label="关系人" min-width="230">
-          <template #default="{ row }">
-            <div class="flex min-w-0 items-center gap-3">
-              <div class="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
-                <img v-if="row.avatarUrl" :src="row.avatarUrl" class="size-full object-contain" alt="关系人头像" />
-                <span v-else class="flex size-full items-center justify-center bg-primary/10 text-sm font-bold text-primary">
-                  {{ relationInitial(row) }}
-                </span>
-              </div>
-              <div class="min-w-0">
-                <p class="truncate text-sm font-semibold text-slate-900">{{ row.name }}</p>
-                <p class="truncate text-xs text-slate-400">{{ row.phone || row.email || row.wechat || '-' }}</p>
-              </div>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="类型" width="130">
-          <template #default="{ row }">
-            <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-              {{ relationTypeLabel(row) }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="关联客户" min-width="190">
-          <template #default="{ row }">
-            <span class="block truncate text-sm text-slate-600">{{ row.customerName || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="来源" width="130">
-          <template #default="{ row }">
-            <span class="text-sm text-slate-500">{{ sourceLabel(row) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="220">
-          <template #default="{ row }">
-            <span class="block truncate text-sm text-slate-500">{{ row.remark || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="更新时间" width="170">
-          <template #default="{ row }">
-            <span class="text-sm text-slate-500">{{ formatDateTime(row.updateTime || row.createTime) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="112" fixed="right">
-          <template #default="{ row }">
-            <div class="flex items-center gap-1" @click.stop>
-              <button class="relation-icon-button" title="编辑" type="button" @click="openEditDialog(row)">
-                <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
-              </button>
-              <button class="relation-icon-button text-rose-500 hover:bg-rose-50" title="删除" type="button" @click="handleDelete(row)">
-                <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
-              </button>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div v-else class="h-full overflow-y-auto px-3 py-3">
-        <div v-if="relations.length === 0" class="py-16 text-center text-slate-400">
-          <span class="material-symbols-outlined text-5xl">diversity_3</span>
-          <p class="mt-3 text-sm">{{ keyword.trim() ? '未找到匹配关系人' : '暂无关系人' }}</p>
-        </div>
-        <div v-else class="flex flex-col gap-3">
-          <button
-            v-for="relation in relations"
-            :key="relation.relationId"
-            type="button"
-            class="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-left transition active:bg-slate-100"
-            @click="openDetail(relation)"
-          >
-            <div class="flex items-start gap-3">
-              <div class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
-                <img v-if="relation.avatarUrl" :src="relation.avatarUrl" class="size-full object-contain" alt="关系人头像" />
-                <span v-else class="flex size-full items-center justify-center bg-primary/10 text-sm font-bold text-primary">
-                  {{ relationInitial(relation) }}
-                </span>
-              </div>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-start gap-2">
-                  <div class="min-w-0 flex-1">
-                    <div class="truncate text-sm font-bold text-slate-900">{{ relation.name }}</div>
-                    <p class="mt-0.5 truncate text-xs text-slate-400">
-                      {{ relationTypeLabel(relation) }} · {{ relation.customerName || '未关联客户' }}
-                    </p>
-                  </div>
-                  <span class="material-symbols-outlined text-base leading-none text-slate-300">chevron_right</span>
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" v-loading="loading">
+      <div class="min-h-0 flex-1">
+        <el-table
+          v-if="!isMobile"
+          :data="relations"
+          height="100%"
+          row-key="relationId"
+          table-layout="fixed"
+          class="wk-customer-table wk-relation-table"
+          empty-text="暂无关系人"
+          @row-click="openDetail"
+        >
+          <el-table-column label="关系人" min-width="220">
+            <template #header>
+              <span class="normal-case tracking-normal">关系人</span>
+            </template>
+            <template #default="{ row }">
+              <div class="flex min-w-0 items-center gap-3">
+                <div class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white">
+                  <img v-if="avatarUrl(row)" :src="avatarUrl(row)" class="size-full object-contain" alt="关系人头像" />
+                  <span v-else class="flex size-full items-center justify-center bg-primary/10 text-xs font-bold text-primary">
+                    {{ relationInitial(row) }}
+                  </span>
                 </div>
-                <p class="mt-3 truncate text-sm text-slate-600">{{ relation.phone || relation.email || relation.wechat || '-' }}</p>
-                <p class="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{{ relation.remark || '暂无备注' }}</p>
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-semibold text-slate-900 transition-colors hover:text-primary hover:underline hover:decoration-primary underline-offset-2">{{ row.name }}</p>
+                  <p class="truncate text-xs text-slate-400">{{ row.phone || row.email || '-' }}</p>
+                </div>
               </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="关系类型" width="130">
+            <template #header>
+              <span class="normal-case tracking-normal">关系类型</span>
+            </template>
+            <template #default="{ row }">
+              <span class="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
+                {{ relationTypeLabel(row.relationType, row.relationTypeName) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="所属公司" min-width="180">
+            <template #header>
+              <span class="normal-case tracking-normal">所属公司</span>
+            </template>
+            <template #default="{ row }">
+              <span class="block truncate text-sm text-slate-600">{{ row.customerName || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="来源" width="120">
+            <template #header>
+              <span class="normal-case tracking-normal">来源</span>
+            </template>
+            <template #default="{ row }">
+              <span class="text-sm text-slate-500">{{ sourceLabel(row) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="更新时间" width="170">
+            <template #header>
+              <span class="normal-case tracking-normal">更新时间</span>
+            </template>
+            <template #default="{ row }">
+              <span class="text-sm text-slate-500">{{ formatDateTime(row.updateTime || row.createTime) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="112" fixed="right">
+            <template #header>
+              <span class="normal-case tracking-normal">操作</span>
+            </template>
+            <template #default="{ row }">
+              <div class="flex items-center gap-1" @click.stop>
+                <button class="relation-icon-btn" title="编辑" @click="openEditDialog(row)">
+                  <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
+                </button>
+                <button class="relation-icon-btn text-rose-500 hover:bg-rose-50" title="删除" @click="handleDelete(row)">
+                  <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
+                </button>
+              </div>
+            </template>
+          </el-table-column>
+
+          <template #empty>
+            <div class="text-center py-16">
+              <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-4">
+                <span class="material-symbols-outlined text-4xl">diversity_3</span>
+              </div>
+              <p class="text-slate-400 text-sm font-medium">{{ keyword.trim() ? '未找到匹配关系人' : '暂无关系人' }}</p>
             </div>
+          </template>
+        </el-table>
+
+        <div v-else class="wk-customer-cards h-full overflow-y-auto px-3 py-3">
+          <div v-if="relations.length === 0" class="text-center py-16">
+            <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-4">
+              <span class="material-symbols-outlined text-4xl">diversity_3</span>
+            </div>
+            <p class="text-slate-400 text-sm font-medium">{{ keyword.trim() ? '未找到匹配关系人' : '暂无关系人' }}</p>
+          </div>
+
+          <div v-else class="flex flex-col gap-3">
+            <button
+              v-for="relation in relations"
+              :key="relation.relationId"
+              type="button"
+              class="wk-customer-card w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:bg-slate-50 active:bg-slate-100"
+              @click="openDetail(relation)"
+            >
+              <div class="flex items-start gap-3">
+                <div class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                  <img v-if="avatarUrl(relation)" :src="avatarUrl(relation)" class="size-full object-contain" alt="关系人头像" />
+                  <span v-else class="flex size-full items-center justify-center bg-primary/10 text-sm font-bold text-primary">
+                    {{ relationInitial(relation) }}
+                  </span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start gap-2">
+                    <div class="min-w-0 flex-1">
+                      <div class="truncate text-sm font-bold text-slate-900">{{ relation.name }}</div>
+                      <p class="mt-0.5 truncate text-xs text-slate-400">{{ relationTypeLabel(relation.relationType, relation.relationTypeName) }} · {{ relation.customerName || '-' }}</p>
+                    </div>
+                    <button type="button" class="relation-icon-btn shrink-0" title="AI 对话" @click.stop="openChat(relation)">
+                      <AiDialogIcon :size="24" :sparkle-size="14" />
+                    </button>
+                  </div>
+                  <div class="mt-3 grid grid-cols-1 gap-1 text-sm text-slate-600">
+                    <p class="truncate">{{ relation.phone || relation.email || relation.wechat || '-' }}</p>
+                    <p class="line-clamp-2 text-xs text-slate-400">{{ relation.remark || '暂无备注' }}</p>
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="total > 0" class="flex shrink-0 items-center justify-between border-t border-slate-200 bg-slate-50/50 px-6 py-4 text-sm text-slate-500">
+        <span>共 {{ total }} 条<span class="hidden md:inline">关系人数据</span></span>
+        <div class="flex items-center gap-1">
+          <button class="flex size-8 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 disabled:opacity-50" :disabled="page <= 1" @click="changePage(page - 1)">
+            <span class="material-symbols-outlined text-lg">chevron_left</span>
+          </button>
+          <template v-if="!isMobile">
+            <button
+              v-for="pageNum in visiblePages"
+              :key="pageNum"
+              class="flex size-8 items-center justify-center rounded border text-xs font-bold"
+              :class="pageNum === page
+                ? 'border-primary bg-primary text-white'
+                : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'"
+              @click="changePage(pageNum)"
+            >
+              {{ pageNum }}
+            </button>
+            <span v-if="totalPages > 5" class="px-1 text-xs text-slate-400">...</span>
+          </template>
+          <span v-else class="px-2">{{ page }} / {{ totalPages }}</span>
+          <button class="flex size-8 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 disabled:opacity-50" :disabled="page >= totalPages" @click="changePage(page + 1)">
+            <span class="material-symbols-outlined text-lg">chevron_right</span>
           </button>
         </div>
       </div>
     </div>
 
-    <div v-if="total > 0" class="flex items-center justify-between text-sm text-slate-500">
-      <span>第 {{ page }} / {{ totalPages }} 页</span>
-      <div class="flex items-center gap-2">
-        <button class="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40" :disabled="page <= 1" @click="changePage(page - 1)">上一页</button>
-        <button class="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40" :disabled="page >= totalPages" @click="changePage(page + 1)">下一页</button>
-      </div>
-    </div>
-
-    <el-dialog
+    <RelationUpsertDialog
       v-model="dialogVisible"
-      :fullscreen="isMobile"
-      :width="isMobile ? '100%' : '560px'"
-      :title="editingRelation ? '编辑关系' : '新建关系'"
+      :editing-relation="editingRelation"
+      @saved="handleRelationSaved"
+    />
+
+    <el-drawer
+      v-model="detailVisible"
+      :size="isMobile ? '100%' : '520px'"
+      title="关系详情"
       destroy-on-close
     >
-      <el-form label-position="top" @submit.prevent>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <el-form-item label="姓名" required>
-            <el-input v-model="form.name" maxlength="100" placeholder="请输入姓名" />
-          </el-form-item>
-          <el-form-item label="关系类型">
-            <el-select v-model="form.relationType" class="w-full" placeholder="请选择">
-              <el-option v-for="item in relationTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="手机号">
-            <el-input v-model="form.phone" maxlength="50" placeholder="请输入手机号" />
-          </el-form-item>
-          <el-form-item label="微信号">
-            <el-input v-model="form.wechat" maxlength="100" placeholder="请输入微信号" />
-          </el-form-item>
-          <el-form-item label="邮箱">
-            <el-input v-model="form.email" maxlength="100" placeholder="请输入邮箱" />
-          </el-form-item>
-          <el-form-item label="关联客户">
-            <el-select
-              v-model="form.customerId"
-              class="w-full"
-              clearable
-              filterable
-              remote
-              reserve-keyword
-              :placeholder="customerSelectPlaceholder"
-              :remote-method="searchCustomers"
-              :loading="customerLoading"
-              :disabled="!canQueryCustomers || saving"
-            >
-              <el-option v-for="item in customerOptions" :key="item.value" :label="item.label" :value="item.value" />
-            </el-select>
-          </el-form-item>
-        </div>
-        <el-form-item label="备注">
-          <el-input v-model="form.remark" type="textarea" :rows="4" maxlength="1000" show-word-limit placeholder="补充关系背景、偏好或合作线索" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100" @click="dialogVisible = false">取消</button>
-          <button
-            type="button"
-            class="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-            :disabled="saving"
-            @click="saveRelation"
-          >
-            {{ saving ? '保存中...' : '保存' }}
-          </button>
-        </div>
-      </template>
-    </el-dialog>
-
-    <el-drawer v-model="detailVisible" :size="isMobile ? '100%' : '460px'" title="关系详情" append-to-body>
-      <div v-loading="detailLoading" class="space-y-5">
-        <template v-if="currentDetail">
-          <div class="flex items-center gap-3">
-            <div class="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <img v-if="currentDetail.avatarUrl" :src="currentDetail.avatarUrl" class="size-full object-contain" alt="关系人头像" />
-              <span v-else class="flex size-full items-center justify-center bg-primary/10 text-base font-bold text-primary">
-                {{ relationInitial(currentDetail) }}
-              </span>
+      <div v-if="detailLoading" class="flex h-64 items-center justify-center">
+        <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+      </div>
+      <div v-else-if="currentDetail?.relation" class="space-y-5">
+        <section class="rounded-lg border border-slate-200 p-4">
+          <div class="flex items-start gap-3">
+            <img v-if="avatarUrl(currentDetail.relation)" :src="avatarUrl(currentDetail.relation)" class="size-12 rounded-lg object-contain" alt="关系人头像" />
+            <div v-else class="flex size-12 shrink-0 items-center justify-center rounded-full bg-slate-900 text-base font-bold text-white">
+              {{ relationInitial(currentDetail.relation) }}
             </div>
-            <div class="min-w-0">
-              <h2 class="truncate text-lg font-bold text-slate-900">{{ currentDetail.name }}</h2>
-              <p class="truncate text-sm text-slate-500">{{ relationTypeLabel(currentDetail) }} · {{ sourceLabel(currentDetail) }}</p>
+            <div class="min-w-0 flex-1">
+              <h3 class="truncate text-base font-bold text-slate-900">{{ currentDetail.relation.name }}</h3>
+              <p class="mt-1 text-sm text-slate-500">{{ relationTypeLabel(currentDetail.relation.relationType, currentDetail.relation.relationTypeName) }}</p>
+            </div>
+            <button class="relation-icon-btn" title="AI 对话" @click="openChat(currentDetail.relation)">
+              <AiDialogIcon :size="24" :sparkle-size="14" />
+            </button>
+          </div>
+          <div class="mt-4 grid grid-cols-1 gap-3 text-sm">
+            <p><span class="text-slate-400">手机号：</span>{{ currentDetail.relation.phone || '-' }}</p>
+            <p><span class="text-slate-400">微信号：</span>{{ currentDetail.relation.wechat || '-' }}</p>
+            <p><span class="text-slate-400">邮箱：</span>{{ currentDetail.relation.email || '-' }}</p>
+            <p><span class="text-slate-400">所属公司：</span>{{ currentDetail.relation.customerName || '-' }}</p>
+            <p><span class="text-slate-400">来源：</span>{{ sourceLabel(currentDetail.relation) }}</p>
+            <p v-if="currentDetail.relation.sourceCustomerName"><span class="text-slate-400">来源客户：</span>{{ currentDetail.relation.sourceCustomerName }}</p>
+          </div>
+          <p class="mt-4 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+            {{ currentDetail.relation.remark || '暂无备注' }}
+          </p>
+        </section>
+
+        <section v-for="section in detailSections" :key="section.key" class="rounded-lg border border-slate-200 p-4">
+          <div class="mb-3 flex items-center justify-between">
+            <h4 class="text-sm font-bold text-slate-900">{{ section.title }}</h4>
+            <span class="text-xs text-slate-400">{{ section.items.length }}</span>
+          </div>
+          <div v-if="section.items.length === 0" class="py-5 text-center text-xs text-slate-400">
+            暂无数据
+          </div>
+          <div v-else class="space-y-2">
+            <div v-for="item in section.items" :key="item.key" class="rounded-lg bg-slate-50 px-3 py-2">
+              <p class="truncate text-sm font-semibold text-slate-800">{{ item.title }}</p>
+              <p v-if="item.subtitle" class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{{ item.subtitle }}</p>
             </div>
           </div>
-
-          <div class="grid grid-cols-1 gap-3 text-sm">
-            <div v-for="item in detailRows" :key="item.label" class="rounded-lg bg-slate-50 px-3 py-2">
-              <div class="text-xs font-medium text-slate-400">{{ item.label }}</div>
-              <div class="mt-1 break-words text-sm font-medium text-slate-700">{{ item.value || '-' }}</div>
-            </div>
-          </div>
-
-          <div class="flex gap-2 pt-2">
-            <button type="button" class="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600" @click="openEditDialog(currentDetail)">编辑</button>
-            <button type="button" class="flex-1 rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600" @click="handleDelete(currentDetail)">删除</button>
-          </div>
-        </template>
+        </section>
       </div>
     </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { addRelation, deleteRelation, getRelationDetail, queryRelationPageList, updateRelation } from '@/api/relation'
-import { queryCustomerList } from '@/api/customer'
-import { useResponsive } from '@/composables/useResponsive'
+import { deleteRelation, getRelationDetail, queryRelationList } from '@/api/relation'
+import AiDialogIcon from '@/components/common/AiDialogIcon.vue'
+import RelationUpsertDialog from '@/views/relation/components/RelationUpsertDialog.vue'
+import { useChatStore } from '@/stores/chat'
 import { useEnumStore } from '@/stores/enums'
-import { useUserStore } from '@/stores/user'
+import { useResponsive } from '@/composables/useResponsive'
 import { isRequestErrorHandled } from '@/utils/requestError'
-import type { CustomerListVO } from '@/types/customer'
-import type { Relation, RelationForm } from '@/types/relation'
+import { appEvents, APP_EVENT } from '@/utils/events'
+import {
+  normalizeRelationTypeOptions,
+  resolveRelationTypeLabel
+} from '@/views/relation/constants'
+import type { RelationDetailVO, RelationVO } from '@/types/relation'
 
-type Option = {
-  label: string
-  value: string
-}
-
-const fallbackRelationTypeOptions: Option[] = [
-  { label: '决策人', value: 'decision_maker' },
-  { label: '影响人', value: 'influencer' },
-  { label: '合作伙伴', value: 'partner' },
-  { label: '客户联系人', value: 'customer_contact' },
-  { label: '其他', value: 'other' }
-]
-
-const fallbackRelationSourceOptions: Option[] = [
-  { label: '手动创建', value: 'manual' },
-  { label: '客户联系人', value: 'customer_contact' },
-  { label: '其他', value: 'other' }
-]
-
-const { isMobile } = useResponsive()
+const router = useRouter()
+const route = useRoute()
+const chatStore = useChatStore()
 const enumStore = useEnumStore()
-const userStore = useUserStore()
-const relations = ref<Relation[]>([])
+enumStore.ensureRelationType()
+const relationTypeChoices = computed(() =>
+  normalizeRelationTypeOptions(enumStore.relationType)
+)
+const { isMobile } = useResponsive()
+
+const relations = ref<RelationVO[]>([])
 const loading = ref(false)
 const keyword = ref('')
 const relationType = ref('')
@@ -288,238 +301,203 @@ const page = ref(1)
 const limit = ref(20)
 const total = ref(0)
 const dialogVisible = ref(false)
-const saving = ref(false)
-const editingRelation = ref<Relation | null>(null)
+const editingRelation = ref<RelationVO | null>(null)
 const detailVisible = ref(false)
 const detailLoading = ref(false)
-const currentDetail = ref<Relation | null>(null)
-const customerOptions = ref<Option[]>([])
-const customerLoading = ref(false)
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-
-const form = reactive<RelationForm>({
-  name: '',
-  phone: '',
-  wechat: '',
-  email: '',
-  relationType: 'other',
-  customerId: '',
-  remark: ''
-})
+const currentDetail = ref<RelationDetailVO | null>(null)
+let searchTimer: number | null = null
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
-const relationTypeOptions = computed<Option[]>(() =>
-  enumStore.relationType.length > 0 ? enumStore.relationType : fallbackRelationTypeOptions
-)
-const relationSourceOptions = computed<Option[]>(() =>
-  enumStore.relationSource.length > 0 ? enumStore.relationSource : fallbackRelationSourceOptions
-)
-const canQueryCustomers = computed(() => userStore.hasPermission('customer:view'))
-const customerSelectPlaceholder = computed(() => canQueryCustomers.value ? '搜索客户' : '暂无客户权限')
-const detailRows = computed(() => {
-  const relation = currentDetail.value
-  if (!relation) return []
+const visiblePages = computed(() => {
+  const totalPageCount = totalPages.value
+  const current = page.value
+  const pages: number[] = []
+  const maxVisible = 5
+  let start = Math.max(1, current - Math.floor(maxVisible / 2))
+  const end = Math.min(totalPageCount, start + maxVisible - 1)
+  start = Math.max(1, end - maxVisible + 1)
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
+})
+
+const detailSections = computed(() => {
+  const detail = currentDetail.value
   return [
-    { label: '手机号', value: relation.phone || '' },
-    { label: '微信号', value: relation.wechat || '' },
-    { label: '邮箱', value: relation.email || '' },
-    { label: '关联客户', value: relation.customerName || '' },
-    { label: '备注', value: relation.remark || '' },
-    { label: '更新时间', value: formatDateTime(relation.updateTime || relation.createTime) }
+    {
+      key: 'tasks',
+      title: '相关任务',
+      items: (detail?.tasks || []).map(task => ({
+        key: `task-${task.taskId}`,
+        title: task.title,
+        subtitle: [task.statusName || task.status, task.dueDate ? `截止 ${formatDateTime(task.dueDate)}` : ''].filter(Boolean).join(' · ')
+      }))
+    },
+    {
+      key: 'schedules',
+      title: '相关日程',
+      items: (detail?.schedules || []).map(schedule => ({
+        key: `schedule-${schedule.scheduleId}`,
+        title: schedule.title,
+        subtitle: [schedule.startTime ? formatDateTime(schedule.startTime) : '', schedule.location || ''].filter(Boolean).join(' · ')
+      }))
+    },
+    {
+      key: 'attachments',
+      title: '相关附件',
+      items: (detail?.attachments || []).map(knowledge => ({
+        key: `knowledge-${knowledge.knowledgeId}`,
+        title: knowledge.name,
+        subtitle: [knowledge.summary || '', knowledge.createTime ? formatDateTime(knowledge.createTime) : ''].filter(Boolean).join(' · ')
+      }))
+    },
+    {
+      key: 'histories',
+      title: '历史记录',
+      items: (detail?.histories || []).map(history => ({
+        key: `history-${history.followUpId}`,
+        title: history.content,
+        subtitle: [history.typeName || history.type, history.followTime ? formatDateTime(history.followTime) : ''].filter(Boolean).join(' · ')
+      }))
+    }
   ]
 })
 
 onMounted(() => {
-  void enumStore.ensureRelationType()
-  void enumStore.ensureRelationSource()
-  loadRelations()
+  void loadRelations()
+  void applyOpenRelationQuery()
 })
+
+watch(
+  () => route.query.openRelationId,
+  () => {
+    void applyOpenRelationQuery()
+  }
+)
+
+function debouncedLoadRelations() {
+  if (searchTimer) window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(() => {
+    page.value = 1
+    void loadRelations()
+  }, 260)
+}
 
 async function loadRelations() {
   loading.value = true
   try {
-    const result = await queryRelationPageList({
+    const result = await queryRelationList({
       keyword: keyword.value.trim() || undefined,
       relationType: relationType.value || undefined,
       page: page.value,
       limit: limit.value
     })
     relations.value = result.list || []
-    total.value = result.totalRow || 0
+    total.value = Number(result.totalRow || 0)
   } catch (error) {
     if (!isRequestErrorHandled(error)) {
-      ElMessage.error('加载关系列表失败')
+      ElMessage.warning('关系列表加载失败')
     }
+    relations.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
 }
 
-function debouncedLoadRelations() {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    page.value = 1
-    loadRelations()
-  }, 300)
-}
-
 function changePage(nextPage: number) {
   if (nextPage < 1 || nextPage > totalPages.value || nextPage === page.value) return
   page.value = nextPage
-  loadRelations()
+  void loadRelations()
 }
 
 function openCreateDialog() {
   editingRelation.value = null
-  resetForm()
   dialogVisible.value = true
 }
 
-function openEditDialog(relation: Relation) {
+function openEditDialog(relation: RelationVO) {
   editingRelation.value = relation
-  form.relationId = relation.relationId
-  form.name = relation.name || ''
-  form.phone = relation.phone || ''
-  form.wechat = relation.wechat || ''
-  form.email = relation.email || ''
-  form.relationType = relation.relationType || 'other'
-  form.customerId = relation.customerId ? String(relation.customerId) : ''
-  form.remark = relation.remark || ''
-  ensureCustomerOption(relation)
   dialogVisible.value = true
-  detailVisible.value = false
 }
 
-function resetForm() {
-  form.relationId = undefined
-  form.name = ''
-  form.phone = ''
-  form.wechat = ''
-  form.email = ''
-  form.relationType = 'other'
-  form.customerId = ''
-  form.remark = ''
-  customerOptions.value = []
+async function handleRelationSaved(payload: { mode: 'create' | 'edit'; relationId?: string }) {
+  await loadRelations()
+  appEvents.emit(APP_EVENT.RELATION_SIDEBAR_REFRESH, { preserveScroll: true })
+  if (payload.relationId && currentDetail.value?.relation.relationId === payload.relationId) {
+    await loadDetail(payload.relationId)
+  }
 }
 
-async function saveRelation() {
-  if (!form.name.trim()) {
-    ElMessage.warning('请输入姓名')
-    return
-  }
-
-  saving.value = true
-  const payload: RelationForm = {
-    ...form,
-    name: form.name.trim(),
-    phone: form.phone?.trim() || undefined,
-    wechat: form.wechat?.trim() || undefined,
-    email: form.email?.trim() || undefined,
-    relationType: form.relationType || 'other',
-    customerId: form.customerId || undefined,
-    remark: form.remark?.trim() || undefined
-  }
-
+async function handleDelete(relation: RelationVO) {
   try {
-    if (editingRelation.value && form.relationId) {
-      await updateRelation({ ...payload, relationId: form.relationId })
-      ElMessage.success('关系已更新')
-    } else {
-      await addRelation(payload)
-      ElMessage.success('关系已创建')
-    }
-    dialogVisible.value = false
-    await loadRelations()
-  } catch (error) {
-    if (!isRequestErrorHandled(error)) {
-      ElMessage.error('保存关系失败')
-    }
-  } finally {
-    saving.value = false
-  }
-}
-
-async function handleDelete(relation: Relation) {
-  try {
-    await ElMessageBox.confirm(`确定删除“${relation.name}”？`, '删除关系', {
+    await ElMessageBox.confirm(`确定删除关系人「${relation.name}」吗？`, '删除关系', {
       confirmButtonText: '删除',
       cancelButtonText: '取消',
       type: 'warning'
     })
     await deleteRelation(relation.relationId)
-    ElMessage.success('关系已删除')
-    detailVisible.value = false
+    ElMessage.success('已删除')
     await loadRelations()
-  } catch (error) {
-    if (!isRequestErrorHandled(error) && error !== 'cancel' && error !== 'close') {
-      ElMessage.error('删除关系失败')
+    appEvents.emit(APP_EVENT.RELATION_SIDEBAR_REFRESH, { preserveScroll: true })
+    if (currentDetail.value?.relation.relationId === relation.relationId) {
+      detailVisible.value = false
+      currentDetail.value = null
     }
+  } catch {
+    // ignore cancel
   }
 }
 
-async function openDetail(relation: Relation) {
+async function openDetail(relation: RelationVO) {
   detailVisible.value = true
+  await loadDetail(relation.relationId)
+}
+
+async function loadDetail(relationId: string) {
   detailLoading.value = true
-  currentDetail.value = relation
   try {
-    const detail = await getRelationDetail(relation.relationId)
-    currentDetail.value = detail.relation || relation
+    currentDetail.value = await getRelationDetail(relationId)
   } catch (error) {
     if (!isRequestErrorHandled(error)) {
-      ElMessage.error('加载关系详情失败')
+      ElMessage.warning('关系详情加载失败')
     }
   } finally {
     detailLoading.value = false
   }
 }
 
-async function searchCustomers(query: string) {
-  if (!canQueryCustomers.value) {
-    customerOptions.value = []
-    return
-  }
-  const keywordText = query.trim()
-  if (!keywordText) {
-    customerOptions.value = []
-    return
-  }
-
-  customerLoading.value = true
-  try {
-    const result = await queryCustomerList({ keyword: keywordText, page: 1, limit: 20 })
-    customerOptions.value = (result.list || []).map(toCustomerOption)
-  } finally {
-    customerLoading.value = false
-  }
+async function openChat(relation: RelationVO) {
+  await chatStore.openRelationChat(relation)
+  await router.push({ path: '/chat', query: { relationId: relation.relationId } })
 }
 
-function ensureCustomerOption(relation: Relation) {
-  if (!relation.customerId || !relation.customerName) return
-  const value = String(relation.customerId)
-  if (!customerOptions.value.some(item => item.value === value)) {
-    customerOptions.value = [{ label: relation.customerName, value }, ...customerOptions.value]
-  }
+async function applyOpenRelationQuery() {
+  const raw = route.query.openRelationId
+  const relationId = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  if (!relationId) return
+  detailVisible.value = true
+  await loadDetail(relationId)
 }
 
-function toCustomerOption(customer: CustomerListVO): Option {
-  return {
-    label: customer.companyName || `客户 ${customer.customerId}`,
-    value: String(customer.customerId)
-  }
+function relationInitial(relation: RelationVO) {
+  return relation.name?.trim().charAt(0) || '?'
 }
 
-function relationInitial(relation: Relation) {
-  return relation.name?.trim()?.charAt(0) || '?'
+function avatarUrl(relation: RelationVO) {
+  return relation.avatarUrl || ''
 }
 
-function relationTypeLabel(relation: Relation) {
-  if (relation.relationTypeName) return relation.relationTypeName
-  return relationTypeOptions.value.find(item => item.value === relation.relationType)?.label || relation.relationType || '其他'
+function relationTypeLabel(type?: string, fallback?: string) {
+  return resolveRelationTypeLabel(type, fallback, relationTypeChoices.value)
 }
 
-function sourceLabel(relation: Relation) {
+function sourceLabel(relation: RelationVO) {
   if (relation.sourceName) return relation.sourceName
-  return relationSourceOptions.value.find(item => item.value === relation.source)?.label || relation.source || '-'
+  if (relation.source === 'customer_contact') return '客户联系人'
+  if (relation.source === 'manual') return '手动创建'
+  return relation.source || '-'
 }
 
 function formatDateTime(value?: string) {
@@ -527,7 +505,6 @@ function formatDateTime(value?: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('zh-CN', {
-    year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -537,19 +514,71 @@ function formatDateTime(value?: string) {
 </script>
 
 <style scoped>
-.relation-icon-button {
+.wk-customer-table :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.wk-customer-table {
+  --el-table-bg-color: var(--wk-bg-surface);
+  --el-table-tr-bg-color: var(--wk-bg-surface);
+  --el-table-header-bg-color: var(--wk-bg-surface-subtle);
+  --el-table-header-text-color: var(--wk-text-muted);
+  --el-table-text-color: var(--wk-text-secondary);
+  --el-table-border-color: var(--wk-border-subtle);
+  --el-table-row-hover-bg-color: transparent;
+  --wk-customer-table-row-hover-bg-color: color-mix(in srgb, var(--wk-primary) 11%, var(--wk-bg-surface));
+}
+
+.wk-customer-table :deep(.el-table__border-left-patch),
+.wk-customer-table :deep(.el-table__fixed-right-patch) {
+  background: var(--wk-bg-surface-subtle);
+}
+
+.wk-customer-table :deep(th.el-table__cell) {
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--wk-border-muted);
+}
+
+.wk-customer-table :deep(td.el-table__cell) {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--wk-border-subtle);
+}
+
+.wk-customer-table :deep(.el-table__row) {
+  cursor: pointer;
+}
+
+.wk-customer-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: var(--wk-customer-table-row-hover-bg-color);
+}
+
+.wk-customer-table :deep(.el-table__empty-block) {
+  min-height: 220px;
+}
+
+.relation-icon-btn {
   display: inline-flex;
   width: 32px;
   height: 32px;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  color: rgb(100 116 139);
+  color: #64748b;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.relation-icon-button:hover {
-  background: rgb(241 245 249);
-  color: rgb(15 23 42);
+.relation-icon-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.wk-customer-card {
+  -webkit-tap-highlight-color: transparent;
 }
 </style>

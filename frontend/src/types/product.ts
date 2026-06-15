@@ -64,50 +64,6 @@ export interface ProductTransferBO {
   ownerId: string
 }
 
-export interface ProductSettingsVO {
-  codeRequired?: boolean
-}
-
-export interface ProductSettingsUpdateBO {
-  codeRequired?: boolean
-}
-
-export interface ProductImportRow {
-  rowNum?: number
-  productName?: string
-  productCode?: string
-  categoryPath?: string
-  categoryId?: string
-  productType?: string
-  unit?: string
-  standardPrice?: number | string
-  costPrice?: number | string
-  ownerName?: string
-  ownerId?: string
-  status?: ProductStatus
-  description?: string
-  duplicate?: boolean
-  existingProductId?: string
-  handleMode?: string
-  errors?: string[]
-}
-
-export interface ProductImportPreviewVO {
-  totalRows: number
-  validRows: number
-  errorRows: number
-  duplicateRows: number
-  rows: ProductImportRow[]
-  errors: string[]
-}
-
-export interface ProductImportResultVO {
-  imported: number
-  updated: number
-  skipped: number
-  errors: string[]
-}
-
 export interface ProductCategoryVO {
   categoryId: string
   parentId?: string
@@ -135,4 +91,48 @@ export interface ProductCategoryMoveBO {
   categoryId: string
   parentId?: string
   sortOrder?: number
+}
+
+export interface ProductSettingsVO {
+  codeRequired: boolean
+}
+
+export interface ProductSettingsUpdateBO {
+  codeRequired: boolean
+}
+
+export interface ProductImportRow {
+  rowNum?: number
+  productName?: string
+  productCode?: string
+  categoryPath?: string
+  categoryId?: string
+  productType?: string
+  unit?: string
+  standardPrice?: number | string
+  costPrice?: number | string
+  ownerName?: string
+  ownerId?: string
+  status?: ProductStatus | string
+  description?: string
+  duplicate?: boolean
+  existingProductId?: string
+  handleMode?: string
+  errors?: string[]
+}
+
+export interface ProductImportPreviewVO {
+  totalRows: number
+  validRows: number
+  errorRows: number
+  duplicateRows: number
+  rows: ProductImportRow[]
+  errors: string[]
+}
+
+export interface ProductImportResultVO {
+  imported: number
+  updated: number
+  skipped: number
+  errors: string[]
 }
