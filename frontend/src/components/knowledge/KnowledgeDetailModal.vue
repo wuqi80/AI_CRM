@@ -431,8 +431,25 @@ type PreviewKind =
   | 'unsupported'
   | 'none'
 
+const VueOfficeDocx = defineAsyncComponent(async () => {
+  await import('@vue-office/docx/lib/v3/index.css')
+  const module = await import('@vue-office/docx/lib/v3/index.js')
+  return module.default
+})
+
+const VueOfficeExcel = defineAsyncComponent(async () => {
+  await import('@vue-office/excel/lib/v3/index.css')
+  const module = await import('@vue-office/excel/lib/v3/index.js')
+  return module.default
+})
+
 const KnowledgePdfPreview = defineAsyncComponent(async () => {
   const module = await import('@/components/knowledge/KnowledgePdfPreview.vue')
+  return module.default
+})
+
+const VueOfficePptx = defineAsyncComponent(async () => {
+  const module = await import('@vue-office/pptx/lib/v3/index.js')
   return module.default
 })
 
@@ -456,6 +473,7 @@ const mobileTabs = [
 const knowledge = ref<Knowledge | null>(null)
 const analysis = ref<KnowledgeAiAnalyzeVO | null>(null)
 const previewBlob = ref<Blob | null>(null)
+const officePreviewSource = ref<Blob | ArrayBuffer | null>(null)
 const mediaPreviewUrl = ref('')
 const mediaPreviewObjectUrl = ref(false)
 const previewKind = ref<PreviewKind>('none')
@@ -473,8 +491,20 @@ const scrollContainerRef = ref<HTMLElement | null>(null)
 const docHtmlContent = ref('')
 const docIframeRef = ref<HTMLIFrameElement | null>(null)
 
-const activePreviewComponent = computed(() => null)
-const previewSource = computed(() => undefined)
+const activePreviewComponent = computed(() => {
+  switch (previewKind.value) {
+    case 'docx':
+      return VueOfficeDocx
+    case 'excel':
+      return VueOfficeExcel
+    case 'pptx':
+      return VueOfficePptx
+    default:
+      return null
+  }
+})
+
+const previewSource = computed(() => officePreviewSource.value ?? undefined)
 
 const showImagePreview = computed(() => {
   return previewKind.value === 'image' && Boolean(mediaPreviewUrl.value) && !previewFailed.value
@@ -492,7 +522,9 @@ const showPdfPreview = computed(() => {
   return previewKind.value === 'pdf' && Boolean(previewBlob.value) && !previewFailed.value
 })
 
-const showOfficePreview = computed(() => false)
+const showOfficePreview = computed(() => {
+  return Boolean(activePreviewComponent.value && previewSource.value && !previewFailed.value)
+})
 
 const showDocHtmlPreview = computed(() => {
   return previewKind.value === 'doc' && Boolean(docHtmlContent.value) && !previewFailed.value
@@ -517,6 +549,7 @@ const analysisStatusText = computed(() => {
 
 function resetPreviewState() {
   previewBlob.value = null
+  officePreviewSource.value = null
   previewKind.value = 'none'
   previewNotice.value = ''
   previewText.value = ''
@@ -639,8 +672,9 @@ function handlePreviewRendered() {
 function handlePreviewError(error: unknown) {
   console.error('Knowledge preview render failed:', error)
   previewBlob.value = null
+  officePreviewSource.value = null
   previewFailed.value = true
-  previewNotice.value = previewNotice.value || '文件渲染失败，请下载后查看。'
+  previewNotice.value = previewNotice.value || '文件渲染失败，已切换为文本内容。'
 }
 
 function handleMediaPreviewError(error: Event) {
@@ -773,13 +807,12 @@ async function loadDocument(id: string) {
       return
     }
 
-    if (kind !== 'pdf') {
-      previewFailed.value = true
-      previewNotice.value = '当前文件暂不支持在线预览，请下载后查看。'
-      return
-    }
-
-    previewBlob.value = fileBlob
+    previewBlob.value = kind === 'pdf' ? fileBlob : null
+    officePreviewSource.value = kind === 'pdf'
+      ? null
+      : kind === 'pptx'
+        ? await fileBlob.arrayBuffer()
+        : fileBlob
   } catch (error) {
     console.error('Failed to load knowledge detail:', error)
     previewFailed.value = true
