@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS crm_external_auth_identity (
 
 CREATE INDEX IF NOT EXISTS idx_external_auth_user_id ON crm_external_auth_identity (user_id);
 
+DROP TRIGGER IF EXISTS trg_external_auth_identity_update_time ON crm_external_auth_identity;
 CREATE TRIGGER trg_external_auth_identity_update_time
     BEFORE UPDATE ON crm_external_auth_identity
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();

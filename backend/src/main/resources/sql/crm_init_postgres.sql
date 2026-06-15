@@ -670,7 +670,8 @@ COMMENT ON TABLE crm_contact_tag IS '联系人标签表';
 DROP TABLE IF EXISTS crm_follow_up CASCADE;
 CREATE TABLE crm_follow_up (
     follow_up_id BIGINT NOT NULL,
-    customer_id BIGINT NOT NULL,
+    customer_id BIGINT,
+    relation_id BIGINT,
     contact_id BIGINT,
     type VARCHAR(50) NOT NULL,
     content TEXT NOT NULL,
