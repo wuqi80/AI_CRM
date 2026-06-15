@@ -101,6 +101,20 @@ public class Knowledge implements Serializable {
     private String weKnoraParseStatus;
 
     /**
+     * AI analysis result snapshot.
+     */
+    @TableField("ai_analysis_snapshot")
+    @Schema(description = "AI analysis snapshot")
+    private String aiAnalysisSnapshot;
+
+    /**
+     * AI analysis completion time.
+     */
+    @TableField("ai_analysis_time")
+    @Schema(description = "AI analysis time")
+    private Date aiAnalysisTime;
+
+    /**
      * 创建时间
      */
     @TableField(fill = FieldFill.INSERT)

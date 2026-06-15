@@ -50,6 +50,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -381,6 +382,11 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "知识库文件不存在");
         }
 
+        KnowledgeAiAnalyzeVO cachedResult = readCachedAnalyzeResult(knowledge);
+        if (cachedResult != null) {
+            return cachedResult;
+        }
+
         String contentText = StrUtil.blankToDefault(knowledge.getContentText(), "");
         // 截断过长的内容
         if (contentText.length() > 4000) {
@@ -402,11 +408,60 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                     .content();
 
             log.info("AI 文档分析原始响应: {}", response);
-            return parseAnalyzeResponse(response, knowledge);
+            KnowledgeAiAnalyzeVO result = parseAnalyzeResponse(response, knowledge);
+            persistAnalyzeResult(knowledge, result);
+            return result;
         } catch (Exception e) {
             log.error("AI 文档分析失败，返回默认值", e);
             return buildFallbackAnalyzeResult(knowledge);
         }
+    }
+
+    private KnowledgeAiAnalyzeVO readCachedAnalyzeResult(Knowledge knowledge) {
+        String snapshot = StrUtil.trimToNull(knowledge.getAiAnalysisSnapshot());
+        if (snapshot == null) {
+            return null;
+        }
+
+        try {
+            KnowledgeAiAnalyzeVO cached = objectMapper.readValue(snapshot, KnowledgeAiAnalyzeVO.class);
+            return normalizeAnalyzeResult(cached, knowledge);
+        } catch (Exception e) {
+            log.warn("解析知识库缓存分析结果失败: knowledgeId={}, error={}",
+                    knowledge.getKnowledgeId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private void persistAnalyzeResult(Knowledge knowledge, KnowledgeAiAnalyzeVO result) {
+        try {
+            KnowledgeAiAnalyzeVO normalized = normalizeAnalyzeResult(result, knowledge);
+            knowledge.setAiAnalysisSnapshot(objectMapper.writeValueAsString(normalized));
+            knowledge.setAiAnalysisTime(new Date());
+            updateById(knowledge);
+        } catch (Exception e) {
+            log.warn("保存知识库 AI 分析缓存失败: knowledgeId={}, error={}",
+                    knowledge.getKnowledgeId(), e.getMessage());
+        }
+    }
+
+    private KnowledgeAiAnalyzeVO normalizeAnalyzeResult(KnowledgeAiAnalyzeVO source, Knowledge knowledge) {
+        KnowledgeAiAnalyzeVO normalized = new KnowledgeAiAnalyzeVO();
+        if (source != null) {
+            normalized.setCoreHighlights(source.getCoreHighlights());
+            normalized.setTalkingPoints(source.getTalkingPoints());
+            normalized.setRelatedEntities(source.getRelatedEntities());
+        }
+        if (StrUtil.isBlank(normalized.getCoreHighlights())) {
+            normalized.setCoreHighlights(StrUtil.blankToDefault(knowledge.getSummary(), "暂无摘要"));
+        }
+        if (normalized.getTalkingPoints() == null) {
+            normalized.setTalkingPoints(List.of());
+        }
+        if (normalized.getRelatedEntities() == null) {
+            normalized.setRelatedEntities(List.of());
+        }
+        return normalized;
     }
 
     private KnowledgeAiAnalyzeVO parseAnalyzeResponse(String response, Knowledge knowledge) {
