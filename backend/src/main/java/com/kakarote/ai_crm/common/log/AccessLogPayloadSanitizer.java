@@ -36,13 +36,16 @@ public final class AccessLogPayloadSanitizer {
             "api_key",
             "api-key",
             "secret",
-            "client_secret"
+            "client_secret",
+            "captcha",
+            "captchaverification",
+            "verificationcode"
     );
     private static final Pattern JSON_SECRET_PATTERN = Pattern.compile(
-            "(?i)(\"(?:password|oldPassword|newPassword|token|apiKey|api_key|secret|clientSecret|client_secret)\"\\s*:\\s*\")([^\"]*)(\")"
+            "(?i)(\"(?:password|oldPassword|newPassword|token|apiKey|api_key|secret|clientSecret|client_secret|captcha|captchaVerification|verificationCode)\"\\s*:\\s*\")([^\"]*)(\")"
     );
     private static final Pattern FORM_SECRET_PATTERN = Pattern.compile(
-            "(?i)(^|[&?])((?:password|oldPassword|newPassword|token|apiKey|api_key|secret|clientSecret|client_secret)=)([^&]*)"
+            "(?i)(^|[&?])((?:password|oldPassword|newPassword|token|apiKey|api_key|secret|clientSecret|client_secret|captcha|captchaVerification|verificationCode)=)([^&]*)"
     );
 
     private AccessLogPayloadSanitizer() {

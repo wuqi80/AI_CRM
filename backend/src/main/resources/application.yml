@@ -98,3 +98,7 @@ weknora:
     match-count: 5
     vector-threshold: 0.5
     auto-rag-enabled: true
+
+wukong:
+  captcha:
+    login-required: false

@@ -109,3 +109,33 @@ export function getUserAuth(): Promise<Record<string, any>> {
 export function getOidcSessionToken(): Promise<{ sessionToken: string }> {
   return get('/auth/oidc-session')
 }
+
+export interface CaptchaData {
+  originalImageBase64: string
+  jigsawImageBase64: string
+  token: string
+  secretKey?: string
+  captchaType?: string
+}
+
+export interface CheckCaptchaParams {
+  token: string
+  pointX: number
+  pointY?: number
+  secretKey?: string
+  captchaType?: string
+}
+
+export interface CheckCaptchaResult {
+  captchaVerification: string
+}
+
+export function getCaptcha(): Promise<CaptchaData> {
+  return post<CaptchaData>('/captcha/get', {
+    captchaType: 'blockPuzzle'
+  })
+}
+
+export function checkCaptcha(params: CheckCaptchaParams): Promise<CheckCaptchaResult> {
+  return post<CheckCaptchaResult>('/captcha/check', params)
+}

@@ -22,4 +22,9 @@ public class LoginUserBO {
      */
     @NotEmpty
     private String password;
+
+    /**
+     * 图形验证码二次校验串。
+     */
+    private String captchaVerification;
 }

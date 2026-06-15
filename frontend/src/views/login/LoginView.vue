@@ -56,6 +56,11 @@
           <p>测试账号: admin / 123456a</p>
         </div>
       </el-card>
+
+      <SliderCaptchaDialog
+        v-model="showCaptchaDialog"
+        @verified="handleCaptchaVerified"
+      />
     </div>
   </div>
 </template>
@@ -67,6 +72,7 @@ import { ElMessage, FormInstance, FormRules } from 'element-plus'
 import { Lock, User } from '@element-plus/icons-vue'
 import { getOidcSessionToken } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
+import SliderCaptchaDialog from '@/components/auth/SliderCaptchaDialog.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -74,6 +80,7 @@ const userStore = useUserStore()
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const showCaptchaDialog = ref(false)
 
 const formData = reactive({
   username: '',
@@ -93,11 +100,19 @@ async function handleLogin() {
 
   try {
     await formRef.value.validate()
-    loading.value = true
+    showCaptchaDialog.value = true
+  } catch (error) {
+    console.error('Login validation error:', error)
+  }
+}
 
+async function handleCaptchaVerified(captchaVerification: string) {
+  try {
+    loading.value = true
     await userStore.login({
       username: formData.username,
-      password: formData.password
+      password: formData.password,
+      captchaVerification
     })
 
     ElMessage.success('登录成功')

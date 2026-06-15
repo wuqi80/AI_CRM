@@ -1,8 +1,13 @@
 package com.kakarote.ai_crm.controller;
 
+import cn.hutool.core.util.StrUtil;
+import com.anji.captcha.model.common.ResponseModel;
+import com.anji.captcha.model.vo.CaptchaVO;
+import com.anji.captcha.service.CaptchaService;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.kakarote.ai_crm.config.captcha.AjCaptchaProperties;
 import com.kakarote.ai_crm.config.OidcConfig;
 import com.kakarote.ai_crm.config.security.service.TokenService;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
@@ -58,10 +63,18 @@ public class AuthController {
     @Autowired
     private FileStorageService fileStorageService;
 
+    @Autowired
+    private CaptchaService captchaService;
+
+    @Autowired
+    private AjCaptchaProperties captchaProperties;
+
     @PostMapping("/login")
     @Operation(summary = "用户登录")
     public Result<Map<String, Object>> login(@Valid @RequestBody LoginUserBO loginUserBO,
                                               HttpServletResponse response) {
+        verifyCaptchaIfNecessary(loginUserBO);
+
         // Authenticate
         Authentication authentication;
         try {
@@ -107,6 +120,22 @@ public class AuthController {
         result.put("userInfo", userVO);
 
         return Result.ok(result);
+    }
+
+    private void verifyCaptchaIfNecessary(LoginUserBO loginUserBO) {
+        if (StrUtil.isBlank(loginUserBO.getCaptchaVerification())) {
+            if (captchaProperties.isLoginRequired()) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_VERIFICATION_CODE_ERROR);
+            }
+            return;
+        }
+
+        CaptchaVO captchaVO = new CaptchaVO();
+        captchaVO.setCaptchaVerification(loginUserBO.getCaptchaVerification());
+        ResponseModel verification = captchaService.verification(captchaVO);
+        if (!verification.isSuccess()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_VERIFICATION_CODE_ERROR);
+        }
     }
 
     @PostMapping("/logout")
