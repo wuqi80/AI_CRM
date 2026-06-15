@@ -1,22 +1,50 @@
 <template>
   <div class="h-full flex bg-background-light overflow-hidden">
     <!-- Task List Section -->
-    <div class="flex-1 overflow-y-auto p-4 md:p-8">
-      <div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex-1 overflow-y-auto px-4 py-6 md:px-6">
+      <div
+        class="space-y-6 transition-[max-width]"
+        :class="effectiveTaskViewMode === 'list' ? 'w-full' : 'mx-auto max-w-4xl'"
+      >
         <!-- Header -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 class="text-xl md:text-2xl font-bold text-slate-900">AI 优先行动中心</h2>
-            <p class="text-sm text-slate-500 mt-1">基于客户价值与成交概率，AI 已为您自动排序今日任务。</p>
+            <h2 class="text-xl md:text-[22px] font-bold text-slate-900">AI 优先行动中心</h2>
+            <p class="text-[13px] text-slate-500 mt-1">基于客户价值与成交概率，AI 已为您自动排序今日任务。</p>
           </div>
-          <div class="flex items-center gap-3">
-            <!-- Segmented filter -->
-            <div class="hidden md:flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+          <button
+            class="flex items-center gap-1.5 self-start px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 md:self-auto"
+            @click="handleAddTask"
+          >
+            <span class="material-symbols-outlined wk-plus-button-icon">add</span>
+            <span>{{ isMobile ? '新建' : '新建任务' }}</span>
+          </button>
+        </div>
+
+        <!-- Status Filter Tabs and list controls -->
+        <div class="wk-task-list-toolbar flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="flex gap-2 overflow-x-auto">
+            <button
+              v-for="tab in statusTabs"
+              :key="tab.value"
+              @click="handleStatusFilter(tab.value)"
+              :class="[
+                'border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] px-4 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap',
+                currentStatus === tab.value
+                  ? 'text-primary ring-1 ring-primary/15'
+                  : 'text-slate-500 hover:border-[var(--wk-input-border-hover)] hover:text-slate-700'
+              ]"
+            >
+              {{ tab.label }} ({{ tab.count }})
+            </button>
+          </div>
+          <div class="flex items-center justify-end gap-3 overflow-x-auto overflow-y-hidden">
+            <div class="flex h-9 max-w-full items-center overflow-x-auto overflow-y-hidden rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1 md:max-w-none">
               <button
                 @click="handleValueFilter('all')"
                 :class="[
-                  'px-4 py-1.5 text-xs font-bold rounded-lg transition-all',
-                  valueFilter === 'all' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
+                  'h-7 shrink-0 whitespace-nowrap px-4 text-xs font-bold rounded-lg transition-all',
+                  valueFilter === 'all' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-500 hover:text-slate-700'
                 ]"
               >
                 全部任务
@@ -24,39 +52,34 @@
               <button
                 @click="handleValueFilter('high-impact')"
                 :class="[
-                  'px-4 py-1.5 text-xs font-bold rounded-lg transition-all',
-                  valueFilter === 'high-impact' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
+                  'h-7 shrink-0 whitespace-nowrap px-4 text-xs font-bold rounded-lg transition-all',
+                  valueFilter === 'high-impact' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-500 hover:text-slate-700'
                 ]"
               >
                 高价值优先
               </button>
             </div>
-            <!-- Add task button -->
-            <button
-              class="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-              @click="handleAddTask"
-            >
-              <span class="material-symbols-outlined wk-plus-button-icon">add</span>
-              <span>{{ isMobile ? '新建' : '新建任务' }}</span>
-            </button>
+            <div v-if="!isMobile" class="flex h-9 shrink-0 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
+              <button
+                type="button"
+                class="flex size-7 items-center justify-center rounded-md transition-all"
+                :class="taskViewMode === 'list' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-400 hover:text-slate-600'"
+                title="列表视图"
+                @click="taskViewMode = 'list'"
+              >
+                <span class="material-symbols-outlined text-[20px]">list</span>
+              </button>
+              <button
+                type="button"
+                class="flex size-7 items-center justify-center rounded-md transition-all"
+                :class="taskViewMode === 'card' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-400 hover:text-slate-600'"
+                title="卡片视图"
+                @click="taskViewMode = 'card'"
+              >
+                <span class="material-symbols-outlined text-[20px]">grid_view</span>
+              </button>
+            </div>
           </div>
-        </div>
-
-        <!-- Status Filter Tabs -->
-        <div class="flex gap-2 overflow-x-auto">
-          <button
-            v-for="tab in statusTabs"
-            :key="tab.value"
-            @click="handleStatusFilter(tab.value)"
-            :class="[
-              'px-4 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap',
-              currentStatus === tab.value
-                ? 'bg-primary text-white'
-                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
-            ]"
-          >
-            {{ tab.label }} ({{ tab.count }})
-          </button>
         </div>
 
         <!-- Loading -->
@@ -68,6 +91,167 @@
         <div v-else-if="displayedTasks.length === 0" class="text-center py-16 text-slate-400">
           <span class="material-symbols-outlined text-5xl">task_alt</span>
           <p class="mt-4 text-sm">暂无任务</p>
+        </div>
+
+        <!-- Task List View -->
+        <div v-else-if="effectiveTaskViewMode === 'list'" class="wk-task-list-table overflow-hidden rounded-2xl border shadow-sm">
+          <div class="overflow-x-auto">
+            <div class="wk-task-list-table__header task-list-grid min-w-[1180px] px-5 py-3 text-sm font-bold">
+              <div>AI评分/任务标题</div>
+              <div>关联客户</div>
+              <div>优先级</div>
+              <div>状态</div>
+              <div>截止日期</div>
+              <div>类别</div>
+              <div>负责人</div>
+              <div class="text-right">操作</div>
+            </div>
+
+            <div
+              v-for="task in displayedTasks"
+              :key="`list-${task.taskId}`"
+              role="button"
+              tabindex="0"
+              :class="[
+                'group wk-task-list-table__row task-list-grid min-w-[1180px] cursor-pointer items-center px-5 py-4 transition-colors last:border-b-0',
+                selectedTask?.taskId === task.taskId ? 'is-selected ring-1 ring-inset ring-primary/20' : '',
+                task.status === 'COMPLETED' ? 'opacity-75' : ''
+              ]"
+              @click="handleViewDetail(task)"
+              @keyup.enter="handleViewDetail(task)"
+            >
+              <div class="flex min-w-0 items-center gap-3">
+                <div
+                  :class="[
+                    'flex h-7 min-w-9 shrink-0 items-center justify-center rounded-lg border px-2 text-sm',
+                    task.status === 'COMPLETED'
+                      ? 'border-emerald-100 bg-emerald-50 text-emerald-500'
+                      : 'border-primary/10 bg-primary/5 text-primary'
+                  ]"
+                >
+                  <span v-if="task.status === 'COMPLETED'" class="material-symbols-outlined text-[18px] leading-none">check</span>
+                  <span v-else>{{ getAiScore(task) }}</span>
+                </div>
+                <div class="min-w-0">
+                  <h3
+                    :class="[
+                      'truncate text-sm font-bold leading-5 transition-colors group-hover:text-primary',
+                      task.status === 'COMPLETED' ? 'text-slate-400 line-through' : 'text-slate-900'
+                    ]"
+                    :title="task.title"
+                  >
+                    {{ task.title }}
+                  </h3>
+                  <p class="mt-1 truncate text-xs leading-5 text-slate-400" :title="getAiInsight(task)">
+                    {{ getAiInsight(task) }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="min-w-0 truncate text-sm text-slate-900" :title="task.customerName || '-'">
+                {{ task.customerName || '-' }}
+              </div>
+
+              <div>
+                <span
+                  class="inline-flex h-6 items-center rounded-full px-2.5 text-sm"
+                  :class="getPriorityBadgeClass(task.priority)"
+                >
+                  {{ getPriorityLabel(task.priority) }}
+                </span>
+              </div>
+
+              <div>
+                <span
+                  class="inline-flex h-6 items-center rounded-md px-2.5 text-sm"
+                  :class="getStatusBadgeClass(task)"
+                >
+                  {{ getStatusLabel(task) }}
+                </span>
+              </div>
+
+              <div class="whitespace-nowrap text-sm text-slate-500">
+                {{ task.dueDate ? formatDateTime(task.dueDate) : '-' }}
+              </div>
+
+              <div>
+                <span
+                  class="inline-flex h-6 max-w-full items-center rounded-md px-2.5 text-sm"
+                  :class="getTaskTypeBadgeClass(task.taskType)"
+                  :title="getTaskTypeLabel(task.taskType)"
+                >
+                  <span class="truncate">{{ getTaskTypeLabel(task.taskType) }}</span>
+                </span>
+              </div>
+
+              <div class="min-w-0 truncate text-sm text-slate-700" :title="getTaskOwnerName(task)">
+                {{ getTaskOwnerName(task) }}
+              </div>
+
+              <div class="flex items-center justify-end gap-2" @click.stop @keyup.stop>
+                <button
+                  v-if="task.status === 'PENDING'"
+                  type="button"
+                  class="inline-flex h-8 items-center rounded-lg bg-blue-50 px-3 text-sm text-blue-600 transition-colors hover:bg-blue-100"
+                  @click="handleStartTask(task)"
+                >
+                  开始处理
+                </button>
+                <button
+                  v-if="task.status !== 'COMPLETED'"
+                  type="button"
+                  class="inline-flex h-8 items-center rounded-lg bg-emerald-50 px-3 text-sm text-emerald-600 transition-colors hover:bg-emerald-100"
+                  @click="handleToggleComplete(task)"
+                >
+                  标记完成
+                </button>
+                <span v-else class="inline-flex h-8 items-center px-2 text-sm text-slate-400">已完成</span>
+              </div>
+            </div>
+
+            <div
+              v-if="showPagination"
+              class="wk-task-list-table__footer flex min-w-[1180px] items-center justify-between border-t px-5 py-4"
+            >
+              <span class="text-sm text-[var(--wk-text-muted)]">
+                共 {{ taskStore.totalCount }} 个任务
+                <span class="hidden md:inline">（第 {{ currentPage }} / {{ totalPages }} 页）</span>
+              </span>
+              <div class="flex items-center gap-1">
+                <button
+                  class="flex size-8 items-center justify-center rounded border border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="currentPage <= 1"
+                  title="上一页"
+                  aria-label="上一页"
+                  @click="handlePageChange(currentPage - 1)"
+                >
+                  <span class="material-symbols-outlined text-lg leading-none">chevron_left</span>
+                </button>
+                <button
+                  v-for="p in visiblePages"
+                  :key="p"
+                  class="flex size-8 items-center justify-center rounded border text-xs font-bold"
+                  :class="p === currentPage
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)]'"
+                  :aria-current="p === currentPage ? 'page' : undefined"
+                  :aria-label="`第 ${p} 页`"
+                  @click="handlePageChange(p)"
+                >
+                  {{ p }}
+                </button>
+                <button
+                  class="flex size-8 items-center justify-center rounded border border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="currentPage >= totalPages"
+                  title="下一页"
+                  aria-label="下一页"
+                  @click="handlePageChange(currentPage + 1)"
+                >
+                  <span class="material-symbols-outlined text-lg leading-none">chevron_right</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Task Cards -->
@@ -226,12 +410,12 @@
         </div>
 
         <!-- Pagination -->
-        <div v-if="taskStore.totalCount > (taskStore.queryParams.limit || 10)" class="mt-6 flex justify-center">
+        <div v-if="showPagination && effectiveTaskViewMode !== 'list'" class="mt-6 flex justify-center">
           <div class="flex items-center gap-2">
             <button
               class="size-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              :disabled="(taskStore.queryParams.page || 1) <= 1"
-              @click="handlePageChange((taskStore.queryParams.page || 1) - 1)"
+              :disabled="currentPage <= 1"
+              @click="handlePageChange(currentPage - 1)"
             >
               <span class="material-symbols-outlined text-lg">chevron_left</span>
             </button>
@@ -241,7 +425,7 @@
               @click="handlePageChange(p)"
               :class="[
                 'size-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors',
-                p === (taskStore.queryParams.page || 1)
+                p === currentPage
                   ? 'bg-primary text-white'
                   : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
               ]"
@@ -250,8 +434,8 @@
             </button>
             <button
               class="size-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              :disabled="(taskStore.queryParams.page || 1) >= totalPages"
-              @click="handlePageChange((taskStore.queryParams.page || 1) + 1)"
+              :disabled="currentPage >= totalPages"
+              @click="handlePageChange(currentPage + 1)"
             >
               <span class="material-symbols-outlined text-lg">chevron_right</span>
             </button>
@@ -300,7 +484,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { aiParseTask } from '@/api/task'
 import { queryCustomerList } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
-import type { Task, TaskAddBO, TaskStatus } from '@/types/common'
+import type { Task, TaskAddBO, TaskPriority, TaskStatus } from '@/types/common'
 import TaskDetailDrawer from './components/TaskDetailDrawer.vue'
 import TaskEditDialog from './components/TaskEditDialog.vue'
 
@@ -310,6 +494,7 @@ const { isMobile } = useResponsive()
 
 const currentStatus = ref('all')
 const valueFilter = ref<'all' | 'high-impact'>('all')
+const taskViewMode = ref<'list' | 'card'>('list')
 const showAddDialog = ref(false)
 const editingTask = ref<Task | null>(null)
 const selectedTask = ref<Task | null>(null)
@@ -392,11 +577,15 @@ const statusTabs = computed(() => {
 
 const displayedTasks = computed(() => taskStore.taskList)
 
-const totalPages = computed(() => Math.ceil(taskStore.totalCount / (taskStore.queryParams.limit || 10)))
+const effectiveTaskViewMode = computed(() => (isMobile.value ? 'card' : taskViewMode.value))
+const currentPage = computed(() => taskStore.queryParams.page || 1)
+const pageSize = computed(() => taskStore.queryParams.limit || 10)
+const totalPages = computed(() => Math.max(1, Math.ceil(taskStore.totalCount / pageSize.value)))
+const showPagination = computed(() => taskStore.totalCount > pageSize.value)
 
 const visiblePages = computed(() => {
   const total = totalPages.value
-  const current = taskStore.queryParams.page || 1
+  const current = currentPage.value
   const pages: number[] = []
   let start = Math.max(1, current - 2)
   const end = Math.min(total, start + 4)
@@ -625,7 +814,8 @@ function getAiScore(task: Task): number {
   if (typeof task.valuePriorityScore === 'number') {
     return task.valuePriorityScore
   }
-  const base = task.priority === 'HIGH' ? 90 : task.priority === 'MEDIUM' ? 60 : 30
+  const priority = normalizeTaskPriority(task.priority)
+  const base = priority === 'HIGH' ? 90 : priority === 'MEDIUM' ? 60 : 30
   const offset = Number(task.taskId) % 10
   return Math.min(99, base + offset)
 }
@@ -634,9 +824,83 @@ function getAiScore(task: Task): number {
 function getAiInsight(task: Task): string {
   if (task.valuePriorityReason) return task.valuePriorityReason
   if (task.description) return task.description
-  if (task.priority === 'HIGH') return '此任务优先级较高，建议尽快处理以推进业务进展。'
-  if (task.priority === 'MEDIUM') return '常规跟进任务，按计划执行即可。'
+  const priority = normalizeTaskPriority(task.priority)
+  if (priority === 'HIGH') return '此任务优先级较高，建议尽快处理以推进业务进展。'
+  if (priority === 'MEDIUM') return '常规跟进任务，按计划执行即可。'
   return '低优先级任务，可在空闲时间处理。'
+}
+
+function normalizeTaskPriority(priority: unknown): TaskPriority {
+  const normalized = String(priority || '').trim().toUpperCase()
+  if (normalized === 'HIGH' || normalized === 'MEDIUM' || normalized === 'LOW') {
+    return normalized
+  }
+  return 'MEDIUM'
+}
+
+function getPriorityLabel(priority: TaskPriority): string {
+  const normalized = normalizeTaskPriority(priority)
+  if (normalized === 'HIGH') return '高级'
+  if (normalized === 'MEDIUM') return '中级'
+  return '低级'
+}
+
+function getPriorityBadgeClass(priority: TaskPriority): string {
+  const normalized = normalizeTaskPriority(priority)
+  if (normalized === 'HIGH') return 'bg-rose-50 text-rose-600'
+  if (normalized === 'MEDIUM') return 'bg-amber-50 text-amber-600'
+  return 'bg-slate-100 text-slate-600'
+}
+
+function getStatusLabel(task: Task): string {
+  if (isOverdue(task)) return '已延期'
+  if (task.status === 'COMPLETED') return '已完成'
+  if (task.status === 'IN_PROGRESS') return '进行中'
+  if (task.status === 'CANCELLED') return '已取消'
+  return '待处理'
+}
+
+function getStatusBadgeClass(task: Task): string {
+  if (isOverdue(task)) return 'bg-red-50 text-red-600'
+  if (task.status === 'COMPLETED') return 'bg-emerald-50 text-emerald-600'
+  if (task.status === 'IN_PROGRESS') return 'bg-blue-50 text-blue-600'
+  if (task.status === 'CANCELLED') return 'bg-slate-100 text-slate-500'
+  return 'bg-slate-100 text-slate-600'
+}
+
+function getTaskTypeLabel(taskType?: string): string {
+  const raw = taskType?.trim()
+  if (!raw) return '任务'
+  const normalized = raw.toUpperCase().replace(/[\s-]+/g, '_')
+  const labels: Record<string, string> = {
+    DOCUMENT: '文档',
+    DOC: '文档',
+    FILE: '文档',
+    RESEARCH: '调研',
+    SURVEY: '调研',
+    FOLLOW_UP: '跟进',
+    FOLLOWUP: '跟进',
+    VISIT: '拜访',
+    MEETING: '会议',
+    CALL: '电话',
+    EMAIL: '邮件',
+    CONTRACT: '合同',
+    PROPOSAL: '方案'
+  }
+  return labels[normalized] || raw
+}
+
+function getTaskTypeBadgeClass(taskType?: string): string {
+  const label = getTaskTypeLabel(taskType)
+  if (label === '调研') return 'bg-violet-50 text-violet-600'
+  if (label === '跟进') return 'bg-slate-100 text-slate-600'
+  if (label === '会议') return 'bg-amber-50 text-amber-600'
+  if (label === '电话' || label === '拜访') return 'bg-emerald-50 text-emerald-600'
+  return 'bg-blue-50 text-blue-600'
+}
+
+function getTaskOwnerName(task: Task): string {
+  return task.assignedToName || task.createUserName || '未分配'
 }
 
 // Check if task is overdue
@@ -647,6 +911,18 @@ function isOverdue(task: Task): boolean {
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
+}
+
+function formatDateTime(dateStr: string): string {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return dateStr
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
 function formatDateTimeLocal(dateStr: string): string {
@@ -671,5 +947,44 @@ function getRelativeTime(dateStr: string): string {
 </script>
 
 <style scoped>
-/* (moved into reusable components) */
+.wk-task-list-table {
+  background: var(--wk-bg-surface);
+  border-color: var(--wk-border-subtle);
+  color: var(--wk-text-secondary);
+}
+
+.wk-task-list-table__header {
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-text-muted);
+  border-bottom: 1px solid var(--wk-border-muted);
+}
+
+.wk-task-list-table__row {
+  background: var(--wk-bg-surface);
+  border-bottom: 1px solid var(--wk-border-subtle);
+}
+
+.wk-task-list-table__footer {
+  background: var(--wk-bg-surface-subtle);
+  border-color: var(--wk-border-subtle);
+}
+
+.wk-task-list-table__row:hover,
+.wk-task-list-table__row.is-selected {
+  background: color-mix(in srgb, var(--wk-primary) 11%, var(--wk-bg-surface));
+}
+
+.task-list-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(300px, 2.25fr)
+    minmax(170px, 1.35fr)
+    minmax(82px, 0.6fr)
+    minmax(92px, 0.65fr)
+    minmax(150px, 1fr)
+    minmax(74px, 0.55fr)
+    minmax(90px, 0.65fr)
+    minmax(150px, 1fr);
+  gap: 18px;
+}
 </style>
