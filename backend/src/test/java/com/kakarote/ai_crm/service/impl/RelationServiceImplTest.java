@@ -9,6 +9,7 @@ import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.mapper.ContactMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.RelationMapper;
+import com.kakarote.ai_crm.service.FileStorageService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,11 +37,14 @@ class RelationServiceImplTest {
     @Mock
     private CustomerMapper customerMapper;
 
+    @Mock
+    private FileStorageService fileStorageService;
+
     private RelationServiceImpl relationService;
 
     @BeforeEach
     void setUp() {
-        relationService = new RelationServiceImpl(relationMapper, contactMapper, customerMapper);
+        relationService = new RelationServiceImpl(relationMapper, contactMapper, customerMapper, fileStorageService);
         setCurrentUser(1001L);
     }
 
