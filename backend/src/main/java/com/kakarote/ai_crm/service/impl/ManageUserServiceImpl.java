@@ -217,7 +217,9 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
                 userEntity.setStatus(updateBO.getStatus());
             }
             if (updateBO.getParentId() != null){
-                userEntity.setParentId(updateBO.getParentId() == 0 ? null : updateBO.getParentId());
+                Long parentId = normalizeParentUserId(updateBO.getParentId());
+                validateParentUser(updateBO.getUserId(), parentId);
+                userEntity.setParentId(parentId);
             }
             updateById(userEntity);
             // 同步角色
@@ -385,6 +387,50 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         String passWord = bCryptPasswordEncoder.encode(newPassword);
         userEntity.setPassword(passWord);
         updateById(userEntity);
+    }
+
+    private Long normalizeParentUserId(Long parentId) {
+        return parentId == null || Objects.equals(parentId, 0L) ? null : parentId;
+    }
+
+    private void validateParentUser(Long userId, Long parentId) {
+        if (parentId == null) {
+            return;
+        }
+        if (Objects.equals(userId, parentId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "直属上级不能选择当前员工");
+        }
+
+        Map<Long, Long> parentByUserId = new HashMap<>();
+        lambdaQuery()
+                .select(ManagerUser::getUserId, ManagerUser::getParentId)
+                .list()
+                .forEach(user -> {
+                    if (user.getUserId() != null) {
+                        parentByUserId.put(user.getUserId(), normalizeParentUserId(user.getParentId()));
+                    }
+                });
+
+        if (!parentByUserId.containsKey(parentId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "直属上级不存在");
+        }
+
+        if (userId != null && wouldCreateParentCycle(userId, parentId, parentByUserId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "直属上级不能选择当前员工或其下级员工");
+        }
+    }
+
+    private boolean wouldCreateParentCycle(Long userId, Long parentId, Map<Long, Long> parentByUserId) {
+        Set<Long> visited = new HashSet<>();
+        Long currentParentId = parentId;
+
+        while (currentParentId != null && visited.add(currentParentId)) {
+            if (Objects.equals(userId, currentParentId)) {
+                return true;
+            }
+            currentParentId = parentByUserId.get(currentParentId);
+        }
+        return false;
     }
 
     @Override
