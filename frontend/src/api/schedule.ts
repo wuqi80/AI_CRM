@@ -1,4 +1,5 @@
 import { get, post } from '@/utils/request'
+import type { PageResult } from '@/types/api'
 
 export interface ScheduleParticipantUser {
   userId: string
@@ -46,12 +47,25 @@ export interface ScheduleUpdateBO extends ScheduleAddBO {
   scheduleId: string
 }
 
+export interface ScheduleQueryBO {
+  scheduleId?: string
+  keyword?: string
+  customerId?: string
+  relationId?: string
+  type?: string
+  startDate?: string
+  endDate?: string
+  page?: number
+  limit?: number
+}
+
 export interface ScheduleAiParseVO {
   title: string
   startTime: string
   endTime: string
   type: string
   customerName: string
+  customerId?: string
   participantNames: string
   participantUserIds?: string[]
   participantUsers?: ScheduleParticipantUser[]
@@ -86,6 +100,10 @@ export function deleteSchedule(id: string): Promise<void> {
  */
 export function getMySchedules(filter: string = 'all'): Promise<ScheduleVO[]> {
   return get('/schedule/mySchedules', { params: { filter } })
+}
+
+export function queryScheduleList(query: ScheduleQueryBO): Promise<PageResult<ScheduleVO>> {
+  return post('/schedule/queryPageList', query)
 }
 
 /**

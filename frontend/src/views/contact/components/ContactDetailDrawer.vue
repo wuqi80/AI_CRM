@@ -25,7 +25,7 @@
             <div class="min-w-0">
               <h3 class="truncate text-sm font-bold text-slate-900">联系人详情</h3>
               <p
-                class="truncate text-[10px] font-bold uppercase tracking-widest text-slate-400"
+                class="truncate text-[11px] font-bold uppercase tracking-widest text-slate-400"
               >
                 {{ contact.position || '联系人' }}
               </p>
@@ -81,13 +81,13 @@
               </h4>
               <div class="flex flex-wrap items-center justify-center gap-2">
                 <span
-                  class="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-primary"
+                  class="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-primary"
                 >
                   {{ contact.position || '联系人' }}
                 </span>
                 <span
                   v-if="contact.isPrimary"
-                  class="rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-600"
+                  class="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-amber-600"
                 >
                   主要联系人
                 </span>
@@ -107,11 +107,11 @@
                   </div>
                   <div class="min-w-0 flex-1">
                     <p
-                      class="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"
+                      class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400"
                     >
                       电话
                     </p>
-                    <p class="font-mono text-sm font-bold text-slate-900">
+                    <p class="text-sm text-[#0d0d0d]">
                       {{ contact.phone || '未填写' }}
                     </p>
                   </div>
@@ -139,11 +139,11 @@
                   </div>
                   <div class="min-w-0 flex-1">
                     <p
-                      class="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"
+                      class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400"
                     >
                       邮箱
                     </p>
-                    <p class="break-all text-sm font-bold text-slate-900">
+                    <p class="break-all text-sm text-[#0d0d0d]">
                       {{ contact.email || '未填写' }}
                     </p>
                   </div>
@@ -168,11 +168,11 @@
                   </div>
                   <div class="min-w-0 flex-1">
                     <p
-                      class="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"
+                      class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400"
                     >
                       微信
                     </p>
-                    <p class="text-sm font-bold text-slate-900">
+                    <p class="text-sm text-[#0d0d0d]">
                       {{ contact.wechat || '未填写' }}
                     </p>
                   </div>
@@ -198,11 +198,11 @@
                   </div>
                   <div class="min-w-0 flex-1">
                     <p
-                      class="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"
+                      class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400"
                     >
                       创建时间
                     </p>
-                    <p class="text-sm font-bold text-slate-900">
+                    <p class="text-sm text-[#0d0d0d]">
                       {{ contact.createTime ? formatDateTime(contact.createTime) : '—' }}
                     </p>
                   </div>
@@ -213,7 +213,7 @@
             <!-- Notes -->
             <div class="space-y-4 border-t border-slate-100 pt-4">
               <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <p class="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   备注
                 </p>
                 <p class="text-sm font-medium leading-relaxed text-slate-700">
@@ -233,7 +233,7 @@
                   <span class="material-symbols-outlined text-xl leading-none">tune</span>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     自定义字段
                   </p>
                 </div>
@@ -245,7 +245,7 @@
                   :key="field.fieldId"
                   class="rounded-2xl border border-slate-100 bg-slate-50 p-4"
                 >
-                  <p class="text-[10px] font-bold tracking-wider text-slate-400">
+                  <p class="text-[11px] font-bold tracking-wider text-slate-400">
                     {{ field.fieldLabel }}
                   </p>
                   <div class="mt-2">
@@ -420,7 +420,8 @@ function formatDateTime(dateStr: string): string {
 async function ensureContactCustomFieldsLoaded() {
   if (contactCustomFieldsLoaded.value) return
   try {
-    contactCustomFields.value = await getEnabledFieldsByEntity('contact')
+    contactCustomFields.value = (await getEnabledFieldsByEntity('contact'))
+      .filter(field => field.fieldSource !== 'system')
     contactCustomFieldsLoaded.value = true
   } catch {
     contactCustomFields.value = []

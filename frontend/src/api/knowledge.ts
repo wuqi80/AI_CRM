@@ -6,6 +6,7 @@ import type {
   KnowledgeAiAnalyzeVO,
   KnowledgeAiSearchBO,
   KnowledgeAiSearchVO,
+  KnowledgePreviewTokenVO,
   KnowledgeTargetedScriptBO
 } from '@/types/common'
 
@@ -16,12 +17,16 @@ export function uploadKnowledge(
   file: File,
   type?: string,
   customerId?: string,
-  summary?: string
+  summary?: string,
+  employeeId?: string,
+  relationId?: string
 ): Promise<string> {
   const formData = new FormData()
   formData.append('file', file)
   if (type) formData.append('type', type)
   if (customerId) formData.append('customerId', customerId)
+  if (employeeId) formData.append('employeeId', employeeId)
+  if (relationId) formData.append('relationId', relationId)
   if (summary) formData.append('summary', summary)
   return upload('/knowledge/upload', formData)
 }
@@ -38,13 +43,6 @@ export function deleteKnowledge(id: string): Promise<void> {
  */
 export function queryKnowledgeList(query: KnowledgeQueryBO): Promise<PageResult<Knowledge>> {
   return post('/knowledge/queryPageList', query)
-}
-
-/**
- * AI search knowledge base
- */
-export function aiSearchKnowledge(query: KnowledgeAiSearchBO): Promise<KnowledgeAiSearchVO> {
-  return post('/knowledge/ai-search', query)
 }
 
 /**
@@ -76,21 +74,61 @@ export function addKnowledgeTag(knowledgeId: string, tagName: string): Promise<v
 }
 
 /**
- * Get knowledge preview content
+ * Update knowledge related customer
  */
+export function updateKnowledgeCustomer(knowledgeId: string, customerId?: string): Promise<void> {
+  return post('/knowledge/updateCustomer', null, { params: { knowledgeId, customerId } })
+}
+
+/**
+ * Get knowledge file content for frontend preview
+ */
+export function getKnowledgeFileBlob(id: string): Promise<Blob> {
+  return get(`/knowledge/download/${id}`, { responseType: 'blob' })
+}
+
 export function getKnowledgePreview(id: string): Promise<Blob> {
-  return get(`/knowledge/preview/${id}`, { responseType: 'blob' })
+  return getKnowledgeFileBlob(id)
+}
+
+/**
+ * Create a short-lived Range preview URL for audio/video files
+ */
+export function getKnowledgePreviewToken(id: string): Promise<KnowledgePreviewTokenVO> {
+  return post<KnowledgePreviewTokenVO>(`/knowledge/${id}/preview-token`).then(result => ({
+    ...result,
+    url: result.url.startsWith('/') ? `${getApiBaseUrl()}${result.url}` : result.url
+  }))
+}
+
+/**
+ * Get .doc file converted to HTML for preview
+ */
+export function getKnowledgePreviewHtml(id: string): Promise<string> {
+  return get(`/knowledge/preview-html/${id}`)
 }
 
 /**
  * AI analyze knowledge document
  */
-export function aiAnalyzeKnowledge(id: string): Promise<KnowledgeAiAnalyzeVO> {
-  return post(`/knowledge/${id}/ai-analyze`)
+export function aiAnalyzeKnowledge(
+  id: string,
+  forceRefresh = false
+): Promise<KnowledgeAiAnalyzeVO> {
+  return post(`/knowledge/${id}/ai-analyze`, null, {
+    params: { forceRefresh }
+  })
 }
 
 /**
- * Stream targeted sales script content
+ * AI search across knowledge base and return summarized answer with references
+ */
+export function aiSearchKnowledge(query: KnowledgeAiSearchBO): Promise<KnowledgeAiSearchVO> {
+  return post('/knowledge/ai-search', query)
+}
+
+/**
+ * Stream targeted sales script content as it is generated
  */
 export async function streamKnowledgeTargetedScript(
   data: KnowledgeTargetedScriptBO,

@@ -1,5 +1,13 @@
 <template>
-  <div class="h-full flex flex-col">
+  <div
+    class="h-full flex flex-col"
+    :class="{
+      'wk-customer-detail-embedded': embedded,
+      'wk-customer-detail-mobile': isMobile,
+      'wk-customer-detail-embedded-mobile': isEmbeddedMobileLayout,
+      'wk-object-detail-embedded': embedded
+    }"
+  >
     <!-- Loading -->
     <div v-if="loading" class="flex-1 flex items-center justify-center">
       <span class="material-symbols-outlined text-slate-300 text-4xl animate-spin">progress_activity</span>
@@ -7,76 +15,214 @@
 
     <!-- Content -->
     <template v-else-if="customer">
-      <!-- Sticky Header -->
-      <div class="sticky top-0 z-20 bg-background-light/90 backdrop-blur-md px-4 md:px-8 pt-4 pb-4 border-b border-slate-200/50 shrink-0">
-        <!-- Breadcrumb -->
-        <div class="flex items-center gap-2 text-sm text-slate-500 mb-3">
-          <button @click="handleBackToCustomerList" class="hover:text-primary flex items-center gap-1 transition-colors">
-            <WkIcon name="customer" :size="14" />
-            客户管理
-          </button>
-          <span class="material-symbols-outlined text-xs">chevron_right</span>
-          <span class="text-slate-900 font-medium">客户详情</span>
-        </div>
+      <div class="min-h-0 flex-1 overflow-auto">
+        <!-- Sticky Header -->
+        <div
+          v-if="!isEmbeddedMobileLayout"
+          class="static z-20 bg-background-light/90 backdrop-blur-md px-4 md:px-8 pt-4 pb-4 border-b border-slate-200/50 shrink-0 md:sticky md:top-0"
+        >
+          <!-- Breadcrumb -->
+          <div v-if="!embedded" class="flex items-center gap-2 text-sm text-slate-500 mb-3">
+            <button @click="handleBackToCustomerList" class="hover:text-primary flex items-center gap-1 transition-colors">
+              <WkIcon name="customer" :size="14" />
+              客户管理
+            </button>
+            <span class="material-symbols-outlined text-xs">chevron_right</span>
+            <span class="text-slate-900 font-medium">客户详情</span>
+          </div>
 
-        <!-- Customer Info Card -->
-        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <div class="flex justify-between">
-            <div class="flex gap-4 min-w-0">
-              <div class="size-14 bg-slate-100 rounded-lg flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
-                <img v-if="customer.logoUrl" :src="customer.logoUrl" alt="" class="size-full object-cover" />
-                <span v-else class="text-2xl font-bold text-slate-400">{{ customer.companyName?.charAt(0) || '?' }}</span>
-              </div>
-              <div class="min-w-0 space-y-2">
-                <div class="flex items-center gap-3 flex-wrap">
-                  <h2 class="text-xl font-bold text-slate-900 truncate">{{ customer.companyName }}</h2>
-                  <span
-                    class="px-2 py-0.5 text-xs font-bold rounded uppercase"
-                    :class="getStageBadgeClass(customer.stage)"
-                  >{{ getStageLabel(customer.stage) }}</span>
-                  <span v-if="customer.level"
-                    class="px-2 py-0.5 text-xs font-bold rounded"
-                    :class="{
-                      'bg-emerald-100 text-emerald-700': customer.level === 'A',
-                      'bg-blue-100 text-blue-700': customer.level === 'B',
-                      'bg-slate-100 text-slate-600': customer.level === 'C'
-                    }"
-                  >{{ customer.level }}级客户</span>
+          <!-- Customer Info Card -->
+          <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div class="flex flex-col gap-3 md:flex-row md:justify-between md:gap-0 justify-between">
+              <div class="flex min-w-0 gap-4">
+                <div class="size-14 bg-slate-100 rounded-lg flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
+                  <img
+                    v-if="customer.logoUrl"
+                    :src="customer.logoUrl"
+                    :alt="customer.companyName || 'company logo'"
+                    class="size-full object-contain bg-white"
+                  />
+                  <span v-else class="text-2xl font-bold text-slate-400">{{ customer.companyName?.charAt(0) || '?' }}</span>
                 </div>
-                <div class="flex items-center gap-4 text-sm flex-wrap">
-                  <p class="text-slate-500">{{ customer.level ? customer.level + '级' : '普通' }}客户 · {{ customer.industry || '未分类' }}</p>
-                  <div class="h-3 w-px bg-slate-200 hidden sm:block"></div>
-                  <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-1">
-                      <span class="text-slate-400">联系人:</span>
-                      <span class="text-slate-600 font-medium">{{ primaryContact?.name || '-' }}</span>
+                <div class="min-w-0 space-y-2">
+                  <div class="flex flex-col items-start gap-1 md:flex-row md:items-center md:gap-3 md:flex-wrap">
+                    <h2 class="text-lg md:text-xl font-bold text-slate-900 truncate min-w-0 w-full md:w-auto">
+                      {{ customer.companyName }}
+                    </h2>
+                    <!-- <span
+                      class="px-2 py-0.5 text-xs font-bold rounded uppercase"
+                      :class="getStageBadgeClass(customer.stage)"
+                    >{{ getStageLabel(customer.stage) }}</span> -->
+                    <span v-if="customer.level"
+                      class="px-2 py-0.5 text-xs font-bold rounded"
+                      :class="{
+                        'bg-emerald-100 text-emerald-700': customer.level === 'A',
+                        'bg-blue-100 text-blue-700': customer.level === 'B',
+                        'bg-slate-100 text-slate-600': customer.level === 'C'
+                      }"
+                    >{{ enumStore.levelLabel(customer.level) }}</span>
+                  </div>
+                  <div class="hidden md:flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+                    <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+                      <div class="flex items-center gap-1 shrink-0">
+                        <span class="text-slate-400">联系人:</span>
+                        <span class="text-slate-600 font-medium">{{ primaryContact?.name || '-' }}</span>
+                      </div>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <span class="text-slate-400">手机:</span>
+                        <span class="text-slate-600 font-medium">{{ primaryContact?.phone || '-' }}</span>
+                      </div>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <span class="text-slate-400">状态:</span>
+                        <span class="text-primary font-bold">{{ getStageLabel(customer.stage) }}</span>
+                      </div>
                     </div>
-                    <div class="flex items-center gap-1">
-                      <span class="text-slate-400">手机:</span>
-                      <span class="text-slate-600 font-mono font-medium">{{ primaryContact?.phone || '-' }}</span>
-                    </div>
-                    <div class="flex items-center gap-1">
-                      <span class="text-slate-400">状态:</span>
-                      <span class="text-primary font-bold">{{ getStageLabel(customer.stage) }}</span>
+                    <div
+                      v-if="customer.tags?.length || canEditCustomerTags"
+                      class="ml-0 flex min-w-0 shrink items-center justify-start gap-1.5 overflow-hidden"
+                    >
+                      <span
+                        v-for="tag in customerVisibleTags"
+                        :key="tag.tagId"
+                        class="group/tag inline-flex h-6 max-w-[88px] shrink-0 items-center gap-1 rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-secondary)]"
+                        :title="tag.tagName"
+                      >
+                        <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                        <button
+                          v-if="canEditCustomerTags"
+                          type="button"
+                          class="hidden shrink-0 text-slate-400 transition-colors hover:text-red-500 group-hover/tag:inline-flex"
+                          title="删除标签"
+                          aria-label="删除标签"
+                          @click.stop="handleRemoveTag(tag)"
+                        >
+                          <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+                        </button>
+                      </span>
+                      <el-popover
+                        v-if="customerHiddenTags.length > 0"
+                        trigger="hover"
+                        placement="bottom-start"
+                        :width="220"
+                        popper-class="wk-customer-tags-popover"
+                      >
+                        <template #reference>
+                          <span
+                            class="inline-flex h-6 shrink-0 cursor-default items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-muted)]"
+                          >
+                            +{{ customerHiddenTags.length }}
+                          </span>
+                        </template>
+                        <div class="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto">
+                          <span
+                            v-for="tag in customerHiddenTags"
+                            :key="tag.tagId"
+                            class="group/tag inline-flex max-w-full items-center gap-1 rounded-lg bg-[#f4f4f4] px-2 py-1 text-[12px] font-medium text-[#5f5f5f]"
+                            :title="tag.tagName"
+                          >
+                            <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                            <button
+                              v-if="canEditCustomerTags"
+                              type="button"
+                              class="inline-flex shrink-0 text-slate-400 transition-colors hover:text-red-500"
+                              title="删除标签"
+                              aria-label="删除标签"
+                              @click.stop="handleRemoveTag(tag)"
+                            >
+                              <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+                            </button>
+                          </span>
+                        </div>
+                      </el-popover>
+                      <button
+                        v-if="canEditCustomerTags"
+                        type="button"
+                        class="inline-flex size-6 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--wk-border-muted)] text-[var(--wk-text-primary)] transition-colors hover:bg-[var(--wk-bg-surface-hover)]"
+                        title="添加标签"
+                        aria-label="添加标签"
+                        @click="showAddTagDialog = true"
+                      >
+                        <span class="material-symbols-outlined text-[15px] leading-none">add</span>
+                      </button>
                     </div>
                   </div>
                 </div>
-                <div v-if="customer.tags?.length || canEditCustomerTags" class="flex flex-wrap items-center gap-2">
-                  <span
-                    v-for="tag in customer.tags"
-                    :key="tag.tagId"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
-                  >
-                    {{ tag.tagName }}
+              </div>
+
+              <!-- Mobile: move contact/tags row under whole left block -->
+              <div class="mt-0 flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm md:hidden">
+                <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+                  <div class="flex items-center gap-1 shrink-0">
+                    <span class="text-slate-400">联系人:</span>
+                    <span class="text-slate-600 font-medium">{{ primaryContact?.name || '-' }}</span>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <span class="text-slate-400">手机:</span>
+                    <span class="text-slate-600 font-mono font-medium">{{ primaryContact?.phone || '-' }}</span>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <span class="text-slate-400">状态:</span>
+                    <span class="text-primary font-bold">{{ getStageLabel(customer.stage) }}</span>
+                  </div>
+                </div>
+                <div
+                  v-if="customer.tags?.length || canEditCustomerTags"
+                  class="customer-detail-mobile-tags-row ml-0 flex w-full min-w-0 flex-nowrap items-center justify-start gap-2 overflow-hidden"
+                >
+                  <div class="customer-detail-mobile-tag-list flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden">
                     <span
-                      v-if="canEditCustomerTags"
-                      class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                      @click="handleRemoveTag(tag)"
-                    >close</span>
-                  </span>
+                      v-for="tag in customerVisibleTags"
+                      :key="tag.tagId"
+                      class="inline-flex min-w-0 items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
+                      :title="tag.tagName"
+                    >
+                      <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                      <span
+                        v-if="canEditCustomerTags"
+                        class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer transition-colors"
+                        @click.stop="handleRemoveTag(tag)"
+                      >close</span>
+                    </span>
+                    <el-popover
+                      v-if="customerHiddenTags.length > 0"
+                      trigger="click"
+                      placement="bottom-start"
+                      :width="220"
+                      popper-class="wk-customer-tags-popover"
+                    >
+                      <template #reference>
+                        <span
+                          class="inline-flex h-7 shrink-0 cursor-pointer items-center rounded-lg bg-slate-100 px-2.5 text-xs font-medium text-slate-500"
+                        >
+                          +{{ customerHiddenTags.length }}
+                        </span>
+                      </template>
+                      <div class="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto">
+                        <span
+                          v-for="tag in customerHiddenTags"
+                          :key="tag.tagId"
+                          class="inline-flex max-w-full items-center gap-1 rounded-lg bg-[#f4f4f4] px-2 py-1 text-[12px] font-medium text-[#5f5f5f]"
+                          :title="tag.tagName"
+                        >
+                          <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                          <button
+                            v-if="canEditCustomerTags"
+                            type="button"
+                            class="inline-flex shrink-0 text-slate-400 transition-colors hover:text-red-500"
+                            title="删除标签"
+                            aria-label="删除标签"
+                            @click.stop="handleRemoveTag(tag)"
+                          >
+                            <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+                          </button>
+                        </span>
+                      </div>
+                    </el-popover>
+                  </div>
                   <button
                     v-if="canEditCustomerTags"
-                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors"
+                    type="button"
+                    class="inline-flex shrink-0 items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors"
                     @click="showAddTagDialog = true"
                   >
                     <span class="wk-plus-button-mark" aria-hidden="true">+</span>
@@ -84,93 +230,96 @@
                   </button>
                 </div>
               </div>
-            </div>
-            <div class="flex gap-2 shrink-0 items-center">
-              <el-popover
-                v-if="canTransferCustomer"
-                :visible="showTransferPopover"
-                trigger="manual"
-                virtual-triggering
-                :virtual-ref="headerMoreButtonRef"
-                placement="bottom-end"
-                :width="260"
-                @show="handleTransferPopoverShow"
-                @hide="handleTransferPopoverHide"
-                @update:visible="showTransferPopover = $event"
-              >
-                <div class="space-y-3">
-                  <el-input
-                    v-model="ownerSearch"
-                    placeholder="搜索用户"
-                    size="small"
-                    clearable
-                  />
-                  <div v-loading="ownerListLoading" class="max-h-56 overflow-auto space-y-1">
-                    <button
-                      v-for="user in filteredTransferUserList"
-                      :key="user.userId"
-                      type="button"
-                      class="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors hover:bg-slate-100"
-                      :class="{ 'bg-primary/5': String(user.userId) === String(customer.ownerId) }"
-                      @click="handleTransferOwner(user)"
-                    >
-                      <div class="size-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                        {{ user.realname?.charAt(0) || '?' }}
-                      </div>
-                      <div class="min-w-0 flex-1">
-                        <p class="text-sm font-medium text-slate-700 truncate">{{ user.realname }}</p>
-                        <p class="text-xs text-slate-400 truncate">{{ user.username || '-' }}</p>
-                      </div>
-                      <span
-                        v-if="String(user.userId) === String(customer.ownerId)"
-                        class="material-symbols-outlined text-primary text-sm shrink-0"
-                      >check</span>
-                    </button>
-                    <p v-if="!ownerListLoading && filteredTransferUserList.length === 0" class="py-4 text-center text-sm text-slate-400">
-                      暂无匹配用户
-                    </p>
-                  </div>
-                </div>
-              </el-popover>
-              <button v-if="canEditCustomer" class="h-8 px-4 inline-flex items-center border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors" @click="handleEdit">编辑资料</button>
-              <button v-if="canCreateFollowUps" class="h-8 px-4 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors" @click="handleAiFollowUp">
-                <WkIcon name="ai" class="text-sm" />
-                AI 跟进
-              </button>
-              <button class="h-8 px-4 bg-primary text-white rounded-lg text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-1.5 hover:bg-primary/90 transition-colors" @click="handleGenerateReport">
-                <WkIcon name="ai" class="text-sm" />
-                生成 AI 分析报告
-              </button>
-              <el-dropdown
-                v-if="canTransferCustomer || canDeleteCustomer"
-                trigger="click"
-                @visible-change="onHeaderMoreDropdownVisible"
-              >
-                <button
-                  ref="headerMoreButtonRef"
-                  type="button"
-                  class="h-8 w-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-solid border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
-                  title="更多操作"
+              <div class="flex w-full flex-nowrap justify-start gap-2 md:overflow-visible md:w-auto md:flex-nowrap md:justify-start shrink-0">
+                <el-popover
+                  v-if="canTransferCustomer"
+                  :visible="showTransferPopover"
+                  trigger="manual"
+                  virtual-triggering
+                  :virtual-ref="headerMoreButtonRef"
+                  placement="bottom-end"
+                  :width="260"
+                  @show="handleTransferPopoverShow"
+                  @hide="handleTransferPopoverHide"
+                  @update:visible="showTransferPopover = $event"
                 >
-                  <span class="material-symbols-outlined text-lg">more_horiz</span>
+                  <div class="space-y-3">
+                    <el-input
+                      v-model="ownerSearch"
+                      placeholder="搜索用户"
+                      size="small"
+                      clearable
+                    />
+                    <div v-loading="ownerListLoading" class="max-h-56 overflow-auto space-y-1">
+                      <button
+                        v-for="user in filteredTransferUserList"
+                        :key="user.userId"
+                        type="button"
+                        class="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors hover:bg-slate-100"
+                        :class="{ 'bg-primary/5': String(user.userId) === String(customer.ownerId) }"
+                        @click="handleTransferOwner(user)"
+                      >
+                        <div class="size-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                          {{ user.realname?.charAt(0) || '?' }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <p class="text-sm font-medium text-slate-700 truncate">{{ user.realname }}</p>
+                          <p class="text-xs text-slate-400 truncate">{{ user.username || '-' }}</p>
+                        </div>
+                        <span
+                          v-if="String(user.userId) === String(customer.ownerId)"
+                          class="material-symbols-outlined text-primary text-sm shrink-0"
+                        >check</span>
+                      </button>
+                      <p v-if="!ownerListLoading && filteredTransferUserList.length === 0" class="py-4 text-center text-sm text-slate-400">
+                        暂无匹配用户
+                      </p>
+                    </div>
+                  </div>
+                </el-popover>
+                <button v-if="canEditCustomer" class="h-8 px-4 inline-flex items-center border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors whitespace-nowrap" @click="handleEdit">编辑</button>
+                <button v-if="canCreateFollowUps" class="h-8 px-4 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors whitespace-nowrap" @click="handleAiFollowUp">
+                  <span class="material-symbols-outlined text-base leading-none">keyboard_voice</span>
+                  语音识别
                 </button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item v-if="canTransferCustomer" @click="openTransferPopoverFromMenu">
-                      <span class="flex items-center gap-2">
-                        <span class="material-symbols-outlined text-sm">swap_horiz</span>
-                        转移负责人
-                      </span>
-                    </el-dropdown-item>
-                    <el-dropdown-item v-if="canDeleteCustomer" :divided="!!canTransferCustomer" @click="handleDeleteCustomerConfirm">
-                      <span class="flex items-center gap-2 text-red-500">
-                        <span class="material-symbols-outlined text-sm">delete</span>
-                        删除
-                      </span>
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+                <button
+                  type="button"
+                  class="h-8 shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-md shadow-primary/25 transition-colors hover:bg-primary/90 whitespace-nowrap"
+                  @click="showBasicInfoDrawer = true"
+                >
+                  <span class="material-symbols-outlined text-base leading-none">description</span>
+                  <span>{{ viewBasicInfoButtonText }}</span>
+                </button>
+                <el-dropdown
+                  v-if="canTransferCustomer || canDeleteCustomer"
+                  trigger="click"
+                  @visible-change="onHeaderMoreDropdownVisible"
+                >
+                  <button
+                    ref="headerMoreButtonRef"
+                    type="button"
+                    class="h-8 w-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-solid border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                    title="更多操作"
+                  >
+                    <span class="material-symbols-outlined text-lg">more_horiz</span>
+                  </button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item v-if="canTransferCustomer" @click="openTransferPopoverFromMenu">
+                        <span class="flex items-center gap-2">
+                          <span class="material-symbols-outlined text-sm">swap_horiz</span>
+                          转移负责人
+                        </span>
+                      </el-dropdown-item>
+                      <el-dropdown-item v-if="canDeleteCustomer" :divided="!!canTransferCustomer" @click="handleDeleteCustomerConfirm">
+                        <span class="flex items-center gap-2 text-red-500">
+                          <span class="material-symbols-outlined text-sm">delete</span>
+                          删除
+                        </span>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
             </div>
           </div>
 
@@ -178,13 +327,13 @@
           <div class="mt-5 pt-4 border-t border-slate-100">
             <!-- <div class="flex items-center gap-2 mb-6">
               <span :class="sectionIconBoxClass" :style="getSectionIconStyle('customerStage')">
-                <WkIcon name="stage" :size="15" />
+                <WkIcon name="stage" :size="14" />
               </span>
               <h3 class="text-sm font-bold text-slate-900">客户阶段</h3>
             </div> -->
-            <div class="relative overflow-visible">
-              <!-- Chevron segments (wrap layout, no scroll) -->
-              <div class="relative flex flex-wrap items-stretch gap-y-2">
+            <div class="wk-customer-stage-scroll relative overflow-visible overflow-x-auto overflow-y-visible md:overflow-visible">
+              <!-- Chevron segments (mobile: no wrap + horizontal scroll; desktop: wrap) -->
+              <div class="relative flex flex-nowrap md:flex-wrap items-stretch gap-x-2 md:gap-x-0 gap-y-2 min-w-max">
                 <template v-for="(stage, idx) in stageFlow" :key="stage">
                   <el-popover
                     v-if="isTerminalStage(stage)"
@@ -232,7 +381,7 @@
                     </div>
                     <template #reference>
                       <div
-                        class="relative h-9 flex-none w-[180px] group"
+                        class="relative h-8 flex-none w-[180px] group"
                         :class="canChangeStage ? 'cursor-pointer' : 'cursor-default'"
                         :title="getStepperLabel(stage)"
                         :style="{ zIndex: getStepperZIndex(stage, idx) }"
@@ -270,7 +419,7 @@
 
                   <div
                     v-else
-                    class="relative h-9 flex-none w-[180px] group"
+                    class="relative h-8 flex-none w-[180px] group"
                     :class="canChangeStage ? 'cursor-pointer' : 'cursor-default'"
                     @click="handleStageChange(stage)"
                     :title="getStepperLabel(stage)"
@@ -307,107 +456,204 @@
       </div>
 
       <!-- 3-Column Content -->
-      <div class="flex-1 overflow-auto px-8 pb-8 pt-6">
+      <div class="wk-mobile-px-15 md:px-8 pb-8 pt-3">
+        <div v-if="!isEmbeddedMobileLayout" class="lg:hidden mb-4">
+          <div class="flex items-center gap-2 p-1 rounded-xl bg-slate-100">
+            <button
+              type="button"
+              class="flex-1 h-9 px-3 rounded-lg text-sm font-bold transition-colors"
+              :class="detailTab === 'ai' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'"
+              @click="detailTab = 'ai'"
+            >
+              AI分析
+            </button>
+            <button
+              v-if="canViewFollowUps"
+              type="button"
+              class="flex-1 h-9 px-3 rounded-lg text-sm font-bold transition-colors"
+              :class="detailTab === 'activity' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'"
+              @click="detailTab = 'activity'"
+            >
+              最近活动
+            </button>
+            <button
+              type="button"
+              class="flex-1 h-9 px-3 rounded-lg text-sm font-bold transition-colors"
+              :class="detailTab === 'related' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'"
+              @click="detailTab = 'related'"
+            >
+              关联模块
+            </button>
+          </div>
+        </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <!-- Left Column: Basic Info (col-span-3) -->
-          <div class="lg:col-span-3 space-y-4">
-            <!-- Basic Info -->
-            <section class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-              <h3 class="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <span :class="sectionIconBoxClass" :style="getSectionIconStyle('basicInfo')">
-                  <WkIcon name="profile" :size="15" />
-                </span>
-                基本信息
-              </h3>
-              <div class="space-y-5">
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">公司全称</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.companyName }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">所属行业</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.industry || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户来源</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.source || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户级别</p>
-                  <span
-                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold"
-                    :class="{
-                      'bg-emerald-50 text-emerald-600': customer.level === 'A',
-                      'bg-blue-50 text-blue-600': customer.level === 'B',
-                      'bg-slate-100 text-slate-500': customer.level === 'C'
-                    }"
-                  >{{ getLevelLabel(customer.level) }}</span>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">主要联系人</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ primaryContact?.name || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">联系电话</p>
-                  <p class="text-sm text-slate-900 font-medium font-mono px-2 py-1 -ml-2 truncate">{{ primaryContact?.phone || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">电子邮箱</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ primaryContact?.email || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户地址</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.address || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">公司网站</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.website || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">预计成交金额</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatAmount(customer.quotation) }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">备注</p>
-                  <p class="text-sm text-slate-600 leading-relaxed px-2 py-1 -ml-2 whitespace-pre-wrap break-words">{{ customer.remark || '暂无备注' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.ownerName || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">创建人</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.createUserName || customer.createUserId || '-' }}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">创建时间</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatDate(customer.createTime) }}</p>
-                </div>
-                <div v-for="field in customFields" :key="field.fieldId">
-                  <p class="text-xs font-bold text-slate-400 tracking-wider mb-1">{{ field.fieldLabel }}</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatCustomFieldDisplayValue(field, customer.customFields?.[field.fieldName]) }}</p>
+          <div :class="[isEmbeddedMobileLayout || detailTab === 'ai' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
+            <section class="group/ai-section bg-white" :class="[!isEmbeddedMobileLayout ? 'rounded-xl border border-slate-200 px-4 shadow-sm py-4' : '']">
+              <div class="mb-4 space-y-1">
+                <!-- 上：图标 + 标题（整行展示，可换行）+ 更新时间 + 刷新 -->
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex min-w-0 flex-1 items-center gap-2">
+                    <span
+                      :class="sectionIconBoxClass"
+                      :style="getSectionIconStyle('basicInfo')"
+                    >
+                      <WkIcon name="ai" :size="14" />
+                    </span>
+                    <h3 class="min-w-0 text-sm font-bold leading-snug text-slate-900 break-words">
+                      {{ savedAiAnalysisTitle }}
+                    </h3>
+                    <button
+                      v-if="showAiAnalysisToggle"
+                      type="button"
+                      class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
+                      :aria-expanded="aiAnalysisExpanded"
+                      :aria-label="aiAnalysisExpanded ? '收起 AI分析' : '展开 AI分析'"
+                      @click="aiAnalysisExpanded = !aiAnalysisExpanded"
+                    >
+                      <span class="material-symbols-outlined text-[16px] leading-none">
+                        {{ aiAnalysisExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
+                      </span>
+                      <span
+                        class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
+                        role="tooltip"
+                      >
+                        {{ aiAnalysisExpanded ? '收起 AI分析' : '展开 AI分析' }}
+                      </span>
+                    </button>
+                  </div>
+                  <div class="flex shrink-0 items-center justify-end gap-2">
+                    <p class="text-right text-xs leading-relaxed text-slate-400">
+                      {{ aiAnalysisDisplayTime }}更新
+                    </p>
+                    <button
+                      v-if="canEditCustomer"
+                      type="button"
+                      class="flex size-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="generatingAiReport"
+                      :title="generatingAiReport ? '生成中…' : '更新 AI 分析'"
+                      :aria-label="generatingAiReport ? '生成中' : '更新 AI 分析'"
+                      @click="handleGenerateReport"
+                    >
+                      <span
+                        class="material-symbols-outlined text-[20px] leading-none"
+                        :class="{ 'animate-spin': generatingAiReport }"
+                      >refresh</span>
+                    </button>
+
+                  </div>
                 </div>
               </div>
+
+              <div v-show="isAiAnalysisVisible">
+                <div
+                  v-if="isAiAnalysisPending || isAiAnalysisFailed"
+                  class="mb-4 rounded-2xl border px-4 py-3"
+                  :class="isAiAnalysisFailed ? 'border-rose-200 bg-rose-50' : 'border-sky-200 bg-sky-50'"
+                >
+                  <div class="flex items-start gap-3">
+                    <div
+                      class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl"
+                      :class="isAiAnalysisFailed ? 'bg-rose-100 text-rose-500' : 'bg-sky-100 text-sky-500'"
+                    >
+                      <span
+                        class="material-symbols-outlined text-[18px] leading-none"
+                        :class="{ 'animate-spin': aiAnalysisStatus === 'running' }"
+                      >{{ isAiAnalysisFailed ? 'error' : (aiAnalysisStatus === 'running' ? 'progress_activity' : 'schedule') }}</span>
+                    </div>
+                    <div class="min-w-0">
+                      <p class="text-sm font-bold" :class="isAiAnalysisFailed ? 'text-rose-700' : 'text-sky-700'">
+                        {{ aiAnalysisStatusLabel }}
+                      </p>
+                      <p class="mt-1 text-xs leading-5" :class="isAiAnalysisFailed ? 'text-rose-600' : 'text-sky-600'">
+                        {{ aiAnalysisStatusDescription }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <AiParseInsightSidebar
+                  :result="savedAiParseResult"
+                  :show-tip="false"
+                  :compact-score="isEmbeddedMobileLayout"
+                  unified
+                  :empty-title="aiAnalysisEmptyTitle"
+                  :empty-description="aiAnalysisEmptyDescription"
+                >
+                  <template v-if="canEditCustomer" #empty-extra>
+                    <div class="mt-5 flex w-full justify-center px-1">
+                      <button
+                        type="button"
+                        class="inline-flex max-w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-white shadow-[0_8px_22px_-6px_rgba(37,99,235,0.55)] transition-[filter,transform] hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:brightness-100 disabled:active:scale-100"
+                        :disabled="generatingAiReport"
+                        :title="generatingAiReport ? '生成中…' : '获取 AI 分析报告'"
+                        @click="handleGenerateReport"
+                      >
+                        <span
+                          v-if="generatingAiReport"
+                          class="material-symbols-outlined shrink-0 text-[16px] leading-none animate-spin"
+                        >progress_activity</span>
+                        <WkIcon v-else name="ai" :size="14" class="shrink-0 text-white" />
+                        <span class="text-[12px] truncate">获取 AI 分析报告</span>
+                      </button>
+                    </div>
+                  </template>
+                </AiParseInsightSidebar>
+              </div>
+
             </section>
           </div>
 
           <!-- Center Column: Follow-ups Timeline (col-span-6) -->
-          <div v-if="canViewFollowUps" class="lg:col-span-6 space-y-4">
-            <div class="flex items-center justify-between">
-              <h3 class="flex items-center gap-2 text-lg font-bold text-slate-900">
-                <span :class="sectionIconBoxClass" :style="getSectionIconStyle('recentActivity')">
+          <div
+            v-if="canViewFollowUps"
+            class="wk-customer-detail-activity group/activity"
+            :class="[isEmbeddedMobileLayout || detailTab === 'activity' ? 'block' : 'hidden', 'lg:block lg:col-span-6 space-y-4', isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : '']"
+          >
+            <div class="flex min-w-0 flex-col items-start gap-2 md:flex-row md:items-center md:justify-between">
+              <div class="flex w-full min-w-0 items-center gap-2">
+                <span
+                  :class="sectionIconBoxClass"
+                  :style="getSectionIconStyle('recentActivity')"
+                >
                   <span :class="sectionMaterialIconClass">history</span>
                 </span>
-                最近活动 - AI时间轴
-              </h3>
-              <div class="flex items-center gap-3">
-                <div class="flex flex-wrap items-center justify-end gap-2">
+                <h3 class="min-w-0 text-sm font-bold leading-snug text-slate-900 break-words">{{ isEmbeddedMobileLayout ? '活动' : '最近活动 - AI时间轴' }}</h3>
+                <button
+                  v-if="showFollowUpTimelineToggle"
+                  type="button"
+                  class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+                  :aria-expanded="followUpTimelineExpanded"
+                  :aria-label="followUpTimelineExpanded ? '收起活动' : '展开活动'"
+                  :title="followUpTimelineExpanded ? '收起活动' : '展开活动'"
+                  @click="followUpTimelineExpanded = !followUpTimelineExpanded"
+                >
+                  <span class="material-symbols-outlined text-[16px] leading-none">
+                    {{ followUpTimelineExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
+                  </span>
+                </button>
+                <button
+                  v-if="isEmbeddedMobileLayout && canCreateFollowUps && !hideEmbeddedFollowUpAction"
+                  type="button"
+                  class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
+                  @click="handleAiFollowUp"
+                >
+                  <span class="material-symbols-outlined text-base leading-none">keyboard_voice</span>
+                  语音识别
+                </button>
+              </div>
+              <div
+                v-if="!isEmbeddedMobileLayout"
+                class="flex w-full justify-start md:w-auto shrink-0 flex-wrap items-center gap-2 md:gap-3"
+              >
+                <div class="flex flex-wrap items-center gap-2">
                   <button
-                    v-for="option in followUpTypeFilters"
+                    v-for="(option, index) in followUpTypeFilters"
                     :key="option.value || 'all'"
                     type="button"
                     :class="[
-                      'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                      'rounded-full py-1.5 text-xs font-medium transition-colors md:px-3',
+                      isMobile && index === 0 ? 'pl-3 pr-3' : 'px-3',
                       selectedFollowUpType === option.value
                         ? 'bg-primary text-white shadow-sm'
                         : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -417,12 +663,8 @@
                     {{ option.label }}
                   </button>
                 </div>
-                <!-- <div class="flex bg-slate-100 p-1 rounded-lg">
-                  <button class="px-3 py-1 text-xs font-bold rounded bg-white shadow-sm">全部</button>
-                  <button class="px-3 py-1 text-xs font-medium text-slate-500">会议摘要</button>
-                  <button class="px-3 py-1 text-xs font-medium text-slate-500">重要进展</button>
-                </div> -->
                 <!-- <button
+                  v-if="canCreateFollowUps"
                   class="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
                   @click="handleOpenFollowUpDialog"
                 >
@@ -432,33 +674,52 @@
               </div>
             </div>
 
-            <div v-if="followUps.length === 0 && !followUpLoading" class="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm">
-              <span class="material-symbols-outlined text-slate-300 text-4xl mb-3">event_note</span>
-              <p class="text-sm text-slate-400">暂无跟进记录</p>
-              <p class="text-xs text-slate-300 mt-1">点击上方按钮添加第一条跟进记录</p>
+            <div
+              v-if="isFollowUpTimelineVisible && followUps.length === 0 && !followUpLoading"
+              :class="isEmbeddedMobileLayout
+                ? 'rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center'
+                : 'bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm'"
+            >
+              <span
+                class="material-symbols-outlined"
+                :class="isEmbeddedMobileLayout ? 'text-2xl leading-none text-slate-400' : 'mb-3 text-4xl text-slate-300'"
+              >event_note</span>
+              <p :class="isEmbeddedMobileLayout ? 'mt-2 text-xs font-medium text-slate-400' : 'text-sm text-slate-400'">暂无跟进记录</p>
+              <p :class="isEmbeddedMobileLayout ? 'mt-1 text-xs text-slate-300' : 'text-xs text-slate-300 mt-1'">点击上方语音识别按钮添加第一条跟进记录</p>
             </div>
 
-            <div v-else class="pl-2 sm:pl-3" v-loading="followUpLoading">
+            <div
+              v-else-if="isFollowUpTimelineVisible && followUpLoading"
+              class="space-y-3"
+            >
+              <div
+                v-for="index in 3"
+                :key="`follow-up-skeleton-${index}`"
+                class="rounded-xl border border-slate-200 bg-white p-3"
+              >
+                <div class="flex items-start gap-3">
+                  <div class="size-9 shrink-0 animate-pulse rounded-xl bg-slate-100" />
+                  <div class="min-w-0 flex-1 space-y-2">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="h-4 w-24 animate-pulse rounded-full bg-slate-100" />
+                      <div class="h-3 w-20 animate-pulse rounded-full bg-slate-100" />
+                    </div>
+                    <div class="h-3 w-full animate-pulse rounded-full bg-slate-100" />
+                    <div class="h-3 w-3/4 animate-pulse rounded-full bg-slate-100" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else-if="isFollowUpTimelineVisible">
               <div
                 v-for="(item, followUpIndex) in followUps"
                 :key="item.followUpId"
-                class="flex items-stretch gap-3"
+                class="flex min-w-0 flex-col"
               >
-                <!-- Timeline rail: line + dot centered on same axis; segment avoids gap between items -->
-                <div class="relative flex w-7 shrink-0 flex-col items-center pt-1.5">
-                  <div
-                    v-if="followUps.length > 1"
-                    class="absolute left-1/2 z-0 w-px -translate-x-1/2 bg-slate-200"
-                    :class="followUpTimelineRailClass(followUpIndex)"
-                  />
-                  <div
-                    class="relative z-10 size-3.5 shrink-0 rounded-full border-2 border-primary bg-white shadow-sm ring-2 ring-slate-50"
-                    aria-hidden="true"
-                  />
-                </div>
-                <!-- flex-col + 固定高度占位：16px 间距在同行 flex 高度内，避免子项 margin 不撑开行高导致卡片贴在一起；左侧轨道 stretch 后竖线仍连续 -->
+                <!-- flex-col + 固定高度占位：16px 间距在同行 flex 高度内，避免子项 margin 不撑开行高导致卡片贴在一起。 -->
                 <div class="flex min-w-0 flex-1 flex-col">
-                  <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                  <div v-if="false" class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
                     <div class="flex items-center justify-between mb-3">
                       <div class="flex items-center gap-3">
                         <div class="size-8 rounded-lg flex items-center justify-center text-white shadow-sm bg-primary">
@@ -474,6 +735,14 @@
                       <div class="flex items-center gap-3">
                         <span class="text-xs text-slate-400 uppercase font-bold">{{ formatDateTime(item.followTime || item.createTime) }}</span>
                         <button
+                          v-if="canEditFollowUps"
+                          type="button"
+                          class="text-slate-300 hover:text-primary transition-colors"
+                          @click="handleEditFollowUp(item)"
+                        >
+                          <span class="material-symbols-outlined text-sm">edit</span>
+                        </button>
+                        <button
                           v-if="canDeleteFollowUps"
                           type="button"
                           class="text-slate-300 hover:text-red-500 transition-colors"
@@ -488,37 +757,25 @@
                       下次联系: {{ formatDateTime(item.nextFollowTime) }}
                     </div>
                     <p class="text-sm text-slate-600 leading-relaxed">{{ item.content }}</p>
-                    <div v-if="item.attachments?.length" class="mt-3 flex flex-wrap gap-2">
-                      <div
-                        v-for="attachment in item.attachments"
-                        :key="attachment.attachmentId"
-                        class="inline-flex max-w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600 transition-colors hover:border-primary/30 hover:text-primary"
-                      >
-                        <button
-                          type="button"
-                          class="inline-flex min-w-0 items-center gap-1.5 px-2.5 py-1.5"
-                          @click="handlePreviewFollowUpAttachment(attachment)"
-                        >
-                          <span class="material-symbols-outlined text-sm">attach_file</span>
-                          <span class="truncate">{{ attachment.fileName }}</span>
-                        </button>
-                        <button
-                          type="button"
-                          class="flex shrink-0 items-center border-l border-slate-200 px-2 text-slate-400 transition-colors hover:bg-white hover:text-primary"
-                          title="下载附件"
-                          @click="handleDownloadFollowUpAttachment(attachment)"
-                        >
-                          <span class="material-symbols-outlined text-sm">download</span>
-                        </button>
-                      </div>
-                    </div>
                   </div>
-                  <div v-if="followUpIndex < followUps.length - 1" class="h-4 shrink-0" aria-hidden="true" />
+                  <FollowUpCard
+                    :item="item"
+                    :can-edit="canEditFollowUps"
+                    :can-delete="canDeleteFollowUps"
+                    :can-toggle-task-complete="canToggleTasks"
+                    :compact="isMobile || isEmbeddedMobileLayout"
+                    @edit="handleEditFollowUp"
+                    @delete="confirmDeleteFollowUp"
+                    @task-click="handleViewFollowUpTask"
+                    @task-toggle-complete="handleToggleFollowUpTask"
+                    @attachment-quote="attachment => handleQuoteFollowUpAttachment(item, attachment)"
+                  />
+                  <div v-if="followUpIndex < followUps.length - 1" class="h-3 shrink-0" aria-hidden="true" />
                 </div>
               </div>
             </div>
 
-            <div v-if="followUpTotal > followUpPageSize" class="flex justify-center">
+            <div v-if="isFollowUpTimelineVisible && followUpTotal > followUpPageSize" class="flex justify-center">
               <el-pagination
                 v-model:current-page="followUpPage"
                 :page-size="followUpPageSize"
@@ -531,137 +788,40 @@
           </div>
 
           <!-- Right Column: Related Modules (col-span-3) -->
-          <div class="lg:col-span-3 space-y-4">
-            <div class="flex items-center justify-between px-1">
+          <div
+            class="wk-related-modules"
+            :class="[isEmbeddedMobileLayout || detailTab === 'related' ? 'block' : 'hidden', 'lg:block lg:col-span-3', isEmbeddedMobileLayout ? '' : 'space-y-4']"
+          >
+            <div v-if="!embedded" class="flex items-center justify-between px-1">
               <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedBusiness')">
                   <span :class="sectionMaterialIconClass">hub</span>
                 </span>
                 关联业务模块
               </h3>
-              <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">3个模块</span>
+              <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">{{ visibleRelatedModuleCount }}个模块</span>
             </div>
 
-            <!-- Contacts Module -->
-            <section v-if="canViewContacts" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4" v-loading="contactLoading">
-              <div class="mb-4 flex items-center justify-between">
-                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedContacts')">
-                    <span :class="sectionMaterialIconClass">group</span>
-                  </span>
-                  关联联系人
-                  <span class="text-slate-400 font-normal">({{ contactTotal }})</span>
-                </h4>
-                <div v-if="canCreateContacts" class="flex items-center gap-2">
-                  <button
-                    type="button"
-                    class="size-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all"
-                    title="名片上传"
-                    aria-label="名片上传"
-                    @click="handleAddContactCardUpload"
-                  >
-                    <span class="material-symbols-outlined text-[18px] leading-none">contact_page</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="size-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all"
-                    title="新建联系人"
-                    aria-label="新建联系人"
-                    @click="handleAddContact"
-                  >
-                    <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">person_add</span>
-                  </button>
-                </div>
-              </div>
-              <div class="space-y-4">
-                <div v-if="contacts.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-8 text-center">
-                  <span class="material-symbols-outlined text-3xl leading-none text-slate-200">person_off</span>
-                  <p class="mt-2 text-xs font-medium text-slate-400">暂无关联联系人</p>
-                </div>
-                <div
-                  v-for="contact in contacts"
-                  :key="contact.contactId"
-                  class="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/70"
-                  @click="handleViewContact(contact)"
-                >
-                  <div class="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-slate-50 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-                  <div class="relative flex flex-col gap-3">
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0 flex flex-1 items-center gap-3">
-                        <div class="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-600 transition-colors group-hover:border-primary/20 group-hover:bg-primary/10 group-hover:text-primary">
-                          {{ contact.name?.trim()?.charAt(0) || '?' }}
-                        </div>
-                        <div class="min-w-0 flex-1">
-                          <div class="flex min-w-0 items-center gap-1.5">
-                            <h5 class="min-w-0 truncate text-sm font-bold leading-tight text-slate-900">{{ contact.name }}</h5>
-                            <el-tooltip
-                              v-if="!contact.isPrimary && canSetPrimaryContacts"
-                              content="设为主要联系人"
-                              placement="top"
-                            >
-                              <button
-                                type="button"
-                                class="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600 transition-all hover:bg-amber-100 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
-                                aria-label="设为主要联系人"
-                                @click.stop="handleSetPrimary(contact.contactId)"
-                              >
-                                <span
-                                  class="material-symbols-outlined text-[18px] leading-none"
-                                  style="font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24"
-                                >star</span>
-                              </button>
-                            </el-tooltip>
-                          </div>
-                          <p class="mt-0.5 truncate text-[11px] font-medium text-slate-500">{{ contact.position || '-' }}</p>
-                        </div>
-                      </div>
-                      <span
-                        v-if="contact.isPrimary"
-                        class="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[11px] font-bold text-primary"
-                      >
-                        <span class="material-symbols-outlined text-[12px] leading-none">stars</span>
-                        主要联系人
-                      </span>
-                    </div>
-
-                    <div class="h-px w-full bg-slate-100" />
-
-                    <div class="space-y-2">
-                      <div class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
-                        <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">call</span>
-                        <span
-                          :class="contact.phone ? 'font-mono text-xs font-medium tracking-tight text-slate-700' : 'text-xs font-medium text-slate-400'"
-                        >{{ contact.phone || '-' }}</span>
-                      </div>
-                      <div class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
-                        <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">mail</span>
-                        <span
-                          class="min-w-0 truncate text-xs font-medium tracking-tight"
-                          :class="contact.email ? 'text-slate-700' : 'text-slate-400'"
-                        >{{ contact.email || '-' }}</span>
-                      </div>
-                      <div class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
-                        <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">chat</span>
-                        <span
-                          class="min-w-0 truncate text-xs font-medium tracking-tight"
-                          :class="contact.wechat ? 'text-slate-700' : 'text-slate-400'"
-                        >{{ contact.wechat ? `WeChat: ${contact.wechat}` : '-' }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="contactTotal > contactPageSize" class="pt-2 flex justify-center">
-                  <el-pagination
-                    v-model:current-page="contactPage"
-                    :page-size="contactPageSize"
-                    :total="contactTotal"
-                    layout="prev, pager, next"
-                    small
-                    @current-change="handleContactPageChange"
-                  />
-                </div>
-              </div>
-            </section>
+            <RelatedContactsModule
+              :contacts="contacts"
+              :loading="contactLoading"
+              :visible="canViewContacts"
+              :embedded-layout="isEmbeddedMobileLayout"
+              :expanded="contactsModuleExpanded"
+              :can-create="canCreateContacts"
+              :can-set-primary="canSetPrimaryContacts"
+              :can-create-relation="canCreateRelation"
+              :total="contactTotal"
+              :page="contactPage"
+              :page-size="contactPageSize"
+              @update:expanded="contactsModuleExpanded = $event"
+              @update:page="handleContactPageChange"
+              @upload-card="handleAddContactCardUpload"
+              @add="handleAddContact"
+              @view="handleViewContact"
+              @set-primary="handleSetPrimary"
+              @add-to-relation="handleAddContactToRelation"
+            />
 
             <!-- Opportunities Module (hidden) -->
             <!-- <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -689,91 +849,57 @@
               </div>
             </section> -->
 
-            <!-- Tasks Module -->
-            <section v-if="canViewTasks" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-              <div class="mb-4 flex items-center justify-between">
-                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('todoTasks')">
-                    <WkIcon name="task" :size="15" />
-                  </span>
-                  待办任务
-                </h4>
-                <button v-if="canCreateTasks" class="size-6 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all" @click="handleAddTask">
-                  <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add</span>
-                </button>
-              </div>
-              <div class="space-y-4">
-                <div v-if="!customer.tasks?.length" class="py-4 text-center">
-                  <p class="text-xs text-slate-400">暂无待办任务</p>
-                </div>
-                <div
-                  v-for="task in customer.tasks?.slice(0, 5)"
-                  :key="task.taskId"
-                  class="flex items-start gap-3 p-3 bg-white border border-slate-100 rounded-xl hover:shadow-sm transition-all"
-                >
-                  <div class="flex-1 min-w-0">
-                    <p class="text-xs font-bold text-slate-900 truncate">{{ task.title }}</p>
-                    <div class="flex items-center gap-2 mt-1">
-                      <span class="text-xs font-bold uppercase" :class="task.dueDate && isOverdue(task.dueDate) ? 'text-red-500' : 'text-slate-400'">
-                        {{ task.dueDate ? formatDate(task.dueDate) : '无截止日期' }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
+            <RelatedTasksModule
+              :tasks="customerTasks"
+              :loading="taskLoading"
+              :visible="canViewTasks"
+              :embedded-layout="embedded"
+              :expanded="tasksModuleExpanded"
+              :can-create="canCreateTasks"
+              :can-toggle="canToggleTasks"
+              :clickable="true"
+              :selected-task-id="selectedCustomerTask?.taskId"
+              @update:expanded="tasksModuleExpanded = $event"
+              @add="handleAddTask"
+              @view="handleViewCustomerTask"
+              @toggle="handleToggleCustomerTask"
+            />
 
-            <!-- Documents Module -->
-            <section v-if="canViewKnowledge" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-              <div class="mb-4 flex items-center justify-between">
-                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('documentCenter')">
-                    <WkIcon name="knowledge" :size="15" />
-                  </span>
-                  文档中心
-                </h4>
-                <button
-                  v-if="canCreateKnowledge"
-                  class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-                  :disabled="customerDocumentUploading"
-                  @click="triggerCustomerDocumentUpload"
-                >
-                  <span class="material-symbols-outlined text-[15px] leading-none">
-                    {{ customerDocumentUploading ? 'progress_activity' : 'upload_file' }}
-                  </span>
-                  上传文档
-                </button>
-                <input
-                  ref="customerDocumentInput"
-                  type="file"
-                  class="hidden"
-                  multiple
-                  @change="handleCustomerDocumentUpload"
-                />
-              </div>
-              <div v-if="customer.documents?.length" class="space-y-2">
-                <div
-                  v-for="doc in customer.documents.slice(0, 5)"
-                  :key="doc.knowledgeId"
-                  class="rounded-xl border border-slate-100 bg-slate-50/70 p-3"
-                >
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <p class="truncate text-xs font-bold text-slate-900">{{ doc.name }}</p>
-                      <p class="mt-1 line-clamp-2 text-xs text-slate-500">{{ doc.summary || getKnowledgeTypeLabel(doc.type) }}</p>
-                    </div>
-                    <span class="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-500">
-                      {{ getKnowledgeTypeLabel(doc.type) }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div v-else>
-                <p class="py-4 text-center text-xs text-slate-400">暂无文档</p>
-              </div>
-            </section>
+            <RelatedSchedulesModule
+              :schedules="customerSchedules"
+              :loading="scheduleLoading"
+              :visible="canViewSchedules"
+              :embedded-layout="embedded"
+              :expanded="schedulesModuleExpanded"
+              :can-create="canCreateSchedules"
+              :clickable="true"
+              :selected-schedule-id="selectedCustomerSchedule?.scheduleId"
+              :total="scheduleTotal"
+              :page="schedulePage"
+              :page-size="schedulePageSize"
+              @update:expanded="schedulesModuleExpanded = $event"
+              @update:page="handleSchedulePageChange"
+              @add="handleAddSchedule"
+              @view="handleViewCustomerSchedule"
+            />
+
+            <RelatedDocumentsModule
+              :documents="customerKnowledgeList"
+              :loading="customerKnowledgeLoading"
+              :visible="canViewKnowledge"
+              :embedded-layout="isEmbeddedMobileLayout"
+              :expanded="documentsModuleExpanded"
+              :can-upload="canUploadKnowledge"
+              :clickable="true"
+              :empty-text="getKnowledgeEmptyText()"
+              @update:expanded="documentsModuleExpanded = $event"
+              @upload="openCustomerKnowledgeUpload"
+              @open="item => openKnowledgeDetail(item.knowledgeId)"
+            />
+
           </div>
         </div>
+      </div>
       </div>
     </template>
 
@@ -786,60 +912,32 @@
       </template>
     </el-dialog>
 
-    <!-- Add Follow-up Dialog -->
-    <el-dialog v-model="showAddFollowUpDialog" title="添加跟进记录" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
-      <el-form :model="followUpForm" label-width="80px">
-        <el-form-item label="跟进类型">
-          <el-select v-model="followUpForm.type" class="w-full">
-            <el-option label="电话" value="call" />
-            <el-option label="会议" value="meeting" />
-            <el-option label="邮件" value="email" />
-            <el-option label="拜访" value="visit" />
-            <el-option label="其他" value="other" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="跟进时间">
-          <el-date-picker v-model="followUpForm.followTime" type="datetime" class="w-full" placeholder="选择跟进时间" value-format="YYYY-MM-DD HH:mm:ss" />
-        </el-form-item>
-        <el-form-item label="跟进内容">
-          <el-input v-model="followUpForm.content" type="textarea" :rows="4" placeholder="请输入跟进内容" />
-        </el-form-item>
-        <el-form-item label="附件">
-          <input
-            ref="followUpAttachmentInput"
-            type="file"
-            class="hidden"
-            multiple
-            @change="handleFollowUpAttachmentChange"
-          >
-          <div class="w-full space-y-2">
-            <el-button :loading="followUpAttachmentUploading" @click="triggerFollowUpAttachmentInput">
-              <span class="material-symbols-outlined mr-1 text-sm">attach_file</span>
-              上传附件
-            </el-button>
-            <div v-if="followUpForm.attachments.length" class="space-y-2">
-              <div
-                v-for="(attachment, index) in followUpForm.attachments"
-                :key="attachment.filePath"
-                class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-              >
-                <div class="min-w-0">
-                  <div class="truncate font-medium text-slate-700">{{ attachment.fileName }}</div>
-                  <div class="text-xs text-slate-400">{{ formatFileSize(attachment.fileSize) }}</div>
-                </div>
-                <button type="button" class="text-slate-400 hover:text-red-500" @click="removeFollowUpAttachment(index)">
-                  <span class="material-symbols-outlined text-base">close</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showAddFollowUpDialog = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmitFollowUp">添加</el-button>
-      </template>
-    </el-dialog>
+    <KnowledgeUploadDialog
+      ref="knowledgeUploadDialogRef"
+      v-model="showKnowledgeUploadDialog"
+      :customer-id="customer?.customerId"
+      headline="上传客户文档"
+      subline="支持 PDF、Word、PPT、Excel。上传后将关联当前客户，AI 将自动解析并建立索引。"
+      step1-label="1. 选择文档类型"
+      success-message="文档上传成功"
+      summary-placeholder="例如：客户关切点、关键结论、下一步计划…"
+      destroy-on-close
+      @success="onCustomerKnowledgeUploadSuccess"
+    />
+
+    <KnowledgeDetailModal
+      v-model="showKnowledgeDetailModal"
+      :knowledge-id="selectedKnowledgeId"
+      @summary-updated="handleKnowledgeSummaryUpdated"
+    />
+
+    <FollowUpUpsertDialog
+      v-model="showAddFollowUpDialog"
+      :customer-id="customer?.customerId || ''"
+      :editing-follow-up="editingFollowUpForDialog"
+      :submitting="submitting"
+      @submit="handleFollowUpDialogSubmit"
+    />
 
     <ContactUpsertDialog
       v-model="showAddContactDialog"
@@ -858,6 +956,15 @@
       @set-primary="handleSetPrimary"
     />
 
+    <CustomerBasicInfoDrawer
+      v-model="showBasicInfoDrawer"
+      :customer="customer"
+      :contacts="contacts"
+      :latest-ai-report="latestAiReport"
+      @contacts-updated="onBasicInfoContactsUpdated"
+      @edit="handleBasicInfoEdit"
+    />
+
     <!-- Edit Customer Dialog -->
     <CustomerUpsertDialog
       v-model="showEditDialog"
@@ -873,47 +980,130 @@
       @saved="handleAiFollowUpSaved"
     />
 
-    <FollowUpAttachmentPreviewModal
-      v-model="showFollowUpAttachmentPreview"
-      :attachment="previewingFollowUpAttachment"
+    <TaskDetailDrawer
+      v-model="showCustomerTaskDetail"
+      :task="selectedCustomerTask"
+      :is-mobile="isMobile && !isEmbeddedMobileLayout"
+      :can-edit="canCreateTasks"
+      :can-toggle-complete="canToggleTasks"
+      @edit="handleCustomerTaskEditFromDetail"
+      @mutated="refreshCustomerTaskArea"
+    />
+
+    <TaskEditDialog
+      v-model="showTaskEditDialog"
+      :editing-task="editingCustomerTask"
+      :default-customer="taskDefaultCustomer"
+      :refresh-store-after-save="false"
+      @saved="handleTaskDialogSaved"
+    />
+
+    <ScheduleDetailDrawer
+      v-model="showCustomerScheduleDetail"
+      :schedule="selectedCustomerSchedule"
+      :is-mobile="isMobile && !isEmbeddedMobileLayout"
+      :can-edit="canEditSchedules"
+      :can-delete="canDeleteSchedules"
+      @edit="handleEditCustomerScheduleFromDetail"
+      @deleted="handleCustomerScheduleDeleted"
+    />
+
+    <ScheduleFormDialog
+      v-model="showScheduleFormDialog"
+      :editing-schedule="editingCustomerSchedule"
+      :default-customer="scheduleDefaultCustomer"
+      @created="handleCustomerScheduleCreated"
+      @updated="handleCustomerScheduleUpdated"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
-import { useEnumStore } from '@/stores/enums'
+import { useTaskStore } from '@/stores/task'
 import { useUserStore } from '@/stores/user'
+import { useEnumStore } from '@/stores/enums'
 import { useResponsive } from '@/composables/useResponsive'
-import { addCustomerTag, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
+import { addCustomerTag, generateCustomerAiReport, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
+import { queryTaskList } from '@/api/task'
+import { queryScheduleList, type ScheduleVO } from '@/api/schedule'
+import type { CustomerAiParseVO } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
-import { addFollowUp, deleteFollowUp, downloadFollowUpAttachment, queryFollowUpPageList, uploadFollowUpAttachment } from '@/api/followup'
-import { deleteContact, setPrimaryContact, queryContactPageList } from '@/api/contact'
-import { getEnabledFieldsByEntity } from '@/api/customField'
-import { uploadKnowledge } from '@/api/knowledge'
+import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } from '@/api/followup'
+import { deleteContact, queryContactPageList, queryContactsByCustomer, setPrimaryContact } from '@/api/contact'
+import { addRelationFromContact } from '@/api/relation'
+import { queryKnowledgeList } from '@/api/knowledge'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { CustomerTag, FollowUp, Contact, FollowUpAttachment, FollowUpAttachmentDraft } from '@/types/customer'
-import type { CustomField } from '@/types/customField'
-import { formatCustomFieldValue as formatCustomFieldDisplayValue } from '@/utils/customFieldDisplay'
+import type { Knowledge, Task, TaskStatus } from '@/types/common'
+import type { Contact, CustomerAiReportVO, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
+import { compactCustomerAiInsight } from '@/utils/customerAi'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
-import FollowUpAttachmentPreviewModal from '@/components/customer/FollowUpAttachmentPreviewModal.vue'
+import FollowUpUpsertDialog from '@/components/customer/FollowUpUpsertDialog.vue'
+import type { FollowUpUpsertSubmitPayload } from '@/components/customer/FollowUpUpsertDialog.vue'
+import AiParseInsightSidebar from '@/components/crm/AiParseInsightSidebar.vue'
+import FollowUpCard from '@/components/customer/FollowUpCard.vue'
+import RelatedContactsModule from '@/components/customer/related/RelatedContactsModule.vue'
+import RelatedDocumentsModule from '@/components/customer/related/RelatedDocumentsModule.vue'
+import RelatedSchedulesModule from '@/components/customer/related/RelatedSchedulesModule.vue'
+import RelatedTasksModule from '@/components/customer/related/RelatedTasksModule.vue'
+import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import ContactUpsertDialog from '@/views/contact/components/ContactUpsertDialog.vue'
 import ContactDetailDrawer from '@/views/contact/components/ContactDetailDrawer.vue'
+import TaskDetailDrawer from '@/views/task/components/TaskDetailDrawer.vue'
+import TaskEditDialog from '@/views/task/components/TaskEditDialog.vue'
+import ScheduleDetailDrawer from '@/views/calendar/components/ScheduleDetailDrawer.vue'
+import ScheduleFormDialog from '@/views/calendar/components/ScheduleFormDialog.vue'
+import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
+import KnowledgeUploadDialog from '@/components/knowledge/KnowledgeUploadDialog.vue'
 import {
   CUSTOMER_DETAIL_LIST_PAGE_QUERY_KEY,
   CUSTOMER_LIST_PAGE_QUERY_KEY
 } from '@/views/customer/constants'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { isRequestErrorHandled } from '@/utils/requestError'
 
 const route = useRoute()
 const router = useRouter()
 const customerStore = useCustomerStore()
-const enumStore = useEnumStore()
+const taskStore = useTaskStore()
 const userStore = useUserStore()
-const { isMobile } = useResponsive()
+const enumStore = useEnumStore()
+enumStore.ensureCustomerStage()
+enumStore.ensureCustomerLevel()
+const { isMobile: responsiveIsMobile } = useResponsive()
+
+const props = withDefaults(defineProps<{
+  customerId?: string
+  embedded?: boolean
+  forceMobile?: boolean
+  hideEmbeddedFollowUpAction?: boolean
+}>(), {
+  customerId: '',
+  embedded: false,
+  forceMobile: false,
+  hideEmbeddedFollowUpAction: false
+})
+
+const emit = defineEmits<{
+  (e: 'quote-attachment', value: { followUp: FollowUp; attachment: FollowUpAttachment }): void
+}>()
+
+type CustomerDetailRefreshModule = 'aiAnalysis' | 'contacts' | 'followUps' | 'tasks' | 'schedules'
+
+type CustomerDetailRefreshPayload = {
+  customerId?: string | number
+  source?: string
+  modules?: CustomerDetailRefreshModule[]
+}
+
+const activeCustomerId = computed(() => props.customerId || String(route.params.id || ''))
+const embedded = computed(() => props.embedded)
+const isMobile = computed(() => props.forceMobile || responsiveIsMobile.value)
+const isEmbeddedMobileLayout = computed(() => props.embedded && props.forceMobile)
+const hideEmbeddedFollowUpAction = computed(() => props.hideEmbeddedFollowUpAction)
 const CUSTOMER_DETAIL_REQUEST_LIMIT = 100
 
 const loading = ref(false)
@@ -924,66 +1114,41 @@ const showAddContactDialog = ref(false)
 const showContactDetail = ref(false)
 const currentContact = ref<Contact | null>(null)
 const editingContact = ref<Contact | null>(null)
+const editingFollowUpForDialog = ref<FollowUp | null>(null)
 const contactAiImagePickerToken = ref(0)
 const showEditDialog = ref(false)
+const showBasicInfoDrawer = ref(false)
 const showAiFollowUpDrawer = ref(false)
-const showFollowUpAttachmentPreview = ref(false)
 const showTerminalStageMenu = ref(false)
 const showTransferPopover = ref(false)
 const headerMoreButtonRef = ref<HTMLElement | null>(null)
+const detailTab = ref<'ai' | 'activity' | 'related'>('ai')
 const newTagName = ref('')
 const followUps = ref<FollowUp[]>([])
 const followUpTotal = ref(0)
 const followUpPage = ref(1)
-const followUpPageSize = ref(CUSTOMER_DETAIL_REQUEST_LIMIT)
+const followUpPageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
 const followUpLoading = ref(false)
+const aiAnalysisExpanded = ref(true)
+const followUpTimelineExpanded = ref(true)
+const contactsModuleExpanded = ref(true)
+const tasksModuleExpanded = ref(true)
+const schedulesModuleExpanded = ref(true)
+const documentsModuleExpanded = ref(true)
 const selectedFollowUpType = ref('')
-const followUpAttachmentInput = ref<HTMLInputElement | null>(null)
-const followUpAttachmentUploading = ref(false)
-const previewingFollowUpAttachment = ref<FollowUpAttachment | null>(null)
-const customerDocumentInput = ref<HTMLInputElement | null>(null)
-const customerDocumentUploading = ref(false)
 const contacts = ref<Contact[]>([])
 const contactTotal = ref(0)
 const contactPage = ref(1)
-const contactPageSize = ref(CUSTOMER_DETAIL_REQUEST_LIMIT)
+const contactPageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
 const contactLoading = ref(false)
-const customFields = ref<CustomField[]>([])
-const ownerSearch = ref('')
-const ownerListLoading = ref(false)
-const userListLoaded = ref(false)
-
-interface TransferUserOption {
-  userId: string
-  realname: string
-  username?: string
-  status?: number
-}
-
-const transferUserList = ref<TransferUserOption[]>([])
-
-const sectionIconBoxClass = 'inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white shadow-[0_8px_18px_rgba(15,23,42,0.08)]'
-const sectionMaterialIconClass = 'material-symbols-outlined text-[16px] leading-none'
-const sectionIconBgColors = {
-  customerStage: '#0052CC',
-  basicInfo: '#5243AA',
-  recentActivity: '#FF991F',
-  relatedBusiness: '#00A3BF',
-  relatedContacts: '#DE350B',
-  todoTasks: '#00875A',
-  documentCenter: '#0052CC',
-} as const
-
-const followUpTypeFilters = [
-  { value: '', label: '全部' },
-  { value: 'call', label: '电话' },
-  { value: 'meeting', label: '会议' },
-  { value: 'email', label: '邮件' },
-  { value: 'visit', label: '拜访' },
-  { value: 'other', label: '其他' }
-] as const
-
-type SectionIconKey = keyof typeof sectionIconBgColors
+const customerTasks = ref<Task[]>([])
+const taskLoading = ref(false)
+const customerSchedules = ref<ScheduleVO[]>([])
+const scheduleTotal = ref(0)
+const schedulePage = ref(1)
+const schedulePageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
+const scheduleLoading = ref(false)
+const customerKnowledgeList = ref<Knowledge[]>([])
 
 function parsePositivePageQuery(value: unknown): number | null {
   if (typeof value !== 'string') return null
@@ -1005,20 +1170,99 @@ function buildCustomerListRoute() {
 function handleBackToCustomerList() {
   router.push(buildCustomerListRoute())
 }
+const customerKnowledgeLoading = ref(false)
+const showKnowledgeUploadDialog = ref(false)
+const knowledgeUploadDialogRef = ref<InstanceType<typeof KnowledgeUploadDialog> | null>(null)
+const selectedKnowledgeId = ref('')
+const showKnowledgeDetailModal = ref(false)
+const generatingAiReport = ref(false)
+const latestAiReport = ref<CustomerAiReportVO | null>(null)
+const ownerSearch = ref('')
+const ownerListLoading = ref(false)
+const userListLoaded = ref(false)
+const selectedCustomerTask = ref<Task | null>(null)
+const showCustomerTaskDetail = computed({
+  get: () => !!selectedCustomerTask.value,
+  set: (val: boolean) => {
+    if (!val) selectedCustomerTask.value = null
+  }
+})
+const showTaskEditDialog = ref(false)
+const editingCustomerTask = ref<Task | null>(null)
+const selectedCustomerSchedule = ref<ScheduleVO | null>(null)
+const showCustomerScheduleDetail = computed({
+  get: () => !!selectedCustomerSchedule.value,
+  set: (val: boolean) => {
+    if (!val) selectedCustomerSchedule.value = null
+  }
+})
+const showScheduleFormDialog = ref(false)
+const editingCustomerSchedule = ref<ScheduleVO | null>(null)
+const taskDefaultCustomer = computed(() => customer.value
+  ? {
+      customerId: customer.value.customerId,
+      companyName: customer.value.companyName || ''
+    }
+  : null
+)
+const scheduleDefaultCustomer = computed(() => customer.value
+  ? {
+      customerId: customer.value.customerId,
+      companyName: customer.value.companyName || ''
+    }
+  : null
+)
+
+watch(showTaskEditDialog, visible => {
+  if (!visible) editingCustomerTask.value = null
+})
+
+watch(showScheduleFormDialog, visible => {
+  if (!visible) editingCustomerSchedule.value = null
+})
+
+interface TransferUserOption {
+  userId: string
+  realname: string
+  username?: string
+  status?: number
+}
+
+const transferUserList = ref<TransferUserOption[]>([])
+
+const sectionIconBoxClass = 'inline-flex size-6 shrink-0 items-center justify-center rounded-md text-white shadow-[0_6px_14px_rgba(15,23,42,0.08)]'
+const sectionMaterialIconClass = 'material-symbols-outlined text-[14px] leading-none'
+const sectionIconBgColors = {
+  customerStage: '#1f1e1c',
+  basicInfo: '#8d4f34',
+  recentActivity: '#cf744f',
+  relatedBusiness: '#5f584f',
+  relatedContacts: '#cf744f',
+  todoTasks: '#5f704a',
+  relatedSchedules: '#8d4f34',
+  documentCenter: '#1f1e1c',
+} as const
+
+const savedAiAnalysisTitle = 'AI分析'
+const emptyAiAnalysisTitle = '\u6682\u65e0 AI \u5206\u6790'
+const emptyAiAnalysisDescription = '\u4fdd\u5b58\u5ba2\u6237\u540e\uff0c\u7cfb\u7edf\u4f1a\u81ea\u52a8\u89e6\u53d1 AI \u5206\u6790\uff0c\u7ed3\u679c\u4f1a\u5c55\u793a\u5728\u8fd9\u91cc\u3002'
+const viewBasicInfoButtonText = '\u57fa\u672c\u4fe1\u606f'
+const AI_ANALYSIS_POLL_INTERVAL_MS = 2500
+const AI_ANALYSIS_POLL_MAX_ATTEMPTS = 24
+
+const followUpTypeFilters = [
+  { value: '', label: '全部' },
+  { value: 'call', label: '电话' },
+  { value: 'meeting', label: '会议' },
+  { value: 'email', label: '邮件' },
+  { value: 'visit', label: '拜访' },
+  { value: 'other', label: '其他' }
+] as const
+
+type SectionIconKey = keyof typeof sectionIconBgColors
 
 function getSectionIconStyle(key: SectionIconKey): { backgroundColor: string } {
   return { backgroundColor: sectionIconBgColors[key] }
-}
-
-/** Vertical rail segment: line starts at first dot center, ends at last dot center; full height between. */
-function followUpTimelineRailClass(index: number): string {
-  const n = followUps.value.length
-  if (n <= 1) return ''
-  const first = index === 0
-  const last = index === n - 1
-  if (first && !last) return 'top-[calc(0.375rem+0.4375rem)] bottom-0'
-  if (!first && last) return 'top-0 h-[calc(0.375rem+0.4375rem)]'
-  return 'top-0 bottom-0'
 }
 
 function isPrimaryContact(contact?: Pick<Contact, 'isPrimary'> | null): boolean {
@@ -1049,10 +1293,47 @@ function syncCurrentContact(customerId: string) {
   }
 }
 
+function onBasicInfoContactsUpdated(newContacts: Contact[]) {
+  contacts.value = newContacts
+  if (customer.value) syncCurrentContact(customer.value.customerId)
+}
+
+async function maybeOpenContactFromQuery(customerId: string) {
+  const openContactId = typeof route.query.openContactId === 'string' ? route.query.openContactId : ''
+  if (!openContactId || !canViewContacts.value) return
+
+  let matchedContact = contacts.value.find(contact => contact.contactId === openContactId)
+  if (!matchedContact) {
+    try {
+      const allContacts = await queryContactsByCustomer(customerId)
+      matchedContact = allContacts.map(contact => normalizeContact(contact)).find(contact => contact.contactId === openContactId)
+    } catch (error) {
+      console.error('Failed to load contact by route query:', error)
+    }
+  }
+
+  if (!matchedContact) return
+
+  currentContact.value = matchedContact
+  showContactDetail.value = true
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.openContactId
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
 async function refreshCustomerContext(customerId: string, options: { resetContacts?: boolean } = {}) {
   const tasks: Promise<any>[] = [customerStore.fetchCustomerDetail(customerId)]
   if (canViewContacts.value) {
     tasks.push(fetchContacts(customerId, options.resetContacts))
+  }
+  await Promise.all(tasks)
+}
+
+async function refreshFollowUpContext(customerId: string, options: { resetFollowUps?: boolean } = {}) {
+  const tasks: Promise<any>[] = [customerStore.fetchCustomerDetail(customerId)]
+  if (canViewFollowUps.value) {
+    tasks.push(fetchFollowUps(customerId, options.resetFollowUps))
   }
   await Promise.all(tasks)
 }
@@ -1073,27 +1354,149 @@ function applyPrimaryContactLocally(contactId: string) {
 }
 
 const primaryContact = computed(() => contacts.value.find(contact => isPrimaryContact(contact)) || contacts.value[0] || null)
+const currentAiInsight = computed(() => compactCustomerAiInsight(latestAiReport.value?.aiInsight || customer.value?.aiInsight))
+const savedAiParseResult = computed<CustomerAiParseVO | null>(() => {
+  const snapshot = customer.value?.aiParseSnapshot
 
+  if (!snapshot) {
+    return null
+  }
 
-function formatDateForApi(date: Date = new Date()): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  const seconds = String(date.getSeconds()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-}
+  try {
+    const parsed = JSON.parse(snapshot)
+    if (!parsed || typeof parsed !== 'object') {
+      return null
+    }
 
-const followUpForm = reactive({
-  customerId: '',
-  type: 'call',
-  content: '',
-  followTime: formatDateForApi(),
-  attachments: [] as FollowUpAttachmentDraft[]
+    const snapshotResult = parsed as CustomerAiParseVO
+    const sidebarResult = { ...snapshotResult }
+    if (isSameAsListAiSummary(sidebarResult.summary)) {
+      sidebarResult.summary = undefined
+    }
+    const hasSidebarContent = sidebarResult.score != null
+      || !!sidebarResult.summary
+      || !!sidebarResult.nextStep
+      || (sidebarResult.tags?.length || 0) > 0
+      || (sidebarResult.keyPoints?.length || 0) > 0
+    return hasSidebarContent ? sidebarResult : null
+  } catch {
+    return null
+  }
+})
+const showAiAnalysisToggle = computed(() => !!savedAiParseResult.value)
+const isAiAnalysisVisible = computed(() => aiAnalysisExpanded.value || !showAiAnalysisToggle.value)
+const showFollowUpTimelineToggle = computed(() => followUpLoading.value || followUps.value.length > 0)
+const isFollowUpTimelineVisible = computed(() => followUpTimelineExpanded.value || !showFollowUpTimelineToggle.value)
+const aiAnalysisStatus = computed(() => customer.value?.aiAnalysisStatus || '')
+const isAiAnalysisPending = computed(() => aiAnalysisStatus.value === 'pending' || aiAnalysisStatus.value === 'running')
+const isAiAnalysisFailed = computed(() => aiAnalysisStatus.value === 'failed')
+const aiAnalysisDisplayTime = computed(() => formatDateTime(customer.value?.aiAnalysisRequestedAt || customer.value?.updateTime))
+const aiAnalysisStatusLabel = computed(() => {
+  switch (aiAnalysisStatus.value) {
+    case 'pending':
+      return 'AI 分析排队中'
+    case 'running':
+      return 'AI 分析生成中'
+    case 'failed':
+      return 'AI 分析未完成'
+    case 'success':
+      return 'AI 分析已更新'
+    default:
+      return ''
+  }
 })
 
+function isSameAsListAiSummary(value?: string | null): boolean {
+  const summary = String(value || '').replace(/\s+/g, ' ').trim()
+  const listSummary = currentAiInsight.value.replace(/\s+/g, ' ').trim()
+  return !!summary && !!listSummary && summary.length <= 90 && summary === listSummary
+}
+
+const aiAnalysisStatusDescription = computed(() => {
+  switch (aiAnalysisStatus.value) {
+    case 'pending':
+      return '客户已保存，系统正在排队处理最新一次 AI 分析任务。'
+    case 'running':
+      return '系统正在基于最新客户资料生成画像和推进建议，结果会自动刷新到当前页面。'
+    case 'failed':
+      return '本次自动分析未成功，可以重新保存客户资料，或点击右上角手动生成 AI 分析报告。'
+    default:
+      return ''
+  }
+})
+const aiAnalysisEmptyTitle = computed(() => {
+  if (isAiAnalysisPending.value) return 'AI 分析生成中'
+  if (isAiAnalysisFailed.value) return 'AI 分析未完成'
+  return emptyAiAnalysisTitle
+})
+const aiAnalysisEmptyDescription = computed(() => {
+  if (isAiAnalysisPending.value) {
+    return '客户资料已保存，系统正在后台生成 AI 客户画像和推进建议，请稍候自动刷新。'
+  }
+  if (isAiAnalysisFailed.value) {
+    return '最近一次自动分析没有成功生成结果。你可以重新保存客户，或手动点击“生成 AI 分析报告”。'
+  }
+  return emptyAiAnalysisDescription
+})
+
+let aiAnalysisPollTimer: ReturnType<typeof setTimeout> | null = null
+let aiAnalysisPollAttempts = 0
+
+function clearAiAnalysisPolling(resetAttempts = true) {
+  if (aiAnalysisPollTimer) {
+    clearTimeout(aiAnalysisPollTimer)
+    aiAnalysisPollTimer = null
+  }
+  if (resetAttempts) {
+    aiAnalysisPollAttempts = 0
+  }
+}
+
+function scheduleAiAnalysisPolling(customerId?: string, resetAttempts = false) {
+  if (!customerId) return
+  if (!isAiAnalysisPending.value) {
+    clearAiAnalysisPolling(resetAttempts)
+    return
+  }
+  if (resetAttempts) {
+    clearAiAnalysisPolling()
+  }
+  if (aiAnalysisPollTimer || aiAnalysisPollAttempts >= AI_ANALYSIS_POLL_MAX_ATTEMPTS) {
+    return
+  }
+
+  aiAnalysisPollTimer = setTimeout(async () => {
+    aiAnalysisPollTimer = null
+    if (activeCustomerId.value !== customerId) {
+      clearAiAnalysisPolling()
+      return
+    }
+
+    aiAnalysisPollAttempts += 1
+    try {
+      await customerStore.fetchCustomerDetail(customerId)
+    } catch (error) {
+      console.error('Failed to poll customer ai analysis status:', error)
+    }
+
+    if (activeCustomerId.value !== customerId) {
+      clearAiAnalysisPolling()
+      return
+    }
+
+    if (isAiAnalysisPending.value && aiAnalysisPollAttempts < AI_ANALYSIS_POLL_MAX_ATTEMPTS) {
+      scheduleAiAnalysisPolling(customerId)
+      return
+    }
+
+    clearAiAnalysisPolling()
+  }, AI_ANALYSIS_POLL_INTERVAL_MS)
+}
+
+
 const customer = computed(() => customerStore.currentCustomer)
+const customerVisibleTags = computed(() => customer.value?.tags?.slice(0, 2) || [])
+const customerHiddenTags = computed(() => customer.value?.tags?.slice(2) || [])
 const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
 const canTransferCustomer = computed(() => userStore.hasPermission('customer:transfer'))
 const canDeleteCustomer = computed(() => userStore.hasPermission('customer:delete'))
@@ -1104,13 +1507,26 @@ const canCreateContacts = computed(() => userStore.hasPermission('contact:create
 const canEditContacts = computed(() => userStore.hasPermission('contact:edit'))
 const canDeleteContacts = computed(() => userStore.hasPermission('contact:delete'))
 const canSetPrimaryContacts = computed(() => userStore.hasPermission('contact:set_primary'))
+const canCreateRelation = true
 const canViewFollowUps = computed(() => userStore.hasPermission('followup:view'))
 const canCreateFollowUps = computed(() => userStore.hasPermission('followup:create'))
+const canEditFollowUps = computed(() => userStore.hasPermission('followup:edit'))
 const canDeleteFollowUps = computed(() => userStore.hasPermission('followup:delete'))
 const canViewTasks = computed(() => userStore.hasPermission('task:view'))
 const canCreateTasks = computed(() => userStore.hasPermission('task:create'))
+const canToggleTasks = computed(() => userStore.hasPermission('task:update_status'))
+const canViewSchedules = computed(() => userStore.hasPermission('schedule:view'))
+const canCreateSchedules = computed(() => userStore.hasPermission('schedule:create'))
+const canEditSchedules = computed(() => userStore.hasPermission('schedule:edit'))
+const canDeleteSchedules = computed(() => userStore.hasPermission('schedule:delete'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
-const canCreateKnowledge = computed(() => userStore.hasPermission('knowledge:create'))
+const canUploadKnowledge = computed(() => userStore.hasPermission('knowledge:upload'))
+const visibleRelatedModuleCount = computed(() => [
+  canViewContacts.value,
+  canViewTasks.value,
+  canViewSchedules.value,
+  canViewKnowledge.value
+].filter(Boolean).length)
 const filteredTransferUserList = computed(() => {
   const keyword = ownerSearch.value.trim().toLowerCase()
   if (!keyword) return transferUserList.value
@@ -1121,43 +1537,173 @@ const filteredTransferUserList = computed(() => {
   )
 })
 
-onMounted(async () => {
-  const customerId = route.params.id as string
-  if (customerId) {
-    loading.value = true
-    followUpForm.customerId = customerId
+watch(showAddFollowUpDialog, (visible) => {
+  if (!visible) {
+    editingFollowUpForDialog.value = null
+  }
+})
 
-    const fetchTasks: Promise<any>[] = [
-      enumStore.ensureCustomerLevel(),
-      enumStore.ensureCustomerStage(),
-      customerStore.fetchCustomerDetail(customerId).catch(err => {
-        console.error('Failed to fetch customer detail:', err)
-      }),
-      getEnabledFieldsByEntity('customer').then(data => {
-        customFields.value = data
-      }).catch(err => {
-        console.error('Failed to fetch custom fields:', err)
-        customFields.value = []
-      })
-    ]
+async function refreshCustomerAiAnalysis(customerId: string) {
+  try {
+    await customerStore.fetchCustomerDetail(customerId)
+  } catch (err) {
+    console.error('Failed to fetch customer ai analysis:', err)
+  }
+}
 
-    if (canViewFollowUps.value) {
-      fetchTasks.push(fetchFollowUps(customerId))
-    } else {
-      followUps.value = []
-      followUpTotal.value = 0
-    }
+async function refreshCustomerDetailModules(
+  customerId: string,
+  options: { resetRelatedPages?: boolean } = {}
+) {
+  const resetRelatedPages = Boolean(options.resetRelatedPages)
+  const fetchTasks: Promise<any>[] = [
+    customerStore.fetchCustomerDetail(customerId).catch(err => {
+      console.error('Failed to fetch customer detail:', err)
+    })
+  ]
 
-    if (canViewContacts.value) {
-      fetchTasks.push(fetchContacts(customerId))
-    } else {
-      contacts.value = []
-      contactTotal.value = 0
-    }
+  if (canViewFollowUps.value) {
+    fetchTasks.push(fetchFollowUps(customerId, resetRelatedPages))
+  } else {
+    followUps.value = []
+    followUpTotal.value = 0
+  }
 
-    await Promise.all(fetchTasks)
+  if (canViewContacts.value) {
+    fetchTasks.push(fetchContacts(customerId, resetRelatedPages))
+  } else {
+    contacts.value = []
+    contactTotal.value = 0
+  }
+
+  if (canViewTasks.value) {
+    fetchTasks.push(fetchCustomerTasks(customerId))
+  } else {
+    customerTasks.value = []
+  }
+
+  if (canViewKnowledge.value) {
+    fetchTasks.push(fetchCustomerKnowledge(customerId))
+  } else {
+    customerKnowledgeList.value = []
+  }
+
+  if (canViewSchedules.value) {
+    fetchTasks.push(fetchCustomerSchedules(customerId, resetRelatedPages))
+  } else {
+    customerSchedules.value = []
+    scheduleTotal.value = 0
+  }
+
+  await Promise.all(fetchTasks)
+}
+
+async function loadCustomerDetailPage() {
+  const customerId = activeCustomerId.value
+  if (!customerId) return
+
+  loading.value = true
+  try {
+    await refreshCustomerDetailModules(customerId)
+  } finally {
     loading.value = false
   }
+}
+
+function handleCustomerDetailRefresh(payload?: CustomerDetailRefreshPayload) {
+  if (payload?.source === 'customer-detail-activity') return
+  const customerId = payload?.customerId ? String(payload.customerId) : ''
+  if (!customerId || customerId !== String(activeCustomerId.value)) return
+
+  if (payload?.modules?.length) {
+    void refreshCustomerScopedModules(customerId, payload.modules)
+    return
+  }
+
+  void refreshCustomerDetailModules(customerId, { resetRelatedPages: true })
+}
+
+function emitCustomerActivityRefresh(customerId?: string) {
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+  if (customerId) {
+    appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, {
+      customerId,
+      source: 'customer-detail-activity'
+    })
+  }
+}
+
+async function refreshCustomerScopedModules(
+  customerId: string,
+  modules: CustomerDetailRefreshModule[]
+) {
+  const uniqueModules = new Set(modules)
+  const requests: Promise<any>[] = []
+
+  if (uniqueModules.has('aiAnalysis')) {
+    requests.push(refreshCustomerAiAnalysis(customerId))
+  }
+
+  if (uniqueModules.has('contacts')) {
+    requests.push(fetchContacts(customerId, true))
+  }
+
+  if (uniqueModules.has('followUps')) {
+    requests.push(fetchFollowUps(customerId, true))
+  }
+
+  if (uniqueModules.has('tasks')) {
+    requests.push(fetchCustomerTasks(customerId))
+  }
+
+  if (uniqueModules.has('schedules')) {
+    requests.push(fetchCustomerSchedules(customerId, true))
+  }
+
+  await Promise.all(requests)
+}
+
+let offCustomerDetailRefresh: (() => void) | null = null
+
+onMounted(() => {
+  void loadCustomerDetailPage()
+  offCustomerDetailRefresh = appEvents.on<CustomerDetailRefreshPayload>(
+    APP_EVENT.CUSTOMER_DETAIL_REFRESH,
+    handleCustomerDetailRefresh
+  )
+})
+
+watch(activeCustomerId, () => {
+  void loadCustomerDetailPage()
+})
+
+watch(
+  () => [customer.value?.customerId || '', customer.value?.aiAnalysisStatus || ''] as const,
+  ([customerId, status], previousValue) => {
+    const previousCustomerId = previousValue?.[0] || ''
+    const previousStatus = previousValue?.[1] || ''
+    if (!customerId) {
+      clearAiAnalysisPolling()
+      return
+    }
+    if (customerId !== previousCustomerId) {
+      clearAiAnalysisPolling()
+    }
+    if (status === 'pending' || status === 'running') {
+      scheduleAiAnalysisPolling(
+        customerId,
+        customerId !== previousCustomerId || (previousStatus !== 'pending' && previousStatus !== 'running')
+      )
+      return
+    }
+    clearAiAnalysisPolling()
+  }
+)
+
+onBeforeUnmount(() => {
+  offCustomerDetailRefresh?.()
+  offCustomerDetailRefresh = null
+  clearAiAnalysisPolling()
 })
 
 async function fetchFollowUps(customerId: string, reset = false) {
@@ -1217,6 +1763,7 @@ async function fetchContacts(customerId: string, reset = false) {
     contactTotal.value = 0
   } finally {
     syncCurrentContact(customerId)
+    await maybeOpenContactFromQuery(customerId)
     contactLoading.value = false
   }
 }
@@ -1226,9 +1773,132 @@ function handleContactPageChange(page: number) {
   if (customer.value) fetchContacts(customer.value.customerId)
 }
 
+function syncSelectedCustomerTask() {
+  const selectedTaskId = selectedCustomerTask.value?.taskId
+  if (!selectedTaskId) return
+  selectedCustomerTask.value = customerTasks.value.find(task =>
+    String(task.taskId) === String(selectedTaskId)
+  ) || selectedCustomerTask.value
+}
+
+async function fetchCustomerTasks(customerId: string) {
+  if (!canViewTasks.value) {
+    customerTasks.value = []
+    return
+  }
+  taskLoading.value = true
+  try {
+    const result = await queryTaskList({
+      customerId,
+      page: 1,
+      limit: CUSTOMER_DETAIL_REQUEST_LIMIT
+    })
+    customerTasks.value = result.list || []
+  } catch (error) {
+    console.error('Failed to fetch customer tasks:', error)
+    customerTasks.value = []
+  } finally {
+    syncSelectedCustomerTask()
+    taskLoading.value = false
+  }
+}
+
+async function fetchCustomerSchedules(customerId: string, reset = false) {
+  if (!canViewSchedules.value) {
+    customerSchedules.value = []
+    scheduleTotal.value = 0
+    return
+  }
+  if (reset) schedulePage.value = 1
+  scheduleLoading.value = true
+  try {
+    const result = await queryScheduleList({
+      customerId,
+      page: schedulePage.value,
+      limit: schedulePageSize.value
+    })
+    customerSchedules.value = result.list || []
+    scheduleTotal.value = result.totalRow || 0
+  } catch (error) {
+    console.error('Failed to fetch customer schedules:', error)
+    customerSchedules.value = []
+    scheduleTotal.value = 0
+  } finally {
+    syncSelectedCustomerSchedule()
+    scheduleLoading.value = false
+  }
+}
+
+function handleSchedulePageChange(page: number) {
+  schedulePage.value = page
+  if (customer.value) fetchCustomerSchedules(customer.value.customerId)
+}
+
+async function fetchCustomerKnowledge(customerId: string) {
+  if (!canViewKnowledge.value) {
+    customerKnowledgeList.value = []
+    return
+  }
+
+  customerKnowledgeLoading.value = true
+  try {
+    const result = await queryKnowledgeList({
+      customerId,
+      page: 1,
+      limit: CUSTOMER_DETAIL_REQUEST_LIMIT
+    })
+    customerKnowledgeList.value = result.list || []
+  } catch (error) {
+    console.error('Failed to fetch customer knowledge:', error)
+    customerKnowledgeList.value = []
+  } finally {
+    customerKnowledgeLoading.value = false
+  }
+}
+
+function openCustomerKnowledgeUpload() {
+  if (!canUploadKnowledge.value) return
+  knowledgeUploadDialogRef.value?.openEmpty()
+}
+
+function onCustomerKnowledgeUploadSuccess() {
+  if (customer.value) {
+    void fetchCustomerKnowledge(customer.value.customerId)
+  }
+}
+
+function openKnowledgeDetail(knowledgeId: string | number) {
+  selectedKnowledgeId.value = String(knowledgeId)
+  showKnowledgeDetailModal.value = true
+}
+
+function handleKnowledgeSummaryUpdated(payload: { knowledgeId: string; summary: string }) {
+  const summary = payload.summary.trim()
+  if (!summary) return
+
+  customerKnowledgeList.value = customerKnowledgeList.value.map(item =>
+    item.knowledgeId === payload.knowledgeId
+      ? { ...item, summary }
+      : item
+  )
+}
+
+function handleQuoteFollowUpAttachment(followUp: FollowUp, attachment: FollowUpAttachment) {
+  emit('quote-attachment', { followUp, attachment })
+}
+
+function getKnowledgeEmptyText() {
+  return canUploadKnowledge.value ? '暂无文档，点击右上角上传文档' : '暂无文档'
+}
+
 function handleEdit() {
   if (!canEditCustomer.value) return
   showEditDialog.value = true
+}
+
+function handleBasicInfoEdit() {
+  showBasicInfoDrawer.value = false
+  handleEdit()
 }
 
 async function loadTransferUserList() {
@@ -1300,9 +1970,10 @@ async function handleTransferOwner(user: TransferUserOption) {
   }
 }
 
-async function handleEditSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
+async function handleEditSuccess(payload: { mode: 'create' | 'edit'; customerId?: string; detail?: CustomerDetailVO | null }) {
   if (payload.mode !== 'edit') return
-  if (customer.value?.customerId) {
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+  if (!payload.detail && customer.value?.customerId) {
     await customerStore.fetchCustomerDetail(customer.value.customerId)
   }
 }
@@ -1312,6 +1983,7 @@ async function handleDeleteCustomer() {
   if (!customer.value) return
   try {
     await customerStore.removeCustomer(customer.value.customerId)
+    appEvents.emit(APP_EVENT.CUSTOMER_SIDEBAR_REFRESH)
     ElMessage.success('客户已删除')
     handleBackToCustomerList()
   } catch {
@@ -1343,12 +2015,37 @@ function handleAiFollowUp() {
   showAiFollowUpDrawer.value = true
 }
 
-function handleAiFollowUpSaved() {
-  if (customer.value && canViewFollowUps.value) fetchFollowUps(customer.value.customerId, true)
+defineExpose({
+  openAiFollowUp: handleAiFollowUp
+})
+
+async function handleAiFollowUpSaved() {
+  if (!customer.value) return
+  await refreshFollowUpContext(customer.value.customerId, { resetFollowUps: true })
+  emitCustomerActivityRefresh(customer.value.customerId)
 }
 
-function handleGenerateReport() {
-  ElMessage.info('AI 分析报告功能开发中')
+function handleEditFollowUp(followUp: FollowUp) {
+  if (!canEditFollowUps.value) return
+  editingFollowUpForDialog.value = followUp
+  showAddFollowUpDialog.value = true
+}
+
+async function handleGenerateReport() {
+  if (!canEditCustomer.value) return
+  if (!customer.value || generatingAiReport.value) return
+
+  generatingAiReport.value = true
+  try {
+    latestAiReport.value = await generateCustomerAiReport(customer.value.customerId)
+    await customerStore.fetchCustomerDetail(customer.value.customerId)
+    appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+    ElMessage.success('AI 分析报告已生成并保存')
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    generatingAiReport.value = false
+  }
 }
 
 function handleAddContact() {
@@ -1430,9 +2127,171 @@ async function handleSetPrimary(contactId: string) {
   }
 }
 
+async function handleAddContactToRelation(contact: Contact) {
+  try {
+    await addRelationFromContact(contact.contactId)
+    ElMessage.success('已添加到关系')
+  } catch (error) {
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('添加到关系失败')
+    }
+  }
+}
+
+async function refreshCustomerTaskArea() {
+  if (!customer.value) return
+  await fetchCustomerTasks(customer.value.customerId)
+  const id = selectedCustomerTask.value?.taskId
+  if (id) {
+    selectedCustomerTask.value = customerTasks.value.find((t: Task) => String(t.taskId) === String(id)) || null
+  }
+}
+
+async function handleToggleCustomerTask(task: Task) {
+  if (!canToggleTasks.value) return
+  const newStatus: TaskStatus = task.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'
+  await taskStore.changeTaskStatus(task.taskId, newStatus)
+  await refreshCustomerTaskArea()
+}
+
+function handleViewCustomerTask(task: Task) {
+  if (!canViewTasks.value) return
+  selectedCustomerTask.value = task
+}
+
+async function resolveCustomerTaskDetail(taskId: string): Promise<Task | null> {
+  const normalizedTaskId = String(taskId)
+  const localTask = customerTasks.value.find((task: Task) => String(task.taskId) === normalizedTaskId) || null
+  if (localTask) {
+    return localTask
+  }
+
+  const result = await queryTaskList({
+    taskId: normalizedTaskId,
+    page: 1,
+    limit: 1
+  })
+
+  return result.list?.[0] || null
+}
+
+async function handleViewFollowUpTask(task: FollowUpTask) {
+  if (!canViewTasks.value) return
+
+  const detail = await resolveCustomerTaskDetail(task.taskId)
+  if (!detail) {
+    ElMessage.warning('任务不存在或已被删除')
+    return
+  }
+
+  selectedCustomerTask.value = detail
+}
+
+async function handleToggleFollowUpTask(task: FollowUpTask) {
+  if (!canToggleTasks.value) return
+
+  const detail = await resolveCustomerTaskDetail(task.taskId)
+  if (!detail) {
+    ElMessage.warning('任务不存在或已被删除')
+    return
+  }
+
+  const newStatus: TaskStatus = detail.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'
+  await taskStore.changeTaskStatus(detail.taskId, newStatus)
+  await refreshCustomerTaskArea()
+  ElMessage.success(newStatus === 'COMPLETED' ? '任务已标记完成' : '任务已重新打开')
+}
+
 function handleAddTask() {
   if (!canCreateTasks.value) return
-  router.push('/task')
+  if (!customer.value) return
+  editingCustomerTask.value = null
+  showTaskEditDialog.value = true
+}
+
+function handleEditCustomerTask(task: Task) {
+  if (!canCreateTasks.value) return
+  editingCustomerTask.value = task
+  showTaskEditDialog.value = true
+}
+
+function handleCustomerTaskEditFromDetail(task: Task) {
+  handleEditCustomerTask(task)
+  if (isMobile.value) selectedCustomerTask.value = null
+}
+
+async function handleTaskDialogSaved() {
+  editingCustomerTask.value = null
+  await refreshCustomerTaskArea()
+}
+
+function syncSelectedCustomerSchedule() {
+  const selectedScheduleId = selectedCustomerSchedule.value?.scheduleId
+  if (!selectedScheduleId) return
+  selectedCustomerSchedule.value = customerSchedules.value.find(schedule =>
+    String(schedule.scheduleId) === String(selectedScheduleId)
+  ) || selectedCustomerSchedule.value
+}
+
+function handleViewCustomerSchedule(schedule: ScheduleVO) {
+  if (!canViewSchedules.value) return
+  selectedCustomerSchedule.value = schedule
+}
+
+function handleAddSchedule() {
+  if (!canCreateSchedules.value) return
+  if (!customer.value) return
+  editingCustomerSchedule.value = null
+  showScheduleFormDialog.value = true
+}
+
+function handleEditCustomerSchedule(schedule: ScheduleVO) {
+  if (!canEditSchedules.value) return
+  editingCustomerSchedule.value = schedule
+  showScheduleFormDialog.value = true
+}
+
+function handleEditCustomerScheduleFromDetail(schedule: ScheduleVO) {
+  handleEditCustomerSchedule(schedule)
+  if (isMobile.value) selectedCustomerSchedule.value = null
+}
+
+async function resolveCustomerScheduleDetail(scheduleId: string): Promise<ScheduleVO | null> {
+  const normalizedScheduleId = String(scheduleId)
+  const localSchedule = customerSchedules.value.find(schedule =>
+    String(schedule.scheduleId) === normalizedScheduleId
+  ) || null
+  if (localSchedule) return localSchedule
+
+  const result = await queryScheduleList({
+    scheduleId: normalizedScheduleId,
+    page: 1,
+    limit: 1
+  })
+
+  return result.list?.[0] || null
+}
+
+async function handleCustomerScheduleCreated() {
+  if (!customer.value) return
+  editingCustomerSchedule.value = null
+  await fetchCustomerSchedules(customer.value.customerId, true)
+}
+
+async function handleCustomerScheduleUpdated(scheduleId: string) {
+  if (!customer.value) return
+  editingCustomerSchedule.value = null
+  await fetchCustomerSchedules(customer.value.customerId)
+  const updatedSchedule = await resolveCustomerScheduleDetail(scheduleId)
+  if (updatedSchedule) {
+    selectedCustomerSchedule.value = updatedSchedule
+  }
+}
+
+async function handleCustomerScheduleDeleted() {
+  if (!customer.value) return
+  await fetchCustomerSchedules(customer.value.customerId)
+  selectedCustomerSchedule.value = null
 }
 
 async function handleAddTag() {
@@ -1460,116 +2319,33 @@ async function handleRemoveTag(tag: CustomerTag) {
   } catch { /* Error handled */ }
 }
 
-function triggerFollowUpAttachmentInput() {
-  followUpAttachmentInput.value?.click()
-}
-
-async function handleFollowUpAttachmentChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = Array.from(input.files || [])
-  if (!files.length) return
-
-  followUpAttachmentUploading.value = true
-  try {
-    for (const file of files) {
-      const uploaded = await uploadFollowUpAttachment(file)
-      followUpForm.attachments.push(uploaded)
-    }
-  } catch (error) {
-    console.error('Upload follow-up attachment failed:', error)
-  } finally {
-    followUpAttachmentUploading.value = false
-    input.value = ''
-  }
-}
-
-function removeFollowUpAttachment(index: number) {
-  followUpForm.attachments.splice(index, 1)
-}
-
-function triggerCustomerDocumentUpload() {
-  customerDocumentInput.value?.click()
-}
-
-async function handleCustomerDocumentUpload(event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = Array.from(input.files || [])
-  const currentCustomer = customer.value
-  if (!files.length || !currentCustomer?.customerId) return
-
-  customerDocumentUploading.value = true
-  try {
-    for (const file of files) {
-      await uploadKnowledge(file, 'document', String(currentCustomer.customerId))
-    }
-    await customerStore.fetchCustomerDetail(currentCustomer.customerId)
-    ElMessage.success(files.length > 1 ? '文档已上传' : '文档上传成功')
-  } catch (error) {
-    console.error('Upload customer document failed:', error)
-    ElMessage.error('文档上传失败')
-  } finally {
-    customerDocumentUploading.value = false
-    input.value = ''
-  }
-}
-
-function formatFileSize(size?: number): string {
-  if (!size || size <= 0) return '-'
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / 1024 / 1024).toFixed(1)} MB`
-}
-
-function getKnowledgeTypeLabel(type?: string): string {
-  const labels: Record<string, string> = {
-    meeting: '会议记录',
-    email: '邮件',
-    recording: '录音',
-    document: '文档',
-    proposal: '方案',
-    contract: '合同'
-  }
-  return type ? labels[type] || type : '文档'
-}
-
-function handlePreviewFollowUpAttachment(attachment: FollowUpAttachment) {
-  previewingFollowUpAttachment.value = attachment
-  showFollowUpAttachmentPreview.value = true
-}
-
-async function handleDownloadFollowUpAttachment(attachment: FollowUpAttachment) {
-  try {
-    await downloadFollowUpAttachment(attachment.attachmentId, attachment.fileName)
-  } catch (error) {
-    console.error('Download follow-up attachment failed:', error)
-  }
-}
-
-async function handleSubmitFollowUp() {
-  if (!canCreateFollowUps.value) return
-  if (!followUpForm.content.trim()) {
-    ElMessage.warning('请输入跟进内容')
-    return
-  }
-  if (!followUpForm.followTime) {
-    ElMessage.warning('请选择跟进时间')
-    return
-  }
+async function handleFollowUpDialogSubmit(payload: FollowUpUpsertSubmitPayload) {
+  const isEdit = payload.mode === 'edit'
+  if (isEdit ? !canEditFollowUps.value : !canCreateFollowUps.value) return
   submitting.value = true
   try {
-    await addFollowUp({
-      customerId: followUpForm.customerId,
-      type: followUpForm.type,
-      content: followUpForm.content,
-      followTime: followUpForm.followTime,
-      attachments: followUpForm.attachments
-    } as any)
-    await fetchFollowUps(followUpForm.customerId, true)
+    const body = {
+      type: payload.type,
+      content: payload.content,
+      followTime: payload.followTime,
+      nextFollowTime: payload.nextFollowTime
+    }
+    if (isEdit) {
+      await updateFollowUp({
+        followUpId: payload.followUpId!,
+        ...body
+      } as FollowUpUpdateBO)
+    } else {
+      await addFollowUp({
+        customerId: payload.customerId,
+        ...body
+      } as FollowUpAddBO)
+    }
+    const successMessage = isEdit ? '跟进记录已更新' : '跟进记录添加成功'
+    await refreshFollowUpContext(payload.customerId, { resetFollowUps: !isEdit })
+    emitCustomerActivityRefresh(payload.customerId)
     showAddFollowUpDialog.value = false
-    followUpForm.content = ''
-    followUpForm.followTime = formatDateForApi()
-    followUpForm.attachments = []
-    ElMessage.success('跟进记录添加成功')
+    ElMessage.success(successMessage)
   } catch { /* Error handled */ } finally {
     submitting.value = false
   }
@@ -1593,30 +2369,28 @@ async function confirmDeleteFollowUp(followUpId: string) {
 async function handleDeleteFollowUp(followUpId: string) {
   if (!canDeleteFollowUps.value) return
   try {
+    if (followUps.value.length === 1 && followUpPage.value > 1) {
+      followUpPage.value -= 1
+    }
     await deleteFollowUp(followUpId)
-    if (customer.value) await fetchFollowUps(customer.value.customerId)
+    if (customer.value) {
+      await refreshFollowUpContext(customer.value.customerId)
+      emitCustomerActivityRefresh(customer.value.customerId)
+    }
     ElMessage.success('跟进记录已删除')
   } catch { /* Error handled */ }
 }
 
-function getStageBadgeClass(stage: string): string {
-  const classes: Record<string, string> = {
-    lead: 'bg-slate-100 text-slate-800',
-    qualified: 'bg-blue-100 text-blue-800',
-    proposal: 'bg-amber-100 text-amber-800',
-    negotiation: 'bg-purple-100 text-purple-800',
-    closed: 'bg-green-100 text-green-800',
-    lost: 'bg-red-100 text-red-800'
-  }
-  return classes[stage] || 'bg-slate-100 text-slate-800'
-}
-
 function getStageLabel(stage: string): string {
-  return enumStore.stageLabel(stage) || stage
-}
-
-function getLevelLabel(level?: string): string {
-  return level ? enumStore.levelLabel(level) || level : '-'
+  if (!stage) return stage
+  // 真相源：/enum/customerStage（回退内置短标签）
+  const label = enumStore.stageLabel(stage)
+  if (label && label !== stage) return label
+  const labels: Record<string, string> = {
+    lead: '线索', qualified: '已验证', proposal: '方案',
+    negotiation: '谈判', closed: '成交', lost: '流失'
+  }
+  return labels[stage] || label || stage
 }
 
 function getStageIndex(stage: string): number {
@@ -1632,7 +2406,7 @@ function getStageIndex(stage: string): number {
 }
 
 const stageFlow = ['lead', 'qualified', 'proposal', 'negotiation', 'closed']
-const stageOptions = [
+const STAGE_OPTIONS_FALLBACK = [
   { value: 'lead', label: '线索' },
   { value: 'qualified', label: '资格审查' },
   { value: 'proposal', label: '方案报价' },
@@ -1640,13 +2414,19 @@ const stageOptions = [
   { value: 'closed', label: '已成交' },
   { value: 'lost', label: '已流失' }
 ]
+// 真相源：/enum/customerStage（未加载时回退内置）
+const stageOptions = computed(() =>
+  enumStore.customerStage.length
+    ? enumStore.customerStage.map(o => ({ value: o.value, label: o.label }))
+    : STAGE_OPTIONS_FALLBACK
+)
 const STEPPER_SEGMENT_WIDTH = 180
-const STEPPER_SEGMENT_HEIGHT = 36
+const STEPPER_SEGMENT_HEIGHT = 32
 const STEPPER_CHEVRON_SIZE = 12
 const STEPPER_END_RADIUS = STEPPER_SEGMENT_HEIGHT / 2
 
 function getStageLabelFull(stage: string): string {
-  return enumStore.stageLabel(stage) || stageOptions.find(s => s.value === stage)?.label || stage
+  return stageOptions.value.find(s => s.value === stage)?.label || stage
 }
 
 function getStepperClipPath(idx: number): string {
@@ -1767,28 +2547,12 @@ function getFollowUpIcon(type: string): string {
   return icons[type] || 'edit_note'
 }
 
-function isOverdue(dateStr: string): boolean {
-  return new Date(dateStr) < new Date()
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('zh-CN')
-}
-
-function formatDateTime(dateStr: string): string {
+function formatDateTime(dateStr?: string): string {
+  if (!dateStr) return '-'
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
-function formatAmount(value?: number | null): string {
-  if (value === null || value === undefined) return '-'
-  const amount = Number(value)
-  if (!Number.isFinite(amount)) return '-'
-  return `¥ ${amount.toLocaleString('zh-CN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2
-  })}`
-}
-
+/* Legacy helper kept only as a reference during the custom field display refactor.
 function formatCustomFieldValue(field: CustomField, value: any): string {
   if (value === null || value === undefined || value === '') return '-'
   switch (field.fieldType) {
@@ -1806,13 +2570,11 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
     case 'datetime': return formatDateTime(value)
     default: return String(value)
   }
-}
+} */
 
-void formatCustomFieldValue
 </script>
 
 <style>
-.wk-stage-result-popover.el-popper,
 .wk-stage-result-popover.el-popover {
   padding: 0;
   border: 1px solid rgb(226 232 240);
@@ -1905,5 +2667,115 @@ void formatCustomFieldValue
 
 .wk-stage-result-popover__item--reopen:hover {
   background: rgb(248 250 252);
+}
+
+@media (max-width: 767.98px) {
+  .wk-mobile-px-15 {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+}
+
+.wk-customer-detail-mobile .md\:px-8 {
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+}
+
+.wk-customer-detail-mobile .md\:sticky {
+  position: static !important;
+}
+
+.wk-customer-detail-mobile .md\:flex-row {
+  flex-direction: column !important;
+}
+
+.wk-customer-detail-mobile .md\:items-center {
+  align-items: flex-start !important;
+}
+
+.wk-customer-detail-mobile .md\:justify-between {
+  justify-content: flex-start !important;
+}
+
+.wk-customer-detail-mobile .md\:gap-0 {
+  gap: 0.75rem !important;
+}
+
+.wk-customer-detail-mobile .md\:gap-3 {
+  gap: 0.5rem !important;
+}
+
+.wk-customer-detail-mobile .md\:flex-wrap {
+  flex-wrap: nowrap !important;
+}
+
+.wk-customer-detail-mobile .md\:overflow-visible {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+.wk-customer-stage-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.wk-customer-stage-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.wk-customer-detail-mobile .md\:w-auto {
+  width: 100% !important;
+}
+
+.wk-customer-detail-mobile .md\:text-xl {
+  font-size: 1.125rem !important;
+  line-height: 1.75rem !important;
+}
+
+.wk-customer-detail-mobile .hidden.md\:flex {
+  display: none !important;
+}
+
+.wk-customer-detail-mobile .md\:hidden {
+  display: flex !important;
+}
+
+.wk-customer-detail-mobile .lg\:hidden {
+  display: block !important;
+}
+
+.wk-customer-detail-mobile .lg\:grid-cols-12 {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.wk-customer-detail-mobile .lg\:col-span-3,
+.wk-customer-detail-mobile .lg\:col-span-6 {
+  grid-column: auto !important;
+}
+
+.wk-customer-detail-mobile .hidden.lg\:block {
+  display: none !important;
+}
+
+.wk-customer-detail-mobile .lg\:block {
+  display: block;
+}
+
+.wk-customer-detail-embedded-mobile .wk-related-modules {
+  display: contents !important;
+}
+
+.wk-customer-detail-embedded-mobile .wk-related-contacts {
+  order: 2;
+}
+
+.wk-customer-detail-embedded-mobile .wk-customer-detail-activity {
+  order: 3;
+}
+
+.wk-customer-detail-embedded-mobile .wk-related-modules > section:not(.wk-related-contacts) {
+  order: 4;
 }
 </style>

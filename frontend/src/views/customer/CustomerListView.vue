@@ -1,20 +1,30 @@
 <template>
-  <div ref="pageRootRef" data-customer-page-root class="flex flex-col gap-6 px-6 py-6">
+  <div ref="pageRootRef" data-customer-page-root class="flex flex-col gap-6 px-4 py-6 md:px-6">
     <!-- Header -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 class="text-2xl font-bold text-slate-900">客户列表</h2>
-        <p class="text-sm text-slate-500">管理您的客户关系并查看 AI 驱动的业务洞察。</p>
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="text-[22px] font-bold text-slate-900">客户列表</h2>
+          <p class="text-[13px] text-slate-500">管理您的客户关系并查看 AI 驱动的业务洞察。</p>
+        </div>
+
+        <button
+          v-if="isMobile"
+          class="h-10 px-4 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 shrink-0"
+          @click="openCreateCustomerDialog()"
+        >
+          <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
+        </button>
       </div>
-      <div class="flex items-center gap-3 flex-wrap">
+      <div class="flex flex-nowrap sm:flex-wrap items-center gap-3 flex-wrap">
         <!-- Search -->
-        <div class="relative group flex items-center">
+        <div class="relative group flex min-w-0 flex-1 items-center sm:flex-none">
           <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">search</span>
           <input
             v-model="customerStore.queryParams.keyword"
             type="text"
             placeholder="搜索公司名称、联系人、电话、标签..."
-            class="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm w-full sm:w-80 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all shadow-sm"
+            class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-11 pr-4 text-sm shadow-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 sm:w-80"
             @keydown.enter="handleSearch"
             @input="debouncedSearch"
           />
@@ -22,13 +32,13 @@
         <el-popover
           v-model:visible="showAiSearchPopover"
           trigger="click"
-          placement="bottom-end"
-          :width="420"
+          :placement="isMobile ? 'bottom' : 'bottom-end'"
+          :width="isMobile ? 'calc(100vw - 2rem)' : 420"
           popper-class="wk-ai-search-popover"
         >
           <template #reference>
             <button
-              class="h-10 px-4 bg-white border border-primary/30 text-primary rounded-xl text-sm font-bold hover:bg-primary/5 transition-all shadow-sm flex items-center gap-2"
+              class="h-10 px-4 bg-white border border-primary/30 text-primary rounded-xl text-sm font-bold whitespace-nowrap hover:bg-primary/5 transition-all shadow-sm flex items-center gap-2"
               type="button"
             >
               <WkIcon name="ai" class="text-sm" />
@@ -64,16 +74,16 @@
               <p class="text-xs text-slate-500 leading-5">{{ aiSearchStatusText }}</p>
             </div>
 
-            <div class="flex items-center justify-between gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
                 v-if="hasAiSearchState"
-                class="text-xs font-medium text-slate-500 hover:text-red-500 transition-colors"
+                class="text-left text-xs font-medium text-slate-500 hover:text-red-500 transition-colors"
                 type="button"
                 @click="clearAiSearch"
               >
                 清空 AI 条件
               </button>
-              <div class="flex items-center gap-2 ml-auto">
+              <div class="flex w-full items-center justify-end gap-2 sm:w-auto sm:ml-auto">
                 <button
                   class="px-3 py-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
                   type="button"
@@ -93,32 +103,93 @@
             </div>
           </div>
         </el-popover>
-        <!-- Import/Export - desktop only -->
-        <div v-if="!isMobile" class="flex items-center gap-1.5 border-r border-slate-200 pr-3 mr-1">
-          <button class="h-10 px-4 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2" @click="showImportDialog = true">
-            <span class="material-symbols-outlined text-[18px] leading-none">upload</span>
-            导入
+        <!-- 视图切换：侧栏 + 表格/卡片/阶段 -->
+        <div v-if="!isMobile" class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+          <button
+            v-if="!isMobile && false"
+            type="button"
+            class="flex items-center justify-center size-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
+            :class="{ 'border-primary text-primary bg-primary/5 ring-1 ring-primary/25 shadow-sm': showListInsightSidebar }"
+            title="切换 AI 洞察侧栏"
+            @click="showListInsightSidebar = !showListInsightSidebar"
+          >
+            <span class="material-symbols-outlined text-[20px]">view_sidebar</span>
           </button>
-          <button class="h-10 px-4 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2" :disabled="exporting" @click="handleExport">
-            <span class="material-symbols-outlined text-[18px] leading-none">download</span>
-            导出
-          </button>
+          <div class="flex bg-slate-100 p-1 rounded-lg shrink-0 border border-slate-200">
+            <button
+              type="button"
+              class="flex items-center justify-center size-8 rounded-md transition-all"
+              :class="listViewMode === 'list' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/20' : 'text-slate-400 hover:text-slate-600'"
+              title="表格视图"
+              @click="listViewMode = 'list'"
+            >
+              <span class="material-symbols-outlined text-[20px]">list</span>
+            </button>
+            <button
+              type="button"
+              class="flex items-center justify-center size-8 rounded-md transition-all"
+              :class="listViewMode === 'card' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/20' : 'text-slate-400 hover:text-slate-600'"
+              title="卡片视图"
+              @click="listViewMode = 'card'"
+            >
+              <span class="material-symbols-outlined text-[20px]">grid_view</span>
+            </button>
+            <button
+              type="button"
+              class="flex items-center justify-center size-8 rounded-md transition-all"
+              :class="listViewMode === 'stage' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/25' : 'text-slate-400 hover:text-slate-600'"
+              title="阶段视图"
+              @click="listViewMode = 'stage'"
+            >
+              <span class="material-symbols-outlined text-[20px]">view_kanban</span>
+            </button>
+          </div>
         </div>
-        <!-- Add Customer -->
+        <!-- 新增客户（与导入/导出已对调顺序） -->
         <button
+          v-if="!isMobile"
           class="h-10 px-4 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
-          @click="showAddDialog = true"
+          @click="openCreateCustomerDialog()"
         >
           <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
-          <span v-if="!isMobile">新增客户</span>
+          <span>新增客户</span>
         </button>
+        <el-dropdown
+          v-if="!isMobile"
+          trigger="click"
+          popper-class="wk-customer-import-export-dropdown"
+        >
+          <button
+            type="button"
+            class="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-primary/30 hover:bg-slate-50 hover:text-primary"
+            title="导入导出"
+          >
+            <span class="material-symbols-outlined text-[22px]">more_vert</span>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="showImportDialog = true">
+                <span class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[16px]">upload</span>
+                  导入
+                </span>
+              </el-dropdown-item>
+              <el-dropdown-item :disabled="exporting" @click="handleExport">
+                <span class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[16px]">download</span>
+                  {{ exporting ? '导出中...' : '导出' }}
+                </span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 
     <div v-if="hasAiSearchState" class="bg-white border border-primary/10 rounded-2xl px-4 py-3 shadow-sm">
       <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold">
+        <div class="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+          <span class="inline-flex shrink-0 items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold">
             <WkIcon name="ai" class="text-[12px]" />
             AI 筛选
           </span>
@@ -148,15 +219,18 @@
     </div>
 
     <!-- Main Content: Table + AI Sidebar -->
-    <div class="flex flex-col xl:flex-row gap-6 items-start relative overflow-x-hidden">
+    <div class="flex flex-col xl:flex-row gap-6 xl:items-start relative overflow-x-hidden">
       <!-- Table Area -->
-      <div class="flex-1 min-w-0 space-y-6">
+      <div class="w-full min-w-0 flex-1 space-y-6">
         <div
           ref="tableCardRef"
-          class="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden"
+          class="flex min-h-0 min-w-0 flex-col"
+          :class="listViewMode === 'list'
+            ? 'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'
+            : 'overflow-visible bg-transparent shadow-none'"
           v-loading="customerStore.loading"
         >
-          <div>
+          <div v-if="listViewMode === 'list' && !isMobile">
             <el-table
               :data="customerStore.customerList"
               :height="tableHeight"
@@ -166,78 +240,171 @@
               empty-text="暂无客户数据"
               @row-click="handleCustomerRowClick"
             >
-              <el-table-column label="公司名称" fixed="left" min-width="240">
-                <template #default="{ row }">
-                  <div class="flex items-center gap-3 min-w-0">
-                    <div class="size-8 rounded bg-primary/10 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0 overflow-hidden">
-                      <img v-if="row.logoUrl" :src="row.logoUrl" alt="" class="size-full object-cover" />
-                      <span v-else>{{ row.companyName?.charAt(0) || '?' }}</span>
-                    </div>
-                    <span class="text-sm font-semibold text-slate-900 truncate block transition-colors">{{ row.companyName }}</span>
-                  </div>
-                </template>
-              </el-table-column>
+              <template v-for="field in listFields" :key="field.fieldId">
+                <el-table-column
+                  :label="field.fieldLabel"
+                  :fixed="getFieldFixed(field)"
+                  :min-width="getFieldMinWidth(field)"
+                  :align="getFieldAlign(field)"
+                >
+                  <template #header>
+                    <span class="normal-case tracking-normal">{{ getListFieldLabel(field) }}</span>
+                  </template>
+                  <template #default="{ row }">
+                    <InlineEditableField
+                      :model-value="getListFieldRawValue(field, row)"
+                      :field="field"
+                      :display-value="getListFieldDisplayValue(field, row)"
+                      :editable="isCustomerListFieldEditable(field)"
+                      :save-handler="(value) => handleInlineCustomerFieldSave(row, field, value)"
+                    >
+                    <template v-if="field.fieldSource === 'custom'">
+                      <template v-if="field.fieldType === 'checkbox'">
+                        <span
+                          v-if="getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) !== null"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap"
+                          :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-slate-100 text-slate-600'"
+                        >
+                          <span
+                            class="size-1.5 rounded-full"
+                            :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
+                              ? 'bg-emerald-500'
+                              : 'bg-slate-400'"
+                          ></span>
+                          {{ getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) ? '开启' : '关闭' }}
+                        </span>
+                        <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
+                      </template>
+                      <span
+                        v-else
+                        class="block text-sm text-slate-600 truncate"
+                        :title="formatCustomFieldValue(field, row.customFields?.[field.fieldName])"
+                      >
+                        {{ formatCustomFieldValue(field, row.customFields?.[field.fieldName]) }}
+                      </span>
+                    </template>
+                    <template v-else-if="field.fieldName === 'companyName'">
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div class="size-8 rounded overflow-hidden border border-slate-200 bg-white flex items-center justify-center flex-shrink-0">
+                          <img
+                            v-if="row.logoUrl"
+                            :src="row.logoUrl"
+                            :alt="row.companyName || 'company logo'"
+                            class="size-full object-contain"
+                          />
+                          <span v-else class="bg-primary/10 text-primary flex size-full items-center justify-center font-bold text-xs">
+                            {{ row.companyName?.charAt(0) || '?' }}
+                          </span>
+                        </div>
+                        <div class="flex min-w-0 items-center gap-2">
+                          <span class="min-w-0 truncate text-sm font-semibold text-slate-900 cursor-pointer transition-colors hover:text-primary hover:underline hover:decoration-primary underline-offset-2">{{ row.companyName || '-' }}</span>
+                        </div>
+                      </div>
+                    </template>
+                    <template v-else-if="field.fieldName === 'aiStatusDetection'">
+                      <div class="wk-cell-status-badges flex items-center justify-start py-1">
+                        <span
+                          v-if="getAiStatusMeta(row.aiStatusDetection)"
+                          class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
+                          :class="getAiStatusMeta(row.aiStatusDetection)?.badgeClass"
+                          :title="getAiStatusMeta(row.aiStatusDetection)?.label"
+                        >
+                          <span class="size-1.5 rounded-full mr-1.5" :class="getAiStatusMeta(row.aiStatusDetection)?.dotClass"></span>
+                          {{ getAiStatusMeta(row.aiStatusDetection)?.label }}
+                        </span>
+                        <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
+                      </div>
+                    </template>
+                    <template v-else-if="field.fieldName === 'aiInsight'">
+                      <div v-if="row.aiInsight" class="py-1">
+                        <el-tooltip
+                          placement="top"
+                          effect="light"
+                          :show-after="150"
+                          popper-class="wk-ai-insight-tooltip"
+                        >
+                          <template #content>
+                            <div class="wk-ai-insight-tooltip__content">
+                              {{ getAiInsightPreview(row.aiInsight) }}
+                            </div>
+                          </template>
+                          <p class="wk-ai-insight-text text-sm text-slate-600">
+                            {{ getAiInsightPreview(row.aiInsight) }}
+                          </p>
+                        </el-tooltip>
+                      </div>
+                      <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
+                    </template>
+                    <template v-else-if="field.fieldName === 'level'">
+                      <div v-if="row.level" class="wk-cell-status-badges">
+                        <span
+                          class="inline-flex shrink-0 items-center justify-center h-6 px-2 rounded-lg font-bold text-xs whitespace-nowrap"
+                          :class="getLevelBadgeClass(row.level)"
+                          :title="getLevelLabel(field, row.level)"
+                        >
+                          {{ getLevelLabel(field, row.level) }}
+                        </span>
+                      </div>
+                      <span v-else class="text-slate-300">-</span>
+                    </template>
+                    <template v-else-if="field.fieldName === 'stage'">
+                      <div v-if="row.stage" class="wk-cell-status-badges">
+                        <span
+                          class="inline-flex min-w-0 max-w-full items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
+                          :class="getStageBadgeClass(row.stage)"
+                          :title="getConfiguredStageLabel(field, row.stage)"
+                        >
+                          <span class="size-1.5 shrink-0 rounded-full mr-1.5" :class="getStageDotClass(row.stage)"></span>
+                          <span class="min-w-0 truncate">{{ getConfiguredStageLabel(field, row.stage) }}</span>
+                        </span>
+                      </div>
+                      <span v-else class="text-slate-300">-</span>
+                    </template>
+                    <span
+                      v-else
+                      class="block text-sm text-slate-600 truncate whitespace-nowrap"
+                      :title="getListFieldDisplayValue(field, row)"
+                    >
+                      {{ getListFieldDisplayValue(field, row) }}
+                    </span>
+                    </InlineEditableField>
+                  </template>
+                </el-table-column>
 
-              <el-table-column label="联系人" min-width="140">
-                <template #default="{ row }">
-                  <div v-if="row.primaryContactName" class="text-sm text-slate-600 whitespace-nowrap">
-                    <div>{{ row.primaryContactName }}</div>
-                    <div v-if="row.primaryContactPosition" class="text-xs text-slate-400">{{ row.primaryContactPosition }}</div>
-                  </div>
-                  <span v-else class="text-sm text-slate-300">-</span>
-                </template>
-              </el-table-column>
+                <el-table-column v-if="field.fieldName === 'companyName'" :key="`${field.fieldId}-contact`" label="联系人" min-width="140">
+                  <template #default="{ row }">
+                    <InlineEditableField
+                      :model-value="row.primaryContactName"
+                      :field="primaryContactNameInlineField"
+                      :display-value="row.primaryContactName || '-'"
+                      :editable="canEditCustomer"
+                      :save-handler="(value) => handleInlinePrimaryContactFieldSave(row, 'primaryContactName', value)"
+                    >
+                      <div v-if="row.primaryContactName" class="text-sm text-slate-600 whitespace-nowrap">
+                        <div>{{ row.primaryContactName }}</div>
+                        <div v-if="row.primaryContactPosition" class="text-xs text-slate-400">{{ row.primaryContactPosition }}</div>
+                      </div>
+                      <span v-else class="text-sm text-slate-300">-</span>
+                    </InlineEditableField>
+                  </template>
+                </el-table-column>
 
-              <el-table-column label="电话" min-width="140">
-                <template #default="{ row }">
-                  <span class="text-sm text-slate-600 font-mono whitespace-nowrap">{{ row.primaryContactPhone || '-' }}</span>
-                </template>
-              </el-table-column>
-
-              <el-table-column label="客户级别" width="110" align="center">
-                <template #default="{ row }">
-                  <span
-                    v-if="row.level"
-                    class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
-                    :class="{
-                      'bg-emerald-50 text-emerald-600': row.level === 'A',
-                      'bg-blue-50 text-blue-600': row.level === 'B',
-                      'bg-slate-100 text-slate-500': row.level === 'C'
-                    }"
-                  >{{ getLevelLabel(row.level) }}</span>
-                  <span v-else class="text-slate-300">-</span>
-                </template>
-              </el-table-column>
-
-              <el-table-column label="行业" min-width="120">
-                <template #default="{ row }">
-                  <span class="text-sm text-slate-600 whitespace-nowrap">{{ row.industry || '-' }}</span>
-                </template>
-              </el-table-column>
-
-              <el-table-column label="商机阶段" min-width="130">
-                <template #default="{ row }">
-                  <span
-                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
-                    :class="getStageBadgeClass(row.stage)"
-                  >
-                    <span class="size-1.5 rounded-full mr-1.5" :class="getStageDotClass(row.stage)"></span>
-                    {{ getStageLabel(row.stage) }}
-                  </span>
-                </template>
-              </el-table-column>
-
-              <!-- <el-table-column label="预计成交金额" min-width="130" align="right">
-                <template #default="{ row }">
-                  <span class="text-sm font-medium text-slate-900 whitespace-nowrap">{{ row.quotation ? formatMoney(row.quotation) : '-' }}</span>
-                </template>
-              </el-table-column> -->
-
-              <el-table-column label="最后跟进" min-width="120">
-                <template #default="{ row }">
-                  <span class="text-sm text-slate-500 whitespace-nowrap">{{ formatRelativeTime(row.lastContactTime) }}</span>
-                </template>
-              </el-table-column>
+                <el-table-column v-if="field.fieldName === 'companyName'" :key="`${field.fieldId}-phone`" label="电话" min-width="140">
+                  <template #default="{ row }">
+                    <InlineEditableField
+                      :model-value="row.primaryContactPhone"
+                      :field="primaryContactPhoneInlineField"
+                      :display-value="row.primaryContactPhone || '-'"
+                      :editable="canEditCustomer"
+                      :save-handler="(value) => handleInlinePrimaryContactFieldSave(row, 'primaryContactPhone', value)"
+                    >
+                      <span class="text-sm text-slate-600 font-mono whitespace-nowrap">{{ row.primaryContactPhone || '-' }}</span>
+                    </InlineEditableField>
+                  </template>
+                </el-table-column>
+              </template>
 
               <el-table-column label="负责人" min-width="140">
                 <template #default="{ row }">
@@ -275,47 +442,9 @@
                 </template>
               </el-table-column>
 
-              <el-table-column
-                v-for="field in listCustomFields"
-                :key="field.fieldId"
-                :label="field.fieldLabel"
-                min-width="140"
-              >
-                <template #header>
-                  <span class="normal-case tracking-normal">{{ field.fieldLabel }}</span>
-                </template>
+              <el-table-column label="操作" fixed="right" width="132" align="left">
                 <template #default="{ row }">
-                  <template v-if="field.fieldType === 'checkbox'">
-                    <span
-                      v-if="getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) !== null"
-                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap"
-                      :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-slate-100 text-slate-600'"
-                    >
-                      <span
-                        class="size-1.5 rounded-full"
-                        :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
-                          ? 'bg-emerald-500'
-                          : 'bg-slate-400'"
-                      ></span>
-                      {{ getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) ? '开启' : '关闭' }}
-                    </span>
-                    <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
-                  </template>
-                  <span
-                    v-else
-                    class="block text-sm text-slate-600 truncate"
-                    :title="formatCustomFieldValue(field, row.customFields?.[field.fieldName])"
-                  >
-                    {{ formatCustomFieldValue(field, row.customFields?.[field.fieldName]) }}
-                  </span>
-                </template>
-              </el-table-column>
-
-              <el-table-column label="操作" fixed="right" width="132" align="right">
-                <template #default="{ row }">
-                  <div class="flex justify-end" data-row-action="true" @click.stop>
+                  <div class="flex" data-row-action="true" @click.stop>
                     <button
                       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
                       @click="handleAiFollowUp(row)"
@@ -338,14 +467,112 @@
             </el-table>
           </div>
 
+          <div v-else-if="listViewMode === 'list' && isMobile" class="wk-customer-cards px-3 py-3">
+            <div v-if="customerStore.customerList.length === 0" class="text-center py-16">
+              <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-4">
+                <span class="material-symbols-outlined text-4xl">group</span>
+              </div>
+              <p class="text-slate-400 text-sm font-medium">暂无客户数据</p>
+            </div>
+
+            <div v-else class="flex flex-col gap-3">
+              <div
+                v-for="row in customerStore.customerList"
+                :key="row.customerId"
+                role="button"
+                tabindex="0"
+                class="wk-customer-card w-full text-left bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+                @click="handleRowClick(row)"
+                @keydown.enter.prevent="handleRowClick(row)"
+                @keydown.space.prevent="handleRowClick(row)"
+              >
+                <div class="flex items-start gap-3">
+                  <div class="size-10 rounded-lg overflow-hidden border border-slate-200 bg-white flex items-center justify-center flex-shrink-0">
+                    <img
+                      v-if="row.logoUrl"
+                      :src="row.logoUrl"
+                      :alt="row.companyName || 'company logo'"
+                      class="size-full object-contain"
+                    />
+                    <span v-else class="bg-primary/10 text-primary flex size-full items-center justify-center font-bold text-sm">
+                      {{ row.companyName?.charAt(0) || '?' }}
+                    </span>
+                  </div>
+
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-start gap-2">
+                      <div class="min-w-0 flex-1">
+                        <div class="flex min-w-0 items-center gap-1.5">
+                          <div class="min-w-0 truncate text-sm font-bold text-slate-900">
+                            {{ row.companyName || '-' }}
+                          </div>
+                        </div>
+                      </div>
+                      <span class="material-symbols-outlined text-slate-300 text-base leading-none pt-0.5">chevron_right</span>
+                    </div>
+
+                    <div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                      <div class="min-w-0">
+                        <div class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">{{ mobileIndustryLabel }}</div>
+                        <div class="text-sm text-slate-600 truncate" :title="getMobileIndustryText(row)">
+                          {{ getMobileIndustryText(row) }}
+                        </div>
+                      </div>
+
+                      <div class="min-w-0">
+                        <div class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">{{ mobileLevelLabel }}</div>
+                        <div class="mt-0.5 min-w-0 wk-cell-status-badges">
+                          <span
+                            v-if="row.level"
+                            class="inline-flex shrink-0 items-center justify-start h-6 px-2 rounded-lg font-bold text-xs whitespace-nowrap"
+                            :class="getLevelBadgeClass(row.level)"
+                            :title="getMobileLevelText(row)"
+                          >
+                            {{ getMobileLevelText(row) }}
+                          </span>
+                          <span v-else class="text-sm text-slate-300">-</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <CustomerListCardView
+            v-else-if="listViewMode === 'card'"
+            :customers="customerStore.customerList"
+            :scroll-max-height="cardStageBodyMaxHeight"
+            :industry-label="getMobileIndustryText"
+            :stage-label="getCardStageLabel"
+            @row-click="handleRowClick"
+            @ai-follow-up="handleAiFollowUp"
+          />
+
+          <CustomerListStageView
+            v-else-if="listViewMode === 'stage'"
+            :customers="customerStore.customerList"
+            :body-height="cardStageBodyMaxHeight"
+            :can-change-stage="canChangeStage"
+            :industry-label="getMobileIndustryText"
+            @row-click="handleRowClick"
+            @ai-follow-up="handleAiFollowUp"
+            @create-in-stage="openCreateCustomerDialog"
+            @stage-dropped="onStageDroppedFromBoard"
+          />
+
           <!-- Pagination -->
           <div
             v-if="customerStore.totalCount > 0"
             ref="paginationBarRef"
-            class="shrink-0 px-6 py-4 bg-slate-50/50 flex items-center justify-between border-t border-slate-200"
+            class="shrink-0 flex items-center justify-between"
+            :class="listViewMode === 'list'
+              ? 'border-t border-slate-200 bg-slate-50/50 px-6 py-4'
+              : 'px-0 pt-4 pb-0'"
           >
             <span class="text-sm text-slate-500">
-              共 {{ customerStore.totalCount }} 条客户数据
+              共 {{ customerStore.totalCount }} 条<span class="hidden md:inline">客户数据</span>
             </span>
             <div class="flex items-center gap-1">
               <button
@@ -379,6 +606,7 @@
 
       <CustomerInsightSidebar
         v-if="!isMobile"
+        v-model:expanded="showListInsightSidebar"
         :negotiation-count="negotiationCount"
         :overdue-count="overdueCount"
         :closed-count="closedCount"
@@ -391,6 +619,7 @@
       v-model="showAddDialog"
       :mode="editingCustomer ? 'edit' : 'create'"
       :customer="editingCustomer"
+      :initial-stage="createDialogInitialStage"
       @success="handleUpsertSuccess"
     />
 
@@ -410,10 +639,11 @@
 </template>
 
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { ref, computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { onBeforeRouteLeave, useRouter, useRoute } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
-import { useEnumStore } from '@/stores/enums'
+import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type {
@@ -421,42 +651,125 @@ import type {
   CustomerAiSearchParseVO,
   CustomerAiSearchQuery,
   CustomerExportBO,
-  CustomerListVO,
   CustomerImportResult,
-  CustomerQueryBO
+  CustomerListVO,
+  CustomerQueryBO,
+  CustomerStage
 } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
-import { getUserColumns } from '@/api/customField'
-import { aiParseCustomerSearch, transferCustomer, exportCustomers } from '@/api/customer'
+import { getListFieldsByEntity } from '@/api/customField'
+import { aiParseCustomerSearch, transferCustomer, exportCustomers, updateCustomerStage } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
+import InlineEditableField from '@/components/common/InlineEditableField.vue'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import CustomerImportDialog from '@/views/customer/components/CustomerImportDialog.vue'
 import CustomerInsightSidebar from '@/views/customer/components/CustomerInsightSidebar.vue'
+import CustomerListCardView from '@/views/customer/components/CustomerListCardView.vue'
+import CustomerListStageView from '@/views/customer/components/CustomerListStageView.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import {
   CUSTOMER_DETAIL_LIST_PAGE_QUERY_KEY,
   CUSTOMER_LIST_PAGE_QUERY_KEY,
+  CUSTOMER_LIST_VIEW_MODE_STORAGE_KEY,
   CUSTOMER_ROUTE_ACTION_CREATE,
   CUSTOMER_ROUTE_ACTION_QUERY_KEY
 } from '@/views/customer/constants'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { compactCustomerAiInsight, getCustomerAiStatusMeta } from '@/utils/customerAi'
 import { formatCustomFieldValue, getCustomFieldCheckboxState } from '@/utils/customFieldDisplay'
+import { normalizeListStage } from '@/utils/customerListViewUi'
 
 const router = useRouter()
 const route = useRoute()
 const customerStore = useCustomerStore()
-const enumStore = useEnumStore()
+const userStore = useUserStore()
+const { aiSearchState } = storeToRefs(customerStore)
 const { isMobile } = useResponsive()
 const pageRootRef = ref<HTMLElement | null>(null)
 const tableCardRef = ref<HTMLElement | null>(null)
 const paginationBarRef = ref<HTMLElement | null>(null)
 const tableHeight = ref<number | undefined>(undefined)
+/** 卡片 / 阶段视图内容区最大高度（px），与表格可视区域算法一致，避免撑破视口 */
+const cardStageBodyMaxHeight = ref(420)
 let layoutObserver: ResizeObserver | null = null
 let tableHeightRaf = 0
 
 const showAddDialog = ref(false)
+const createDialogInitialStage = ref<CustomerStage | null>(null)
 const editingCustomer = ref<CustomerListVO | null>(null)
-const listCustomFields = ref<CustomField[]>([])
+const listFields = ref<CustomField[]>([])
+const listViewMode = ref<'list' | 'card' | 'stage'>('list')
+const lastNonMobileListViewMode = ref<'list' | 'card' | 'stage'>('list')
+const listViewModeAutoSwitching = ref(false)
+const AI_SIDEBAR_STORAGE_KEY = 'wk_ai_crm:customer_ai_sidebar_expanded:v2'
+
+function getInitialListInsightSidebarExpanded() {
+  try {
+    const raw = localStorage.getItem(AI_SIDEBAR_STORAGE_KEY)
+    if (raw === null) return false
+    return raw === '1'
+  } catch {
+    return false
+  }
+}
+
+const showListInsightSidebar = ref(getInitialListInsightSidebarExpanded())
+
+const AI_CUSTOMER_LIST_FIELDS: CustomField[] = [
+  {
+    fieldId: '__ai_status_detection__',
+    entityType: 'customer',
+    fieldName: 'aiStatusDetection',
+    fieldLabel: 'AI状态探测',
+    fieldType: 'text',
+    fieldSource: 'system',
+    columnName: 'ai_status_detection',
+    isRequired: false,
+    isSearchable: true,
+    isShowInList: true,
+    isUnique: false,
+    sortOrder: 900,
+    status: 1
+  },
+  {
+    fieldId: '__ai_insight__',
+    entityType: 'customer',
+    fieldName: 'aiInsight',
+    fieldLabel: 'AI洞察',
+    fieldType: 'textarea',
+    fieldSource: 'system',
+    columnName: 'ai_insight',
+    isRequired: false,
+    isSearchable: true,
+    isShowInList: true,
+    isUnique: false,
+    sortOrder: 910,
+    status: 1
+  }
+]
+const PINNED_LIST_FIELD_ORDER = ['companyName', 'aiStatusDetection', 'aiInsight'] as const
+const INLINE_EDITABLE_SYSTEM_FIELDS = new Set([
+  'companyName',
+  'industry',
+  'level',
+  'source',
+  'website',
+  'quotation',
+  'address',
+  'nextFollowTime',
+  'remark'
+])
+const READONLY_LIST_FIELDS = new Set(['aiStatusDetection', 'aiInsight', 'lastContactTime'])
+const primaryContactNameInlineField: Partial<CustomField> = {
+  fieldName: 'primaryContactName',
+  fieldLabel: '联系人',
+  fieldType: 'text'
+}
+const primaryContactPhoneInlineField: Partial<CustomField> = {
+  fieldName: 'primaryContactPhone',
+  fieldLabel: '电话',
+  fieldType: 'text'
+}
 
 // Import/Export state
 const exporting = ref(false)
@@ -470,7 +783,6 @@ const AI_SEARCH_EXAMPLES = [
 const showAiSearchPopover = ref(false)
 const aiSearchInput = ref('')
 const aiSearchLoading = ref(false)
-const aiSearchState = ref<CustomerAiSearchParseVO | null>(null)
 
 const hasAiSearchState = computed(() => {
   return Boolean(aiSearchState.value?.displayChips.length || aiSearchState.value?.explanation)
@@ -608,10 +920,14 @@ function syncAiKeywordChip(keyword: string) {
   }
 }
 
-async function clearAiSearch() {
+function resetAiSearchFilters() {
   aiSearchState.value = null
   aiSearchInput.value = ''
   customerStore.resetQueryParams()
+}
+
+async function clearAiSearch() {
+  resetAiSearchFilters()
   await syncCustomerListPageQuery(customerStore.queryParams.page || 1)
   await customerStore.fetchCustomerList(true)
 }
@@ -706,8 +1022,11 @@ async function handleRemoveAiChip(key: string) {
 }
 
 function handleUpsertSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
-  customerStore.queryParams.page = getCustomerListPageFromRouteQuery()
-  customerStore.fetchCustomerList(false)
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+  if (payload.mode === 'create' && payload.customerId) {
+    router.push(buildCustomerDetailRoute(payload.customerId))
+    return
+  }
   if (payload.mode === 'edit') {
     editingCustomer.value = null
   }
@@ -733,9 +1052,10 @@ function getTableNaturalHeight() {
   return naturalHeight > 0 ? Math.ceil(naturalHeight) : undefined
 }
 
-function updateTableHeight() {
+/** 白卡片内「表格 / 卡片网格 / 看板」可用高度（扣除底部分页与页面下边距），与 el-table 的 :height 计算同源 */
+function getAvailableListBodyHeight(): number {
   const tableCardEl = tableCardRef.value
-  if (!tableCardEl) return
+  if (!tableCardEl) return 420
 
   const scrollContainer = tableCardEl.closest('main')
   const pagePaddingBottom = pageRootRef.value
@@ -746,9 +1066,30 @@ function updateTableHeight() {
     : window.innerHeight
   const paginationHeight = paginationBarRef.value?.offsetHeight ?? 0
   const cardBorderHeight = tableCardEl.offsetHeight - tableCardEl.clientHeight
-  const availableHeight = Math.floor(
-    viewportBottom - tableCardEl.getBoundingClientRect().top - paginationHeight - pagePaddingBottom - cardBorderHeight
+  const bottomGap = 8
+  return Math.floor(
+    viewportBottom
+      - tableCardEl.getBoundingClientRect().top
+      - paginationHeight
+      - pagePaddingBottom
+      - cardBorderHeight
+      - bottomGap
   )
+}
+
+function updateTableHeight() {
+  const tableCardEl = tableCardRef.value
+  if (!tableCardEl) return
+
+  const availableHeight = getAvailableListBodyHeight()
+  const minBodyPx = 200
+  cardStageBodyMaxHeight.value = Math.max(minBodyPx, availableHeight)
+
+  if (listViewMode.value === 'card' || listViewMode.value === 'stage') {
+    tableHeight.value = undefined
+    return
+  }
+
   const naturalHeight = getTableNaturalHeight()
 
   if (!naturalHeight) {
@@ -779,6 +1120,7 @@ function handleAiFollowUp(customer: CustomerListVO) {
 
 function handleAiFollowUpSaved() {
   customerStore.fetchCustomerList(false)
+  appEvents.emit(APP_EVENT.CUSTOMER_SIDEBAR_REFRESH)
 }
 
 // Owner transfer
@@ -813,7 +1155,27 @@ const visiblePages = computed(() => {
   return pages
 })
 
+const industryField = computed(() => listFields.value.find(field => field.fieldName === 'industry') || null)
+const levelField = computed(() => listFields.value.find(field => field.fieldName === 'level') || null)
+
+const mobileIndustryLabel = computed(() => industryField.value?.fieldLabel || 'INDUSTRY')
+const mobileLevelLabel = computed(() => levelField.value?.fieldLabel || 'LEVEL')
+
+function getMobileIndustryText(row: CustomerListVO): string {
+  if (!industryField.value) return (row.industry as unknown as string) || '-'
+  return getListFieldDisplayValue(industryField.value, row)
+}
+
+function getMobileLevelText(row: CustomerListVO): string {
+  if (!row.level) return '-'
+  if (!levelField.value) return String(row.level)
+  return getLevelLabel(levelField.value, String(row.level))
+}
+
 // Computed
+const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
+const canChangeStage = computed(() => userStore.hasPermission('customer:change_stage'))
+
 const closedCount = computed(() => {
   return customerStore.customerList.filter(c => c.stage === 'closed').length
 })
@@ -837,15 +1199,186 @@ const overdueCount = computed(() => {
   }).length
 })
 
+function getFieldFixed(field: CustomField): 'left' | undefined {
+  return field.fieldName === 'companyName' ? 'left' : undefined
+}
+
+function getFieldAlign(field: CustomField): 'left' | 'right' {
+  if (field.fieldType === 'number' || field.fieldName === 'quotation') return 'right'
+  return 'left'
+}
+
+function getFieldMinWidth(field: CustomField): number {
+  const widthMap: Record<string, number> = {
+    companyName: 240,
+    aiStatusDetection: 160,
+    aiInsight: 320,
+    industry: 120,
+    stage: 130,
+    level: 124,
+    source: 140,
+    website: 180,
+    quotation: 130,
+    lastContactTime: 120,
+    nextFollowTime: 160,
+    address: 180,
+    remark: 180
+  }
+
+  return widthMap[field.fieldName] || 140
+}
+
+function getListFieldRawValue(field: CustomField, row: CustomerListVO): unknown {
+  if (field.fieldSource === 'custom') {
+    return row.customFields?.[field.fieldName]
+  }
+
+  return (row as unknown as Record<string, unknown>)[field.fieldName]
+}
+
+function getFieldOptionLabel(field: CustomField, value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-'
+  const normalizedValue = String(value)
+  return field.options?.find(option => option.value === normalizedValue)?.label || normalizedValue
+}
+
+function getListFieldLabel(field: CustomField): string {
+  if (field.fieldName === 'aiStatusDetection') return 'AI 状态探测'
+  if (field.fieldName === 'aiInsight') return 'AI 洞察摘要'
+  return field.fieldLabel
+}
+
+function getLevelLabel(field: CustomField, level: string): string {
+  return getFieldOptionLabel(field, level)
+}
+
+function formatMoney(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-'
+  const amount = Number(value)
+  if (Number.isNaN(amount)) return String(value)
+
+  return new Intl.NumberFormat('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  }).format(amount)
+}
+
+function getListFieldDisplayValue(field: CustomField, row: CustomerListVO): string {
+  const rawValue = getListFieldRawValue(field, row)
+
+  if (rawValue === null || rawValue === undefined || rawValue === '') {
+    return '-'
+  }
+
+  if (field.fieldName === 'lastContactTime') {
+    return formatRelativeTime(String(rawValue))
+  }
+
+  if (field.fieldName === 'quotation') {
+    return formatMoney(rawValue)
+  }
+
+  return formatCustomFieldValue(field, rawValue)
+}
+
+function isCustomerListFieldEditable(field: CustomField): boolean {
+  if (READONLY_LIST_FIELDS.has(field.fieldName)) return false
+  if (field.fieldSource === 'custom') return canEditCustomer.value
+  if (field.fieldName === 'stage') return canChangeStage.value
+  return canEditCustomer.value && INLINE_EDITABLE_SYSTEM_FIELDS.has(field.fieldName)
+}
+
+async function handleInlineCustomerFieldSave(row: CustomerListVO, field: CustomField, value: any) {
+  if (field.fieldName === 'stage') {
+    await updateCustomerStage(row.customerId, String(value || ''))
+    await customerStore.fetchCustomerList(false)
+  } else {
+    await customerStore.editCustomerField({
+      customerId: row.customerId,
+      fieldName: field.fieldName,
+      fieldSource: field.fieldSource,
+      value
+    })
+  }
+  if (field.fieldName === 'companyName') {
+    appEvents.emit(APP_EVENT.CUSTOMER_SIDEBAR_REFRESH)
+  }
+  ElMessage.success('保存成功')
+}
+
+async function handleInlinePrimaryContactFieldSave(row: CustomerListVO, fieldName: string, value: any) {
+  await customerStore.editCustomerField({
+    customerId: row.customerId,
+    fieldName,
+    fieldSource: 'contact',
+    value
+  })
+  ElMessage.success('保存成功')
+}
+
+function getAiStatusMeta(value: string | undefined | null) {
+  return getCustomerAiStatusMeta(value)
+}
+
+function getAiInsightPreview(value: string | undefined | null): string {
+  return compactCustomerAiInsight(value) || '-'
+}
+
+function getPinnedFieldOrder(fieldName: string): number {
+  const index = PINNED_LIST_FIELD_ORDER.indexOf(fieldName as typeof PINNED_LIST_FIELD_ORDER[number])
+  return index >= 0 ? index : Number.MAX_SAFE_INTEGER
+}
+
+function sortListFields(fields: CustomField[]): CustomField[] {
+  return [...fields].sort((left, right) => {
+    const leftPinnedOrder = getPinnedFieldOrder(left.fieldName)
+    const rightPinnedOrder = getPinnedFieldOrder(right.fieldName)
+
+    if (leftPinnedOrder !== rightPinnedOrder) {
+      return leftPinnedOrder - rightPinnedOrder
+    }
+
+    const leftSortOrder = Number(left.sortOrder ?? Number.MAX_SAFE_INTEGER)
+    const rightSortOrder = Number(right.sortOrder ?? Number.MAX_SAFE_INTEGER)
+    if (leftSortOrder !== rightSortOrder) {
+      return leftSortOrder - rightSortOrder
+    }
+
+    return left.fieldName.localeCompare(right.fieldName)
+  })
+}
+
 async function loadListCustomFields() {
   try {
-    listCustomFields.value = await getUserColumns('customer')
+    const serverFields = await getListFieldsByEntity('customer')
+    const existingFieldNames = new Set(serverFields.map(field => field.fieldName))
+    listFields.value = sortListFields([
+      ...serverFields,
+      ...AI_CUSTOMER_LIST_FIELDS.filter(field => !existingFieldNames.has(field.fieldName))
+    ])
   } catch {
     // Error handled by interceptor
   }
 }
 
 onMounted(async () => {
+  try {
+    const saved = localStorage.getItem(CUSTOMER_LIST_VIEW_MODE_STORAGE_KEY)
+    if (saved === 'list' || saved === 'card' || saved === 'stage') {
+      listViewMode.value = saved
+    }
+  } catch {
+    /* ignore */
+  }
+
+  lastNonMobileListViewMode.value = listViewMode.value
+  if (isMobile.value) {
+    listViewModeAutoSwitching.value = true
+    listViewMode.value = 'card'
+    listViewModeAutoSwitching.value = false
+  }
+
+  aiSearchInput.value = aiSearchState.value?.normalizedQuery || aiSearchState.value?.originalQuery || ''
   queueTableHeightUpdate()
   window.addEventListener('resize', queueTableHeightUpdate, { passive: true })
 
@@ -858,8 +1391,6 @@ onMounted(async () => {
   customerStore.queryParams.page = getCustomerListPageFromRouteQuery()
 
   await Promise.all([
-    enumStore.ensureCustomerLevel(),
-    enumStore.ensureCustomerStage(),
     loadListCustomFields(),
     customerStore.fetchCustomerList(false)
   ])
@@ -867,14 +1398,18 @@ onMounted(async () => {
   await nextTick()
   queueTableHeightUpdate()
 
-  const routeAction = route.query[CUSTOMER_ROUTE_ACTION_QUERY_KEY] || route.query.action
-  if (routeAction === CUSTOMER_ROUTE_ACTION_CREATE || routeAction === 'create') {
-    showAddDialog.value = true
+  if (route.query[CUSTOMER_ROUTE_ACTION_QUERY_KEY] === CUSTOMER_ROUTE_ACTION_CREATE) {
+    openCreateCustomerDialog()
     const nextQuery = { ...route.query }
     delete nextQuery[CUSTOMER_ROUTE_ACTION_QUERY_KEY]
-    delete nextQuery.action
-    void router.replace({ path: route.path, query: nextQuery })
+    await router.replace({ path: route.path, query: nextQuery })
   }
+})
+
+onBeforeRouteLeave((to) => {
+  if (to.path.startsWith('/customer')) return
+  if (!aiSearchState.value) return
+  resetAiSearchFilters()
 })
 
 onBeforeUnmount(() => {
@@ -889,6 +1424,46 @@ watch(() => [customerStore.totalCount, customerStore.customerList.length], async
   queueTableHeightUpdate()
 })
 
+watch(isMobile, (mobile) => {
+  if (mobile) {
+    if (listViewMode.value !== 'card') {
+      lastNonMobileListViewMode.value = listViewMode.value
+    }
+    listViewModeAutoSwitching.value = true
+    listViewMode.value = 'card'
+    listViewModeAutoSwitching.value = false
+    return
+  }
+
+  if (listViewMode.value === 'card') {
+    listViewModeAutoSwitching.value = true
+    listViewMode.value = lastNonMobileListViewMode.value
+    listViewModeAutoSwitching.value = false
+  }
+})
+
+watch(showListInsightSidebar, (value) => {
+  try {
+    localStorage.setItem(AI_SIDEBAR_STORAGE_KEY, value ? '1' : '0')
+  } catch {
+    // Ignore storage failures
+  }
+})
+
+watch(listViewMode, (v) => {
+  if (listViewModeAutoSwitching.value) return
+  try {
+    localStorage.setItem(CUSTOMER_LIST_VIEW_MODE_STORAGE_KEY, v)
+  } catch {
+    /* ignore */
+  }
+  void nextTick(() => queueTableHeightUpdate())
+})
+
+watch(showAddDialog, (open) => {
+  if (!open) createDialogInitialStage.value = null
+})
+
 watch(
   () => route.query[CUSTOMER_LIST_PAGE_QUERY_KEY],
   (pageQuery, previousPageQuery) => {
@@ -901,17 +1476,17 @@ watch(
 )
 
 const offCustomerListRefresh = appEvents.on(APP_EVENT.CUSTOMER_LIST_REFRESH, () => {
-  customerStore.fetchCustomerList(false)
+  void customerStore.fetchCustomerList(false, false, { silent: true })
 })
 
 onBeforeUnmount(() => {
   offCustomerListRefresh()
 })
 
-async function handleSearch() {
+function handleSearch() {
   syncAiKeywordChip((customerStore.queryParams.keyword || '').trim())
   customerStore.queryParams.page = 1
-  await syncCustomerListPageQuery(customerStore.queryParams.page || 1)
+  void syncCustomerListPageQuery(customerStore.queryParams.page || 1)
   customerStore.fetchCustomerList(true)
 }
 
@@ -940,11 +1515,56 @@ function handleRowClick(row: CustomerListVO) {
 }
 
 function getStageLabel(stage: string): string {
-  return enumStore.stageLabel(stage) || stage
+  const labels: Record<string, string> = {
+    lead: '线索',
+    qualified: '资格审查',
+    proposal: '方案报价',
+    negotiation: '谈判中',
+    closed: '已成交',
+    lost: '已流失'
+  }
+  return labels[stage] || stage
 }
 
-function getLevelLabel(level: string): string {
-  return enumStore.levelLabel(level) || level
+function getConfiguredStageLabel(field: CustomField, stage: string): string {
+  const optionLabel = getFieldOptionLabel(field, stage)
+  return optionLabel !== stage ? optionLabel : getStageLabel(stage)
+}
+
+function getCardStageLabel(row: CustomerListVO): string {
+  const st = normalizeListStage(row.stage)
+  const field = listFields.value.find(f => f.fieldName === 'stage')
+  if (field) return getConfiguredStageLabel(field, st)
+  return getStageLabel(st)
+}
+
+async function onStageDroppedFromBoard(payload: { customerId: string; stage: CustomerStage }) {
+  if (!canChangeStage.value) return
+  const { customerId, stage } = payload
+  const row = customerStore.customerList.find(c => c.customerId === customerId)
+  if (!row) return
+  if (normalizeListStage(row.stage) === stage) return
+  try {
+    await updateCustomerStage(customerId, stage)
+    ElMessage.success('阶段已更新')
+    await customerStore.fetchCustomerList(false)
+  } catch {
+    /* Error handled by interceptor */
+  }
+}
+
+function openCreateCustomerDialog(stage?: CustomerStage) {
+  createDialogInitialStage.value = stage ?? null
+  showAddDialog.value = true
+}
+
+function getLevelBadgeClass(level: string): string {
+  const classes: Record<string, string> = {
+    A: 'bg-emerald-50 text-emerald-600',
+    B: 'bg-blue-50 text-blue-600',
+    C: 'bg-slate-100 text-slate-500'
+  }
+  return classes[level] || 'bg-slate-100 text-slate-500'
 }
 
 function getStageBadgeClass(stage: string): string {
@@ -1015,6 +1635,7 @@ async function handleTransfer(customer: CustomerListVO, user: any) {
 // ==================== Import / Export ====================
 
 async function handleExport() {
+  if (exporting.value) return
   exporting.value = true
   try {
     const blob = await exportCustomers(buildExportPayload())
@@ -1046,48 +1667,134 @@ async function handleImportSuccess(_result: CustomerImportResult) {
   display: none;
 }
 
+.wk-customer-table {
+  --el-table-bg-color: var(--wk-bg-surface);
+  --el-table-tr-bg-color: var(--wk-bg-surface);
+  --el-table-header-bg-color: var(--wk-bg-surface-subtle);
+  --el-table-header-text-color: var(--wk-text-muted);
+  --el-table-text-color: var(--wk-text-secondary);
+  --el-table-border-color: var(--wk-border-subtle);
+  --el-table-row-hover-bg-color: transparent;
+  --wk-customer-table-row-hover-bg-color: color-mix(in srgb, var(--wk-primary) 11%, var(--wk-bg-surface));
+}
+
 .wk-customer-table :deep(.el-table__border-left-patch),
 .wk-customer-table :deep(.el-table__fixed-right-patch) {
-  background: #f8fafc;
+  background: var(--wk-bg-surface-subtle);
 }
 
 .wk-customer-table :deep(th.el-table__cell) {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-text-muted);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 16px 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--wk-border-muted);
 }
 
 .wk-customer-table :deep(td.el-table__cell) {
   padding: 16px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--wk-border-subtle);
 }
 
 .wk-customer-table :deep(.el-table__row) {
   cursor: pointer;
 }
 
-.wk-customer-table :deep(.el-table__body tr:hover > td.el-table__cell),
-.wk-customer-table :deep(.el-table__body tr.hover-row > td.el-table__cell) {
-  background: #eff6ff;
+.wk-customer-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: var(--wk-customer-table-row-hover-bg-color);
 }
 
 .wk-customer-table :deep(.el-table__empty-block) {
   min-height: 220px;
 }
 
+/* 状态 / 级别 / AI 状态徽章：单行不换行；列极窄时隐藏溢出，避免单元格出现横向滚动条 */
+.wk-cell-status-badges {
+  box-sizing: border-box;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.wk-ai-insight-text {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+:deep(.wk-ai-insight-tooltip) {
+  max-width: 420px;
+}
+
+:deep(.wk-ai-insight-tooltip__content) {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
 .wk-ai-chip :deep(.el-tag__content) {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: #137fec;
 }
 
-:deep(.wk-ai-search-popover) {
+:global(.wk-ai-search-popover.el-popper) {
   border-radius: 20px;
   border: 1px solid #dbeafe;
   box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
   padding: 16px;
+}
+
+@media (max-width: 767px) {
+  .wk-ai-chip {
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    padding-block: 5px;
+  }
+
+  :global(.wk-ai-search-popover.el-popper) {
+    left: 50% !important;
+    width: calc(100vw - 2rem) !important;
+    max-width: calc(100vw - 2rem);
+    transform: translateX(-50%) !important;
+  }
+}
+
+:global(.wk-customer-import-export-dropdown.el-popper) {
+  border-color: #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
+}
+
+:global(.wk-customer-import-export-dropdown .el-popper__arrow) {
+  display: none;
+}
+
+:global(.wk-customer-import-export-dropdown .el-dropdown-menu) {
+  padding: 4px 0;
+}
+
+:global(.wk-customer-import-export-dropdown .el-dropdown-menu__item) {
+  height: 40px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+:global(.wk-customer-import-export-dropdown .el-dropdown-menu__item:not(.is-disabled):hover),
+:global(.wk-customer-import-export-dropdown .el-dropdown-menu__item:not(.is-disabled):focus) {
+  background-color: rgba(19, 127, 236, 0.1);
+  color: #137fec;
+}
+
+.wk-customer-card {
+  -webkit-tap-highlight-color: transparent;
 }
 </style>

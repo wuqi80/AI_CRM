@@ -5,11 +5,13 @@ import type {
   CustomerDetailVO,
   CustomerAddBO,
   CustomerUpdateBO,
+  CustomerFieldUpdateBO,
   CustomerQueryBO,
   CustomerExportBO,
   CustomerImportPreview,
   CustomerImportRow,
   CustomerImportResult,
+  CustomerAiReportVO,
   CustomerAiSearchParseBO,
   CustomerAiSearchParseVO
 } from '@/types/customer'
@@ -26,6 +28,13 @@ export function addCustomer(data: CustomerAddBO): Promise<string> {
  */
 export function updateCustomer(data: CustomerUpdateBO): Promise<void> {
   return post('/customer/update', data)
+}
+
+/**
+ * Update a single customer field
+ */
+export function updateCustomerField(data: CustomerFieldUpdateBO): Promise<CustomerDetailVO> {
+  return post('/customer/updateField', data)
 }
 
 /**
@@ -107,17 +116,6 @@ export function importCustomerPreview(file: File): Promise<CustomerImportPreview
   return upload('/customer/import/preview', formData)
 }
 
-export interface CustomerLogoUploadVO {
-  logo: string
-  logoUrl?: string
-}
-
-export function uploadCustomerLogo(file: File): Promise<CustomerLogoUploadVO> {
-  const formData = new FormData()
-  formData.append('file', file)
-  return upload('/customer/logo/upload', formData)
-}
-
 /**
  * Confirm import
  */
@@ -140,6 +138,7 @@ export interface CustomerAiParseVO {
   level?: string
   stage?: string
   source?: string
+  website?: string
   remark?: string
   contactName?: string
   contactPhone?: string
@@ -154,6 +153,10 @@ export interface CustomerAiParseVO {
 
 export function aiParseCustomer(data: CustomerAiParseBO): Promise<CustomerAiParseVO> {
   return post('/customer/ai-parse', data)
+}
+
+export function generateCustomerAiReport(id: string): Promise<CustomerAiReportVO> {
+  return post(`/customer/${id}/ai-report`)
 }
 
 export function aiParseCustomerSearch(data: CustomerAiSearchParseBO): Promise<CustomerAiSearchParseVO> {

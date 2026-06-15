@@ -13,25 +13,33 @@ export interface Customer {
   logo?: string
   logoUrl?: string
   address?: string
+  aiStatusDetection?: string
+  aiInsight?: string
+  aiAnalysisStatus?: string
+  aiAnalysisRequestedAt?: string
   description?: string
   createTime: string
   updateTime: string
 }
 
-export type CustomerStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed' | 'lost'
-export type CustomerLevel = 'A' | 'B' | 'C'
+// 内置取值用于自动补全；(string & {}) 允许用户在系统设置里新增的自定义取值
+export type CustomerStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed' | 'lost' | (string & {})
+export type CustomerLevel = 'A' | 'B' | 'C' | (string & {})
 
 export interface CustomerListVO extends Customer {
   contactCount: number
   lastFollowUpTime?: string
   lastContactTime?: string
+  nextFollowTime?: string
   tags: string[]
   customFields?: Record<string, any>
   // Financial info
   quotation?: number
+  remark?: string
   // Primary contact info
   primaryContactName?: string
   primaryContactPhone?: string
+  primaryContactEmail?: string
   primaryContactPosition?: string
   // Team & source
   teamMemberNames?: string[]
@@ -45,6 +53,7 @@ export interface CustomerDetailVO extends Customer {
   lastContactTime?: string
   nextFollowTime?: string
   remark?: string
+  aiParseSnapshot?: string
   ownerAvatar?: string
   createUserId?: string | number
   createUserName?: string
@@ -95,8 +104,10 @@ export interface CustomerAddBO {
   logo?: string
   address?: string
   quotation?: number | null
+  nextFollowTime?: string
   remark?: string
   description?: string
+  aiParseSnapshot?: string
   // Primary contact
   contactName?: string
   contactPhone?: string
@@ -108,6 +119,13 @@ export interface CustomerAddBO {
 
 export interface CustomerUpdateBO extends CustomerAddBO {
   customerId: string
+}
+
+export interface CustomerFieldUpdateBO {
+  customerId: string
+  fieldName: string
+  fieldSource?: 'system' | 'custom' | 'contact'
+  value: any
 }
 
 export interface CustomerFieldFilterBO {
@@ -144,6 +162,7 @@ export interface CustomerQueryBO {
 }
 
 export type CustomerQuerySortBy =
+  | 'updateTime'
   | 'createTime'
   | 'quotation'
   | 'lastContactTime'
@@ -185,6 +204,14 @@ export interface CustomerAiSearchQuery {
 export interface CustomerAiSearchDisplayChip {
   key: string
   label: string
+}
+
+export interface CustomerAiReportVO {
+  customerId: string
+  aiStatusDetection?: string
+  aiInsight?: string
+  aiDeepInsight?: string
+  aiNextStep?: string
 }
 
 export interface CustomerAiSearchParseVO {
@@ -237,8 +264,6 @@ export interface FollowUp {
   customerId?: string
   relationId?: string
   relationName?: string
-  contactId?: string
-  contactName?: string
   type: FollowUpType
   content: string
   summary?: string
@@ -248,30 +273,34 @@ export interface FollowUp {
   result?: string
   nextPlan?: string
   nextFollowTime?: string
+  attachments?: FollowUpAttachment[]
+  tasks?: FollowUpTask[]
   createUserId: string
   createUserName?: string
   createTime: string
-  attachments?: FollowUpAttachment[]
 }
 
 export interface FollowUpAttachment {
   attachmentId: string
-  followUpId?: string
+  followUpId: string
   fileName: string
   filePath: string
   fileSize?: number
   mimeType?: string
   sort?: number
-  analysisStatus?: string
+  analysisStatus?: 'idle' | 'processing' | 'completed' | 'failed' | string
   analysisContent?: string
   analysisTime?: string
 }
 
-export interface FollowUpAttachmentDraft {
-  fileName: string
-  filePath: string
-  fileSize?: number
-  mimeType?: string
+export interface FollowUpTask {
+  taskId: string
+  title: string
+  description?: string
+  dueDate?: string
+  status?: string
+  taskType?: string
+  generatedByAi?: number
 }
 
 export type FollowUpType = 'call' | 'meeting' | 'email' | 'visit' | 'other'
@@ -281,26 +310,33 @@ export interface FollowUpAddBO {
   relationId?: string
   type: string
   content: string
-  followTime: string
-  contactId?: string
-  nextFollowTime?: string
   summary?: string
   sceneType?: string
   aiGenerated?: number
-  attachments?: FollowUpAttachmentDraft[]
+  followTime: string
+  contactId?: string
+  nextFollowTime?: string
+  attachments?: Array<{
+    fileName: string
+    filePath: string
+    fileSize: number
+    mimeType: string
+  }>
+  suggestedTasks?: Array<{
+    title: string
+    description?: string
+    dueDate?: string
+    taskType?: string
+  }>
 }
 
 export interface FollowUpUpdateBO {
   followUpId: string
-  relationId?: string
-  contactId?: string
   type: string
   content: string
   followTime: string
+  contactId?: string
   nextFollowTime?: string
-  summary?: string
-  sceneType?: string
-  aiGenerated?: number
 }
 
 export interface FollowUpQueryBO {

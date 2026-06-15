@@ -11,6 +11,23 @@ type LegacyMediaNavigator = Navigator & {
   msGetUserMedia?: LegacyGetUserMedia
 }
 
+type CapacitorGlobal = {
+  getPlatform?: () => string
+  isNativePlatform?: () => boolean
+}
+
+type CapacitorWindow = Window & {
+  Capacitor?: CapacitorGlobal
+}
+
+export interface MobileAudioFileCaptureOptions {
+  useMobileAudioApi: boolean
+  hasAudioInput: boolean
+  hasMediaRecorder: boolean
+  canCaptureAudioFile: boolean
+  preferFileCapture?: boolean
+}
+
 function getLegacyGetUserMedia(): LegacyGetUserMedia | undefined {
   if (typeof navigator === 'undefined') return undefined
   const nav = navigator as LegacyMediaNavigator
@@ -23,6 +40,42 @@ function getLegacyGetUserMedia(): LegacyGetUserMedia | undefined {
 export function hasMobileAudioInputSupport(): boolean {
   if (typeof navigator === 'undefined') return false
   return Boolean(navigator.mediaDevices?.getUserMedia || getLegacyGetUserMedia())
+}
+
+function getCapacitorGlobal(): CapacitorGlobal | undefined {
+  if (typeof window === 'undefined') return undefined
+  return (window as CapacitorWindow).Capacitor
+}
+
+export function getCapacitorPlatform(): string {
+  const capacitor = getCapacitorGlobal()
+  if (typeof capacitor?.getPlatform !== 'function') return ''
+  return capacitor.getPlatform()
+}
+
+export function isNativeCapacitorAndroid(): boolean {
+  const capacitor = getCapacitorGlobal()
+  if (!capacitor) return false
+
+  const isNativePlatform = typeof capacitor.isNativePlatform === 'function'
+    ? capacitor.isNativePlatform()
+    : getCapacitorPlatform() !== 'web'
+
+  return isNativePlatform && getCapacitorPlatform() === 'android'
+}
+
+export function shouldPreferMobileAudioFileCapture(): boolean {
+  return isNativeCapacitorAndroid()
+}
+
+export function shouldUseMobileAudioFileCapture(options: MobileAudioFileCaptureOptions): boolean {
+  return options.useMobileAudioApi
+    && options.canCaptureAudioFile
+    && (
+      Boolean(options.preferFileCapture)
+      || !options.hasAudioInput
+      || !options.hasMediaRecorder
+    )
 }
 
 export async function requestMobileAudioStream(

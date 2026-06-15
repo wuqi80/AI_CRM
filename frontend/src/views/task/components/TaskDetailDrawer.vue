@@ -12,78 +12,152 @@
   >
     <div v-if="task" class="h-full flex flex-col bg-white shadow-2xl">
       <!-- Header -->
-      <div class="flex items-center justify-between p-6 border-b border-slate-100">
-        <span class="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full uppercase tracking-widest">
-          任务详情
-        </span>
-        <div class="flex items-center gap-2">
+      <div class="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-6 sm:px-8">
+        <div class="flex min-w-0 items-center gap-3">
+          <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <span class="material-symbols-outlined text-[20px] leading-none">task_alt</span>
+          </div>
+          <div class="min-w-0">
+            <h3 class="truncate text-sm font-bold text-slate-900">任务详情</h3>
+            <p class="truncate text-[11px] font-bold uppercase tracking-widest text-slate-400">
+              {{ getStatusLabel(task.status) }}
+            </p>
+          </div>
+        </div>
+        <div class="flex shrink-0 items-center gap-2">
           <button
             v-if="canEdit"
-            @click="$emit('edit', task)"
-            class="size-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-primary transition-colors"
+            class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-primary"
             type="button"
             aria-label="编辑任务"
             title="编辑任务"
+            @click="$emit('edit', task)"
           >
             <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
           </button>
           <button
-            @click="open = false"
-            class="size-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200"
             type="button"
             aria-label="关闭任务详情"
             title="关闭"
+            @click="open = false"
           >
-            <span class="material-symbols-outlined text-xl leading-none">close</span>
+            <span class="material-symbols-outlined text-[18px] leading-none">close</span>
           </button>
         </div>
       </div>
 
       <!-- Content -->
-      <div class="flex-1 min-h-0 overflow-y-auto p-8">
-        <h2 class="text-2xl font-bold text-slate-900 mb-2 line-clamp-2">{{ task.title }}</h2>
+      <div class="flex-1 min-h-0 overflow-y-auto px-8 pb-8 pt-8">
+        <h2 class="mb-8 line-clamp-2 text-2xl font-bold leading-tight text-slate-900">{{ task.title }}</h2>
 
-        <div class="grid grid-cols-2 gap-4 my-8">
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">截止时间</p>
-            <p :class="['text-xs font-bold', isOverdue(task) ? 'text-red-500' : 'text-slate-700']">
-              {{ task.dueDate ? formatDateTime(task.dueDate) : '未设定' }}
-            </p>
-            <p v-if="isOverdue(task)" class="text-xs text-red-500 font-bold mt-1">(已延期)</p>
+        <div class="mb-8 grid grid-cols-2 gap-4">
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">schedule</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">截止时间</p>
+              </div>
+              <p :class="['text-sm', isOverdue(task) ? 'font-bold text-red-500' : 'text-[#0d0d0d]']">
+                {{ task.dueDate ? formatDateTime(task.dueDate) : '未设定' }}
+              </p>
+              <p v-if="isOverdue(task)" class="mt-1 text-[11px] font-bold text-red-500">(已延期)</p>
+            </div>
           </div>
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">优先级</p>
-            <p :class="['text-xs font-bold uppercase', getPriorityColor(task.priority)]">
-              {{ getPriorityLabel(task.priority) }}
-            </p>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">priority_high</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">优先级</p>
+              </div>
+              <p :class="['text-sm font-bold uppercase', getPriorityColor(task.priority)]">
+                {{ getPriorityLabel(task.priority) }}
+              </p>
+            </div>
           </div>
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
-            <p class="text-xs font-bold text-slate-700">{{ task.assignedToName || '未分配' }}</p>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">person</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">负责人</p>
+              </div>
+              <p class="text-sm text-[#0d0d0d]">{{ task.assignedToName || '未分配' }}</p>
+            </div>
           </div>
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">任务状态</p>
-            <p class="text-xs font-bold text-primary uppercase">{{ getStatusLabel(task.status) }}</p>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">task_alt</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">任务状态</p>
+              </div>
+              <p class="text-sm font-bold uppercase text-primary">{{ getStatusLabel(task.status) }}</p>
+            </div>
+          </div>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">folder</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">所属项目</p>
+              </div>
+              <p class="truncate text-sm text-[#0d0d0d]" :title="getProjectDisplayName(task)">
+                {{ getProjectDisplayName(task) }}
+              </p>
+              <p v-if="task.laneName" class="mt-1 truncate text-xs text-slate-400">{{ task.laneName }}</p>
+            </div>
+          </div>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">person</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">创建人</p>
+              </div>
+              <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateUserName }}</p>
+            </div>
+          </div>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">calendar_clock</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">创建时间</p>
+              </div>
+              <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateTime }}</p>
+            </div>
           </div>
         </div>
 
         <div class="space-y-8">
-          <section v-if="task.participantNames">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">参与人</h3>
-            <p class="text-sm text-slate-700">{{ task.participantNames }}</p>
+          <section v-if="task.participantNames" class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">参与人</p>
+            <p class="whitespace-pre-wrap text-sm font-medium leading-relaxed text-slate-700">
+              {{ task.participantNames }}
+            </p>
           </section>
 
           <section v-if="task.customerName">
             <div class="mb-4 flex items-center gap-2">
               <span class="material-symbols-outlined text-[18px] text-slate-400">corporate_fare</span>
-              <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">关联客户</h3>
+              <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400">关联客户</h3>
             </div>
             <div
-              class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition-colors"
+              class="flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors"
               :class="task.customerId ? 'cursor-pointer hover:bg-slate-50' : ''"
               @click="handleGoToCustomerDetail"
             >
-              <div class="flex size-10 items-center justify-center rounded-xl bg-primary/10 font-bold text-primary">
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-bold text-primary shadow-sm">
                 {{ task.customerName.charAt(0) }}
               </div>
               <div class="min-w-0 flex-1">
@@ -94,19 +168,19 @@
           </section>
 
           <section v-if="task.description">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">任务描述</h3>
-            <div class="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-              <p class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{{ task.description }}</p>
+            <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">任务描述</p>
+              <p class="whitespace-pre-wrap text-sm font-medium leading-relaxed text-slate-700">{{ task.description }}</p>
             </div>
           </section>
 
-          <section v-if="aiInsight" class="p-6 bg-slate-900 rounded-[2rem] text-white">
+          <section v-if="displayAiInsight" class="p-6 bg-slate-900 rounded-[2rem] text-white">
             <div class="flex items-center gap-2 mb-4">
               <WkIcon name="ai" class="text-emerald-400" />
               <h3 class="text-sm font-bold">AI 推荐沟通话术</h3>
             </div>
             <p class="text-xs text-slate-300 leading-relaxed italic">
-              "{{ aiInsight }}"
+              "{{ displayAiInsight }}"
             </p>
           </section>
         </div>
@@ -117,7 +191,7 @@
         <div class="flex gap-3 items-stretch">
           <button
             v-if="canToggleComplete && task.status !== 'COMPLETED'"
-            @click="$emit('toggle-complete', task)"
+            @click="handleToggleComplete"
             class="flex-1 py-3 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
             type="button"
           >
@@ -126,7 +200,7 @@
           </button>
           <button
             v-else-if="canToggleComplete"
-            @click="$emit('toggle-complete', task)"
+            @click="handleToggleComplete"
             class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
             type="button"
           >
@@ -136,7 +210,7 @@
 
           <button
             v-if="canDelete"
-            @click="$emit('delete', task)"
+            @click="handleDelete"
             class="size-12 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
             type="button"
             aria-label="删除任务"
@@ -150,127 +224,247 @@
   </el-drawer>
 
   <!-- Mobile -->
-  <el-dialog
+  <el-drawer
     v-else
     v-model="open"
-    title="任务详情"
-    width="95%"
-    fullscreen
-    class="task-detail-dialog"
+    direction="rtl"
+    size="100%"
+    :with-header="false"
+    class="task-detail-drawer task-detail-drawer--mobile"
   >
-    <template v-if="task">
-      <h2 class="text-lg font-bold text-slate-900 mb-4">{{ task.title }}</h2>
-
-      <div class="grid grid-cols-2 gap-3 mb-6">
-        <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-xs font-bold text-slate-400 uppercase mb-1">截止时间</p>
-          <p :class="['text-xs font-bold', isOverdue(task) ? 'text-red-500' : 'text-slate-700']">
-            {{ task.dueDate ? formatDateTime(task.dueDate) : '未设定' }}
-          </p>
-        </div>
-        <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-xs font-bold text-slate-400 uppercase mb-1">优先级</p>
-          <p :class="['text-xs font-bold', getPriorityColor(task.priority)]">
-            {{ getPriorityLabel(task.priority) }}
-          </p>
-        </div>
-        <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-xs font-bold text-slate-400 uppercase mb-1">负责人</p>
-          <p class="text-xs font-bold text-slate-700">{{ task.assignedToName || '未分配' }}</p>
-        </div>
-        <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-xs font-bold text-slate-400 uppercase mb-1">状态</p>
-          <p class="text-xs font-bold text-primary">{{ getStatusLabel(task.status) }}</p>
-        </div>
-      </div>
-
-      <div v-if="task.participantNames" class="mb-6">
-        <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">参与人</h3>
-        <p class="text-sm text-slate-700">{{ task.participantNames }}</p>
-      </div>
-
-      <div v-if="task.customerName" class="mb-6">
-        <div class="mb-2 flex items-center gap-2">
-          <span class="material-symbols-outlined text-base text-slate-400">corporate_fare</span>
-          <h3 class="text-xs font-bold uppercase text-slate-400">关联客户</h3>
-        </div>
-        <div
-          class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-colors"
-          :class="task.customerId ? 'cursor-pointer active:bg-slate-50' : ''"
-          role="button"
-          :tabindex="task.customerId ? 0 : -1"
-          @click="handleGoToCustomerDetail"
-        >
-          <div class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-            {{ task.customerName.charAt(0) }}
+    <div v-if="task" class="h-full flex flex-col bg-white">
+      <!-- Header -->
+      <div class="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-6">
+        <div class="flex min-w-0 items-center gap-3">
+          <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <span class="material-symbols-outlined text-[20px] leading-none">task_alt</span>
           </div>
-          <p class="min-w-0 flex-1 text-sm font-bold text-slate-900">{{ task.customerName }}</p>
-          <span v-if="task.customerId" class="material-symbols-outlined shrink-0 text-slate-300">chevron_right</span>
+          <div class="min-w-0">
+            <h3 class="truncate text-sm font-bold text-slate-900">任务详情</h3>
+            <p class="truncate text-[11px] font-bold uppercase tracking-widest text-slate-400">
+              {{ getStatusLabel(task.status) }}
+            </p>
+          </div>
         </div>
-      </div>
-
-      <div v-if="task.description" class="mb-6">
-        <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">描述</h3>
-        <p class="text-sm text-slate-600 whitespace-pre-wrap">{{ task.description }}</p>
-      </div>
-
-      <div v-if="aiInsight" class="p-4 bg-slate-900 rounded-2xl text-white">
-        <div class="flex items-center gap-2 mb-3">
-          <WkIcon name="ai" class="text-emerald-400 text-sm" />
-          <h3 class="text-sm font-bold">AI 推荐沟通话术</h3>
-        </div>
-        <p class="text-xs text-slate-300 leading-relaxed italic">"{{ aiInsight }}"</p>
-      </div>
-    </template>
-
-    <template v-if="task" #footer>
-      <div class="space-y-3">
-        <div class="flex gap-3">
+        <div class="flex shrink-0 items-center gap-2">
           <button
             v-if="canEdit"
-            @click="$emit('edit', task)"
-            class="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 flex items-center justify-center gap-2"
+            class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-primary"
             type="button"
+            aria-label="编辑任务"
+            title="编辑任务"
+            @click="$emit('edit', task)"
           >
-            <span class="material-symbols-outlined text-base">edit</span>
-            编辑任务
+            <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
           </button>
           <button
-            v-if="canToggleComplete && task.status !== 'COMPLETED'"
-            @click="$emit('toggle-complete', task)"
-            class="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+            class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200"
             type="button"
+            aria-label="关闭任务详情"
+            title="关闭"
+            @click="open = false"
           >
-            <span class="material-symbols-outlined text-base">check_circle</span>
-            标记完成
+            <span class="material-symbols-outlined text-[18px] leading-none">close</span>
           </button>
         </div>
-        <button
-          v-if="canDelete"
-          @click="$emit('delete', task)"
-          class="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-slate-400 hover:text-red-500 transition-colors"
-          type="button"
-        >
-          <span class="material-symbols-outlined text-sm">delete</span>
-          删除此任务
-        </button>
       </div>
-    </template>
-  </el-dialog>
+
+      <!-- Content -->
+      <div class="flex-1 min-h-0 overflow-y-auto px-5 pb-5 pt-5">
+        <h2 class="text-lg font-bold text-slate-900 mb-4">{{ task.title }}</h2>
+
+        <div class="mb-6 grid grid-cols-2 gap-3">
+          <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <div class="flex items-center gap-3">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                <span class="material-symbols-outlined text-[18px] leading-none">schedule</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">截止时间</p>
+                <p :class="['text-sm', isOverdue(task) ? 'font-bold text-red-500' : 'text-[#0d0d0d]']">
+                  {{ task.dueDate ? formatDateTime(task.dueDate) : '未设定' }}
+                </p>
+                <p v-if="isOverdue(task)" class="mt-0.5 text-[11px] font-bold text-red-500">(已延期)</p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <div class="flex items-center gap-3">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                <span class="material-symbols-outlined text-[18px] leading-none">priority_high</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">优先级</p>
+                <p :class="['text-sm font-bold uppercase', getPriorityColor(task.priority)]">
+                  {{ getPriorityLabel(task.priority) }}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <div class="flex items-center gap-3">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                <span class="material-symbols-outlined text-[18px] leading-none">person</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">负责人</p>
+                <p class="text-sm text-[#0d0d0d]">{{ task.assignedToName || '未分配' }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <div class="flex items-center gap-3">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                <span class="material-symbols-outlined text-[18px] leading-none">task_alt</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">状态</p>
+                <p class="text-sm font-bold uppercase text-primary">{{ getStatusLabel(task.status) }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <div class="flex items-center gap-3">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                <span class="material-symbols-outlined text-[18px] leading-none">folder</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">所属项目</p>
+                <p class="truncate text-sm text-[#0d0d0d]" :title="getProjectDisplayName(task)">
+                  {{ getProjectDisplayName(task) }}
+                </p>
+                <p v-if="task.laneName" class="mt-0.5 truncate text-xs text-slate-400">{{ task.laneName }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <div class="flex items-center gap-3">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                <span class="material-symbols-outlined text-[18px] leading-none">person</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">创建人</p>
+                <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateUserName }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <div class="flex items-center gap-3">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                <span class="material-symbols-outlined text-[18px] leading-none">calendar_clock</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">创建时间</p>
+                <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateTime }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="task.participantNames" class="mb-6 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">参与人</p>
+          <p class="text-sm font-medium leading-relaxed text-slate-700">{{ task.participantNames }}</p>
+        </div>
+
+        <div v-if="task.customerName" class="mb-6">
+          <div class="mb-2 flex items-center gap-2">
+            <span class="material-symbols-outlined text-base text-slate-400">corporate_fare</span>
+            <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400">关联客户</h3>
+          </div>
+          <div
+            class="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors"
+            :class="task.customerId ? 'cursor-pointer active:bg-slate-50' : ''"
+            role="button"
+            :tabindex="task.customerId ? 0 : -1"
+            @click="handleGoToCustomerDetail"
+          >
+            <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-bold text-primary shadow-sm">
+              {{ task.customerName.charAt(0) }}
+            </div>
+            <p class="min-w-0 flex-1 text-sm font-bold text-slate-900">{{ task.customerName }}</p>
+            <span v-if="task.customerId" class="material-symbols-outlined shrink-0 text-slate-300">chevron_right</span>
+          </div>
+        </div>
+
+        <div v-if="task.description" class="mb-6 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">描述</p>
+          <p class="whitespace-pre-wrap text-sm font-medium leading-relaxed text-slate-700">{{ task.description }}</p>
+        </div>
+
+        <div v-if="displayAiInsight" class="p-4 bg-slate-900 rounded-2xl text-white">
+          <div class="flex items-center gap-2 mb-3">
+            <WkIcon name="ai" class="text-emerald-400 text-sm" />
+            <h3 class="text-sm font-bold">AI 推荐沟通话术</h3>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed italic">"{{ displayAiInsight }}"</p>
+        </div>
+      </div>
+
+      <!-- Bottom Actions -->
+      <div v-if="task" class="p-4 border-t border-slate-100">
+        <div class="space-y-3">
+          <div class="flex gap-3">
+            <button
+              v-if="canEdit"
+              @click="$emit('edit', task)"
+              class="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 flex items-center justify-center gap-2"
+              type="button"
+            >
+              <span class="material-symbols-outlined text-base">edit</span>
+              编辑任务
+            </button>
+            <button
+              v-if="canToggleComplete && task.status !== 'COMPLETED'"
+              @click="handleToggleComplete"
+              class="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+              type="button"
+            >
+              <span class="material-symbols-outlined text-base">check_circle</span>
+              标记完成
+            </button>
+            <button
+              v-else-if="canToggleComplete"
+              @click="handleToggleComplete"
+              class="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+              type="button"
+            >
+              <span class="material-symbols-outlined text-base">undo</span>
+              重新开始
+            </button>
+          </div>
+          <button
+            v-if="canDelete"
+            @click="handleDelete"
+            class="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-slate-400 hover:text-red-500 transition-colors"
+            type="button"
+          >
+            <span class="material-symbols-outlined text-sm">delete</span>
+            删除此任务
+          </button>
+        </div>
+      </div>
+    </div>
+  </el-drawer>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useTaskStore } from '@/stores/task'
 import type { Task, TaskPriority, TaskStatus } from '@/types/common'
+import { getTaskAiInsightText } from '@/utils/taskAiInsight'
+import { normalizeTaskPriority } from '@/utils/taskPriority'
 
 const router = useRouter()
+const taskStore = useTaskStore()
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
   task: Task | null
   isMobile: boolean
   desktopWidth?: string
+  /** 非空时覆盖根据任务推导的默认 AI 话术 */
   aiInsight?: string
   canEdit?: boolean
   canDelete?: boolean
@@ -286,14 +480,61 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
   (e: 'edit', task: Task): void
-  (e: 'delete', task: Task): void
-  (e: 'toggle-complete', task: Task): void
+  /** 完成状态切换或删除成功后触发，由父级刷新列表/客户数据 */
+  (e: 'mutated'): void
 }>()
 
 const open = computed({
   get: () => props.modelValue,
   set: (v: boolean) => emit('update:modelValue', v)
 })
+
+const displayAiInsight = computed(() => {
+  const override = props.aiInsight?.trim()
+  if (override) return props.aiInsight!.trim()
+  if (!props.task) return ''
+  return getTaskAiInsightText(props.task)
+})
+
+const displayCreateTime = computed(() => {
+  const t = props.task?.createTime
+  if (!t) return '未知'
+  return formatDateTime(t)
+})
+
+const displayCreateUserName = computed(() => {
+  const name = props.task?.createUserName?.trim()
+  return name || '未知'
+})
+
+function getProjectDisplayName(task: Task): string {
+  return task.projectName || '未关联项目'
+}
+
+async function handleToggleComplete() {
+  const task = props.task
+  if (!task) return
+  const newStatus = task.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'
+  await taskStore.changeTaskStatus(task.taskId, newStatus)
+  emit('mutated')
+  if (props.isMobile) {
+    open.value = false
+  }
+}
+
+async function handleDelete() {
+  const task = props.task
+  if (!task) return
+  try {
+    await ElMessageBox.confirm(`确定要删除任务「${task.title}」吗？`, '提示', { type: 'warning' })
+    await taskStore.removeTask(task.taskId)
+    ElMessage.success('删除成功')
+    open.value = false
+    emit('mutated')
+  } catch {
+    /* 取消 */
+  }
+}
 
 function handleGoToCustomerDetail() {
   if (!props.task?.customerId) return
@@ -314,11 +555,13 @@ function isOverdue(task: Task): boolean {
 }
 
 function getPriorityLabel(p: TaskPriority): string {
-  return p === 'HIGH' ? '高' : p === 'MEDIUM' ? '中' : '低'
+  const priority = normalizeTaskPriority(p)
+  return priority === 'HIGH' ? '高' : priority === 'MEDIUM' ? '中' : '低'
 }
 
 function getPriorityColor(p: TaskPriority): string {
-  return p === 'HIGH' ? 'text-red-500' : p === 'MEDIUM' ? 'text-amber-500' : 'text-slate-500'
+  const priority = normalizeTaskPriority(p)
+  return priority === 'HIGH' ? 'text-red-500' : priority === 'MEDIUM' ? 'text-amber-500' : 'text-slate-500'
 }
 
 function getStatusLabel(s: TaskStatus): string {

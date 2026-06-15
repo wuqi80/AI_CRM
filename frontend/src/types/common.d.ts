@@ -5,9 +5,18 @@ export interface Task {
   description?: string
   customerId?: string
   customerName?: string
+  relationId?: string
+  relationName?: string
+  projectId?: string
+  projectName?: string
+  laneId?: string
+  laneName?: string
   priority: TaskPriority
+  priorityName?: string
   status: TaskStatus
+  statusName?: string
   dueDate?: string
+  overdue?: boolean
   assignedTo?: string
   assignedToName?: string
   taskType?: string
@@ -31,6 +40,9 @@ export interface TaskAddBO {
   description?: string
   customerId?: string
   priority?: TaskPriority
+  relationId?: string
+  projectId?: string
+  laneId?: string
   dueDate?: string
   assignedTo?: string
   taskType?: string
@@ -43,11 +55,15 @@ export interface TaskUpdateBO extends TaskAddBO {
 }
 
 export interface TaskQueryBO {
+  taskId?: string
   keyword?: string
   status?: TaskStatus
   priority?: TaskPriority
   customerId?: string
   assignedTo?: string
+  relationId?: string
+  projectId?: string
+  laneId?: string
   filter?: 'all' | 'today' | 'thisWeek' | 'overdue' | 'mine'
   sortMode?: 'default' | 'value'
   highValueOnly?: boolean
@@ -119,6 +135,12 @@ export interface KnowledgeAiSearchVO {
   matchPercent: number
   totalHits: number
   references: KnowledgeAiSearchReferenceItem[]
+}
+
+export interface KnowledgePreviewTokenVO {
+  url: string
+  expiresAt: string
+  expiresInSeconds: number
 }
 
 export interface KnowledgeTargetedScriptBO {

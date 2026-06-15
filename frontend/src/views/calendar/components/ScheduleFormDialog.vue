@@ -1,12 +1,14 @@
 <template>
   <el-dialog
     v-model="visible"
-    :width="isMobile ? '96%' : '720px'"
-    :fullscreen="isMobile"
+    :width="isMobile ? 'calc(100% - 32px)' : '720px'"
     :show-close="false"
     destroy-on-close
-    top="6vh"
-    class="schedule-dialog !rounded-2xl !p-0 overflow-hidden wk-crm-el-field-scope"
+    :top="isMobile ? '16px' : '10vh'"
+    :class="[
+      'schedule-dialog !rounded-2xl !p-0 overflow-hidden wk-crm-el-field-scope',
+      isMobile ? 'schedule-dialog--mobile' : 'schedule-dialog--desktop'
+    ]"
   >
     <template #header>
       <div class="flex items-center justify-between">
@@ -15,23 +17,26 @@
             <span class="material-symbols-outlined text-[22px] text-primary">calendar_month</span>
           </div>
           <div>
-            <h2 class="text-lg font-bold text-slate-900">新增日程</h2>
-            <p class="text-xs text-slate-500 mt-0.5">手动填写更高效，也支持 AI 智能解析</p>
+            <h2 class="text-lg font-bold text-slate-900">{{ isEdit ? '编辑日程' : '新增日程' }}</h2>
+            <p class="text-xs text-slate-500 mt-0.5">{{ isEdit ? '调整日程信息，保存后同步日程安排' : '手动填写更高效，也支持 AI 智能解析' }}</p>
           </div>
         </div>
         <button
-          class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+          class="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
           type="button"
           aria-label="关闭"
           @click="visible = false"
         >
-          <span class="material-symbols-outlined">close</span>
+          <span class="material-symbols-outlined text-[22px] leading-none">close</span>
         </button>
       </div>
     </template>
 
     <div class="space-y-6 bg-white px-5 pb-6 pt-5 md:px-6 md:pb-7 md:pt-6">
-      <section class="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/5 via-white to-slate-50 p-4 shadow-sm">
+      <section
+        v-if="!isEdit"
+        class="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/5 via-white to-slate-50 p-4 shadow-sm"
+      >
         <div class="flex items-center gap-2 mb-3">
           <WkIcon name="ai" class="text-primary text-sm" />
           <span class="text-xs font-bold text-primary uppercase tracking-wide">智能解析</span>
@@ -76,50 +81,26 @@
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label class="mb-1.5 block text-xs font-bold text-slate-500">
-              开始日期
-              <span class="text-red-500">*</span>
-            </label>
-            <el-date-picker
-              v-model="scheduleForm.startDate"
-              type="date"
-              value-format="YYYY-MM-DD"
-              placeholder="选择开始日期"
-              size="large"
-              class="w-full wk-crm-el-field-date"
-            />
-          </div>
-          <div>
-            <label class="mb-1.5 block text-xs font-bold text-slate-500">
               开始时间
               <span class="text-red-500">*</span>
             </label>
-            <el-time-picker
+            <el-date-picker
               v-model="scheduleForm.startTime"
-              value-format="HH:mm"
-              format="HH:mm"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              format="YYYY-MM-DD HH:mm"
               placeholder="选择开始时间"
               size="large"
               class="w-full wk-crm-el-field-date"
             />
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-bold text-slate-500">结束日期</label>
-            <el-date-picker
-              v-model="scheduleForm.endDate"
-              type="date"
-              value-format="YYYY-MM-DD"
-              placeholder="选择结束日期"
-              clearable
-              size="large"
-              class="w-full wk-crm-el-field-date"
-            />
-          </div>
-          <div>
             <label class="mb-1.5 block text-xs font-bold text-slate-500">结束时间</label>
-            <el-time-picker
+            <el-date-picker
               v-model="scheduleForm.endTime"
-              value-format="HH:mm"
-              format="HH:mm"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              format="YYYY-MM-DD HH:mm"
               placeholder="选择结束时间"
               clearable
               size="large"
@@ -190,7 +171,7 @@
               :value="item.value"
             />
           </el-select>
-          <p v-if="participantAiWarning" class="mt-1 text-xs font-medium text-amber-600">
+          <p v-if="!isEdit && participantAiWarning" class="mt-1 text-xs font-medium text-amber-600">
             AI 识别到但未匹配到系统员工：{{ participantAiWarning }}
           </p>
         </div>
@@ -234,7 +215,7 @@
           type="button"
           @click="handleSaveSchedule"
         >
-          {{ saving ? '保存中...' : '确认创建' }}
+          {{ saving ? '保存中...' : (isEdit ? '确认更新' : '确认创建') }}
         </button>
       </div>
     </template>
@@ -249,9 +230,12 @@ import { queryCustomerList } from '@/api/customer'
 import {
   addSchedule,
   aiParseSchedule,
+  updateSchedule,
   type ScheduleAddBO,
   type ScheduleAiParseVO,
-  type ScheduleParticipantUser
+  type ScheduleParticipantUser,
+  type ScheduleUpdateBO,
+  type ScheduleVO
 } from '@/api/schedule'
 import WkIcon from '@/components/common/WkIcon.vue'
 import { useResponsive } from '@/composables/useResponsive'
@@ -261,25 +245,49 @@ type Option = {
   label: string
 }
 
+type DefaultCustomer = {
+  customerId?: string | number
+  companyName?: string | null
+} | null
+type DefaultRelation = {
+  relationId?: string | number
+  name?: string | null
+} | null
+type DefaultParticipantUser = {
+  userId?: string | number
+  realname?: string | null
+  username?: string | null
+}
+
 type ScheduleFormState = {
   title: string
-  startDate: string
   startTime: string
-  endDate: string
   endTime: string
   type: string
   customerId: string
+  relationId: string
+  contactId: string
   location: string
   description: string
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: boolean
-}>()
+  editingSchedule?: ScheduleVO | null
+  defaultCustomer?: DefaultCustomer
+  defaultRelation?: DefaultRelation
+  defaultParticipantUsers?: DefaultParticipantUser[]
+}>(), {
+  editingSchedule: null,
+  defaultCustomer: null,
+  defaultRelation: null,
+  defaultParticipantUsers: () => []
+})
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'created'): void
+  (e: 'updated', scheduleId: string): void
 }>()
 
 const { isMobile } = useResponsive()
@@ -287,12 +295,12 @@ const { isMobile } = useResponsive()
 function createDefaultFormState(): ScheduleFormState {
   return {
     title: '',
-    startDate: '',
     startTime: '',
-    endDate: '',
     endTime: '',
     type: 'meeting',
     customerId: '',
+    relationId: '',
+    contactId: '',
     location: '',
     description: ''
   }
@@ -314,15 +322,35 @@ const visible = computed({
   set: (value: boolean) => emit('update:modelValue', value)
 })
 
+const isEdit = computed(() => !!props.editingSchedule?.scheduleId)
+
 const canSave = computed(() =>
-  !!scheduleForm.title.trim() && !!scheduleForm.startDate && !!scheduleForm.startTime && !saving.value
+  !!scheduleForm.title.trim() && !!scheduleForm.startTime && !saving.value
 )
 
 watch(
   () => props.modelValue,
   value => {
-    if (!value) {
+    if (value) {
+      initScheduleForm()
+    } else {
       resetScheduleForm()
+    }
+  }
+)
+
+watch(
+  () => [
+    props.editingSchedule?.scheduleId,
+    props.defaultCustomer?.customerId,
+    props.defaultCustomer?.companyName,
+    props.defaultRelation?.relationId,
+    props.defaultRelation?.name,
+    props.defaultParticipantUsers.map(user => `${user.userId || ''}:${user.realname || ''}:${user.username || ''}`).join('|')
+  ] as const,
+  () => {
+    if (visible.value) {
+      initScheduleForm()
     }
   }
 )
@@ -334,6 +362,75 @@ function resetScheduleForm() {
   selectedParticipantUserIds.value = []
   customerOptions.value = []
   userOptions.value = []
+}
+
+function initScheduleForm() {
+  resetScheduleForm()
+  const schedule = props.editingSchedule
+  if (!schedule) {
+    applyDefaultCustomer()
+    applyDefaultRelation()
+    applyDefaultParticipantUsers()
+    return
+  }
+
+  Object.assign(scheduleForm, {
+    title: schedule.title || '',
+    startTime: parseAiDateTime(schedule.startTime) || schedule.startTime || '',
+    endTime: schedule.endTime ? (parseAiDateTime(schedule.endTime) || schedule.endTime) : '',
+    type: normalizeScheduleType(schedule.type),
+    customerId: schedule.customerId ? String(schedule.customerId) : '',
+    relationId: schedule.relationId ? String(schedule.relationId) : '',
+    contactId: schedule.contactId ? String(schedule.contactId) : '',
+    location: schedule.location || '',
+    description: schedule.description || ''
+  })
+
+  if (schedule.customerId) {
+    customerOptions.value = [{
+      value: String(schedule.customerId),
+      label: schedule.customerName || String(schedule.customerId)
+    }]
+  }
+
+  if (schedule.participantUsers?.length) {
+    const options = schedule.participantUsers.map(user => buildUserOption(user))
+    mergeUserOptions(options)
+    selectedParticipantUserIds.value = schedule.participantUsers.map(user => String(user.userId))
+  } else if (schedule.participantUserIds?.length) {
+    selectedParticipantUserIds.value = schedule.participantUserIds.map(userId => String(userId))
+  }
+}
+
+function applyDefaultCustomer() {
+  const customer = props.defaultCustomer
+  if (!customer?.customerId) return
+
+  scheduleForm.customerId = String(customer.customerId)
+  customerOptions.value = [{
+    value: String(customer.customerId),
+    label: customer.companyName || String(customer.customerId)
+  }]
+}
+
+function applyDefaultRelation() {
+  const relation = props.defaultRelation
+  if (!relation?.relationId) return
+  scheduleForm.relationId = String(relation.relationId)
+}
+
+function applyDefaultParticipantUsers() {
+  const users = props.defaultParticipantUsers
+    .filter(user => user.userId)
+    .map(user => ({
+      userId: String(user.userId),
+      realname: user.realname || '',
+      username: user.username || ''
+    }))
+  if (users.length === 0) return
+
+  mergeUserOptions(users.map(user => buildUserOption(user)))
+  selectedParticipantUserIds.value = users.map(user => user.userId)
 }
 
 function normalizeScheduleType(type?: string): string {
@@ -359,16 +456,17 @@ function formatDatePart(value: number): string {
   return value.toString().padStart(2, '0')
 }
 
+function formatDateTimeValue(date: Date): string {
+  return `${date.getFullYear()}-${formatDatePart(date.getMonth() + 1)}-${formatDatePart(date.getDate())} ${formatDatePart(date.getHours())}:${formatDatePart(date.getMinutes())}:${formatDatePart(date.getSeconds())}`
+}
+
 function parseAiDateTime(value?: string) {
   if (!value) return null
 
-  const directMatch = value.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})/)
+  const directMatch = value.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/)
   if (directMatch) {
-    const [, year, month, day, hour, minute] = directMatch
-    return {
-      date: `${year}-${formatDatePart(Number(month))}-${formatDatePart(Number(day))}`,
-      time: `${formatDatePart(Number(hour))}:${minute}`
-    }
+    const [, year, month, day, hour, minute, second] = directMatch
+    return `${year}-${formatDatePart(Number(month))}-${formatDatePart(Number(day))} ${formatDatePart(Number(hour))}:${minute}:${second || '00'}`
   }
 
   const parsed = new Date(value)
@@ -376,10 +474,7 @@ function parseAiDateTime(value?: string) {
     return null
   }
 
-  return {
-    date: `${parsed.getFullYear()}-${formatDatePart(parsed.getMonth() + 1)}-${formatDatePart(parsed.getDate())}`,
-    time: `${formatDatePart(parsed.getHours())}:${formatDatePart(parsed.getMinutes())}`
-  }
+  return formatDateTimeValue(parsed)
 }
 
 function buildUserOption(user: ScheduleParticipantUser | Record<string, any>): Option {
@@ -399,6 +494,24 @@ function mergeUserOptions(options: Option[]) {
     optionMap.set(item.value, item)
   })
   userOptions.value = Array.from(optionMap.values())
+}
+
+function normalizeCompanyName(value?: string): string {
+  return String(value || '')
+    .trim()
+    .replace(/[\s()（）]/g, '')
+    .replace(/(?:有限责任公司|股份有限公司|集团有限公司|有限公司|集团公司|公司|集团)$/u, '')
+}
+
+function findExactCustomerMatch(customers: Array<{ customerId: string | number, companyName: string }>, customerName: string) {
+  const rawName = customerName.trim()
+  const normalizedName = normalizeCompanyName(rawName)
+  const matchedCustomers = customers.filter(customer =>
+    customer.companyName === rawName
+    || normalizeCompanyName(customer.companyName) === normalizedName
+  )
+
+  return matchedCustomers.length === 1 ? matchedCustomers[0] : null
 }
 
 async function searchCustomers(query: string) {
@@ -468,29 +581,33 @@ async function handleAiParse() {
 
     const parsedStart = parseAiDateTime(result.startTime)
     if (parsedStart) {
-      scheduleForm.startDate = parsedStart.date
-      scheduleForm.startTime = parsedStart.time
-      if (!scheduleForm.endDate) {
-        scheduleForm.endDate = parsedStart.date
-      }
+      scheduleForm.startTime = parsedStart
     }
 
     const parsedEnd = parseAiDateTime(result.endTime)
     if (parsedEnd) {
-      scheduleForm.endDate = parsedEnd.date
-      scheduleForm.endTime = parsedEnd.time
+      scheduleForm.endTime = parsedEnd
     }
 
-    if (result.customerName) {
+    if (result.customerId && result.customerName) {
+      customerOptions.value = [{
+        value: String(result.customerId),
+        label: result.customerName
+      }]
+      scheduleForm.customerId = String(result.customerId)
+    } else if (result.customerName) {
       const res = await queryCustomerList({ keyword: result.customerName, page: 1, limit: 5 })
       const customers = res.list || []
-      if (customers.length > 0) {
-        customerOptions.value = customers.map((customer: any) => ({
-          value: String(customer.customerId),
-          label: customer.companyName
-        }))
-        scheduleForm.customerId = String(customers[0].customerId)
-      }
+      customerOptions.value = customers.map((customer: any) => ({
+        value: String(customer.customerId),
+        label: customer.companyName
+      }))
+
+      const matchedCustomer = findExactCustomerMatch(customers, result.customerName)
+      scheduleForm.customerId = matchedCustomer ? String(matchedCustomer.customerId) : ''
+    } else {
+      scheduleForm.customerId = ''
+      customerOptions.value = []
     }
 
     if (result.participantUsers?.length) {
@@ -506,7 +623,7 @@ async function handleAiParse() {
     if (participantAiWarning.value) {
       ElMessage.warning('部分参与人未匹配到系统员工，请手动确认')
     } else {
-      ElMessage.success('智能解析完成，请确认后再创建')
+      ElMessage.success(`智能解析完成，请确认后再${isEdit.value ? '保存' : '创建'}`)
     }
   } catch (error) {
     console.error('AI 解析日程失败', error)
@@ -518,17 +635,10 @@ async function handleAiParse() {
 async function handleSaveSchedule() {
   if (!canSave.value) return
 
-  if ((scheduleForm.endDate && !scheduleForm.endTime) || (!scheduleForm.endDate && scheduleForm.endTime)) {
-    ElMessage.warning('结束日期和结束时间请同时填写')
-    return
-  }
+  const startTime = scheduleForm.startTime
+  const endTime = scheduleForm.endTime || undefined
 
-  const startTime = `${scheduleForm.startDate}T${scheduleForm.startTime}:00`
-  const endTime = scheduleForm.endDate && scheduleForm.endTime
-    ? `${scheduleForm.endDate}T${scheduleForm.endTime}:00`
-    : undefined
-
-  if (endTime && new Date(endTime).getTime() < new Date(startTime).getTime()) {
+  if (endTime && endTime < startTime) {
     ElMessage.warning('结束时间不能早于开始时间')
     return
   }
@@ -541,17 +651,29 @@ async function handleSaveSchedule() {
       endTime,
       type: scheduleForm.type,
       customerId: scheduleForm.customerId || undefined,
+      relationId: scheduleForm.relationId || undefined,
+      contactId: scheduleForm.contactId || undefined,
       location: scheduleForm.location || undefined,
       description: scheduleForm.description || undefined,
       participantUserIds: selectedParticipantUserIds.value.length ? selectedParticipantUserIds.value : undefined
     }
 
-    await addSchedule(data)
-    ElMessage.success('日程创建成功')
-    emit('created')
+    if (isEdit.value && props.editingSchedule) {
+      const updateData: ScheduleUpdateBO = {
+        scheduleId: props.editingSchedule.scheduleId,
+        ...data
+      }
+      await updateSchedule(updateData)
+      ElMessage.success('日程更新成功')
+      emit('updated', props.editingSchedule.scheduleId)
+    } else {
+      await addSchedule(data)
+      ElMessage.success('日程创建成功')
+      emit('created')
+    }
     visible.value = false
   } catch (error) {
-    console.error('Create schedule failed:', error)
+    console.error(`${isEdit.value ? 'Update' : 'Create'} schedule failed:`, error)
   } finally {
     saving.value = false
   }
@@ -562,18 +684,48 @@ async function handleSaveSchedule() {
 .schedule-dialog .el-dialog__header {
   padding: 22px 24px 16px !important;
   margin-right: 0;
+  flex-shrink: 0;
 }
 
 .schedule-dialog .el-dialog__body {
-  max-height: 72vh;
-  overflow-y: auto;
   padding: 0 !important;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .schedule-dialog .el-dialog__footer {
   padding: 14px 24px 22px !important;
+  flex-shrink: 0;
 }
 
+.schedule-dialog.el-dialog {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.schedule-dialog--desktop.el-dialog {
+  max-height: calc(100vh - 20vh);
+  margin-bottom: 10vh;
+}
+
+.schedule-dialog--mobile.el-dialog {
+  height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px);
+  height: calc(100dvh - 32px);
+  max-height: calc(100dvh - 32px);
+  margin: 16px auto !important;
+  border-radius: 1rem !important;
+}
+
+html.wk-native-mobile .schedule-dialog--mobile.el-dialog {
+  height: calc(100dvh - 32px - var(--wk-safe-top) - var(--wk-safe-bottom));
+  max-height: calc(100dvh - 32px - var(--wk-safe-top) - var(--wk-safe-bottom));
+  margin: calc(16px + var(--wk-safe-top)) auto calc(16px + var(--wk-safe-bottom)) !important;
+}
+
+/* Prevent overlay from scrolling — dialog body scrolls internally */
 .el-overlay:has(.schedule-dialog),
 .el-overlay-dialog:has(.schedule-dialog) {
   overflow: hidden;

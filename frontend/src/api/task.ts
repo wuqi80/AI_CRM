@@ -1,19 +1,20 @@
 import { post, get } from '@/utils/request'
 import type { PageResult } from '@/types/api'
 import type { Task, TaskAddBO, TaskUpdateBO, TaskQueryBO } from '@/types/common'
+import { normalizeTaskList, normalizeTaskPriorityPayload } from '@/utils/taskPriority'
 
 /**
  * Create task
  */
 export function addTask(data: TaskAddBO): Promise<string> {
-  return post('/task/add', data)
+  return post('/task/add', normalizeTaskPriorityPayload(data))
 }
 
 /**
  * Update task
  */
 export function updateTask(data: TaskUpdateBO): Promise<void> {
-  return post('/task/update', data)
+  return post('/task/update', normalizeTaskPriorityPayload(data))
 }
 
 /**
@@ -26,8 +27,12 @@ export function deleteTask(id: string): Promise<void> {
 /**
  * Query tasks with pagination
  */
-export function queryTaskList(query: TaskQueryBO): Promise<PageResult<Task>> {
-  return post('/task/queryPageList', query)
+export async function queryTaskList(query: TaskQueryBO): Promise<PageResult<Task>> {
+  const result = await post<PageResult<Task>>('/task/queryPageList', query)
+  return {
+    ...result,
+    list: normalizeTaskList(result.list)
+  }
 }
 
 /**
@@ -40,8 +45,9 @@ export function updateTaskStatus(taskId: string, status: string): Promise<void> 
 /**
  * Get my tasks
  */
-export function getMyTasks(filter: string = 'all'): Promise<Task[]> {
-  return get('/task/myTasks', { params: { filter } })
+export async function getMyTasks(filter: string = 'all'): Promise<Task[]> {
+  const tasks = await get<Task[]>('/task/myTasks', { params: { filter } })
+  return normalizeTaskList(tasks)
 }
 
 /**

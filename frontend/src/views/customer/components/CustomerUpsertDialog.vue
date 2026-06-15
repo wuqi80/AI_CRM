@@ -15,24 +15,31 @@
         <!-- Modal Container -->
         <div :class="[
           'wk-customer-upsert-modal relative w-full bg-slate-50 shadow-2xl overflow-hidden flex flex-col wk-crm-el-field-scope',
-          isMobile ? 'max-w-full max-h-full rounded-none inset-0' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
+          isMobile ? 'max-w-full max-h-full inset-0 rounded-[1rem]' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
         ]">
           <!-- Header -->
           <div class="wk-customer-upsert-modal__header bg-white border-b border-slate-200 px-6 sm:px-8 py-4 sm:py-5 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-3 sm:gap-4">
-              <div class="size-10 sm:size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                <span class="material-symbols-outlined">{{ isEdit ? 'edit' : 'person_add' }}</span>
+            <div class="flex min-w-0 items-center gap-3 sm:gap-4">
+              <div
+                :class="[
+                  'flex items-center justify-center',
+                  isEdit
+                    ? 'size-8 sm:size-9 rounded-xl text-slate-600'
+                    : 'size-10 sm:size-12 rounded-2xl text-primary'
+                ]"
+              >
+                <span class="material-symbols-outlined" :class="isEdit ? 'text-[18px]' : ''">{{ isEdit ? 'edit' : 'person_add' }}</span>
               </div>
-              <div>
-                <h2 class="text-lg sm:text-xl font-bold text-slate-900">{{ isEdit ? '编辑客户' : '新增客户' }}</h2>
-                <p class="text-xs text-slate-500">{{ isEdit ? '修改客户基本信息和联系方式' : '使用 AI 智能录入或手动填写客户信息' }}</p>
+              <div class="min-w-0">
+                <h2 class="truncate text-lg sm:text-xl font-bold text-slate-900">{{ isEdit ? '编辑客户' : '新增客户' }}</h2>
+                <p class="truncate text-xs text-slate-500">{{ isEdit ? '修改客户基本信息和联系方式' : '使用 AI 智能录入或手动填写客户信息' }}</p>
               </div>
             </div>
             <div class="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
                 @click="handleClose"
-                class="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                class="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors whitespace-nowrap"
               >
                 取消
               </button>
@@ -40,7 +47,7 @@
                 type="button"
                 @click="handleSubmit"
                 :disabled="submitting"
-                class="px-5 sm:px-8 py-2 sm:py-2.5 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50"
+                class="px-5 sm:px-8 py-2 sm:py-2.5 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
               >
                 <span v-if="submitting" class="size-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                 <span v-else class="material-symbols-outlined text-sm">save</span>
@@ -54,15 +61,25 @@
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <!-- Left Column -->
               <div :class="[isEdit ? 'lg:col-span-12' : 'lg:col-span-7', 'space-y-5']">
+                <input
+                  ref="aiImageInputRef"
+                  type="file"
+                  class="hidden"
+                  accept="image/*"
+                  @change="handleAiImageChange"
+                />
                 <AiSmartEntrySection
                   v-if="!isEdit"
                   v-model="aiInputText"
-                  placeholder="在此粘贴客户描述、邮件内容，或直接粘贴 (Ctrl+V) 名片图片..."
+                  placeholder="在此粘贴客户描述、邮件内容，或点击上传名片图片..."
                   :ai-image-preview="aiImagePreview"
                   :ai-parsing="aiParsing"
                   :can-extract="Boolean(aiInputText.trim() || aiImageFile)"
                   :show-image-hint="Boolean(aiImagePreview && !aiParsing)"
+                  :show-upload-button="true"
+                  :upload-disabled="aiParsing"
                   @paste="handleAiPaste"
+                  @upload-image="openAiImagePicker"
                   @extract="handleAiExtract"
                   @remove-image="removeAiImage"
                 >
@@ -83,7 +100,27 @@
                     <span class="w-1 h-3 bg-primary rounded-full"></span>
                     基础信息
                   </h3>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                  <div class="mb-5 space-y-1.5">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">公司 LOGO</label>
+                    <CustomerLogoUploader
+                      :logo-url="customerLogoUrl"
+                      :alt="formData.companyName || '公司 Logo'"
+                      :disabled="submitting"
+                      :size="72"
+                      @uploaded="handleFormLogoUploaded"
+                      @removed="handleFormLogoRemoved"
+                    />
+                  </div>
+                  <DynamicFieldForm
+                    ref="dynamicFieldFormRef"
+                    entity-type="customer"
+                    mode="form"
+                    v-model="customerFieldValues"
+                    :entity-id="isEdit ? (props.customer as any)?.customerId : null"
+                    :full-span-field-names="['companyName', 'address', 'remark']"
+                    class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"
+                  />
+                  <div v-if="false" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <div class="md:col-span-2 space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">公司名称 <span class="text-red-400">*</span></label>
                       <el-input
@@ -92,40 +129,6 @@
                         size="large"
                         class="w-full wk-crm-el-field-input"
                       />
-                    </div>
-                    <div class="md:col-span-2 flex items-center gap-4">
-                      <div class="size-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-                        <img v-if="logoPreviewUrl" :src="logoPreviewUrl" alt="" class="size-full object-cover" />
-                        <span v-else class="text-xl font-bold text-slate-400">{{ formData.companyName?.charAt(0) || '?' }}</span>
-                      </div>
-                      <div class="flex items-center gap-2 min-w-0">
-                        <input
-                          ref="logoInputRef"
-                          type="file"
-                          class="hidden"
-                          accept="image/png,image/jpeg,image/webp,image/gif"
-                          @change="handleLogoFileChange"
-                        />
-                        <button
-                          type="button"
-                          class="h-10 px-4 rounded-xl bg-slate-900 text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-50"
-                          :disabled="logoUploading"
-                          @click="logoInputRef?.click()"
-                        >
-                          <span v-if="logoUploading" class="size-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                          <span v-else class="material-symbols-outlined text-base">add_photo_alternate</span>
-                          {{ formData.logo ? '更换Logo' : '上传Logo' }}
-                        </button>
-                        <button
-                          v-if="formData.logo"
-                          type="button"
-                          class="size-10 rounded-xl text-slate-500 hover:bg-slate-100 inline-flex items-center justify-center"
-                          title="移除Logo"
-                          @click="clearLogo"
-                        >
-                          <span class="material-symbols-outlined text-base">delete</span>
-                        </button>
-                      </div>
                     </div>
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">所属行业</label>
@@ -140,10 +143,10 @@
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">客户级别</label>
                       <el-select v-model="formData.level" class="w-full wk-crm-el-field-select" size="large">
                         <el-option
-                          v-for="option in enumStore.customerLevel"
-                          :key="option.value"
-                          :label="option.label"
-                          :value="option.value"
+                          v-for="opt in enumStore.customerLevel"
+                          :key="opt.value"
+                          :label="opt.label"
+                          :value="opt.value"
                         />
                       </el-select>
                     </div>
@@ -151,10 +154,10 @@
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">商机阶段</label>
                       <el-select v-model="formData.stage" class="w-full wk-crm-el-field-select" size="large">
                         <el-option
-                          v-for="option in enumStore.customerStage"
-                          :key="option.value"
-                          :label="option.label"
-                          :value="option.value"
+                          v-for="opt in enumStore.customerStage"
+                          :key="opt.value"
+                          :label="opt.label"
+                          :value="opt.value"
                         />
                       </el-select>
                     </div>
@@ -200,7 +203,7 @@
                     <DynamicFieldForm
                       ref="dynamicFieldFormRef"
                       entity-type="customer"
-                      v-model="customFieldValues"
+                      v-model="customerFieldValues"
                     />
                   </div>
                 </section>
@@ -250,7 +253,7 @@
                 >
                   <template #tip>
                     <p class="text-xs text-slate-600 leading-relaxed">
-                      您可以直接粘贴该客户的简介、公司官网文字，或者<strong>直接在输入框 Ctrl+V 粘贴名片图片</strong>，AI 会自动识别并补全信息。
+                      您可以直接粘贴该客户的简介、公司官网文字，或者<strong>点击上传名片图片</strong>，AI 会自动识别并补全信息。
                     </p>
                   </template>
                 </AiParseInsightSidebar>
@@ -264,19 +267,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { useCustomerStore } from '@/stores/customer'
 import { useEnumStore } from '@/stores/enums'
-import { aiParseCustomer, uploadCustomerLogo } from '@/api/customer'
+import { aiParseCustomer } from '@/api/customer'
 import type { CustomerAiParseVO } from '@/api/customer'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 import AiSmartEntrySection from '@/components/crm/AiSmartEntrySection.vue'
 import AiParseInsightSidebar from '@/components/crm/AiParseInsightSidebar.vue'
+import CustomerLogoUploader from './CustomerLogoUploader.vue'
 import type { CustomerAddBO, CustomerDetailVO, CustomerLevel, CustomerListVO, CustomerStage } from '@/types/customer'
+import type { CustomField } from '@/types/customField'
 
 type Mode = 'create' | 'edit'
 type CustomerLike = CustomerListVO | CustomerDetailVO | null
@@ -285,36 +290,40 @@ const props = defineProps<{
   modelValue: boolean
   mode: Mode
   customer?: CustomerLike
+  /** 新建时预选的商机阶段（如阶段看板「+」带入） */
+  initialStage?: CustomerStage | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
-  (e: 'success', payload: { mode: Mode; customerId?: string }): void
+  (e: 'success', payload: { mode: Mode; customerId?: string; detail?: CustomerDetailVO | null }): void
 }>()
 
 const { isMobile } = useResponsive()
 const customerStore = useCustomerStore()
 const enumStore = useEnumStore()
+enumStore.ensureCustomerStage()
+enumStore.ensureCustomerLevel()
 
 const isEdit = computed(() => props.mode === 'edit')
 
 const submitting = ref(false)
 const dynamicFieldFormRef = ref<InstanceType<typeof DynamicFieldForm>>()
-const customFieldValues = ref<Record<string, any>>({})
-const logoInputRef = ref<HTMLInputElement | null>(null)
-const logoUploading = ref(false)
-const logoPreviewUrl = ref('')
+const customerFieldValues = ref<Record<string, any>>({})
+const customerLogoUrl = ref('')
+const customerLogoTouched = ref(false)
 
 const formData = reactive<CustomerAddBO>({
   companyName: '',
   industry: '',
-  level: 'B',
+  level: undefined,
   stage: 'lead',
   source: '',
   website: '',
   logo: '',
   address: '',
   quotation: undefined,
+  nextFollowTime: undefined,
   remark: '',
   description: '',
   contactName: '',
@@ -328,11 +337,121 @@ const aiParsing = ref(false)
 const aiParseResult = ref<CustomerAiParseVO | null>(null)
 const aiImageFile = ref<File | null>(null)
 const aiImagePreview = ref<string | null>(null)
+const aiImageInputRef = ref<HTMLInputElement | null>(null)
 
-onMounted(() => {
-  void enumStore.ensureCustomerLevel()
-  void enumStore.ensureCustomerStage()
-})
+const CUSTOMER_SYSTEM_FIELD_NAMES = new Set([
+  'companyName',
+  'industry',
+  'stage',
+  'level',
+  'source',
+  'website',
+  'quotation',
+  'address',
+  'nextFollowTime',
+  'remark'
+])
+
+function padDateTimePart(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+function normalizeDateTimeValue(value: unknown): string | undefined {
+  if (value === null || value === undefined || value === '') {
+    return undefined
+  }
+
+  const rawValue = String(value).trim()
+  if (!rawValue) {
+    return undefined
+  }
+
+  const normalizedValue = rawValue.replace('T', ' ').replace(/\.\d+Z?$/, '')
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(normalizedValue)) {
+    return normalizedValue
+  }
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalizedValue)) {
+    return `${normalizedValue}:00`
+  }
+
+  const parsedDate = new Date(rawValue)
+  if (Number.isNaN(parsedDate.getTime())) {
+    return rawValue
+  }
+
+  return [
+    parsedDate.getFullYear(),
+    padDateTimePart(parsedDate.getMonth() + 1),
+    padDateTimePart(parsedDate.getDate())
+  ].join('-') + ` ${[
+    padDateTimePart(parsedDate.getHours()),
+    padDateTimePart(parsedDate.getMinutes()),
+    padDateTimePart(parsedDate.getSeconds())
+  ].join(':')}`
+}
+
+function buildCustomerFieldValues(c: CustomerLike): Record<string, any> {
+  if (!c) {
+    return {}
+  }
+
+  const anyCustomer = c as any
+  return {
+    companyName: c.companyName || '',
+    industry: c.industry || '',
+    level: (c.level || null) as CustomerLevel | null,
+    stage: (c.stage || 'lead') as CustomerStage,
+    source: anyCustomer.source || '',
+    website: anyCustomer.website || '',
+    quotation: anyCustomer.quotation ?? undefined,
+    address: anyCustomer.address || '',
+    nextFollowTime: normalizeDateTimeValue(anyCustomer.nextFollowTime),
+    remark: anyCustomer.remark || '',
+    ...(c.customFields ? { ...c.customFields } : {})
+  }
+}
+
+function getDynamicFormFields(): CustomField[] {
+  const exposedFields = dynamicFieldFormRef.value?.fields as CustomField[] | { value?: CustomField[] } | undefined
+  if (Array.isArray(exposedFields)) {
+    return exposedFields
+  }
+  if (exposedFields && Array.isArray(exposedFields.value)) {
+    return exposedFields.value
+  }
+  return []
+}
+
+function getDynamicFormValues(): Record<string, any> {
+  const exposedValues = dynamicFieldFormRef.value?.localValues as Record<string, any> | { value?: Record<string, any> } | undefined
+  if (exposedValues && typeof exposedValues === 'object' && !Array.isArray(exposedValues)) {
+    if ('value' in exposedValues && exposedValues.value && typeof exposedValues.value === 'object') {
+      return { ...exposedValues.value }
+    }
+    return { ...exposedValues }
+  }
+  return { ...customerFieldValues.value }
+}
+
+function splitCustomerFieldValues() {
+  const fieldMap = new Map(getDynamicFormFields().map(field => [field.fieldName, field]))
+  const currentValues = getDynamicFormValues()
+  const systemValues: Record<string, any> = {}
+  const customValues: Record<string, any> = {}
+
+  for (const [fieldName, fieldValue] of Object.entries(currentValues)) {
+    const field = fieldMap.get(fieldName)
+    const isSystemField = field ? field.fieldSource === 'system' : CUSTOMER_SYSTEM_FIELD_NAMES.has(fieldName)
+
+    if (isSystemField) {
+      systemValues[fieldName] = fieldValue
+    } else {
+      customValues[fieldName] = fieldValue
+    }
+  }
+
+  return { systemValues, customValues }
+}
 
 function getPrimaryContactFromCustomer(c: CustomerLike): { name?: string; phone?: string; email?: string } {
   if (!c) return {}
@@ -346,47 +465,60 @@ function getPrimaryContactFromCustomer(c: CustomerLike): { name?: string; phone?
 }
 
 function hydrateFromCustomer() {
+  dynamicFieldFormRef.value?.clearUniqueFieldErrors()
   const c = props.customer ?? null
   Object.assign(formData, {
     companyName: c?.companyName || '',
     industry: c?.industry || '',
-    level: (c?.level || 'B') as CustomerLevel,
+    level: (c?.level || undefined) as CustomerLevel | undefined,
     stage: (c?.stage || 'lead') as CustomerStage,
     source: (c?.source || '') as any,
     website: (c?.website || '') as any,
-    logo: (c?.logo || '') as any,
+    logo: ((c as any)?.logo || '') as any,
     address: (c?.address || '') as any,
     quotation: (c?.quotation ?? undefined) as any,
+    nextFollowTime: normalizeDateTimeValue((c as any)?.nextFollowTime) as any,
     remark: ((c as any)?.remark || '') as any,
     description: (c?.description || '') as any
   })
-  logoPreviewUrl.value = (c?.logoUrl || '') as any
   const pc = getPrimaryContactFromCustomer(c)
   formData.contactName = pc.name || ''
   formData.contactPhone = pc.phone || ''
   formData.contactEmail = pc.email || ''
-  customFieldValues.value = c?.customFields ? { ...c.customFields } : {}
+  customerLogoUrl.value = ((c as any)?.logoUrl || '') as string
+  customerLogoTouched.value = false
+  customerFieldValues.value = buildCustomerFieldValues(c)
+}
+
+function applyCreateInitialStage() {
+  const s = props.initialStage
+  if (!s) return
+  formData.stage = s
+  customerFieldValues.value = { ...customerFieldValues.value, stage: s }
 }
 
 function resetAll() {
+  dynamicFieldFormRef.value?.clearUniqueFieldErrors()
   Object.assign(formData, {
     companyName: '',
     industry: '',
-    level: 'B',
+    level: undefined,
     stage: 'lead',
     source: '',
     website: '',
     logo: '',
     address: '',
     quotation: undefined,
+    nextFollowTime: undefined,
     remark: '',
     description: '',
     contactName: '',
     contactPhone: '',
     contactEmail: ''
   })
-  customFieldValues.value = {}
-  logoPreviewUrl.value = ''
+  customerLogoUrl.value = ''
+  customerLogoTouched.value = false
+  customerFieldValues.value = { level: null }
   aiInputText.value = ''
   aiParsing.value = false
   aiParseResult.value = null
@@ -400,11 +532,14 @@ function handleClose() {
 
 // Keep local form in sync when opening / switching mode
 watch(
-  () => [props.modelValue, props.mode, props.customer] as const,
+  () => [props.modelValue, props.mode, props.customer, props.initialStage] as const,
   ([open]) => {
     if (!open) return
     if (props.mode === 'edit') hydrateFromCustomer()
-    else resetAll()
+    else {
+      resetAll()
+      applyCreateInitialStage()
+    }
   }
 )
 
@@ -415,11 +550,37 @@ function handleAiPaste(e: ClipboardEvent) {
     if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
       const file = items[i].getAsFile()
       if (file) {
-        aiImageFile.value = file
-        aiImagePreview.value = URL.createObjectURL(file)
+        applyAiImageFile(file)
+        break
       }
     }
   }
+}
+
+function applyAiImageFile(file: File) {
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    return
+  }
+  removeAiImage()
+  aiImageFile.value = file
+  aiImagePreview.value = URL.createObjectURL(file)
+}
+
+function handleAiImageChange(event: Event) {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (file) {
+    applyAiImageFile(file)
+  }
+  if (input) {
+    input.value = ''
+  }
+}
+
+async function openAiImagePicker() {
+  await nextTick()
+  aiImageInputRef.value?.click()
 }
 
 function removeAiImage() {
@@ -428,38 +589,22 @@ function removeAiImage() {
   aiImagePreview.value = null
 }
 
-async function handleLogoFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file || logoUploading.value) return
-
-  logoUploading.value = true
-  try {
-    const result = await uploadCustomerLogo(file)
-    formData.logo = result.logo
-    logoPreviewUrl.value = result.logoUrl || ''
-    ElMessage.success('Logo上传成功')
-  } catch (error: unknown) {
-    console.error('Upload customer logo failed:', error)
-    if (!isRequestErrorHandled(error)) {
-      const message = error instanceof Error ? error.message : '上传失败'
-      ElMessage.error(message)
-    }
-  } finally {
-    logoUploading.value = false
-  }
+function handleFormLogoUploaded(payload: { logo: string; logoUrl: string }) {
+  formData.logo = payload.logo
+  customerLogoUrl.value = payload.logoUrl
+  customerLogoTouched.value = true
 }
 
-function clearLogo() {
+function handleFormLogoRemoved() {
   formData.logo = ''
-  logoPreviewUrl.value = ''
+  customerLogoUrl.value = ''
+  customerLogoTouched.value = true
 }
 
 async function handleAiExtract() {
   if (aiParsing.value) return
   if (!aiInputText.value.trim() && !aiImageFile.value) {
-    ElMessage.warning('请输入文本或粘贴图片')
+    ElMessage.warning('请输入文本或上传图片')
     return
   }
 
@@ -482,16 +627,39 @@ async function handleAiExtract() {
     })
     aiParseResult.value = result
 
-    if (result.companyName) formData.companyName = result.companyName
-    if (result.industry) formData.industry = result.industry
-    if (result.level && enumStore.customerLevel.some(option => option.value === result.level)) {
+    if (!hasCustomerFieldFilled(result)) {
+      ElMessage.warning('本次智能解析没有提取到可填充的信息，请确认图片清晰或补充文字后重试')
+      return
+    }
+
+    if (result.companyName) {
+      formData.companyName = result.companyName
+      customerFieldValues.value.companyName = result.companyName
+    }
+    if (result.industry) {
+      formData.industry = result.industry
+      customerFieldValues.value.industry = result.industry
+    }
+    if (result.level && ['A', 'B', 'C'].includes(result.level)) {
       formData.level = result.level as CustomerLevel
+      customerFieldValues.value.level = result.level as CustomerLevel
     }
-    if (result.stage && enumStore.customerStage.some(option => option.value === result.stage)) {
+    if (result.stage && ['lead', 'qualified', 'proposal', 'negotiation', 'closed', 'lost'].includes(result.stage)) {
       formData.stage = result.stage as CustomerStage
+      customerFieldValues.value.stage = result.stage as CustomerStage
     }
-    if (result.source) formData.source = result.source
-    if (result.remark) formData.remark = result.remark
+    if (result.source) {
+      formData.source = result.source
+      customerFieldValues.value.source = result.source
+    }
+    if (result.website) {
+      formData.website = result.website
+      customerFieldValues.value.website = result.website
+    }
+    if (result.remark) {
+      formData.remark = result.remark
+      customerFieldValues.value.remark = result.remark
+    }
     if (result.contactName) formData.contactName = result.contactName
     if (result.contactPhone) formData.contactPhone = result.contactPhone
     if (result.contactEmail) formData.contactEmail = result.contactEmail
@@ -508,8 +676,27 @@ async function handleAiExtract() {
   }
 }
 
+function hasCustomerFieldFilled(result: CustomerAiParseVO | null): boolean {
+  if (!result) return false
+  return Boolean(
+    result.companyName
+    || result.industry
+    || result.level
+    || result.stage
+    || result.source
+    || result.website
+    || result.remark
+    || result.contactName
+    || result.contactPhone
+    || result.contactEmail
+  )
+}
+
 async function handleSubmit() {
-  if (!formData.companyName?.trim()) {
+  const currentFieldValues = getDynamicFormValues()
+  const companyName = String(currentFieldValues.companyName ?? formData.companyName ?? '').trim()
+
+  if (!companyName) {
     ElMessage.warning('请输入公司名称')
     return
   }
@@ -520,13 +707,22 @@ async function handleSubmit() {
       ElMessage.warning(`请填写必填字段: ${missingFields.join(', ')}`)
       return
     }
+    const uniqueValid = await dynamicFieldFormRef.value.validateUniqueFields()
+    if (!uniqueValid) {
+      return
+    }
   }
 
   submitting.value = true
   try {
+    const { systemValues, customValues } = splitCustomerFieldValues()
     const submitData = {
       ...formData,
-      customFields: customFieldValues.value
+      ...systemValues,
+      companyName,
+      logo: isEdit.value && !customerLogoTouched.value ? undefined : formData.logo,
+      aiParseSnapshot: !isEdit.value && aiParseResult.value ? JSON.stringify(aiParseResult.value) : undefined,
+      customFields: customValues
     }
 
     if (props.mode === 'edit') {
@@ -535,13 +731,13 @@ async function handleSubmit() {
         ElMessage.error('缺少 customerId，无法保存')
         return
       }
-      await customerStore.editCustomer({ ...submitData, customerId })
+      const detail = await customerStore.editCustomer({ ...submitData, customerId })
       ElMessage.success('更新成功')
-      emit('success', { mode: 'edit', customerId })
+      emit('success', { mode: 'edit', customerId, detail })
     } else {
-      await customerStore.createCustomer(submitData)
+      const customerId = await customerStore.createCustomer(submitData)
       ElMessage.success('创建成功')
-      emit('success', { mode: 'create' })
+      emit('success', { mode: 'create', customerId: String(customerId) })
     }
 
     emit('update:modelValue', false)

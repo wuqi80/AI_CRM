@@ -1,53 +1,61 @@
 /**
- * Scoped Element Plus field skin (AddTaskDrawer-style borders).
+ * Scoped Element Plus field skin (chat composer-style borders).
  * Wrap a dialog/form root with .wk-crm-el-field-scope, then add modifiers on controls:
  *   - .wk-crm-el-field-input     → el-input (single-line) or el-textarea (type="textarea", EP 2.x root)
  *   - .wk-crm-el-field-select    → el-select
  *   - .wk-crm-el-field-date      → el-date-picker
  *   - .wk-crm-el-field-ai       → optional extra class on AI textarea el-input (shadow-sm)
- * Reference: border border-slate-200 bg-slate-50 rounded-xl;
- * focus: border-primary + ring-2 ring-primary/20.
+ * Reference: the main chat composer uses warm surface, subtle border, rounded-2xl, and soft focus shadow.
  */
 
 .wk-crm-el-field-scope {
-  --wk-field-bg: rgb(248 250 252);
-  --wk-field-border: rgb(226 232 240);
-  --wk-field-radius: 0.75rem;
-  --wk-field-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  /* ring-primary/20 — matches Tailwind primary #137fec @ 20% */
-  --wk-field-focus-ring: rgba(19, 127, 236, 0.2);
+  --wk-field-bg: var(--wk-input-bg, var(--wk-bg-surface, #fffefa));
+  --wk-field-border: var(--wk-input-border, var(--wk-border-subtle, #e7e2da));
+  --wk-field-border-hover: var(--wk-input-border-hover, var(--wk-border-muted, #d8d2c9));
+  --wk-field-border-focus: var(--wk-input-border-focus, var(--wk-border-muted, #d8d2c9));
+  --wk-field-radius: var(--wk-input-radius, 1rem);
+  --wk-field-shadow-sm: var(--wk-input-shadow, 0 2px 8px rgb(48 43 35 / 0.05));
+  --wk-field-focus-shadow: var(--wk-input-focus-shadow, 0 4px 14px rgb(48 43 35 / 0.08));
 }
 
-@supports (color: color-mix(in srgb, red, blue)) {
-  .wk-crm-el-field-scope {
-    --wk-field-focus-ring: color-mix(in srgb, var(--el-color-primary, #137fec) 20%, transparent);
-  }
+html.dark .wk-crm-el-field-scope {
+  --wk-field-error-ring: rgba(239, 68, 68, 0.18);
 }
 
 /* —— el-input single line —— */
 .wk-crm-el-field-scope .wk-crm-el-field-input:not(.el-input--textarea) .el-input__wrapper {
   background-color: var(--wk-field-bg) !important;
-  box-shadow: 0 0 0 1px var(--wk-field-border) inset !important;
+  box-shadow:
+    0 0 0 1px var(--wk-field-border) inset,
+    var(--wk-field-shadow-sm) !important;
   border-radius: var(--wk-field-radius) !important;
   transition:
     box-shadow 0.2s ease,
     background-color 0.2s ease !important;
 }
 
-.wk-crm-el-field-scope .wk-crm-el-field-input:not(.el-input--textarea) .el-input__wrapper.is-focus {
-  background-color: #fff !important;
+.wk-crm-el-field-scope .wk-crm-el-field-input:not(.el-input--textarea) .el-input__wrapper:hover {
   box-shadow:
-    0 0 0 1px var(--el-color-primary) inset,
-    0 0 0 2px var(--wk-field-focus-ring) !important;
+    0 0 0 1px var(--wk-field-border-hover) inset,
+    var(--wk-field-shadow-sm) !important;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-input:not(.el-input--textarea) .el-input__wrapper.is-focus {
+  background-color: var(--wk-field-bg) !important;
+  box-shadow:
+    0 0 0 1px var(--wk-field-border-focus) inset,
+    var(--wk-field-focus-shadow) !important;
 }
 
 /* —— el-input type=textarea: root is .el-textarea (not .el-input--textarea) in Element Plus 2.x —— */
 .wk-crm-el-field-scope .wk-crm-el-field-input.el-textarea .el-textarea__inner {
   font-size: 0.875rem;
   line-height: 1.5;
-  color: rgb(15 23 42);
+  color: var(--wk-text-primary, rgb(15 23 42));
   background-color: var(--wk-field-bg) !important;
-  box-shadow: 0 0 0 1px var(--wk-field-border) inset !important;
+  box-shadow:
+    0 0 0 1px var(--wk-field-border) inset,
+    var(--wk-field-shadow-sm) !important;
   border-radius: var(--wk-field-radius) !important;
   border: none !important;
   outline: none !important;
@@ -58,16 +66,22 @@
     background-color 0.2s ease !important;
 }
 
-.wk-crm-el-field-scope .wk-crm-el-field-input.el-textarea .el-textarea__inner:focus {
-  background-color: #fff !important;
+.wk-crm-el-field-scope .wk-crm-el-field-input.el-textarea .el-textarea__inner:hover {
   box-shadow:
-    0 0 0 1px var(--el-color-primary) inset,
-    0 0 0 2px var(--wk-field-focus-ring) !important;
+    0 0 0 1px var(--wk-field-border-hover) inset,
+    var(--wk-field-shadow-sm) !important;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-input.el-textarea .el-textarea__inner:focus {
+  background-color: var(--wk-field-bg) !important;
+  box-shadow:
+    0 0 0 1px var(--wk-field-border-focus) inset,
+    var(--wk-field-focus-shadow) !important;
 }
 
 /* —— AI parse textarea: + shadow-sm, slate-700 text, taller —— */
 .wk-crm-el-field-scope .wk-crm-el-field-input.wk-crm-el-field-ai.el-textarea .el-textarea__inner {
-  color: rgb(51 65 85);
+  color: var(--wk-text-secondary, rgb(51 65 85));
   padding: 1rem 1.25rem;
   min-height: 7rem;
   box-shadow:
@@ -76,17 +90,18 @@
 }
 
 .wk-crm-el-field-scope .wk-crm-el-field-input.wk-crm-el-field-ai.el-textarea .el-textarea__inner:focus {
-  color: rgb(15 23 42);
+  color: var(--wk-text-primary, rgb(15 23 42));
   box-shadow:
-    0 0 0 1px var(--el-color-primary) inset,
-    0 0 0 2px var(--wk-field-focus-ring),
-    var(--wk-field-shadow-sm) !important;
+    0 0 0 1px var(--wk-field-border-focus) inset,
+    var(--wk-field-focus-shadow) !important;
 }
 
 /* —— el-select —— */
 .wk-crm-el-field-scope .wk-crm-el-field-select .el-select__wrapper {
   background-color: var(--wk-field-bg) !important;
-  box-shadow: 0 0 0 1px var(--wk-field-border) inset !important;
+  box-shadow:
+    0 0 0 1px var(--wk-field-border) inset,
+    var(--wk-field-shadow-sm) !important;
   border-radius: var(--wk-field-radius) !important;
   min-height: 40px;
   padding: 0 12px;
@@ -95,11 +110,17 @@
     background-color 0.2s ease !important;
 }
 
-.wk-crm-el-field-scope .wk-crm-el-field-select .el-select__wrapper.is-focused {
-  background-color: #fff !important;
+.wk-crm-el-field-scope .wk-crm-el-field-select .el-select__wrapper:hover {
   box-shadow:
-    0 0 0 1px var(--el-color-primary) inset,
-    0 0 0 2px var(--wk-field-focus-ring) !important;
+    0 0 0 1px var(--wk-field-border-hover) inset,
+    var(--wk-field-shadow-sm) !important;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-select .el-select__wrapper.is-focused {
+  background-color: var(--wk-field-bg) !important;
+  box-shadow:
+    0 0 0 1px var(--wk-field-border-focus) inset,
+    var(--wk-field-focus-shadow) !important;
 }
 
 /* —— el-date-picker (editor uses .el-input__wrapper) —— */
@@ -111,7 +132,9 @@
 .wk-crm-el-field-scope .wk-crm-el-field-date .el-input__wrapper {
   width: 100%;
   background-color: var(--wk-field-bg) !important;
-  box-shadow: 0 0 0 1px var(--wk-field-border) inset !important;
+  box-shadow:
+    0 0 0 1px var(--wk-field-border) inset,
+    var(--wk-field-shadow-sm) !important;
   border-radius: var(--wk-field-radius) !important;
   min-height: 40px;
   padding: 0 12px;
@@ -120,9 +143,46 @@
     background-color 0.2s ease !important;
 }
 
-.wk-crm-el-field-scope .wk-crm-el-field-date .el-input__wrapper.is-focus {
-  background-color: #fff !important;
+.wk-crm-el-field-scope .wk-crm-el-field-date .el-input__wrapper:hover {
   box-shadow:
-    0 0 0 1px var(--el-color-primary) inset,
-    0 0 0 2px var(--wk-field-focus-ring) !important;
+    0 0 0 1px var(--wk-field-border-hover) inset,
+    var(--wk-field-shadow-sm) !important;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-date .el-input__wrapper.is-focus {
+  background-color: var(--wk-field-bg) !important;
+  box-shadow:
+    0 0 0 1px var(--wk-field-border-focus) inset,
+    var(--wk-field-focus-shadow) !important;
+}
+
+.wk-crm-el-field-scope {
+  --wk-field-error: rgb(239 68 68);
+  --wk-field-error-ring: rgb(254 226 226);
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-error:not(.el-input--textarea) .el-input__wrapper,
+.wk-crm-el-field-scope .wk-crm-el-field-error:not(.el-input--textarea) .el-input__wrapper.is-focus,
+.wk-crm-el-field-scope .wk-crm-el-field-error.el-textarea .el-textarea__inner,
+.wk-crm-el-field-scope .wk-crm-el-field-error.el-textarea .el-textarea__inner:focus,
+.wk-crm-el-field-scope .wk-crm-el-field-error.wk-crm-el-field-date .el-input__wrapper,
+.wk-crm-el-field-scope .wk-crm-el-field-error.wk-crm-el-field-date .el-input__wrapper.is-focus,
+.wk-crm-el-field-scope .wk-crm-el-field-error.wk-crm-el-field-select .el-select__wrapper,
+.wk-crm-el-field-scope .wk-crm-el-field-error.wk-crm-el-field-select .el-select__wrapper.is-focused {
+  background-color: var(--wk-bg-surface, #fff) !important;
+  box-shadow:
+    0 0 0 1px var(--wk-field-error) inset,
+    0 0 0 2px var(--wk-field-error-ring) !important;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-error.el-switch .el-switch__core {
+  border-color: var(--wk-field-error) !important;
+  box-shadow: 0 0 0 2px var(--wk-field-error-ring);
+}
+
+.wk-crm-el-field-error-message {
+  margin-left: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--wk-field-error, rgb(239 68 68));
 }

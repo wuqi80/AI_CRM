@@ -3,17 +3,11 @@ import type {
   CustomField,
   CustomFieldAddBO,
   CustomFieldUpdateBO,
+  CustomFieldUniqueCheckBO,
   FieldSortBO,
   FieldSortUpdateBO,
   EntityType
 } from '@/types/customField'
-
-export interface CustomFieldUniqueCheckBO {
-  entityType: EntityType
-  entityId?: string
-  fieldName: string
-  value?: unknown
-}
 
 /**
  * Add custom field
@@ -65,6 +59,27 @@ export function getEnabledFieldsByEntity(entityType: EntityType): Promise<Custom
 }
 
 /**
+ * Get fields visible in list pages
+ */
+export function getListFieldsByEntity(entityType: EntityType): Promise<CustomField[]> {
+  return get(`/custom-field/list-visible/${entityType}`)
+}
+
+/**
+ * Get fields used in forms
+ */
+export function getFormFieldsByEntity(entityType: EntityType): Promise<CustomField[]> {
+  return get(`/custom-field/form/${entityType}`)
+}
+
+/**
+ * Validate unique field value
+ */
+export function validateUniqueFieldValue(data: CustomFieldUniqueCheckBO): Promise<void> {
+  return post('/custom-field/validate-unique', data)
+}
+
+/**
  * Update fields sort order
  */
 export function updateFieldSort(sortList: FieldSortBO[]): Promise<void> {
@@ -90,8 +105,4 @@ export function getUserColumnsAll(entityType: EntityType): Promise<CustomField[]
  */
 export function saveUserSort(data: FieldSortUpdateBO): Promise<void> {
   return post('/custom-field/user-sort', data)
-}
-
-export function checkCustomFieldUnique(data: CustomFieldUniqueCheckBO): Promise<boolean> {
-  return post('/custom-field/unique/check', data)
 }

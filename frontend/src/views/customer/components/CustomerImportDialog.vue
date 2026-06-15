@@ -127,7 +127,11 @@ import { computed, ref } from 'vue'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { confirmCustomerImport, downloadImportTemplate, importCustomerPreview } from '@/api/customer'
+import { useEnumStore } from '@/stores/enums'
 import type { CustomerImportPreview, CustomerImportResult, CustomerImportRow } from '@/types/customer'
+
+const enumStore = useEnumStore()
+enumStore.ensureCustomerStage()
 
 const STAGE_LABELS: Record<string, string> = {
   lead: '线索',
@@ -163,7 +167,10 @@ const globalDuplicateMode = ref<CustomerImportRow['handleMode']>('')
 const importUploadRef = ref<UploadInstance>()
 
 function getStageLabel(stage: string): string {
-  return STAGE_LABELS[stage] || stage
+  if (!stage) return stage
+  // 真相源：/enum/customerStage（回退内置）
+  const label = enumStore.stageLabel(stage)
+  return label && label !== stage ? label : (STAGE_LABELS[stage] || stage)
 }
 
 async function handleDownloadTemplate() {

@@ -5,10 +5,20 @@ import {
   getCustomerDetail,
   addCustomer,
   updateCustomer,
+  updateCustomerField,
   deleteCustomer,
   getCustomerStatistics
 } from '@/api/customer'
-import type { CustomerListVO, CustomerDetailVO, CustomerQueryBO, CustomerAddBO, CustomerUpdateBO } from '@/types/customer'
+import type {
+  CustomerListVO,
+  CustomerDetailVO,
+  CustomerQueryBO,
+  CustomerAddBO,
+  CustomerUpdateBO,
+  CustomerFieldUpdateBO,
+  CustomerAiSearchParseVO
+} from '@/types/customer'
+import { normalizeTaskList } from '@/utils/taskPriority'
 
 const DEFAULT_CUSTOMER_PAGE_SIZE = 10
 
@@ -47,6 +57,7 @@ export const useCustomerStore = defineStore('customer', () => {
   const totalCount = ref(0)
   const loading = ref(false)
   const statistics = ref<any>(null)
+  const aiSearchState = ref<CustomerAiSearchParseVO | null>(null)
 
   // Query params
   const queryParams = ref<CustomerQueryBO>(createDefaultCustomerQueryParams())
@@ -58,13 +69,19 @@ export const useCustomerStore = defineStore('customer', () => {
   })
 
   // Actions
-  async function fetchCustomerList(reset = false, append = false) {
+  async function fetchCustomerList(
+    reset = false,
+    append = false,
+    options: { silent?: boolean } = {}
+  ) {
     if (reset) {
       queryParams.value.page = 1
       customerList.value = []
     }
 
-    loading.value = true
+    if (!options.silent) {
+      loading.value = true
+    }
     try {
       const result = await queryCustomerList(queryParams.value)
       if (append) {
@@ -76,31 +93,50 @@ export const useCustomerStore = defineStore('customer', () => {
       }
       totalCount.value = result.totalRow
     } finally {
-      loading.value = false
+      if (!options.silent) {
+        loading.value = false
+      }
     }
   }
 
-  async function fetchCustomerDetail(customerId: string) {
+  async function fetchCustomerDetail(customerId: string): Promise<CustomerDetailVO> {
     loading.value = true
     try {
-      currentCustomer.value = await getCustomerDetail(customerId)
+      const detail = await getCustomerDetail(customerId)
+      currentCustomer.value = {
+        ...detail,
+        tasks: normalizeTaskList(detail.tasks)
+      }
+      return currentCustomer.value
     } finally {
       loading.value = false
     }
   }
 
   async function createCustomer(data: CustomerAddBO): Promise<string> {
-    const customerId = await addCustomer(data)
-    await fetchCustomerList(true)
-    return customerId
+    return addCustomer(data)
   }
 
-  async function editCustomer(data: CustomerUpdateBO): Promise<void> {
+  async function editCustomer(data: CustomerUpdateBO): Promise<CustomerDetailVO | null> {
     await updateCustomer(data)
-    await fetchCustomerList(true)
     if (currentCustomer.value?.customerId === data.customerId) {
-      await fetchCustomerDetail(data.customerId)
+      return fetchCustomerDetail(data.customerId)
     }
+    return null
+  }
+
+  async function editCustomerField(data: CustomerFieldUpdateBO, options: { refreshList?: boolean } = {}): Promise<CustomerDetailVO> {
+    const detail = await updateCustomerField(data)
+    if (options.refreshList ?? true) {
+      await fetchCustomerList(false, false, { silent: true })
+    }
+    if (currentCustomer.value?.customerId === data.customerId) {
+      currentCustomer.value = {
+        ...detail,
+        tasks: normalizeTaskList(detail.tasks)
+      }
+    }
+    return detail
   }
 
   async function removeCustomer(customerId: string): Promise<void> {
@@ -153,6 +189,7 @@ export const useCustomerStore = defineStore('customer', () => {
     totalCount,
     loading,
     statistics,
+    aiSearchState,
     queryParams,
     // Getters
     hasMore,
@@ -161,6 +198,7 @@ export const useCustomerStore = defineStore('customer', () => {
     fetchCustomerDetail,
     createCustomer,
     editCustomer,
+    editCustomerField,
     removeCustomer,
     fetchStatistics,
     setQueryParams,

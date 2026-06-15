@@ -1,7 +1,8 @@
 // Custom Field related types
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'datetime' | 'select' | 'multiselect' | 'checkbox'
-export type EntityType = 'customer' | 'contact' | 'relation'
+export type EntityType = 'customer' | 'contact' | 'relation' | 'product'
+export type FieldSource = 'system' | 'custom'
 
 export interface FieldOption {
   value: string
@@ -23,7 +24,9 @@ export interface CustomField {
   fieldName: string
   fieldLabel: string
   fieldType: FieldType
+  fieldSource: FieldSource
   columnName: string
+  columnType?: string
   defaultValue?: string
   placeholder?: string
   isRequired: boolean
@@ -79,6 +82,13 @@ export interface CustomFieldUpdateBO {
   sortOrder?: number
 }
 
+export interface CustomFieldUniqueCheckBO {
+  entityType: EntityType
+  entityId?: string | number | null
+  fieldName: string
+  value: any
+}
+
 export interface FieldSortBO {
   fieldId: string
   sortOrder: number
@@ -99,5 +109,6 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
 export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
   customer: '客户',
   contact: '联系人',
-  relation: '关系'
+  relation: '关系',
+  product: '产品'
 }

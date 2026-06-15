@@ -1,9 +1,9 @@
 <template>
-  <div v-if="fields.length > 0" class="dynamic-field-form">
+  <div v-if="dynamicFields.length > 0" class="dynamic-field-form">
     <div
-      v-for="field in fields"
+      v-for="field in dynamicFields"
       :key="field.fieldId"
-      :class="field.fieldType === 'textarea' ? 'md:col-span-2' : ''"
+      :class="getFieldWrapperClass(field)"
       class="space-y-1.5"
     >
       <label class="text-xs font-bold text-slate-500 ml-1">
@@ -16,8 +16,9 @@
         v-model="localValues[field.fieldName]"
         :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
         size="large"
-        class="w-full wk-crm-el-field-input"
-        @input="emitChange"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-input')"
+        @input="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       />
       <el-input
         v-else-if="field.fieldType === 'textarea'"
@@ -26,8 +27,9 @@
         :rows="3"
         resize="none"
         :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
-        class="w-full wk-crm-el-field-input"
-        @input="emitChange"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-input')"
+        @input="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       />
       <el-input
         v-else-if="field.fieldType === 'number'"
@@ -35,8 +37,9 @@
         type="number"
         :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
         size="large"
-        class="w-full wk-crm-el-field-input"
-        @input="emitChange"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-input')"
+        @input="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       />
       <el-date-picker
         v-else-if="field.fieldType === 'date'"
@@ -45,8 +48,9 @@
         value-format="YYYY-MM-DD"
         :placeholder="field.placeholder || '选择日期'"
         size="large"
-        class="w-full wk-crm-el-field-date"
-        @change="emitChange"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-date')"
+        @change="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       />
       <el-date-picker
         v-else-if="field.fieldType === 'datetime'"
@@ -55,17 +59,19 @@
         value-format="YYYY-MM-DD HH:mm:ss"
         :placeholder="field.placeholder || '选择日期时间'"
         size="large"
-        class="w-full wk-crm-el-field-date"
-        @change="emitChange"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-date')"
+        @change="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       />
       <el-select
         v-else-if="field.fieldType === 'select'"
         v-model="localValues[field.fieldName]"
         :placeholder="field.placeholder || '请选择'"
         size="large"
-        class="w-full wk-crm-el-field-select"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-select')"
         clearable
-        @change="emitChange"
+        @change="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       >
         <el-option
           v-for="opt in field.options"
@@ -79,10 +85,11 @@
         v-model="localValues[field.fieldName]"
         :placeholder="field.placeholder || '请选择'"
         size="large"
-        class="w-full wk-crm-el-field-select"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-select')"
         multiple
         clearable
-        @change="emitChange"
+        @change="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       >
         <el-option
           v-for="opt in field.options"
@@ -92,8 +99,15 @@
         />
       </el-select>
       <div v-else-if="field.fieldType === 'checkbox'" class="pt-1">
-        <el-switch v-model="localValues[field.fieldName]" @change="emitChange" />
+        <el-switch
+          v-model="localValues[field.fieldName]"
+          :class="getFieldControlClass(field, '')"
+          @change="handleFieldChange(field, true)"
+        />
       </div>
+      <p v-if="uniqueFieldErrors[field.fieldName]" class="wk-crm-el-field-error-message">
+        {{ uniqueFieldErrors[field.fieldName] }}
+      </p>
     </div>
   </div>
 </template>
@@ -101,15 +115,23 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import type { CustomField, EntityType } from '@/types/customField'
-import { getEnabledFieldsByEntity } from '@/api/customField'
+import { getEnabledFieldsByEntity, getFormFieldsByEntity, validateUniqueFieldValue } from '@/api/customField'
 
 // 与新建任务一致：父级需带 wk-crm-el-field-scope 才应用 wk-crm-el-field-skin.css
 
 const props = withDefaults(defineProps<{
   entityType: EntityType
   modelValue?: Record<string, any>
+  fields?: CustomField[] | null
+  mode?: 'custom' | 'form'
+  fullSpanFieldNames?: string[]
+  entityId?: string | number | null
 }>(), {
-  modelValue: () => ({})
+  modelValue: () => ({}),
+  fields: null,
+  mode: 'custom',
+  fullSpanFieldNames: () => [],
+  entityId: null
 })
 
 const emit = defineEmits<{
@@ -117,8 +139,32 @@ const emit = defineEmits<{
   'fieldsLoaded': [fields: CustomField[]]
 }>()
 
-const fields = ref<CustomField[]>([])
+const dynamicFields = ref<CustomField[]>([])
 const localValues = ref<Record<string, any>>({})
+const uniqueFieldErrors = ref<Record<string, string>>({})
+
+function filterFieldsByMode(nextFields: CustomField[]): CustomField[] {
+  if (props.mode !== 'custom') {
+    return nextFields
+  }
+
+  return nextFields.filter(field => field.fieldSource !== 'system')
+}
+
+function getFieldWrapperClass(field: CustomField): string {
+  if (field.fieldType === 'textarea' || props.fullSpanFieldNames.includes(field.fieldName)) {
+    return 'md:col-span-2'
+  }
+  return ''
+}
+
+function hasUniqueFieldError(field: CustomField): boolean {
+  return Boolean(uniqueFieldErrors.value[field.fieldName])
+}
+
+function getFieldControlClass(field: CustomField, baseClass: string) {
+  return [baseClass, { 'wk-crm-el-field-error': hasUniqueFieldError(field) }]
+}
 
 function normalizeMultiselectValue(value: unknown): string[] {
   if (value === null || value === undefined || value === '') return []
@@ -182,17 +228,17 @@ function normalizeFieldValue(field: CustomField, value: unknown): any {
 }
 
 function applyModelValue(modelValue?: Record<string, any>) {
-  if (!modelValue) return
+  const sourceValues = modelValue || {}
 
-  if (fields.value.length === 0) {
-    Object.assign(localValues.value, modelValue)
+  if (dynamicFields.value.length === 0) {
+    localValues.value = { ...sourceValues }
     return
   }
 
-  const nextValues = { ...localValues.value }
-  const fieldMap = new Map(fields.value.map(field => [field.fieldName, field]))
+  const nextValues: Record<string, any> = {}
+  const fieldMap = new Map(dynamicFields.value.map(field => [field.fieldName, field]))
 
-  for (const [fieldName, rawValue] of Object.entries(modelValue)) {
+  for (const [fieldName, rawValue] of Object.entries(sourceValues)) {
     const field = fieldMap.get(fieldName)
     nextValues[fieldName] = field ? normalizeFieldValue(field, rawValue) : rawValue
   }
@@ -227,8 +273,9 @@ function parseDefaultValue(field: CustomField): any {
 }
 
 function applyFieldDefaults() {
-  fields.value.forEach(field => {
-    if (localValues.value[field.fieldName] === undefined || localValues.value[field.fieldName] === null) {
+  dynamicFields.value.forEach(field => {
+    const hasExplicitValue = Object.prototype.hasOwnProperty.call(localValues.value, field.fieldName)
+    if (!hasExplicitValue || localValues.value[field.fieldName] === undefined) {
       if (field.fieldType === 'multiselect') {
         localValues.value[field.fieldName] = []
       } else if (field.fieldType === 'checkbox') {
@@ -246,11 +293,17 @@ function applyFieldDefaults() {
 // Load custom fields
 async function loadFields() {
   try {
-    fields.value = await getEnabledFieldsByEntity(props.entityType)
+    const loadedFields = props.fields && props.fields.length > 0
+      ? props.fields
+      : props.mode === 'form'
+        ? await getFormFieldsByEntity(props.entityType)
+        : await getEnabledFieldsByEntity(props.entityType)
+
+    dynamicFields.value = filterFieldsByMode(loadedFields)
     // 先按字段类型归一化编辑态已有值，再补默认值
     applyModelValue(props.modelValue)
     applyFieldDefaults()
-    emit('fieldsLoaded', fields.value)
+    emit('fieldsLoaded', dynamicFields.value)
   } catch {
     // Error handled by interceptor
   }
@@ -260,12 +313,90 @@ function emitChange() {
   emit('update:modelValue', { ...localValues.value })
 }
 
+function getUniqueErrorMessage(error: unknown, field: CustomField): string {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return `字段「${field.fieldLabel}」的值已存在`
+}
+
+function setUniqueFieldError(field: CustomField, message: string) {
+  uniqueFieldErrors.value = {
+    ...uniqueFieldErrors.value,
+    [field.fieldName]: message
+  }
+}
+
+function clearUniqueFieldError(field: CustomField) {
+  if (!uniqueFieldErrors.value[field.fieldName]) {
+    return
+  }
+  const nextErrors = { ...uniqueFieldErrors.value }
+  delete nextErrors[field.fieldName]
+  uniqueFieldErrors.value = nextErrors
+}
+
+function clearUniqueFieldErrors() {
+  uniqueFieldErrors.value = {}
+}
+
+function shouldSkipUniqueValue(value: unknown): boolean {
+  return value === null || value === undefined || value === '' ||
+    (Array.isArray(value) && value.length === 0)
+}
+
+async function validateUniqueField(field: CustomField): Promise<boolean> {
+  if (!field.isUnique) {
+    return true
+  }
+
+  const value = localValues.value[field.fieldName]
+  if (shouldSkipUniqueValue(value)) {
+    clearUniqueFieldError(field)
+    return true
+  }
+
+  try {
+    await validateUniqueFieldValue({
+      entityType: props.entityType,
+      entityId: props.entityId,
+      fieldName: field.fieldName,
+      value
+    })
+    clearUniqueFieldError(field)
+    return true
+  } catch (error) {
+    setUniqueFieldError(field, getUniqueErrorMessage(error, field))
+    return false
+  }
+}
+
+function handleFieldBlur(field: CustomField) {
+  void validateUniqueField(field)
+}
+
+function handleFieldChange(field: CustomField, validateUnique = false) {
+  clearUniqueFieldError(field)
+  emitChange()
+  if (validateUnique) {
+    void validateUniqueField(field)
+  }
+}
+
 // Watch for external value changes
 watch(() => props.modelValue, (newVal) => {
-  if (newVal) {
-    applyModelValue(newVal)
-  }
+  applyModelValue(newVal)
+  applyFieldDefaults()
 }, { deep: true, immediate: true })
+
+watch(() => props.fields, (newFields) => {
+  if (newFields && newFields.length > 0) {
+    dynamicFields.value = filterFieldsByMode(newFields)
+    applyModelValue(props.modelValue)
+    applyFieldDefaults()
+    emit('fieldsLoaded', dynamicFields.value)
+  }
+}, { deep: true })
 
 onMounted(() => {
   loadFields()
@@ -273,7 +404,7 @@ onMounted(() => {
 
 // Expose validation method
 function validate(): boolean {
-  for (const field of fields.value) {
+  for (const field of dynamicFields.value) {
     if (field.isRequired) {
       const value = localValues.value[field.fieldName]
       if (value === null || value === undefined || value === '' ||
@@ -287,7 +418,7 @@ function validate(): boolean {
 
 function getRequiredFieldLabels(): string[] {
   const missing: string[] = []
-  for (const field of fields.value) {
+  for (const field of dynamicFields.value) {
     if (field.isRequired) {
       const value = localValues.value[field.fieldName]
       if (value === null || value === undefined || value === '' ||
@@ -299,5 +430,23 @@ function getRequiredFieldLabels(): string[] {
   return missing
 }
 
-defineExpose({ validate, getRequiredFieldLabels, fields, localValues })
+async function validateUniqueFields(): Promise<boolean> {
+  for (const field of dynamicFields.value) {
+    const valid = await validateUniqueField(field)
+    if (!valid) {
+      return false
+    }
+  }
+  return true
+}
+
+defineExpose({
+  validate,
+  getRequiredFieldLabels,
+  validateUniqueFields,
+  clearUniqueFieldErrors,
+  fields: dynamicFields,
+  localValues,
+  uniqueFieldErrors
+})
 </script>

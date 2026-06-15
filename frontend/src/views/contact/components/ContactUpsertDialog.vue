@@ -8,23 +8,23 @@
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="open" class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+      <div v-if="open" class="fixed inset-0 z-[3600] flex items-center justify-center p-4 sm:p-6">
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="handleClose" />
 
         <div
           :class="[
             'relative w-full bg-slate-50 shadow-2xl overflow-hidden flex flex-col wk-crm-el-field-scope',
-            isMobile ? 'max-w-full max-h-full rounded-none inset-0' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
+            isMobile ? 'max-w-full max-h-full rounded-[1rem] inset-0' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
           ]"
         >
           <div class="bg-white border-b border-slate-200 px-6 sm:px-8 py-4 sm:py-5 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-3 sm:gap-4">
+            <div class="flex min-w-0 items-center gap-3 sm:gap-4">
               <div class="size-10 sm:size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                 <span class="material-symbols-outlined">{{ isEdit ? 'edit' : 'person_add' }}</span>
               </div>
-              <div>
-                <h2 class="text-lg sm:text-xl font-bold text-slate-900">{{ isEdit ? '编辑联系人' : '添加联系人' }}</h2>
-                <p class="text-xs text-slate-500">
+              <div class="min-w-0">
+                <h2 class="truncate text-lg sm:text-xl font-bold text-slate-900">{{ isEdit ? '编辑联系人' : '添加联系人' }}</h2>
+                <p class="truncate text-xs text-slate-500">
                   {{ isEdit ? '修改联系人基本信息与备注' : '使用 AI 智能录入或手动填写联系人信息' }}
                 </p>
               </div>
@@ -32,7 +32,7 @@
             <div class="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
-                class="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                class="min-w-[3.5rem] px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors whitespace-nowrap"
                 @click="handleClose"
               >
                 取消
@@ -40,7 +40,7 @@
               <button
                 type="button"
                 :disabled="submitting"
-                class="px-5 sm:px-8 py-2 sm:py-2.5 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50"
+                class="min-w-[4rem] justify-center px-5 sm:px-8 py-2 sm:py-2.5 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
                 @click="handleSubmit"
               >
                 <span v-if="submitting" class="size-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -63,12 +63,15 @@
               <AiSmartEntrySection
                 v-if="!isEdit"
                 v-model="aiInputText"
-                placeholder="在此粘贴联系人描述、邮件内容，或直接粘贴 (Ctrl+V) 名片图片..."
+                placeholder="在此粘贴联系人描述、邮件内容，或点击上传名片图片..."
                 :ai-image-preview="aiImagePreview"
                 :ai-parsing="aiParsing"
                 :can-extract="Boolean(aiInputText.trim() || aiImageFile)"
                 :show-image-hint="Boolean(aiImagePreview && !aiParsing)"
+                :show-upload-button="true"
+                :upload-disabled="aiParsing"
                 @paste="handleAiPaste"
+                @upload-image="openAiImagePicker"
                 @extract="handleAiExtract"
                 @remove-image="removeAiImage"
               >
@@ -99,8 +102,11 @@
                       v-model="formData.name"
                       placeholder="请输入姓名"
                       size="large"
-                      class="w-full wk-crm-el-field-input"
+                      :class="getContactFieldControlClass('name', 'w-full wk-crm-el-field-input')"
+                      @input="clearContactUniqueFieldError('name')"
+                      @blur="handleContactUniqueFieldBlur('name', formData.name)"
                     />
+                    <p v-if="systemUniqueErrors.name" class="wk-crm-el-field-error-message">{{ systemUniqueErrors.name }}</p>
                   </div>
                   <div class="space-y-1.5">
                     <label class="text-xs font-bold text-slate-500 uppercase ml-1">职位</label>
@@ -108,8 +114,11 @@
                       v-model="formData.position"
                       placeholder="请输入职位"
                       size="large"
-                      class="w-full wk-crm-el-field-input"
+                      :class="getContactFieldControlClass('position', 'w-full wk-crm-el-field-input')"
+                      @input="clearContactUniqueFieldError('position')"
+                      @blur="handleContactUniqueFieldBlur('position', formData.position)"
                     />
+                    <p v-if="systemUniqueErrors.position" class="wk-crm-el-field-error-message">{{ systemUniqueErrors.position }}</p>
                   </div>
                   <div class="space-y-1.5">
                     <label class="text-xs font-bold text-slate-500 uppercase ml-1">电话</label>
@@ -117,8 +126,11 @@
                       v-model="formData.phone"
                       placeholder="请输入电话"
                       size="large"
-                      class="w-full wk-crm-el-field-input"
+                      :class="getContactFieldControlClass('phone', 'w-full wk-crm-el-field-input')"
+                      @input="clearContactUniqueFieldError('phone')"
+                      @blur="handleContactUniqueFieldBlur('phone', formData.phone)"
                     />
+                    <p v-if="systemUniqueErrors.phone" class="wk-crm-el-field-error-message">{{ systemUniqueErrors.phone }}</p>
                   </div>
                   <div class="space-y-1.5">
                     <label class="text-xs font-bold text-slate-500 uppercase ml-1">邮箱</label>
@@ -126,8 +138,11 @@
                       v-model="formData.email"
                       placeholder="请输入邮箱"
                       size="large"
-                      class="w-full wk-crm-el-field-input"
+                      :class="getContactFieldControlClass('email', 'w-full wk-crm-el-field-input')"
+                      @input="clearContactUniqueFieldError('email')"
+                      @blur="handleContactUniqueFieldBlur('email', formData.email)"
                     />
+                    <p v-if="systemUniqueErrors.email" class="wk-crm-el-field-error-message">{{ systemUniqueErrors.email }}</p>
                   </div>
                   <div class="space-y-1.5 md:col-span-2">
                     <label class="text-xs font-bold text-slate-500 uppercase ml-1">微信</label>
@@ -135,8 +150,11 @@
                       v-model="formData.wechat"
                       placeholder="请输入微信号"
                       size="large"
-                      class="w-full wk-crm-el-field-input"
+                      :class="getContactFieldControlClass('wechat', 'w-full wk-crm-el-field-input')"
+                      @input="clearContactUniqueFieldError('wechat')"
+                      @blur="handleContactUniqueFieldBlur('wechat', formData.wechat)"
                     />
+                    <p v-if="systemUniqueErrors.wechat" class="wk-crm-el-field-error-message">{{ systemUniqueErrors.wechat }}</p>
                   </div>
                   <div class="space-y-1.5 md:col-span-2">
                     <label class="text-xs font-bold text-slate-500 uppercase ml-1">备注</label>
@@ -146,8 +164,11 @@
                       :rows="3"
                       resize="none"
                       placeholder="请输入备注"
-                      class="w-full wk-crm-el-field-input"
+                      :class="getContactFieldControlClass('notes', 'w-full wk-crm-el-field-input')"
+                      @input="clearContactUniqueFieldError('notes')"
+                      @blur="handleContactUniqueFieldBlur('notes', formData.notes)"
                     />
+                    <p v-if="systemUniqueErrors.notes" class="wk-crm-el-field-error-message">{{ systemUniqueErrors.notes }}</p>
                   </div>
                   <div class="space-y-1.5 md:col-span-2 flex items-center gap-3 pt-1">
                     <label
@@ -156,14 +177,18 @@
                     >主联系人</label>
                     <el-switch
                       v-model="formData.isPrimary"
+                      :class="getContactFieldControlClass('isPrimary', '')"
                       style="--el-switch-on-color: var(--el-color-primary)"
+                      @change="handleContactUniqueFieldBlur('isPrimary', formData.isPrimary ? 1 : 0)"
                     />
+                    <p v-if="systemUniqueErrors.isPrimary" class="wk-crm-el-field-error-message">{{ systemUniqueErrors.isPrimary }}</p>
                   </div>
                 </div>
                 <DynamicFieldForm
                   ref="dynamicFieldFormRef"
                   entity-type="contact"
                   v-model="customFieldValues"
+                  :entity-id="props.contact?.contactId || null"
                   class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mt-4"
                 />
               </section>
@@ -176,15 +201,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
-import { addContact, updateContact } from '@/api/contact'
-import { aiParseCustomer } from '@/api/customer'
+import { addContact, aiParseContact, updateContact } from '@/api/contact'
 import type { CustomerAiParseVO } from '@/api/customer'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { isRequestErrorHandled } from '@/utils/requestError'
+import { getFormFieldsByEntity, validateUniqueFieldValue } from '@/api/customField'
 import type { Contact } from '@/types/customer'
+import type { CustomField } from '@/types/customField'
 import AiSmartEntrySection from '@/components/crm/AiSmartEntrySection.vue'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 
@@ -229,6 +255,10 @@ const formData = reactive({
 
 const dynamicFieldFormRef = ref<InstanceType<typeof DynamicFieldForm>>()
 const customFieldValues = ref<Record<string, any>>({})
+const contactFields = ref<CustomField[]>([])
+const systemUniqueErrors = ref<Record<string, string>>({})
+
+const contactFieldMap = computed(() => new Map(contactFields.value.map(field => [field.fieldName, field])))
 
 const aiInputText = ref('')
 const aiParsing = ref(false)
@@ -259,6 +289,107 @@ function resetAiState() {
   aiParsing.value = false
   aiParseResult.value = null
   removeAiImage()
+}
+
+async function loadContactFields() {
+  try {
+    contactFields.value = await getFormFieldsByEntity('contact')
+  } catch {
+    // Error handled by interceptor.
+  }
+}
+
+function shouldSkipUniqueValue(value: unknown): boolean {
+  return value === null || value === undefined || value === '' ||
+    (Array.isArray(value) && value.length === 0)
+}
+
+function getContactFieldControlClass(fieldName: string, baseClass: string) {
+  return [baseClass, { 'wk-crm-el-field-error': Boolean(systemUniqueErrors.value[fieldName]) }]
+}
+
+function getContactUniqueErrorMessage(error: unknown, fieldName: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  const label = contactFieldMap.value.get(fieldName)?.fieldLabel || fieldName
+  return `字段「${label}」的值已存在`
+}
+
+function setContactUniqueFieldError(fieldName: string, message: string) {
+  systemUniqueErrors.value = {
+    ...systemUniqueErrors.value,
+    [fieldName]: message
+  }
+}
+
+function clearContactUniqueFieldError(fieldName: string) {
+  if (!systemUniqueErrors.value[fieldName]) {
+    return
+  }
+  const nextErrors = { ...systemUniqueErrors.value }
+  delete nextErrors[fieldName]
+  systemUniqueErrors.value = nextErrors
+}
+
+async function validateContactUniqueField(fieldName: string, value: unknown): Promise<boolean> {
+  const field = contactFieldMap.value.get(fieldName)
+  if (!field?.isUnique || field.fieldSource !== 'system' || shouldSkipUniqueValue(value)) {
+    clearContactUniqueFieldError(fieldName)
+    return true
+  }
+
+  try {
+    await validateUniqueFieldValue({
+      entityType: 'contact',
+      entityId: props.contact?.contactId || null,
+      fieldName,
+      value
+    })
+    clearContactUniqueFieldError(fieldName)
+    return true
+  } catch (error) {
+    setContactUniqueFieldError(fieldName, getContactUniqueErrorMessage(error, fieldName))
+    return false
+  }
+}
+
+function handleContactUniqueFieldBlur(fieldName: string, value: unknown) {
+  void validateContactUniqueField(fieldName, value)
+}
+
+function getContactSystemFieldValue(fieldName: string): unknown {
+  switch (fieldName) {
+    case 'name':
+      return formData.name.trim()
+    case 'position':
+      return formData.position.trim()
+    case 'phone':
+      return formData.phone.trim()
+    case 'email':
+      return formData.email.trim()
+    case 'wechat':
+      return formData.wechat.trim()
+    case 'notes':
+      return formData.notes.trim()
+    case 'isPrimary':
+      return formData.isPrimary ? 1 : 0
+    default:
+      return undefined
+  }
+}
+
+async function validateContactSystemUniqueFields(): Promise<boolean> {
+  for (const field of contactFields.value) {
+    if (field.fieldSource !== 'system' || !field.isUnique) {
+      continue
+    }
+    const valid = await validateContactUniqueField(field.fieldName, getContactSystemFieldValue(field.fieldName))
+    if (!valid) {
+      return false
+    }
+  }
+  return true
 }
 
 function handleAiPaste(e: ClipboardEvent) {
@@ -294,7 +425,7 @@ async function openAiImagePicker() {
 async function handleAiExtract() {
   if (aiParsing.value) return
   if (!aiInputText.value.trim() && !aiImageFile.value) {
-    ElMessage.warning('请输入文本或粘贴图片')
+    ElMessage.warning('请输入文本或上传图片')
     return
   }
 
@@ -310,12 +441,17 @@ async function handleAiExtract() {
       imageMimeType = aiImageFile.value.type
     }
 
-    const result = await aiParseCustomer({
+    const result = await aiParseContact({
       content: aiInputText.value.trim() || '请从图片中提取联系人信息',
       imageObjectKey,
       imageMimeType
     })
     aiParseResult.value = result
+
+    if (!hasContactFormFieldFilled(result)) {
+      ElMessage.warning('本次智能解析没有提取到可填充的信息，请确认图片清晰或补充文字后重试')
+      return
+    }
 
     if (result.contactName) formData.name = result.contactName
     if (result.contactPhone) formData.phone = result.contactPhone
@@ -324,6 +460,11 @@ async function handleAiExtract() {
     if (result.remark) formData.notes = result.remark
 
     ElMessage.success('AI 提取完成，信息已自动填充')
+    /*
+      ElMessage.warning('本次智能解析没有提取到可填充的信息，请确认图片清晰或补充文字后重试')
+      return
+    */
+
   } catch (error: unknown) {
     console.error('AI parse contact failed:', error)
     if (!isRequestErrorHandled(error)) {
@@ -335,7 +476,19 @@ async function handleAiExtract() {
   }
 }
 
+function hasContactFormFieldFilled(result: CustomerAiParseVO | null): boolean {
+  if (!result) return false
+  return Boolean(
+    result.contactName
+    || result.contactPhone
+    || result.contactEmail
+    || result.contactPosition
+    || result.remark
+  )
+}
+
 function resetForm() {
+  dynamicFieldFormRef.value?.clearUniqueFieldErrors()
   formData.name = ''
   formData.position = ''
   formData.phone = ''
@@ -344,6 +497,7 @@ function resetForm() {
   formData.notes = ''
   formData.isPrimary = false
   customFieldValues.value = {}
+  systemUniqueErrors.value = {}
   resetAiState()
 }
 
@@ -359,7 +513,13 @@ watch(
       return
     }
 
+    if (contactFields.value.length === 0) {
+      void loadContactFields()
+    }
+
     if (props.contact) {
+      systemUniqueErrors.value = {}
+      dynamicFieldFormRef.value?.clearUniqueFieldErrors()
       formData.name = props.contact.name || ''
       formData.position = props.contact.position || ''
       formData.phone = props.contact.phone || ''
@@ -378,6 +538,10 @@ watch(
   },
   { immediate: true }
 )
+
+onMounted(() => {
+  void loadContactFields()
+})
 
 watch(
   () => [props.modelValue, props.autoOpenAiImagePickerToken, props.contact?.contactId] as const,
@@ -403,6 +567,15 @@ async function handleSubmit() {
       ElMessage.warning(`请填写必填字段: ${missingFields.join(', ')}`)
       return
     }
+    const customUniqueValid = await dynamicFieldFormRef.value.validateUniqueFields()
+    if (!customUniqueValid) {
+      return
+    }
+  }
+
+  const systemUniqueValid = await validateContactSystemUniqueFields()
+  if (!systemUniqueValid) {
+    return
   }
 
   if (formData.isPrimary) {
