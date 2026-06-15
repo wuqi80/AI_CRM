@@ -1227,7 +1227,8 @@ INSERT INTO crm_system_config (config_id, config_key, config_value, config_type,
 (104, 'weknora_knowledge_base_id', '', 'weknora', '默认知识库ID', NOW()),
 (105, 'weknora_match_count', '5', 'weknora', '搜索最大结果数', NOW()),
 (106, 'weknora_vector_threshold', '0.5', 'weknora', '向量相似度阈值', NOW()),
-(107, 'weknora_auto_rag_enabled', 'true', 'weknora', '是否启用自动RAG', NOW());
+(107, 'weknora_auto_rag_enabled', 'true', 'weknora', '是否启用自动RAG', NOW()),
+(108, 'product.code.required', 'true', 'product', 'Whether product code is required', NOW());
 
 -- 插入客户团队成员
 INSERT INTO crm_customer_team (id, customer_id, user_id, role, create_user_id, create_time) VALUES

@@ -169,8 +169,17 @@ export function upload<T = any>(url: string, formData: FormData, config?: AxiosR
   })
 }
 
-export function download(url: string, filename?: string): Promise<void> {
-  return service.get(url, { responseType: 'blob' }).then((response: any) => {
+export function download(url: string, filename?: string, config?: AxiosRequestConfig): Promise<void> {
+  const requestConfig: AxiosRequestConfig = {
+    ...config,
+    responseType: 'blob'
+  }
+  const method = (config?.method || 'get').toString().toLowerCase()
+  const request = method === 'post'
+    ? service.post(url, config?.data, requestConfig)
+    : service.get(url, requestConfig)
+
+  return request.then((response: any) => {
     const blob = new Blob([response])
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
