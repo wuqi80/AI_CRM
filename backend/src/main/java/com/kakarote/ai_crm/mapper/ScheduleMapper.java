@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.kakarote.ai_crm.entity.BO.ScheduleQueryBO;
 import com.kakarote.ai_crm.entity.PO.Schedule;
+import com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -29,4 +30,13 @@ public interface ScheduleMapper extends BaseMapper<Schedule> {
                                      @Param("filter") String filter,
                                      @Param("today") Date today,
                                      @Param("weekEnd") Date weekEnd);
+
+    Long countGlobalSearch(@Param("keyword") String keyword,
+                           @Param("pattern") String pattern,
+                           @Param("userId") Long userId);
+
+    List<GlobalSearchResultVO> globalSearch(@Param("keyword") String keyword,
+                                            @Param("pattern") String pattern,
+                                            @Param("userId") Long userId,
+                                            @Param("limit") int limit);
 }

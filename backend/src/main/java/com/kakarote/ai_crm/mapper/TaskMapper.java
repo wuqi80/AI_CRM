@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.kakarote.ai_crm.entity.BO.TaskQueryBO;
 import com.kakarote.ai_crm.entity.PO.Task;
+import com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -39,4 +40,10 @@ public interface TaskMapper extends BaseMapper<Task> {
                                      @Param("filter") String filter,
                                      @Param("today") Date today,
                                      @Param("weekEnd") Date weekEnd);
+
+    Long countGlobalSearch(@Param("keyword") String keyword, @Param("pattern") String pattern);
+
+    List<GlobalSearchResultVO> globalSearch(@Param("keyword") String keyword,
+                                            @Param("pattern") String pattern,
+                                            @Param("limit") int limit);
 }

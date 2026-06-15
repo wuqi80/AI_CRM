@@ -636,7 +636,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useResponsive } from '@/composables/useResponsive'
 import { queryKnowledgeList, uploadKnowledge, deleteKnowledge, downloadKnowledge, reparseKnowledge } from '@/api/knowledge'
 import { ElMessage, ElMessageBox, UploadInstance, UploadRequestOptions } from 'element-plus'
@@ -644,6 +645,7 @@ import type { Knowledge, KnowledgeQueryBO, KnowledgeType } from '@/types/common'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
 
 const { isMobile } = useResponsive()
+const route = useRoute()
 /** 桌面侧栏折叠，仅 UI */
 const sidebarCollapsed = ref(false)
 const hotSearchTags = ['产品知识库', '销售话术', '售后服务', '入职培训', '客户FAQ']
@@ -696,10 +698,21 @@ const visiblePages = computed(() => {
   return pages
 })
 
-onMounted(() => {
+onMounted(async () => {
   void uploadRef.value
-  fetchList()
+  applyRouteQuery()
+  await fetchList()
+  openKnowledgeFromRoute()
 })
+
+watch(
+  () => [route.query.knowledgeId, route.query.keyword],
+  async () => {
+    applyRouteQuery()
+    await fetchList()
+    openKnowledgeFromRoute()
+  }
+)
 
 async function fetchList() {
   loading.value = true
@@ -765,6 +778,26 @@ async function handleConfirmUpload() {
 function openDetail(item: Knowledge) {
   selectedKnowledgeId.value = item.knowledgeId
   showDetailModal.value = true
+}
+
+function applyRouteQuery() {
+  const keyword = firstQueryValue(route.query.keyword)
+  if (keyword) {
+    queryParams.keyword = keyword
+    queryParams.page = 1
+  }
+}
+
+function openKnowledgeFromRoute() {
+  const knowledgeId = firstQueryValue(route.query.knowledgeId)
+  if (!knowledgeId) return
+  selectedKnowledgeId.value = knowledgeId
+  showDetailModal.value = true
+}
+
+function firstQueryValue(value: unknown): string {
+  if (Array.isArray(value)) return value[0] ? String(value[0]) : ''
+  return value == null ? '' : String(value)
 }
 
 async function handleDownload(item: Knowledge) {

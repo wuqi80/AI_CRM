@@ -198,7 +198,7 @@
               v-model="globalSearchKeyword"
               type="text"
               class="w-full bg-slate-100 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/50 transition-all outline-none"
-              placeholder="搜索公司、联系人或 AI 标签..."
+              placeholder="搜索客户、联系人、任务、日程、知识库..."
               @keydown.enter="handleGlobalSearch"
               @input="debouncedGlobalSearch"
             />
@@ -250,7 +250,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useEnterpriseStore } from '@/stores/enterprise'
 import defaultLogoImg from '@/assets/images/logo.png'
-import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
 import { useChatDrawer } from '@/composables/useChatDrawer'
 import { ElMessageBox } from 'element-plus'
@@ -265,19 +264,21 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const enterpriseStore = useEnterpriseStore()
-const customerStore = useCustomerStore()
 const { isMobile } = useResponsive()
 const globalSearchKeyword = ref('')
 const showCreateCustomer = ref(false)
 
-// Sync global search with customer store keyword
-watch(() => customerStore.queryParams.keyword, (val) => {
-  globalSearchKeyword.value = val || ''
-})
-
 watch(() => route.fullPath, () => {
   showUserMenu.value = false
 })
+
+watch(
+  () => [route.path, route.query.keyword],
+  () => {
+    globalSearchKeyword.value = route.path === '/search' ? firstQueryValue(route.query.keyword) : ''
+  },
+  { immediate: true }
+)
 
 onMounted(() => enterpriseStore.loadConfig())
 
@@ -351,23 +352,25 @@ function handleOpenAccountSettings() {
 
 function handleGlobalSearch() {
   const keyword = globalSearchKeyword.value.trim()
-  customerStore.queryParams.keyword = keyword
-  customerStore.queryParams.page = 1
-  if (route.path.startsWith('/customer')) {
-    customerStore.fetchCustomerList(true)
-  } else {
-    router.push('/customer')
-  }
+  const target = keyword ? { path: '/search', query: { keyword } } : { path: '/search' }
+  router.push(target)
 }
 
 let globalSearchTimer: ReturnType<typeof setTimeout> | null = null
 function debouncedGlobalSearch() {
   if (globalSearchTimer) clearTimeout(globalSearchTimer)
   globalSearchTimer = setTimeout(() => {
-    if (route.path.startsWith('/customer')) {
-      handleGlobalSearch()
+    if (route.path === '/search') {
+      const keyword = globalSearchKeyword.value.trim()
+      const target = keyword ? { path: '/search', query: { keyword } } : { path: '/search' }
+      router.replace(target)
     }
   }, 500)
+}
+
+function firstQueryValue(value: unknown): string {
+  if (Array.isArray(value)) return value[0] ? String(value[0]) : ''
+  return value == null ? '' : String(value)
 }
 
 async function handleLogout() {

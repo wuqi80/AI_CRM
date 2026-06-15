@@ -71,4 +71,43 @@
         ORDER BY s.start_time ASC
     </select>
 
+    <sql id="scheduleGlobalSearchConditions">
+        s.create_user_id = #{userId}
+        AND (
+            LOWER(COALESCE(s.title, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(s.description, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(s.location, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.company_name, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(ct.name, '')) LIKE LOWER(#{pattern})
+        )
+    </sql>
+
+    <select id="countGlobalSearch" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM crm_schedule s
+        LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
+        LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
+        WHERE <include refid="scheduleGlobalSearchConditions"/>
+    </select>
+
+    <select id="globalSearch" resultType="com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO">
+        SELECT
+            'schedule' AS type,
+            s.schedule_id AS record_id,
+            s.title,
+            CONCAT_WS(' · ', NULLIF(c.company_name, ''), NULLIF(s.type, ''), NULLIF(s.location, '')) AS subtitle,
+            s.description AS content,
+            s.customer_id,
+            s.contact_id,
+            s.start_time AS event_time,
+            s.create_time,
+            s.create_time AS update_time
+        FROM crm_schedule s
+        LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
+        LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
+        WHERE <include refid="scheduleGlobalSearchConditions"/>
+        ORDER BY s.start_time DESC NULLS LAST, s.schedule_id DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

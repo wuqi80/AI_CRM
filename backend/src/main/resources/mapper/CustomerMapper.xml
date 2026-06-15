@@ -228,4 +228,40 @@
         SELECT COUNT(*) FROM crm_customer WHERE status = 1 AND level = #{level}
     </select>
 
+    <sql id="customerGlobalSearchConditions">
+        c.status = 1
+        AND (
+            LOWER(COALESCE(c.company_name, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.primary_contact_name, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.primary_contact_phone, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.tag_names, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.remark, '')) LIKE LOWER(#{pattern})
+        )
+    </sql>
+
+    <select id="countGlobalSearch" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM crm_customer c
+        WHERE <include refid="customerGlobalSearchConditions"/>
+    </select>
+
+    <select id="globalSearch" resultType="com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO">
+        SELECT
+            'customer' AS type,
+            c.customer_id AS record_id,
+            c.company_name AS title,
+            CONCAT_WS(' · ', NULLIF(c.industry, ''), NULLIF(c.stage, ''), NULLIF(u.realname, '')) AS subtitle,
+            CONCAT_WS(' · ', NULLIF(c.primary_contact_name, ''), NULLIF(c.primary_contact_phone, ''), NULLIF(c.tag_names, ''), NULLIF(c.remark, '')) AS content,
+            c.customer_id AS customer_id,
+            CAST(NULL AS BIGINT) AS contact_id,
+            COALESCE(c.update_time, c.create_time) AS event_time,
+            c.create_time,
+            c.update_time
+        FROM crm_customer c
+        LEFT JOIN manager_user u ON c.owner_id = u.user_id
+        WHERE <include refid="customerGlobalSearchConditions"/>
+        ORDER BY COALESCE(c.update_time, c.create_time) DESC NULLS LAST, c.customer_id DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

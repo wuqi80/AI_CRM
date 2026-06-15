@@ -138,4 +138,39 @@
         WHERE assigned_to = #{userId} AND LOWER(status) != 'completed'
     </select>
 
+    <sql id="taskGlobalSearchConditions">
+        (
+            LOWER(COALESCE(t.title, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(t.description, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(t.participant_names, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.company_name, '')) LIKE LOWER(#{pattern})
+        )
+    </sql>
+
+    <select id="countGlobalSearch" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM crm_task t
+        LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        WHERE <include refid="taskGlobalSearchConditions"/>
+    </select>
+
+    <select id="globalSearch" resultType="com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO">
+        SELECT
+            'task' AS type,
+            t.task_id AS record_id,
+            t.title,
+            CONCAT_WS(' · ', NULLIF(c.company_name, ''), NULLIF(t.status, ''), NULLIF(t.priority, '')) AS subtitle,
+            t.description AS content,
+            t.customer_id,
+            CAST(NULL AS BIGINT) AS contact_id,
+            COALESCE(t.due_date, t.create_time) AS event_time,
+            t.create_time,
+            t.update_time
+        FROM crm_task t
+        LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        WHERE <include refid="taskGlobalSearchConditions"/>
+        ORDER BY COALESCE(t.due_date, t.create_time) DESC NULLS LAST, t.task_id DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

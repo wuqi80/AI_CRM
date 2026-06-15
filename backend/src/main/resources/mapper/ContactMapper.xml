@@ -37,4 +37,43 @@
         LIMIT 1
     </select>
 
+    <sql id="contactGlobalSearchConditions">
+        c.status = 1
+        AND (
+            LOWER(COALESCE(c.name, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.position, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.phone, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.email, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.wechat, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.notes, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(cu.company_name, '')) LIKE LOWER(#{pattern})
+        )
+    </sql>
+
+    <select id="countGlobalSearch" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM crm_contact c
+        LEFT JOIN crm_customer cu ON c.customer_id = cu.customer_id
+        WHERE <include refid="contactGlobalSearchConditions"/>
+    </select>
+
+    <select id="globalSearch" resultType="com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO">
+        SELECT
+            'contact' AS type,
+            c.contact_id AS record_id,
+            c.name AS title,
+            CONCAT_WS(' · ', NULLIF(cu.company_name, ''), NULLIF(c.position, ''), NULLIF(c.phone, '')) AS subtitle,
+            CONCAT_WS(' · ', NULLIF(c.email, ''), NULLIF(c.notes, '')) AS content,
+            c.customer_id,
+            c.contact_id,
+            COALESCE(c.last_contact_time, c.create_time) AS event_time,
+            c.create_time,
+            c.update_time
+        FROM crm_contact c
+        LEFT JOIN crm_customer cu ON c.customer_id = cu.customer_id
+        WHERE <include refid="contactGlobalSearchConditions"/>
+        ORDER BY COALESCE(c.last_contact_time, c.create_time) DESC NULLS LAST, c.contact_id DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

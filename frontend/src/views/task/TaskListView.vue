@@ -292,7 +292,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useTaskStore } from '@/stores/task'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -304,6 +305,7 @@ import TaskDetailDrawer from './components/TaskDetailDrawer.vue'
 import TaskEditDialog from './components/TaskEditDialog.vue'
 
 const taskStore = useTaskStore()
+const route = useRoute()
 const { isMobile } = useResponsive()
 
 const currentStatus = ref('all')
@@ -415,9 +417,20 @@ const showTaskDetail = computed({
   }
 })
 
-onMounted(() => {
-  taskStore.fetchTaskList(true)
+onMounted(async () => {
+  applyRouteKeyword()
+  await taskStore.fetchTaskList(true)
+  syncSelectedTaskFromRoute()
 })
+
+watch(
+  () => [route.query.taskId, route.query.keyword],
+  async () => {
+    applyRouteKeyword()
+    await taskStore.fetchTaskList(true)
+    syncSelectedTaskFromRoute()
+  }
+)
 
 
 
@@ -450,6 +463,24 @@ async function handleStartTask(task: Task) {
 
 function handleViewDetail(task: Task) {
   selectedTask.value = task
+}
+
+function applyRouteKeyword() {
+  const keyword = firstQueryValue(route.query.keyword)
+  if (keyword) {
+    taskStore.queryParams.keyword = keyword
+  }
+}
+
+function syncSelectedTaskFromRoute() {
+  const taskId = firstQueryValue(route.query.taskId)
+  if (!taskId) return
+  selectedTask.value = taskStore.taskList.find(task => String(task.taskId) === taskId) || null
+}
+
+function firstQueryValue(value: unknown): string {
+  if (Array.isArray(value)) return value[0] ? String(value[0]) : ''
+  return value == null ? '' : String(value)
 }
 
 function handleEditFromDetail(task: Task) {

@@ -5,11 +5,14 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
+import com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+
+import java.util.List;
 
 /**
  * 知识库Mapper
@@ -50,4 +53,10 @@ public interface KnowledgeMapper extends BaseMapper<Knowledge> {
             """)
     int updateParseStatusIgnoreDataPermission(@Param("knowledgeId") Long knowledgeId,
                                               @Param("parseStatus") String parseStatus);
+
+    Long countGlobalSearch(@Param("keyword") String keyword, @Param("pattern") String pattern);
+
+    List<GlobalSearchResultVO> globalSearch(@Param("keyword") String keyword,
+                                            @Param("pattern") String pattern,
+                                            @Param("limit") int limit);
 }

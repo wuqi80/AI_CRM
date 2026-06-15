@@ -293,7 +293,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { getMySchedules } from '@/api/schedule'
@@ -308,6 +309,7 @@ import ScheduleDetailDrawer from './components/ScheduleDetailDrawer.vue'
 import ScheduleFormDialog from './components/ScheduleFormDialog.vue'
 
 const { isMobile } = useResponsive()
+const route = useRoute()
 
 const lunarFormatter = new Intl.DateTimeFormat('zh-Hans-u-ca-chinese', {
   month: 'short',
@@ -414,7 +416,13 @@ async function loadTasks() {
 
 onMounted(async () => {
   await Promise.all([loadSchedules(), loadTasks()])
+  syncSelectedRecordFromRoute()
 })
+
+watch(
+  () => [route.query.scheduleId, route.query.taskId],
+  () => syncSelectedRecordFromRoute()
+)
 
 // --- Helpers ---
 
@@ -459,6 +467,25 @@ async function handleToggleTask(task: Task) {
 function selectTask(task: Task) {
   selectedEvent.value = null
   selectedTask.value = task
+}
+
+function syncSelectedRecordFromRoute() {
+  const scheduleId = firstQueryValue(route.query.scheduleId)
+  const taskId = firstQueryValue(route.query.taskId)
+  if (scheduleId) {
+    selectedEvent.value = schedules.value.find(item => String(item.scheduleId) === scheduleId) || null
+    selectedTask.value = null
+    return
+  }
+  if (taskId) {
+    selectedTask.value = tasks.value.find(item => String(item.taskId) === taskId) || null
+    selectedEvent.value = null
+  }
+}
+
+function firstQueryValue(value: unknown): string {
+  if (Array.isArray(value)) return value[0] ? String(value[0]) : ''
+  return value == null ? '' : String(value)
 }
 
 function syncSelectedTask() {

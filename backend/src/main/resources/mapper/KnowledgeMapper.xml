@@ -60,4 +60,40 @@
         WHERE k.knowledge_id = #{knowledgeId}
     </select>
 
+    <sql id="knowledgeGlobalSearchConditions">
+        k.status != 2
+        AND (
+            LOWER(COALESCE(k.name, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(k.summary, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(k.content_text, '')) LIKE LOWER(#{pattern})
+            OR LOWER(COALESCE(c.company_name, '')) LIKE LOWER(#{pattern})
+        )
+    </sql>
+
+    <select id="countGlobalSearch" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM crm_knowledge k
+        LEFT JOIN crm_customer c ON k.customer_id = c.customer_id
+        WHERE <include refid="knowledgeGlobalSearchConditions"/>
+    </select>
+
+    <select id="globalSearch" resultType="com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO">
+        SELECT
+            'knowledge' AS type,
+            k.knowledge_id AS record_id,
+            k.name AS title,
+            CONCAT_WS(' · ', NULLIF(c.company_name, ''), NULLIF(k.type, '')) AS subtitle,
+            COALESCE(NULLIF(k.summary, ''), LEFT(k.content_text, 220)) AS content,
+            k.customer_id,
+            CAST(NULL AS BIGINT) AS contact_id,
+            k.create_time AS event_time,
+            k.create_time,
+            k.update_time
+        FROM crm_knowledge k
+        LEFT JOIN crm_customer c ON k.customer_id = c.customer_id
+        WHERE <include refid="knowledgeGlobalSearchConditions"/>
+        ORDER BY k.create_time DESC NULLS LAST, k.knowledge_id DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

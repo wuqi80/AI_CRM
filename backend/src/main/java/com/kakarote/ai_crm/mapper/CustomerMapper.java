@@ -6,6 +6,7 @@ import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.CustomerListVO;
+import com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -45,4 +46,10 @@ public interface CustomerMapper extends BaseMapper<Customer> {
      * 按等级统计客户数量
      */
     Long countByLevel(@Param("level") String level);
+
+    Long countGlobalSearch(@Param("keyword") String keyword, @Param("pattern") String pattern);
+
+    List<GlobalSearchResultVO> globalSearch(@Param("keyword") String keyword,
+                                            @Param("pattern") String pattern,
+                                            @Param("limit") int limit);
 }
