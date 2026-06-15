@@ -102,7 +102,17 @@
                 <span class="material-symbols-outlined text-3xl text-slate-300 animate-spin">progress_activity</span>
               </div>
 
-              <!-- WeKnora iframe preview -->
+              <!-- Native video preview -->
+              <video
+                v-else-if="previewUrl && !previewFailed && isVideoPreview()"
+                :src="previewUrl"
+                class="size-full bg-black object-contain"
+                controls
+                playsinline
+                @error="previewFailed = true"
+              />
+
+              <!-- Iframe preview -->
               <iframe
                 v-else-if="previewUrl && !previewFailed"
                 :src="previewUrl"
@@ -487,6 +497,13 @@ function handleDownload() {
 }
 
 // Helpers
+function isVideoPreview(): boolean {
+  const mimeType = (knowledge.value?.mimeType || '').toLowerCase()
+  const fileName = (knowledge.value?.name || '').toLowerCase()
+  return mimeType.startsWith('video/')
+    || /\.(mp4|webm|mov|m4v|ogg|ogv)$/i.test(fileName)
+}
+
 function formatDate(dateStr?: string): string {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleDateString('zh-CN')

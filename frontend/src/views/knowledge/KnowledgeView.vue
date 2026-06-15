@@ -30,7 +30,7 @@
           :before-upload="handleBeforeUpload"
           :http-request="handleUpload"
           multiple
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp4,.webm,.mov,.m4v,.ogg,.ogv,video/*"
         >
           <button
             type="button"
@@ -259,7 +259,7 @@
                 :before-upload="handleBeforeUpload"
                 :http-request="handleUpload"
                 multiple
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp4,.webm,.mov,.m4v,.ogg,.ogv,video/*"
               >
                 <button class="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg">
                   <span class="material-symbols-outlined text-sm">upload</span>
@@ -613,7 +613,7 @@
               :disabled="uploading"
               drag
               multiple
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp4,.webm,.mov,.m4v,.ogg,.ogv,video/*"
             >
               <div
                 class="rounded-[2rem] border-2 border-dashed border-slate-200 bg-white p-8 md:p-10 text-center transition-all hover:border-primary hover:bg-primary/5"
