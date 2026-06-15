@@ -13,6 +13,7 @@
         r.company,
         r.customer_id,
         linked_customer.company_name AS customer_name,
+        linked_customer.logo AS customer_logo,
         r.remark,
         r.source,
         r.source_customer_id,

@@ -19,6 +19,7 @@ import com.kakarote.ai_crm.entity.VO.RelationVO;
 import com.kakarote.ai_crm.mapper.ContactMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.RelationMapper;
+import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IRelationService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import org.springframework.stereotype.Service;
@@ -38,13 +39,16 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
     private final RelationMapper relationMapper;
     private final ContactMapper contactMapper;
     private final CustomerMapper customerMapper;
+    private final FileStorageService fileStorageService;
 
     public RelationServiceImpl(RelationMapper relationMapper,
                                ContactMapper contactMapper,
-                               CustomerMapper customerMapper) {
+                               CustomerMapper customerMapper,
+                               FileStorageService fileStorageService) {
         this.relationMapper = relationMapper;
         this.contactMapper = contactMapper;
         this.customerMapper = customerMapper;
+        this.fileStorageService = fileStorageService;
     }
 
     @Override
@@ -174,17 +178,26 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
         vo.setRelationTypeName(resolveRelationTypeName(vo.getRelationType()));
         vo.setSourceName(resolveSourceName(vo.getSource()));
         vo.setCustomFields(Collections.emptyMap());
-        fillCustomerName(vo);
+        fillCustomerFields(vo);
+        vo.setAvatarUrl(resolveFileUrl(vo.getAvatar()));
     }
 
-    private void fillCustomerName(RelationVO vo) {
-        if (vo.getCustomerId() == null || StrUtil.isNotBlank(vo.getCustomerName())) {
+    private void fillCustomerFields(RelationVO vo) {
+        if (vo.getCustomerId() == null) {
             return;
         }
-        Customer customer = customerMapper.selectById(vo.getCustomerId());
-        if (customer != null && !Objects.equals(customer.getStatus(), 0)) {
-            vo.setCustomerName(customer.getCompanyName());
+        if (StrUtil.isBlank(vo.getCustomerName()) || StrUtil.isBlank(vo.getCustomerLogo())) {
+            Customer customer = customerMapper.selectById(vo.getCustomerId());
+            if (customer != null && !Objects.equals(customer.getStatus(), 0)) {
+                if (StrUtil.isBlank(vo.getCustomerName())) {
+                    vo.setCustomerName(customer.getCompanyName());
+                }
+                if (StrUtil.isBlank(vo.getCustomerLogo())) {
+                    vo.setCustomerLogo(customer.getLogo());
+                }
+            }
         }
+        vo.setCustomerLogoUrl(resolveFileUrl(vo.getCustomerLogo()));
     }
 
     private String resolveRelationTypeName(String relationType) {
@@ -220,6 +233,22 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
         Customer customer = customerMapper.selectById(relation.getCustomerId());
         if (customer == null || Objects.equals(customer.getStatus(), 0)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist");
+        }
+    }
+
+    private String resolveFileUrl(String filePath) {
+        if (StrUtil.isBlank(filePath)) {
+            return null;
+        }
+        String normalized = StrUtil.trim(filePath);
+        if (StrUtil.startWithIgnoreCase(normalized, "http://")
+                || StrUtil.startWithIgnoreCase(normalized, "https://")) {
+            return normalized;
+        }
+        try {
+            return fileStorageService.getUrl(normalized);
+        } catch (Exception ignored) {
+            return null;
         }
     }
 }
