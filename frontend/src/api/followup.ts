@@ -1,5 +1,12 @@
 import { download, post, upload } from '@/utils/request'
-import type { FollowUp, FollowUpAddBO, FollowUpAttachmentDraft, FollowUpQueryBO, FollowUpUpdateBO } from '@/types/customer'
+import type {
+  FollowUp,
+  FollowUpAddBO,
+  FollowUpAttachment,
+  FollowUpAttachmentDraft,
+  FollowUpQueryBO,
+  FollowUpUpdateBO
+} from '@/types/customer'
 import type { PageResult } from '@/types/api'
 
 /**
@@ -63,6 +70,16 @@ export function uploadFollowUpAttachment(file: File): Promise<FollowUpAttachment
   const formData = new FormData()
   formData.append('file', file)
   return upload('/followup/attachment/upload', formData)
+}
+
+export function transcribeFollowUpAudio(file: File): Promise<string> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return upload('/followup/ai-transcribe', formData)
+}
+
+export function analyzeFollowUpAttachment(attachmentId: string): Promise<FollowUpAttachment> {
+  return post(`/followup/attachment/${attachmentId}/ai-analyze`)
 }
 
 export function downloadFollowUpAttachment(attachmentId: string, fileName?: string): Promise<void> {

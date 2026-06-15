@@ -54,6 +54,11 @@ public interface IFollowUpService extends IService<FollowUp> {
     FollowUpAttachmentVO getAttachment(Long attachmentId);
 
     /**
+     * Analyze an attachment with the configured AI model.
+     */
+    FollowUpAttachmentVO analyzeAttachment(Long attachmentId);
+
+    /**
      * 删除附件。
      */
     void deleteAttachment(Long attachmentId);

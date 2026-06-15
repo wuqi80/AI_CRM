@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
+import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
@@ -27,15 +28,22 @@ import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.FollowUpAttachmentMapper;
 import com.kakarote.ai_crm.mapper.FollowUpMapper;
 import com.kakarote.ai_crm.mapper.RelationMapper;
+import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IFollowUpService;
+import com.kakarote.ai_crm.utils.AiMediaUtil;
+import com.kakarote.ai_crm.utils.DocumentTextExtractor;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.MimeType;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -45,6 +53,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -58,6 +67,8 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
     private static final DateTimeFormatter AI_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter DATE_ONLY_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
+    private static final int MAX_ATTACHMENT_ANALYSIS_LENGTH = 4000;
     private static final List<DateTimeFormatter> DATE_TIME_FORMATTERS = List.of(
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
@@ -94,6 +105,9 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private AiAudioTranscriptionService aiAudioTranscriptionService;
 
     @Lazy
     @Autowired
@@ -224,6 +238,40 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public FollowUpAttachmentVO analyzeAttachment(Long attachmentId) {
+        FollowUpAttachment attachment = followUpAttachmentMapper.selectById(attachmentId);
+        if (attachment == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment does not exist");
+        }
+
+        attachment.setAnalysisStatus("processing");
+        followUpAttachmentMapper.updateById(attachment);
+
+        try {
+            String analysis = buildAttachmentAnalysis(attachment);
+            attachment.setAnalysisStatus("completed");
+            attachment.setAnalysisContent(analysis);
+            attachment.setAnalysisTime(new Date());
+            followUpAttachmentMapper.updateById(attachment);
+            return toAttachmentVO(attachment);
+        } catch (BusinessException ex) {
+            attachment.setAnalysisStatus("failed");
+            attachment.setAnalysisContent(ex.getMessage());
+            attachment.setAnalysisTime(new Date());
+            followUpAttachmentMapper.updateById(attachment);
+            return toAttachmentVO(attachment);
+        } catch (Exception ex) {
+            log.error("Attachment AI analysis failed, attachmentId={}", attachmentId, ex);
+            attachment.setAnalysisStatus("failed");
+            attachment.setAnalysisContent("AI analysis failed, please try again later.");
+            attachment.setAnalysisTime(new Date());
+            followUpAttachmentMapper.updateById(attachment);
+            return toAttachmentVO(attachment);
+        }
+    }
+
+    @Override
     public FollowUpAiParseVO aiParseFollowUp(FollowUpAiParseBO parseBO) {
         String customerName = StrUtil.blankToDefault(parseBO.getCustomerName(), "未知客户");
         String now = LocalDateTime.now().format(AI_TIME_FORMATTER);
@@ -311,6 +359,219 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
     private FollowUpAttachmentVO toAttachmentVO(FollowUpAttachment attachment) {
         return BeanUtil.copyProperties(attachment, FollowUpAttachmentVO.class);
+    }
+
+    private String buildAttachmentAnalysis(FollowUpAttachment attachment) {
+        String mimeType = StrUtil.blankToDefault(attachment.getMimeType(), "");
+        String fileName = StrUtil.blankToDefault(attachment.getFileName(), "");
+        if (mimeType.startsWith("image/")) {
+            return analyzeImageAttachment(attachment);
+        }
+        if (isAudioFile(mimeType, fileName)) {
+            return analyzeAudioAttachment(attachment);
+        }
+
+        String content;
+        if (isTextFile(mimeType, fileName)) {
+            content = extractFileText(attachment.getFilePath());
+        } else if (isDocumentFile(mimeType, fileName)) {
+            content = extractDocumentText(attachment.getFilePath(), mimeType, fileName);
+        } else {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                "Current attachment type is not supported for AI analysis");
+        }
+
+        if (StrUtil.isBlank(content)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                "No readable content could be extracted from this attachment");
+        }
+        return analyzeTextLikeAttachment(fileName, content);
+    }
+
+    private String analyzeImageAttachment(FollowUpAttachment attachment) {
+        AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
+        if (capabilities == null || !capabilities.isSupportsVision()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                "The current model does not support image analysis");
+        }
+
+        String prompt = """
+            You are a CRM assistant.
+            Analyze this follow-up attachment image and reply in concise Simplified Chinese.
+            Keep the answer to 2-3 sentences. Mention the most important visible facts first, then at most one practical implication.
+            Do not use markdown or bullet points.
+            """;
+
+        try {
+            Media media = AiMediaUtil.buildMedia(
+                fileStorageService,
+                attachment.getFilePath(),
+                MimeType.valueOf(StrUtil.blankToDefault(attachment.getMimeType(), "image/jpeg"))
+            );
+            String response = chatClientProvider.getChatClient()
+                .prompt()
+                .user(user -> user.text(prompt).media(media))
+                .call()
+                .content();
+            return StrUtil.blankToDefault(response, "Unable to generate an effective image analysis.").trim();
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Image analysis failed");
+        }
+    }
+
+    private String analyzeAudioAttachment(FollowUpAttachment attachment) {
+        try (InputStream inputStream = fileStorageService.getFileStream(attachment.getFilePath())) {
+            if (inputStream == null) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment audio could not be loaded");
+            }
+            byte[] bytes = inputStream.readAllBytes();
+            String transcript = aiAudioTranscriptionService.transcribe(
+                bytes,
+                attachment.getFileName(),
+                attachment.getMimeType()
+            );
+            if (StrUtil.isBlank(transcript)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                    "No valid transcript could be produced from this audio");
+            }
+            return analyzeTextLikeAttachment(
+                attachment.getFileName(),
+                "Audio transcript:\n" + limitText(transcript, MAX_ATTACHMENT_ANALYSIS_LENGTH)
+            );
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Audio analysis failed");
+        }
+    }
+
+    private String analyzeTextLikeAttachment(String fileName, String content) {
+        String prompt = """
+            You are a CRM assistant.
+            Please analyze the attachment content below and reply in concise Simplified Chinese.
+            Requirements:
+            1. Keep the answer within 2-3 sentences.
+            2. Summarize the most important concrete facts from the attachment.
+            3. If helpful, add one practical follow-up implication in the last sentence.
+            4. Do not use markdown, bullet points, or quotation marks.
+
+            Attachment: %s
+            Content:
+            %s
+            """.formatted(fileName, limitText(content, MAX_ATTACHMENT_ANALYSIS_LENGTH));
+
+        try {
+            String response = chatClientProvider.getChatClient()
+                .prompt()
+                .user(prompt)
+                .call()
+                .content();
+            return StrUtil.blankToDefault(response, "Attachment content was read, but no useful analysis was generated.")
+                .trim();
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Attachment analysis failed");
+        }
+    }
+
+    private boolean isTextFile(String mimeType, String fileName) {
+        if (mimeType != null && (mimeType.startsWith("text/") || "application/json".equals(mimeType))) {
+            return true;
+        }
+        String lowerFileName = StrUtil.blankToDefault(fileName, "").toLowerCase(Locale.ROOT);
+        return lowerFileName.endsWith(".txt")
+            || lowerFileName.endsWith(".md")
+            || lowerFileName.endsWith(".csv")
+            || lowerFileName.endsWith(".json")
+            || lowerFileName.endsWith(".xml")
+            || lowerFileName.endsWith(".yaml")
+            || lowerFileName.endsWith(".yml")
+            || lowerFileName.endsWith(".log");
+    }
+
+    private boolean isDocumentFile(String mimeType, String fileName) {
+        String lowerMimeType = StrUtil.blankToDefault(mimeType, "").toLowerCase(Locale.ROOT);
+        if (lowerMimeType.equals("application/pdf")
+            || lowerMimeType.equals("application/msword")
+            || lowerMimeType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            || lowerMimeType.equals("application/vnd.ms-excel")
+            || lowerMimeType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            || lowerMimeType.equals("application/vnd.ms-powerpoint")
+            || lowerMimeType.equals("application/vnd.openxmlformats-officedocument.presentationml.presentation")) {
+            return true;
+        }
+        String lowerFileName = StrUtil.blankToDefault(fileName, "").toLowerCase(Locale.ROOT);
+        return lowerFileName.endsWith(".pdf")
+            || lowerFileName.endsWith(".doc")
+            || lowerFileName.endsWith(".docx")
+            || lowerFileName.endsWith(".xls")
+            || lowerFileName.endsWith(".xlsx")
+            || lowerFileName.endsWith(".ppt")
+            || lowerFileName.endsWith(".pptx");
+    }
+
+    private boolean isAudioFile(String mimeType, String fileName) {
+        String lowerMimeType = StrUtil.blankToDefault(mimeType, "").toLowerCase(Locale.ROOT);
+        if (lowerMimeType.startsWith("audio/")) {
+            return true;
+        }
+        String lowerFileName = StrUtil.blankToDefault(fileName, "").toLowerCase(Locale.ROOT);
+        return lowerFileName.endsWith(".mp3")
+            || lowerFileName.endsWith(".wav")
+            || lowerFileName.endsWith(".m4a")
+            || lowerFileName.endsWith(".aac")
+            || lowerFileName.endsWith(".webm")
+            || lowerFileName.endsWith(".ogg");
+    }
+
+    private String extractFileText(String filePath) {
+        try (InputStream inputStream = fileStorageService.getFileStream(filePath)) {
+            if (inputStream == null) {
+                return null;
+            }
+            byte[] bytes = inputStream.readNBytes(MAX_EXTRACTED_TEXT_LENGTH * 3);
+            String text = new String(bytes, StandardCharsets.UTF_8);
+            if (text.length() > MAX_EXTRACTED_TEXT_LENGTH) {
+                text = text.substring(0, MAX_EXTRACTED_TEXT_LENGTH) + "\n...(truncated)";
+            }
+            return text;
+        } catch (Exception e) {
+            log.warn("Failed to read text attachment: {}", filePath, e);
+            return null;
+        }
+    }
+
+    private String extractDocumentText(String filePath, String mimeType, String fileName) {
+        try (InputStream inputStream = fileStorageService.getFileStream(filePath)) {
+            if (inputStream == null) {
+                return null;
+            }
+            String text = DocumentTextExtractor.parseToString(inputStream, mimeType, fileName);
+            if (StrUtil.isBlank(text)) {
+                return null;
+            }
+            if (text.length() > MAX_EXTRACTED_TEXT_LENGTH) {
+                text = text.substring(0, MAX_EXTRACTED_TEXT_LENGTH) + "\n...(truncated)";
+            }
+            return text.trim();
+        } catch (Exception e) {
+            log.warn("Failed to extract document text: {}", filePath, e);
+            return null;
+        }
+    }
+
+    private String limitText(String content, int maxLength) {
+        if (content == null) {
+            return "";
+        }
+        String normalized = content.trim();
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, maxLength) + "\n...(truncated)";
     }
 
     private void safeDeleteFile(String filePath) {

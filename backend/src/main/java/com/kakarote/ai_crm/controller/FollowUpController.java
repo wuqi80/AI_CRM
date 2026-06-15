@@ -14,6 +14,7 @@ import com.kakarote.ai_crm.entity.BO.FollowUpUpdateBO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAttachmentVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
+import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IFollowUpService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,6 +48,9 @@ public class FollowUpController {
 
     @Autowired
     private IFollowUpService followUpService;
+
+    @Autowired
+    private AiAudioTranscriptionService aiAudioTranscriptionService;
 
     @Autowired
     private FileStorageService fileStorageService;
@@ -95,6 +99,20 @@ public class FollowUpController {
     @RequirePermission("followup:create")
     public Result<FollowUpAiParseVO> aiParse(@Valid @RequestBody FollowUpAiParseBO parseBO) {
         return Result.ok(followUpService.aiParseFollowUp(parseBO));
+    }
+
+    @PostMapping("/attachment/{attachmentId}/ai-analyze")
+    @Operation(summary = "AI analyze follow-up attachment")
+    @RequirePermission("followup:view")
+    public Result<FollowUpAttachmentVO> aiAnalyzeAttachment(@PathVariable Long attachmentId) {
+        return Result.ok(followUpService.analyzeAttachment(attachmentId));
+    }
+
+    @PostMapping("/ai-transcribe")
+    @Operation(summary = "AI audio transcription")
+    @RequirePermission("followup:create")
+    public Result<String> aiTranscribe(@RequestPart("file") MultipartFile file) {
+        return Result.ok(aiAudioTranscriptionService.transcribe(file));
     }
 
     @PostMapping("/attachment/upload")
