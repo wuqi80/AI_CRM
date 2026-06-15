@@ -1872,7 +1872,6 @@
       @submit="handleCreateProject"
     />
     <AccountSettingsModal v-model="showAccountSettingsModal" />
-    <ProfileEditBottomSheet v-model="showProfileEditSheet" />
     <Teleport to="body">
       <Transition name="customer-search-dialog">
         <div
@@ -2040,7 +2039,6 @@ import defaultLogoImg from '@/assets/images/logo.png'
 import FloatingActionButton from '@/components/common/FloatingActionButton.vue'
 import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 import AccountSettingsModal from '@/views/profile/components/AccountSettingsModal.vue'
-import ProfileEditBottomSheet from '@/views/profile/components/ProfileEditBottomSheet.vue'
 import ChatSessionActionsPopover from '@/components/layout/ChatSessionActionsPopover.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import RelationUpsertDialog from '@/views/relation/components/RelationUpsertDialog.vue'
@@ -2824,7 +2822,6 @@ const showUserMenu = ref(false)
 const currentAppVersion = ref(DEFAULT_CURRENT_VERSION)
 const checkingAppUpdate = ref(false)
 const showAccountSettingsModal = ref(false)
-const showProfileEditSheet = ref(false)
 const showCreateCustomer = ref(false)
 const showCreateRelation = ref(false)
 const showCreateProject = ref(false)
@@ -4607,10 +4604,6 @@ function mobileProfileNavigate(path: string, query?: Record<string, string>) {
 
 function handleOpenAccountSettings() {
   showUserMenu.value = false
-  if (isMobile.value) {
-    showProfileEditSheet.value = true
-    return
-  }
   showAccountSettingsModal.value = true
 }
 
