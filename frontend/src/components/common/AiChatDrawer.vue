@@ -237,7 +237,7 @@
                 type="text"
                 class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-slate-900 px-2 py-2 text-sm placeholder:text-slate-400"
                 placeholder="输入您的问题..."
-                :disabled="chatStore.isStreaming || isUploading"
+                :disabled="chatStore.currentSessionIsStreaming || isUploading"
                 @keydown.enter.exact.prevent="handleSend"
               />
               <button
@@ -259,10 +259,10 @@
               </button>
               <button
                 class="size-9 rounded-lg bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-sm shadow-primary/20 transition-all disabled:opacity-50"
-                :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
+                :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.currentSessionIsStreaming || isUploading"
                 @click="handleSend"
               >
-                <span v-if="chatStore.isStreaming || isUploading" class="material-symbols-outlined text-lg animate-spin">progress_activity</span>
+                <span v-if="chatStore.currentSessionIsStreaming || isUploading" class="material-symbols-outlined text-lg animate-spin">progress_activity</span>
                 <span v-else class="material-symbols-outlined text-lg">send</span>
               </button>
             </div>
@@ -434,7 +434,7 @@ function handleOpenFullPage() {
 async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
-  if ((!text && !hasFiles) || chatStore.isStreaming || isUploading.value) return
+  if ((!text && !hasFiles) || chatStore.currentSessionIsStreaming || isUploading.value) return
 
   const content = text || '请分析这些文件'
   inputText.value = ''

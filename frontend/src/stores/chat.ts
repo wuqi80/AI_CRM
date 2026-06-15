@@ -10,7 +10,7 @@ import {
   sendMessageStream,
   sendMessageSync
 } from '@/api/chat'
-import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, ChatAppOption } from '@/types/common'
+import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, ChatMessage, ChatAppOption } from '@/types/common'
 
 interface LocalMessage {
   id: string
@@ -21,14 +21,21 @@ interface LocalMessage {
   attachments?: ChatAttachmentVO[]
 }
 
+interface StreamingTask {
+  sessionId: string
+  userMessageId: string
+  assistantMessageId: string
+  startedAt: number
+}
+
 export const useChatStore = defineStore('chat', () => {
   const RAG_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_rag_enabled:v1'
 
   // State
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
-  const messages = ref<LocalMessage[]>([])
-  const isStreaming = ref(false)
+  const messagesBySessionId = ref<Record<string, LocalMessage[]>>({})
+  const streamingTasks = ref<Record<string, StreamingTask>>({})
   const loading = ref(false)
   const sessionsLoading = ref(false)
   const ragEnabled = ref(loadRagEnabled())
@@ -38,6 +45,17 @@ export const useChatStore = defineStore('chat', () => {
   let fetchSessionsPromise: Promise<void> | null = null
 
   // Getters
+  const messages = computed(() => {
+    if (!currentSessionId.value) return []
+    return messagesBySessionId.value[currentSessionId.value] || []
+  })
+
+  const isStreaming = computed(() => Object.keys(streamingTasks.value).length > 0)
+  const streamingSessionIds = computed(() => Object.keys(streamingTasks.value))
+  const currentSessionIsStreaming = computed(() =>
+    currentSessionId.value ? Boolean(streamingTasks.value[currentSessionId.value]) : false
+  )
+
   const currentSession = computed(() =>
     sessions.value.find(s => s.sessionId === currentSessionId.value)
   )
@@ -83,7 +101,7 @@ export const useChatStore = defineStore('chat', () => {
     await fetchSessions()
     currentSessionId.value = sessionId
     setCurrentAppCode(resolvedAppCode)
-    messages.value = []
+    setSessionMessages(sessionId, [])
     return sessionId
   }
 
@@ -96,14 +114,8 @@ export const useChatStore = defineStore('chat', () => {
     loading.value = true
     try {
       const dbMessages = await getMessageList(sessionId)
-      messages.value = dbMessages.map(m => ({
-        id: m.messageId,
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-        timestamp: new Date(m.createTime),
-        isStreaming: false,
-        attachments: m.attachments
-      }))
+      const loadedMessages = dbMessages.map(toLocalMessage)
+      setSessionMessages(sessionId, mergeLoadedMessagesWithStreaming(sessionId, loadedMessages))
     } finally {
       loading.value = false
     }
@@ -112,9 +124,10 @@ export const useChatStore = defineStore('chat', () => {
   async function removeSession(sessionId: string) {
     await deleteSession(sessionId)
     sessions.value = sessions.value.filter(s => s.sessionId !== sessionId)
+    delete messagesBySessionId.value[sessionId]
+    delete streamingTasks.value[sessionId]
     if (currentSessionId.value === sessionId) {
       currentSessionId.value = null
-      messages.value = []
     }
   }
 
@@ -135,18 +148,22 @@ export const useChatStore = defineStore('chat', () => {
       await startNewSession('新对话')
     }
 
+    const sessionId = currentSessionId.value!
+    if (streamingTasks.value[sessionId]) return
+    const userMessageId = createLocalMessageId('user')
+    const assistantMessageId = createLocalMessageId('assistant')
+
     // Add user message
     const userMessage: LocalMessage = {
-      id: Date.now().toString(),
+      id: userMessageId,
       role: 'user',
       content,
       timestamp: new Date(),
       attachments: attachmentVOs
     }
-    messages.value.push(userMessage)
+    appendSessionMessage(sessionId, userMessage)
 
     // Add assistant placeholder
-    const assistantMessageId = (Date.now() + 1).toString()
     const assistantMessage: LocalMessage = {
       id: assistantMessageId,
       role: 'assistant',
@@ -154,34 +171,33 @@ export const useChatStore = defineStore('chat', () => {
       timestamp: new Date(),
       isStreaming: true
     }
-    messages.value.push(assistantMessage)
+    appendSessionMessage(sessionId, assistantMessage)
 
-    isStreaming.value = true
+    streamingTasks.value[sessionId] = {
+      sessionId,
+      userMessageId,
+      assistantMessageId,
+      startedAt: Date.now()
+    }
 
     try {
       const effectiveRagEnabled = (useRag ?? ragEnabled.value) || Boolean(knowledgeIds?.length)
       await sendMessageStream(
-        currentSessionId.value!,
+        sessionId,
         content,
         (chunk) => {
-          // Update assistant message with chunk
-          const lastMessage = messages.value[messages.value.length - 1]
-          if (lastMessage && lastMessage.role === 'assistant') {
-            lastMessage.content += chunk
-          }
+          const assistantMessage = ensureStreamingAssistantMessage(sessionId, assistantMessageId)
+          assistantMessage.content += chunk
         },
         async () => {
-          // Complete - mark message as done streaming
-          const lastMessage = messages.value[messages.value.length - 1]
-          if (lastMessage && lastMessage.role === 'assistant') {
-            lastMessage.isStreaming = false
-          }
+          markAssistantMessageDone(sessionId, assistantMessageId)
+          delete streamingTasks.value[sessionId]
           // Refresh session list to get updated title
           await fetchSessions()
         },
         (error) => {
           console.error('Stream error:', error)
-          const lastMessage = messages.value[messages.value.length - 1]
+          const lastMessage = ensureStreamingAssistantMessage(sessionId, assistantMessageId)
           if (lastMessage && lastMessage.role === 'assistant') {
             if (!lastMessage.content) {
               lastMessage.content = '抱歉，发生错误，请重试。'
@@ -198,13 +214,8 @@ export const useChatStore = defineStore('chat', () => {
       // Error already handled by onError callback, but ensure message is marked as complete
       console.error('sendMessage error:', error)
     } finally {
-      // Always reset streaming state
-      isStreaming.value = false
-      // Ensure the assistant message is marked as not streaming
-      const lastMessage = messages.value[messages.value.length - 1]
-      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
-        lastMessage.isStreaming = false
-      }
+      delete streamingTasks.value[sessionId]
+      markAssistantMessageDone(sessionId, assistantMessageId)
     }
   }
 
@@ -213,19 +224,24 @@ export const useChatStore = defineStore('chat', () => {
       await startNewSession('新对话')
     }
 
+    const sessionId = currentSessionId.value!
+    if (streamingTasks.value[sessionId]) {
+      return ''
+    }
+
     // Add user message
     const userMessage: LocalMessage = {
-      id: Date.now().toString(),
+      id: createLocalMessageId('user'),
       role: 'user',
       content,
       timestamp: new Date()
     }
-    messages.value.push(userMessage)
+    appendSessionMessage(sessionId, userMessage)
 
     loading.value = true
     try {
       const response = await sendMessageSync(
-        currentSessionId.value!,
+        sessionId,
         content,
         undefined,
         (useRag ?? ragEnabled.value) || Boolean(knowledgeIds?.length),
@@ -234,12 +250,12 @@ export const useChatStore = defineStore('chat', () => {
       )
 
       const assistantMessage: LocalMessage = {
-        id: (Date.now() + 1).toString(),
+        id: createLocalMessageId('assistant'),
         role: 'assistant',
         content: response,
         timestamp: new Date()
       }
-      messages.value.push(assistantMessage)
+      appendSessionMessage(sessionId, assistantMessage)
 
       return response
     } finally {
@@ -248,7 +264,10 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function clearMessages() {
-    messages.value = []
+    const sessionId = currentSessionId.value
+    if (sessionId && !streamingTasks.value[sessionId]) {
+      setSessionMessages(sessionId, [])
+    }
     currentSessionId.value = null
   }
 
@@ -277,12 +296,111 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function getSessionMessages(sessionId: string): LocalMessage[] {
+    if (!messagesBySessionId.value[sessionId]) {
+      messagesBySessionId.value[sessionId] = []
+    }
+    return messagesBySessionId.value[sessionId]
+  }
+
+  function setSessionMessages(sessionId: string, nextMessages: LocalMessage[]) {
+    messagesBySessionId.value[sessionId] = nextMessages
+  }
+
+  function appendSessionMessage(sessionId: string, message: LocalMessage) {
+    getSessionMessages(sessionId).push(message)
+  }
+
+  function findSessionMessage(sessionId: string, messageId: string): LocalMessage | undefined {
+    return getSessionMessages(sessionId).find(message => message.id === messageId)
+  }
+
+  function ensureStreamingAssistantMessage(sessionId: string, assistantMessageId: string): LocalMessage {
+    const existingMessage = findSessionMessage(sessionId, assistantMessageId)
+    if (existingMessage) return existingMessage
+
+    const message: LocalMessage = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isStreaming: true
+    }
+    appendSessionMessage(sessionId, message)
+    return message
+  }
+
+  function markAssistantMessageDone(sessionId: string, assistantMessageId: string) {
+    const assistantMessage = findSessionMessage(sessionId, assistantMessageId)
+    if (assistantMessage) {
+      assistantMessage.isStreaming = false
+    }
+  }
+
+  function mergeLoadedMessagesWithStreaming(
+    sessionId: string,
+    loadedMessages: LocalMessage[]
+  ): LocalMessage[] {
+    const task = streamingTasks.value[sessionId]
+    if (!task) return loadedMessages
+
+    const mergedMessages = [...loadedMessages]
+    const localMessages = messagesBySessionId.value[sessionId] || []
+
+    for (const localMessage of localMessages) {
+      if (mergedMessages.some(message => message.id === localMessage.id)) {
+        continue
+      }
+      if (localMessage.id === task.assistantMessageId || localMessage.isStreaming) {
+        mergedMessages.push(localMessage)
+        continue
+      }
+      if (localMessage.id === task.userMessageId && !hasEquivalentLoadedMessage(mergedMessages, localMessage)) {
+        mergedMessages.push(localMessage)
+      }
+    }
+
+    return mergedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+  }
+
+  function hasEquivalentLoadedMessage(messagesToCheck: LocalMessage[], target: LocalMessage): boolean {
+    const equivalenceWindow = 5 * 60 * 1000
+    return messagesToCheck.some(message =>
+      message.role === target.role &&
+      message.content === target.content &&
+      Math.abs(message.timestamp.getTime() - target.timestamp.getTime()) <= equivalenceWindow
+    )
+  }
+
+  function toLocalMessage(message: ChatMessage): LocalMessage {
+    return {
+      id: message.messageId,
+      role: message.role as 'user' | 'assistant',
+      content: message.content,
+      timestamp: new Date(message.createTime),
+      isStreaming: false,
+      attachments: message.attachments
+    }
+  }
+
+  function createLocalMessageId(prefix: 'user' | 'assistant'): string {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  }
+
+  function isSessionStreaming(sessionId: string): boolean {
+    return Boolean(streamingTasks.value[sessionId])
+  }
+
   return {
     // State
     sessions,
     currentSessionId,
     messages,
+    messagesBySessionId,
+    streamingTasks,
+    streamingSessionIds,
     isStreaming,
+    currentSessionIsStreaming,
     loading,
     sessionsLoading,
     ragEnabled,
@@ -303,6 +421,7 @@ export const useChatStore = defineStore('chat', () => {
     sendMessageWithSync,
     clearMessages,
     setRagEnabled,
-    setCurrentAppCode
+    setCurrentAppCode,
+    isSessionStreaming
   }
 })

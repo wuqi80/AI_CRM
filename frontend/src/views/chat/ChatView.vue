@@ -440,7 +440,7 @@
                     type="text"
                     class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-slate-900 px-3 py-3 text-sm placeholder:text-slate-400"
                     placeholder="输入指令，如：总结今天与张总的会议..."
-                    :disabled="chatStore.isStreaming || isUploading"
+                    :disabled="chatStore.currentSessionIsStreaming || isUploading"
                     @keydown.enter.exact.prevent="handleSend"
                   />
                   <div class="flex items-center gap-2 pr-1">
@@ -463,10 +463,10 @@
                     </button>
                     <button
                       class="size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
-                      :disabled="(!inputText.trim() && selectedFiles.length === 0 && selectedKnowledgeItems.length === 0) || chatStore.isStreaming || isUploading"
+                      :disabled="(!inputText.trim() && selectedFiles.length === 0 && selectedKnowledgeItems.length === 0) || chatStore.currentSessionIsStreaming || isUploading"
                       @click="handleSend"
                     >
-                      <span v-if="chatStore.isStreaming || isUploading" class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
+                      <span v-if="chatStore.currentSessionIsStreaming || isUploading" class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
                       <span v-else class="material-symbols-outlined text-xl">send</span>
                     </button>
                   </div>
@@ -944,7 +944,7 @@ async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
   const hasKnowledge = selectedKnowledgeItems.value.length > 0
-  if ((!text && !hasFiles && !hasKnowledge) || chatStore.isStreaming || isUploading.value) return
+  if ((!text && !hasFiles && !hasKnowledge) || chatStore.currentSessionIsStreaming || isUploading.value) return
   if (!(await ensureAiAvailable())) return
 
   const effectiveAppCode = chatStore.currentAppCode
