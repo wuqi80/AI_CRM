@@ -140,10 +140,16 @@
     <!-- Mobile Drawer Navigation -->
     <Teleport to="body">
       <Transition name="drawer-overlay">
-        <div v-if="isMobile && drawerVisible" class="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm" @click="drawerVisible = false"></div>
+        <div v-if="isMobile && drawerVisible" class="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm" @click="closeMobileDrawer"></div>
       </Transition>
       <Transition name="drawer-panel">
-        <aside v-if="isMobile && drawerVisible" class="wk-mobile-drawer-panel fixed left-0 top-0 bottom-0 w-72 bg-white flex flex-col shadow-2xl z-[101]">
+        <aside
+          v-if="isMobile && drawerVisible"
+          class="wk-mobile-drawer-panel fixed left-0 top-0 bottom-0 w-72 bg-white flex flex-col shadow-2xl z-[101] touch-pan-y"
+          @touchstart.passive="handleMobileDrawerTouchStart"
+          @touchend.passive="handleMobileDrawerTouchEnd"
+          @touchcancel.passive="resetMobileDrawerSwipe"
+        >
           <div class="wk-mobile-drawer-header p-6 flex items-center gap-3">
             <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
               <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
@@ -259,6 +265,7 @@ import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDial
 import AccountSettingsModal from '@/views/profile/components/AccountSettingsModal.vue'
 import type { WkIconName } from '@/components/common/wkIcon'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { shouldCloseMobileDrawerFromSwipe, type SwipePoint } from '@/utils/mobileDrawerSwipe'
 
 const route = useRoute()
 const router = useRouter()
@@ -283,6 +290,7 @@ watch(
 onMounted(() => enterpriseStore.loadConfig())
 
 const drawerVisible = ref(false)
+const mobileDrawerSwipeStart = ref<SwipePoint | null>(null)
 const showUserMenu = ref(false)
 const showAccountSettingsModal = ref(false)
 const { isOpen: chatDrawerOpen } = useChatDrawer()
@@ -352,7 +360,42 @@ function navigateTo(path: string) {
 
 function mobileNavigate(path: string) {
   router.push(path)
+  closeMobileDrawer()
+}
+
+function closeMobileDrawer() {
   drawerVisible.value = false
+  showUserMenu.value = false
+  resetMobileDrawerSwipe()
+}
+
+function handleMobileDrawerTouchStart(event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touch) return
+  mobileDrawerSwipeStart.value = {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  }
+}
+
+function handleMobileDrawerTouchEnd(event: TouchEvent) {
+  const start = mobileDrawerSwipeStart.value
+  resetMobileDrawerSwipe()
+  const touch = event.changedTouches[0]
+  if (!start || !touch) return
+  if (shouldCloseMobileDrawerFromSwipe({
+    start,
+    end: {
+      clientX: touch.clientX,
+      clientY: touch.clientY
+    }
+  })) {
+    closeMobileDrawer()
+  }
+}
+
+function resetMobileDrawerSwipe() {
+  mobileDrawerSwipeStart.value = null
 }
 
 function handleOpenAccountSettings() {
