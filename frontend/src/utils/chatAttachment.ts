@@ -17,6 +17,7 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
   'audio/aac': 'aac',
   'audio/amr': 'amr',
   'audio/flac': 'flac',
+  'audio/mp3': 'mp3',
   'audio/mp4': 'm4a',
   'audio/mpeg': 'mp3',
   'audio/ogg': 'ogg',
