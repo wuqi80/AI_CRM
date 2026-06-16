@@ -1074,15 +1074,14 @@ async function completeLoginRedirect(redirectValue: unknown) {
 
 .external-auth-btn__microsoft-icon {
   display: grid;
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1rem;
+  height: 1rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px;
+  gap: 0.12rem;
 }
 
 .external-auth-btn__microsoft-pane {
   display: block;
-  border-radius: 1px;
 }
 
 .external-auth-btn__microsoft-pane--red {
