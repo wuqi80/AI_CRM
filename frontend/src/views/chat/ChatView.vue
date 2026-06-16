@@ -812,12 +812,18 @@
                     <template #reference>
                       <button
                         type="button"
-                        class="size-10 flex items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-50 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                        class="wk-chat-upload-trigger group/chat-upload-trigger relative flex size-8 items-center justify-center rounded-full text-[#0d0d0d] transition-colors hover:bg-[#f1f1f1] disabled:cursor-not-allowed disabled:opacity-50"
                         :disabled="isUploading"
                         aria-label="添加附件"
                         title="添加附件"
                       >
-                        <span class="material-symbols-outlined">add_circle</span>
+                        <WkIcon name="add-1" :box-size="16" class="shrink-0" />
+                        <span
+                          class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/chat-upload-trigger:opacity-100"
+                          role="tooltip"
+                        >
+                          添加附件
+                        </span>
                       </button>
                     </template>
                     <div class="wk-chat-upload-menu">
@@ -879,13 +885,24 @@
                   <button
                     v-if="selectedChatAppLabel"
                     type="button"
-                    class="group/crm-toolbar hidden h-10 shrink-0 items-center gap-1.5 rounded-full bg-slate-50 pl-2 pr-3 text-sm font-semibold text-[var(--wk-text-primary)] transition-colors hover:bg-slate-100 sm:inline-flex"
+                    class="group/crm-toolbar hidden h-9 shrink-0 items-center rounded-full pl-1 pr-3.5 text-sm font-semibold text-[var(--wk-text-primary)] transition-all hover:bg-[var(--wk-bg-surface-hover)] sm:inline-flex"
                     :title="`已启用 ${selectedChatAppLabel}，点击关闭`"
                     @click="chatStore.setSelectedAppCode('general')"
                   >
-                    <span class="material-symbols-outlined text-[18px] leading-none">{{ selectedChatAppIcon }}</span>
+                    <span class="relative flex size-[22px] shrink-0 items-center justify-center">
+                      <span
+                        class="flex size-full items-center justify-center transition-opacity duration-150 group-hover/crm-toolbar:pointer-events-none group-hover/crm-toolbar:opacity-0"
+                      >
+                        <span class="material-symbols-outlined text-[18px] leading-none">{{ selectedChatAppIcon }}</span>
+                      </span>
+                      <span
+                        class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-[var(--wk-bg-surface-active)] text-[var(--wk-text-primary)] opacity-0 transition-opacity duration-150 group-hover/crm-toolbar:opacity-100"
+                        aria-hidden="true"
+                      >
+                        <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                      </span>
+                    </span>
                     <span class="max-w-[96px] truncate">{{ selectedChatAppLabel }}</span>
-                    <span class="material-symbols-outlined text-[16px] leading-none text-slate-400 transition-colors group-hover/crm-toolbar:text-slate-700">close</span>
                   </button>
                   <textarea
                     ref="chatInputRef"
