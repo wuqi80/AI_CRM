@@ -540,7 +540,7 @@
                         class="text-xs font-medium"
                         :class="message.isStreaming ? 'text-primary/70' : 'text-slate-400'"
                       >
-                        {{ formatTime(message.timestamp) }}
+                        {{ getAssistantMessageStatusLabel(Boolean(message.isStreaming)) }} · {{ formatTime(message.timestamp) }}
                       </span>
                     </div>
                   </div>
@@ -1570,7 +1570,11 @@ import MobileChatTopHeader from './components/MobileChatTopHeader.vue'
 import ProductChatInfoPanel from './components/ProductChatInfoPanel.vue'
 import RelationChatInfoPanel from './components/RelationChatInfoPanel.vue'
 import { renderMarkdown } from '@/utils/markdown'
-import { getAssistantMessagePlaceholder, normalizeAssistantMessageContent } from '@/utils/chatMessage'
+import {
+  getAssistantMessagePlaceholder,
+  getAssistantMessageStatusLabel,
+  normalizeAssistantMessageContent
+} from '@/utils/chatMessage'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import { isRequestErrorHandled } from '@/utils/requestError'
