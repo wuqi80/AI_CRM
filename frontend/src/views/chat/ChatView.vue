@@ -712,6 +712,22 @@
                 </div>
               </div>
 
+              <div
+                v-if="showKnowledgeFollowUpChips && (selectedFiles.length > 0 || selectedKnowledgeItems.length > 0)"
+                class="flex flex-wrap gap-2 px-2"
+              >
+                <button
+                  v-for="(prompt, index) in KNOWLEDGE_DOC_PROMPTS"
+                  :key="index"
+                  type="button"
+                  class="inline-flex max-w-full items-center gap-1.5 rounded-xl bg-[#f5f5f5] px-3 py-2 text-left text-[13px] leading-snug text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
+                  @click="applyKnowledgeDocPrompt(prompt)"
+                >
+                  <span class="min-w-0">{{ prompt }}</span>
+                  <span class="material-symbols-outlined shrink-0 text-[16px] leading-none text-[#909090]">arrow_forward</span>
+                </button>
+              </div>
+
               <!-- Input Box -->
               <div class="relative group">
                 <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl group-focus-within:bg-primary/10 transition-all opacity-0 group-focus-within:opacity-100"></div>
@@ -1285,6 +1301,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const chatInputRef = ref<HTMLTextAreaElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const selectedKnowledgeItems = ref<Knowledge[]>([])
+const showKnowledgeFollowUpChips = ref(false)
 const composerAttachmentScrollRef = ref<HTMLElement | null>(null)
 const composerAttachmentShowScrollArrows = ref(false)
 const composerAttachmentCanScrollLeft = ref(false)
@@ -1360,6 +1377,11 @@ const DEFAULT_CHAT_AI_CONFIG: AiConfigUpdateBO = {
 const SCROLL_TO_BOTTOM_THRESHOLD_PX = 100
 const MOBILE_KEYBOARD_INSET_GAP_PX = 8
 const MOBILE_KEYBOARD_VISIBLE_THRESHOLD_PX = 24
+const KNOWLEDGE_DOC_PROMPTS = [
+  '详细总结这些文档内容',
+  '用通俗易懂的话，说说这些文档讲了什么',
+  '生成一个简短摘要'
+] as const
 const CUSTOMER_STAGE_FALLBACK_OPTIONS = [
   { value: 'lead', label: '线索' },
   { value: 'qualified', label: '资格审查' },
@@ -1696,6 +1718,7 @@ watch(
       return
     }
     disconnectComposerAttachmentScrollObserver()
+    showKnowledgeFollowUpChips.value = false
     composerAttachmentShowScrollArrows.value = false
     composerAttachmentCanScrollLeft.value = false
     composerAttachmentCanScrollRight.value = false
@@ -2755,6 +2778,7 @@ function handleKnowledgePickerConfirm(items: Knowledge[]) {
   if (chatStore.selectedAppCode === 'general') {
     chatStore.setSelectedAppCode('knowledge')
   }
+  showKnowledgeFollowUpChips.value = true
 }
 
 function handleFileSelect(event: Event) {
@@ -2773,6 +2797,9 @@ function handleFileSelect(event: Event) {
   }
 
   selectedFiles.value = result.files
+  if (result.files.length > 0) {
+    showKnowledgeFollowUpChips.value = true
+  }
   input.value = '' // Reset input for re-selecting same file
 }
 
@@ -2788,6 +2815,9 @@ function handlePaste(event: ClipboardEvent) {
 
   event.preventDefault()
   selectedFiles.value = result.files
+  if (result.files.length > 0) {
+    showKnowledgeFollowUpChips.value = true
+  }
 }
 
 function removeSelectedFile(index: number) {
@@ -2800,6 +2830,14 @@ function removeSelectedFile(index: number) {
 
 function removeSelectedKnowledge(knowledgeId: string) {
   selectedKnowledgeItems.value = selectedKnowledgeItems.value.filter(item => item.knowledgeId !== knowledgeId)
+}
+
+function applyKnowledgeDocPrompt(prompt: string) {
+  inputText.value = prompt
+  void nextTick(() => {
+    resizeChatTextarea()
+    chatStore.requestComposerFocus()
+  })
 }
 
 function isImageAttachment(attachment?: ChatAttachmentVO | null): attachment is ChatAttachmentVO {
