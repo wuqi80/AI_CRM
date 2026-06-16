@@ -184,7 +184,7 @@
     <!-- Main Area -->
     <div
       v-if="!isMobile || mobilePanel === 'chat'"
-      class="flex-1 min-w-0 flex flex-col relative bg-white overflow-hidden"
+      class="wk-chat-shell flex-1 min-w-0 flex flex-col relative overflow-hidden"
     >
       <!-- Chat View -->
       <template v-if="currentView === 'chat'">
@@ -3123,6 +3123,17 @@ function resolveChatAppIcon(code: string): string {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.wk-chat-shell {
+  background:
+    linear-gradient(180deg, var(--wk-bg-surface) 0%, rgb(var(--wk-bg-page-rgb) / 0.96) 62%, var(--wk-bg-page) 100%);
+}
+
+.wk-chat-customer-header {
+  border-color: var(--wk-border-subtle);
+  background: color-mix(in srgb, var(--wk-bg-surface) 92%, transparent);
+  backdrop-filter: blur(14px);
 }
 
 .wk-chat-message {
