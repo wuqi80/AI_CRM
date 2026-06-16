@@ -48,7 +48,7 @@ const LEGAL_DOCUMENT_URLS: Record<LegalDocumentType, string> = {
   privacy: 'https://file.72crm.com/static/law/72crm_ai_privacy.txt'
 }
 
-const documentTitle = computed(() => (props.documentType === 'privacy' ? '隐私声明' : '用户协议'))
+const documentTitle = computed(() => (props.documentType === 'privacy' ? '隐私政策' : '用户协议'))
 const documentIntro = computed(() => `请仔细阅读以下${documentTitle.value}内容。`)
 const documentUrl = computed(() => LEGAL_DOCUMENT_URLS[props.documentType])
 const shouldCloseInAppBrowser = computed(() => route.query[IN_APP_BROWSER_QUERY_KEY] === '1')

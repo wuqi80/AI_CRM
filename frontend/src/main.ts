@@ -1,9 +1,7 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import '@fontsource/inter/300.css'
 import '@fontsource/inter/400.css'
 import '@fontsource/inter/500.css'
@@ -13,28 +11,13 @@ import '@fontsource/inter/800.css'
 import '@fontsource/inter/900.css'
 import '@fontsource-variable/noto-sans-sc'
 import 'material-symbols/outlined.css'
-import WkIcon from '@/components/common/WkIcon.vue'
-import { useTheme } from '@/composables/useTheme'
 import { isNativeMobileRuntime } from '@/utils/nativeMobileRuntime'
-
-import App from './App.vue'
-import router from './router'
+import { ensureNativePrivacyConsent } from '@/utils/nativePrivacyConsent'
 import './styles/iconfont.css'
 import './styles/main.css'
 import './styles/wk-crm-el-field-skin.css'
 
-useTheme()
-
-const nativeMobileRuntime = isNativeMobileRuntime()
-
-if (nativeMobileRuntime) {
-  document.documentElement.classList.add('wk-native-mobile')
-  void import('@/utils/capacitorSafeArea').catch((error) => {
-    console.warn('Failed to load native safe area plugin:', error)
-  })
-}
-
-async function scheduleNativeMobileRuntime(): Promise<void> {
+async function scheduleNativeMobileRuntime(nativeMobileRuntime: boolean): Promise<void> {
   if (!nativeMobileRuntime) return
 
   try {
@@ -57,14 +40,48 @@ async function scheduleNativeMobileRuntime(): Promise<void> {
   }
 }
 
-const app = createApp(App)
+async function bootstrap(): Promise<void> {
+  const nativeMobileRuntime = isNativeMobileRuntime()
+  const canContinue = await ensureNativePrivacyConsent({ nativeRuntime: nativeMobileRuntime })
+  if (!canContinue) return
 
-app.use(createPinia())
-app.use(router)
-app.use(ElementPlus, { locale: zhCn })
-app.component('WkIcon', WkIcon)
+  const [
+    { default: ElementPlus },
+    { default: zhCn },
+    { default: WkIcon },
+    { useTheme },
+    { default: App },
+    { default: router }
+  ] = await Promise.all([
+    import('element-plus'),
+    import('element-plus/es/locale/lang/zh-cn'),
+    import('@/components/common/WkIcon.vue'),
+    import('@/composables/useTheme'),
+    import('./App.vue'),
+    import('./router')
+  ])
 
-router.isReady().then(() => {
+  useTheme()
+
+  if (nativeMobileRuntime) {
+    document.documentElement.classList.add('wk-native-mobile')
+    void import('@/utils/capacitorSafeArea').catch((error) => {
+      console.warn('Failed to load native safe area plugin:', error)
+    })
+  }
+
+  const app = createApp(App)
+
+  app.use(createPinia())
+  app.use(router)
+  app.use(ElementPlus, { locale: zhCn })
+  app.component('WkIcon', WkIcon)
+
+  await router.isReady()
   app.mount('#app')
-  void scheduleNativeMobileRuntime()
+  void scheduleNativeMobileRuntime(nativeMobileRuntime)
+}
+
+void bootstrap().catch((error) => {
+  console.error('Failed to bootstrap app:', error)
 })

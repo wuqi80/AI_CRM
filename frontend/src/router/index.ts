@@ -29,7 +29,7 @@ const routes: RouteRecordRaw[] = [
     name: 'PrivacyPolicy',
     component: () => import('@/views/legal/LegalDocumentView.vue'),
     props: { documentType: 'privacy' },
-    meta: { requiresAuth: false, title: '隐私声明' }
+    meta: { requiresAuth: false, title: '隐私政策' }
   },
   {
     path: '/',
