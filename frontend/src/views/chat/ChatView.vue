@@ -1,5 +1,5 @@
 <template>
-  <div ref="chatViewRef" class="relative flex h-full" :class="{ 'flex-col': isMobile }">
+  <div ref="chatViewRef" class="flex h-full" :class="{ 'flex-col': isMobile }">
     <Teleport to="body">
       <div
         v-if="showMobileTopViewportShield"
