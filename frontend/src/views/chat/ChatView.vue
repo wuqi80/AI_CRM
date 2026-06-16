@@ -36,17 +36,6 @@
             >
               <span class="material-symbols-outlined text-[20px] leading-none">edit_square</span>
             </button>
-            <span v-if="showMobileNewSessionAction && showMobileObjectDetailAction" class="wk-mobile-chat-actions__divider" aria-hidden="true"></span>
-            <button
-              v-if="showMobileObjectDetailAction"
-              type="button"
-              class="wk-mobile-chat-actions__btn"
-              :aria-label="mobileObjectDetailTitle"
-              :title="mobileObjectDetailTitle"
-              @click="openMobileObjectDetail"
-            >
-              <span class="material-symbols-outlined text-[24px] leading-none">more_horiz</span>
-            </button>
           </div>
         </div>
       </div>
@@ -1234,8 +1223,12 @@
             aria-label="关闭详情"
             @click="closeMobileObjectDetail"
           ></button>
-          <section class="wk-mobile-object-detail__sheet">
-            <header class="wk-mobile-object-detail__header">
+          <section
+            class="wk-mobile-object-detail__sheet"
+            :class="{ 'is-dragging': mobileObjectDetailSheetDragging }"
+            :style="mobileObjectDetailSheetStyle"
+          >
+            <header class="wk-mobile-object-detail__header" @pointerdown="handleMobileObjectDetailDragStart">
               <span class="wk-mobile-object-detail__handle" aria-hidden="true"></span>
               <div class="wk-mobile-object-detail__title-row">
                 <p id="wk-mobile-object-detail-title" class="wk-mobile-object-detail__title">
@@ -1244,6 +1237,7 @@
                 <button
                   type="button"
                   class="wk-mobile-object-detail__close"
+                  @pointerdown.stop
                   aria-label="关闭详情"
                   @click="closeMobileObjectDetail"
                 >
@@ -1413,6 +1407,9 @@ type ComposerAttachmentPreviewItem =
   | { kind: 'knowledge'; key: string; knowledge: Knowledge }
   | { kind: 'file'; key: string; file: File; fileIndex: number }
 
+const MOBILE_OBJECT_DETAIL_SHEET_LEVELS = [58, 78, 94] as const
+const MOBILE_OBJECT_DETAIL_SHEET_MAX_HEIGHT = MOBILE_OBJECT_DETAIL_SHEET_LEVELS[MOBILE_OBJECT_DETAIL_SHEET_LEVELS.length - 1]
+
 const chatStore = useChatStore()
 const agentStore = useAgentStore()
 const enterpriseStore = useEnterpriseStore()
@@ -1481,11 +1478,15 @@ const selectedCustomerTagSubmitting = ref(false)
 const objectPanelLoading = ref(false)
 const objectPanelError = ref('')
 const mobileObjectDetailOpen = ref(false)
+const mobileObjectDetailSheetHeight = ref<number>(MOBILE_OBJECT_DETAIL_SHEET_LEVELS[0])
+const mobileObjectDetailSheetDragging = ref(false)
 const customerPanelVisible = ref(true)
 const customerPanelWidth = ref(380)
 const customerPanelResizing = ref(false)
 let objectDetailRequestId = 0
 let customerDetailRequestId = 0
+let mobileObjectDetailDragStartY = 0
+let mobileObjectDetailDragStartHeight: number = MOBILE_OBJECT_DETAIL_SHEET_LEVELS[0]
 let offSelectedCustomerDetailRefresh: (() => void) | null = null
 let mediaRecorder: MediaRecorder | null = null
 let mediaStream: MediaStream | null = null
@@ -1714,11 +1715,8 @@ const showMobileTopViewportShield = computed(() => showMobileTopChrome.value)
 const showMobileNewSessionAction = computed(() =>
   showMobileFloatingBar.value && Boolean(chatStore.currentSessionId) && !chatStore.isNewSessionPending
 )
-const showMobileObjectDetailAction = computed(() =>
-  showMobileFloatingBar.value && isObjectContextChat.value && currentView.value === 'chat' && mobilePanel.value === 'chat'
-)
 const mobileChatFloatingActionCount = computed(() =>
-  (showMobileNewSessionAction.value ? 1 : 0) + (showMobileObjectDetailAction.value ? 1 : 0)
+  showMobileNewSessionAction.value ? 1 : 0
 )
 const showMobileChatFloatingActions = computed(() => mobileChatFloatingActionCount.value > 0)
 const effectiveMobileKeyboardInset = computed(() => Math.max(
@@ -1744,6 +1742,9 @@ const mobileTopFixedLayerStyle = computed(() =>
       }
     : undefined
 )
+const mobileObjectDetailSheetStyle = computed(() => ({
+  height: `${mobileObjectDetailSheetHeight.value}vh`
+}))
 const chatMessagesAreaClass = computed(() => {
   if (!isChatEmpty.value) return 'wk-chat-messages--scrollable flex-1 overflow-y-auto pb-4 pt-6 md:pt-8'
   if (isMobile.value) return 'flex-1 overflow-hidden py-6'
@@ -1878,6 +1879,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   stopCustomerPanelResize()
+  removeMobileObjectDetailDragListeners()
   unregisterMobileKeyboardInsetListeners()
   offSelectedCustomerDetailRefresh?.()
   offSelectedCustomerDetailRefresh = null
@@ -3450,10 +3452,59 @@ function handleMobileHeaderTitle() {
   }
 }
 
+function clampMobileObjectDetailSheetHeight(value: number) {
+  return Math.min(
+    MOBILE_OBJECT_DETAIL_SHEET_MAX_HEIGHT,
+    Math.max(MOBILE_OBJECT_DETAIL_SHEET_LEVELS[0], value)
+  )
+}
+
+function snapMobileObjectDetailSheetHeight(value: number) {
+  return MOBILE_OBJECT_DETAIL_SHEET_LEVELS.reduce((best, level) => (
+    Math.abs(level - value) < Math.abs(best - value) ? level : best
+  ), MOBILE_OBJECT_DETAIL_SHEET_LEVELS[0])
+}
+
+function removeMobileObjectDetailDragListeners() {
+  window.removeEventListener('pointermove', handleMobileObjectDetailDragMove)
+  window.removeEventListener('pointerup', handleMobileObjectDetailDragEnd)
+  window.removeEventListener('pointercancel', handleMobileObjectDetailDragEnd)
+}
+
+function handleMobileObjectDetailDragStart(event: PointerEvent) {
+  if (!mobileObjectDetailOpen.value || event.button !== 0) return
+
+  mobileObjectDetailSheetDragging.value = true
+  mobileObjectDetailDragStartY = event.clientY
+  mobileObjectDetailDragStartHeight = mobileObjectDetailSheetHeight.value
+  window.addEventListener('pointermove', handleMobileObjectDetailDragMove, { passive: false })
+  window.addEventListener('pointerup', handleMobileObjectDetailDragEnd)
+  window.addEventListener('pointercancel', handleMobileObjectDetailDragEnd)
+}
+
+function handleMobileObjectDetailDragMove(event: PointerEvent) {
+  if (!mobileObjectDetailSheetDragging.value) return
+
+  event.preventDefault()
+  const viewportHeight = Math.max(1, window.innerHeight)
+  const deltaY = mobileObjectDetailDragStartY - event.clientY
+  const nextHeight = mobileObjectDetailDragStartHeight + (deltaY / viewportHeight) * 100
+  mobileObjectDetailSheetHeight.value = clampMobileObjectDetailSheetHeight(nextHeight)
+}
+
+function handleMobileObjectDetailDragEnd() {
+  if (!mobileObjectDetailSheetDragging.value) return
+
+  mobileObjectDetailSheetDragging.value = false
+  mobileObjectDetailSheetHeight.value = snapMobileObjectDetailSheetHeight(mobileObjectDetailSheetHeight.value)
+  removeMobileObjectDetailDragListeners()
+}
+
 function openMobileObjectDetail() {
   const id = currentObjectId.value
   if (!id) return
 
+  mobileObjectDetailSheetHeight.value = MOBILE_OBJECT_DETAIL_SHEET_LEVELS[0]
   mobileObjectDetailOpen.value = true
 
   if (chatObjectKind.value !== 'customer' && !objectPanelLoading.value) {
@@ -3463,6 +3514,8 @@ function openMobileObjectDetail() {
 
 function closeMobileObjectDetail() {
   mobileObjectDetailOpen.value = false
+  mobileObjectDetailSheetDragging.value = false
+  removeMobileObjectDetailDragListeners()
 }
 
 function handleMobileObjectAddTask() {
@@ -3841,12 +3894,6 @@ function resolveChatAppIcon(code: string): string {
   background: rgb(13 13 13 / 0.05);
 }
 
-.wk-mobile-chat-actions__divider {
-  width: 1px;
-  height: 22px;
-  background: rgb(13 13 13 / 0.08);
-}
-
 .wk-mobile-object-detail {
   position: fixed;
   inset: 0;
@@ -3876,6 +3923,10 @@ function resolveChatAppIcon(code: string): string {
   background: var(--wk-bg-surface, #fff);
   box-shadow: 0 -18px 55px rgb(15 23 42 / 0.18);
   transition: height 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wk-mobile-object-detail__sheet.is-dragging {
+  transition: none;
 }
 
 .wk-mobile-object-detail__header {
