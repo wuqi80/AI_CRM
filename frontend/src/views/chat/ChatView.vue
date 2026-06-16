@@ -1988,7 +1988,7 @@ const mobileChatHeaderKind = computed<'customer' | 'employee' | 'relation' | 'pr
 const mobileChatHeaderTitle = computed(() => {
   const session = currentChatSession.value
   if (chatObjectKind.value === 'customer') {
-    return session?.customerName || session?.title || '客户对话'
+    return selectedCustomer.value?.companyName || session?.customerName || session?.title || '客户对话'
   }
   if (chatObjectKind.value === 'employee') {
     return employeeDetail.value?.realname || session?.employeeName || session?.title || '通讯录对话'
@@ -2003,7 +2003,7 @@ const mobileChatHeaderTitle = computed(() => {
 })
 const mobileChatHeaderAvatarUrl = computed(() => {
   const session = currentChatSession.value
-  if (chatObjectKind.value === 'customer') return session?.customerLogoUrl || ''
+  if (chatObjectKind.value === 'customer') return selectedCustomer.value?.logoUrl || session?.customerLogoUrl || ''
   if (chatObjectKind.value === 'employee') return employeeDetail.value?.imgUrl || session?.employeeAvatarUrl || employeeDetail.value?.img || ''
   if (chatObjectKind.value === 'relation') return relationDetail.value?.relation?.avatarUrl || session?.relationAvatarUrl || relationDetail.value?.relation?.avatar || ''
   if (chatObjectKind.value === 'product') return productDetail.value?.mainImageUrl || session?.productImageUrl || ''
@@ -3717,9 +3717,11 @@ function openMobileMainMenu() {
 }
 
 function handleMobileHeaderTitle() {
-  if (chatObjectKind.value) {
-    openMobileObjectDetail()
+  if (chatObjectKind.value === 'customer') {
+    openSelectedCustomerBasicInfo()
+    return
   }
+  if (chatObjectKind.value) openMobileObjectDetail()
 }
 
 function clampMobileObjectDetailSheetHeight(value: number) {
