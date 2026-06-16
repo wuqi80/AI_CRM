@@ -51,19 +51,19 @@ public class ChatController {
     }
 
     @GetMapping("/applications")
-    @Operation(summary = "List chat applications")
+    @Operation(summary = "获取聊天应用列表")
     public Result<List<ChatAppOptionVO>> listChatApplications() {
         return Result.ok(chatService.listChatApplications());
     }
 
     @GetMapping("/app/options")
-    @Operation(summary = "List chat application options")
+    @Operation(summary = "获取聊天可选应用")
     public Result<List<ChatAppOptionVO>> listChatAppOptions() {
         return Result.ok(chatService.listChatApplications());
     }
 
     @GetMapping("/model/options")
-    @Operation(summary = "List chat model options")
+    @Operation(summary = "获取聊天可选模型")
     public Result<List<Map<String, Object>>> listChatModelOptions() {
         AiConfigVO config = systemConfigService.getAiConfig();
         List<Map<String, Object>> options = new java.util.ArrayList<>();
@@ -120,7 +120,7 @@ public class ChatController {
     }
 
     @PostMapping("/session/pin/{id}")
-    @Operation(summary = "Update chat session pin status")
+    @Operation(summary = "更新会话置顶状态")
     public Result<String> updateSessionPin(@PathVariable("id") Long id, @Valid @RequestBody SessionPinBO pinBO) {
         chatService.updateSessionPin(id, pinBO);
         return Result.ok();
