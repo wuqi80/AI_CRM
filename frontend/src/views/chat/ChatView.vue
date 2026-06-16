@@ -363,9 +363,9 @@
 
           <div
             v-else-if="showDesktopObjectHeader"
-            class="wk-chat-customer-header relative z-20 shrink-0 border-b border-[#ececec] bg-white py-2 pl-4 pr-4 md:pl-8"
+            class="wk-chat-customer-header relative z-20 shrink-0 border-b py-2 pl-4 pr-1 md:pl-8"
           >
-            <div class="flex h-9 w-full items-center justify-between gap-3 pr-10">
+            <div class="mx-auto flex h-9 w-full items-center justify-between gap-3 pr-20">
               <div class="flex min-w-0 flex-1 items-center gap-2">
                 <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                   <img
@@ -385,23 +385,30 @@
                   </span>
                 </div>
                 <h2
-                  class="min-w-[80px] max-w-[220px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]"
+                  class="min-w-0 max-w-[240px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]"
                   :title="desktopObjectHeaderTitle"
                 >
                   {{ desktopObjectHeaderTitle }}
                 </h2>
-                <span class="inline-flex h-6 shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-secondary)]">
-                  {{ desktopObjectHeaderBadge }}
+                <span
+                  class="inline-flex h-6 max-w-[140px] shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-1.5 text-[11px] font-medium text-[var(--wk-text-secondary)]"
+                  :title="desktopObjectHeaderBadge"
+                >
+                  <span class="min-w-0 truncate">{{ desktopObjectHeaderBadge }}</span>
                 </span>
-                <span v-if="desktopObjectHeaderMeta" class="hidden min-w-0 truncate text-xs text-slate-400 md:inline">
-                  {{ desktopObjectHeaderMeta }}
+                <span
+                  v-if="desktopObjectHeaderMeta"
+                  class="hidden h-6 max-w-[140px] shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-1.5 text-[11px] font-medium text-[var(--wk-text-secondary)] md:inline-flex"
+                  :title="desktopObjectHeaderMeta"
+                >
+                  <span class="min-w-0 truncate">{{ desktopObjectHeaderMeta }}</span>
                 </span>
               </div>
             </div>
             <button
               v-if="showObjectPanelShell && customerPanelVisible"
               type="button"
-              class="group/sb-toggle absolute right-4 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef]"
+              class="group/sb-toggle absolute right-4 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] md:right-4"
               aria-label="收起对象侧栏"
               title="收起对象侧栏"
               @click="customerPanelVisible = false"
