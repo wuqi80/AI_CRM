@@ -15,7 +15,7 @@ export interface AiModelCapabilities {
   supportsStream: boolean
   supportsToolCall: boolean
   supportsVision: boolean
-  supportsAudioTranscription?: boolean
+  supportsAudioTranscription: boolean
 }
 
 export interface AiProviderPreset {
@@ -29,7 +29,7 @@ export interface AiProviderPreset {
   supportsStream: boolean
   supportsToolCall: boolean
   supportsVision: boolean
-  supportsAudioTranscription?: boolean
+  supportsAudioTranscription: boolean
   configured?: boolean
   active?: boolean
   apiKeyConfigured?: boolean

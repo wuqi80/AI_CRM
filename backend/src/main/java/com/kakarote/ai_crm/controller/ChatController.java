@@ -88,6 +88,7 @@ public class ChatController {
                 capabilities.put("supportsStream", provider.getSupportsStream());
                 capabilities.put("supportsToolCall", provider.getSupportsToolCall());
                 capabilities.put("supportsVision", provider.getSupportsVision());
+                capabilities.put("supportsAudioTranscription", provider.getSupportsAudioTranscription());
                 option.put("capabilities", capabilities);
                 options.add(option);
             }

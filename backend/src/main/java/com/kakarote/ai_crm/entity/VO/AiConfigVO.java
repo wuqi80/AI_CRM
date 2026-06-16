@@ -76,6 +76,9 @@ public class AiConfigVO implements Serializable {
 
         @Schema(description = "是否支持视觉输入")
         private Boolean supportsVision;
+
+        @Schema(description = "是否支持语音转写")
+        private Boolean supportsAudioTranscription;
     }
 
     @Data
@@ -110,6 +113,9 @@ public class AiConfigVO implements Serializable {
 
         @Schema(description = "默认是否支持视觉输入")
         private Boolean supportsVision;
+
+        @Schema(description = "默认是否支持语音转写")
+        private Boolean supportsAudioTranscription;
 
         @Schema(description = "是否已保存该服务商配置")
         private Boolean configured;
