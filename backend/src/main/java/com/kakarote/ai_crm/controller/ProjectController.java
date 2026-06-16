@@ -18,6 +18,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -186,6 +187,14 @@ public class ProjectController {
     public Result<ProjectVO> deleteTaskAttachmentCompat(@PathVariable Long projectId,
                                                         @PathVariable Long taskId,
                                                         @PathVariable Long attachmentId) {
+        return Result.ok(projectService.deleteTaskAttachment(projectId, taskId, attachmentId));
+    }
+
+    @DeleteMapping("/{projectId}/task/{taskId}/attachment/{attachmentId}")
+    @Operation(summary = "Delete project task attachment")
+    public Result<ProjectVO> deleteTaskAttachmentByDelete(@PathVariable Long projectId,
+                                                          @PathVariable Long taskId,
+                                                          @PathVariable Long attachmentId) {
         return Result.ok(projectService.deleteTaskAttachment(projectId, taskId, attachmentId));
     }
 
