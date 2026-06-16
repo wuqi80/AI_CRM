@@ -264,6 +264,160 @@
       <!-- Chat View -->
       <template v-if="currentView === 'chat'">
         <div class="flex-1 flex flex-col overflow-hidden">
+          <div
+            v-if="showDesktopCustomerHeader"
+            class="wk-chat-customer-header relative z-20 shrink-0 border-b border-[#ececec] bg-white py-2 pl-4 pr-4 md:pl-8"
+          >
+            <div class="flex h-9 w-full items-center justify-between gap-3">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  <img
+                    v-if="customerHeaderLogoUrl"
+                    :src="customerHeaderLogoUrl"
+                    :alt="customerHeaderTitle || 'company logo'"
+                    class="size-full bg-white object-contain"
+                  />
+                  <span v-else class="text-xs font-bold text-slate-400">
+                    {{ customerHeaderTitle.charAt(0) || '?' }}
+                  </span>
+                </div>
+                <h2
+                  class="min-w-[80px] max-w-[220px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]"
+                  :title="customerHeaderTitle"
+                >
+                  {{ customerHeaderTitle }}
+                </h2>
+                <span
+                  v-if="selectedCustomerLoading"
+                  class="material-symbols-outlined shrink-0 animate-spin text-[16px] leading-none text-slate-300"
+                >
+                  progress_activity
+                </span>
+                <div
+                  v-if="selectedCustomer && (selectedCustomer.tags?.length || canEditSelectedCustomerTags)"
+                  class="flex min-w-0 shrink items-center gap-1.5 overflow-hidden"
+                >
+                  <span
+                    v-for="tag in selectedCustomerVisibleTags"
+                    :key="tag.tagId"
+                    class="group/tag inline-flex h-6 max-w-[88px] shrink-0 items-center gap-1 rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-secondary)]"
+                    :title="tag.tagName"
+                  >
+                    <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                    <button
+                      v-if="canEditSelectedCustomerTags"
+                      type="button"
+                      class="hidden shrink-0 text-slate-400 transition-colors hover:text-red-500 group-hover/tag:inline-flex"
+                      title="删除标签"
+                      aria-label="删除标签"
+                      @click.stop="handleRemoveSelectedCustomerTag(tag)"
+                    >
+                      <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+                    </button>
+                  </span>
+                  <el-popover
+                    v-if="selectedCustomerHiddenTags.length > 0"
+                    trigger="hover"
+                    placement="bottom-start"
+                    :width="220"
+                    popper-class="wk-customer-tags-popover"
+                  >
+                    <template #reference>
+                      <span class="inline-flex h-6 shrink-0 cursor-default items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-muted)]">
+                        +{{ selectedCustomerHiddenTags.length }}
+                      </span>
+                    </template>
+                    <div class="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto">
+                      <span
+                        v-for="tag in selectedCustomerHiddenTags"
+                        :key="tag.tagId"
+                        class="group/tag inline-flex max-w-full items-center gap-1 rounded-lg bg-[#f4f4f4] px-2 py-1 text-[12px] font-medium text-[#5f5f5f]"
+                        :title="tag.tagName"
+                      >
+                        <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                        <button
+                          v-if="canEditSelectedCustomerTags"
+                          type="button"
+                          class="inline-flex shrink-0 text-slate-400 transition-colors hover:text-red-500"
+                          title="删除标签"
+                          aria-label="删除标签"
+                          @click.stop="handleRemoveSelectedCustomerTag(tag)"
+                        >
+                          <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+                        </button>
+                      </span>
+                    </div>
+                  </el-popover>
+                  <button
+                    v-if="canEditSelectedCustomerTags"
+                    type="button"
+                    class="inline-flex size-6 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--wk-border-muted)] text-[var(--wk-text-primary)] transition-colors hover:bg-[var(--wk-bg-surface-hover)]"
+                    title="添加标签"
+                    aria-label="添加标签"
+                    @click.stop="showSelectedCustomerTagDialog = true"
+                  >
+                    <span class="material-symbols-outlined text-[15px] leading-none">add</span>
+                  </button>
+                </div>
+              </div>
+              <div class="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] bg-primary px-2.5 text-[12px] font-semibold text-white shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="!selectedCustomer"
+                  aria-label="基本信息"
+                  @click="showSelectedCustomerBasicInfoDrawer = true"
+                >
+                  <span class="material-symbols-outlined text-[15px] leading-none">description</span>
+                  <span>基本信息</span>
+                </button>
+                <el-dropdown
+                  v-if="selectedCustomer && canChangeSelectedCustomerStage"
+                  trigger="click"
+                  @command="handleSelectedCustomerStageCommand"
+                >
+                  <button
+                    type="button"
+                    class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] font-semibold transition-colors"
+                    :class="selectedCustomerStageButtonClass"
+                  >
+                    <span class="material-symbols-outlined text-[15px] leading-none">
+                      {{ getCustomerStageIcon(selectedCustomer.stage) }}
+                    </span>
+                    <span>{{ selectedCustomerStageText }}</span>
+                    <span class="material-symbols-outlined text-[15px] leading-none">expand_more</span>
+                  </button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item
+                        v-for="stage in customerStageOptions"
+                        :key="stage.value"
+                        :command="stage.value"
+                      >
+                        <span class="flex items-center gap-2">
+                          <span class="material-symbols-outlined shrink-0 text-[16px] leading-none">
+                            {{ getCustomerStageIcon(stage.value) }}
+                          </span>
+                          {{ stage.label }}
+                        </span>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+                <span
+                  v-else-if="selectedCustomer"
+                  class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] font-semibold"
+                  :class="selectedCustomerStageButtonClass"
+                >
+                  <span class="material-symbols-outlined text-[15px] leading-none">
+                    {{ getCustomerStageIcon(selectedCustomer.stage) }}
+                  </span>
+                  <span>{{ selectedCustomerStageText }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
           <!-- Messages Area -->
           <div
             ref="messagesContainer"
@@ -1003,6 +1157,32 @@
       </Transition>
     </Teleport>
 
+    <CustomerBasicInfoDrawer
+      v-model="showSelectedCustomerBasicInfoDrawer"
+      :customer="selectedCustomer"
+      :contacts="selectedCustomer?.contacts || []"
+      @contacts-updated="handleSelectedCustomerContactsUpdated"
+    />
+
+    <el-dialog
+      v-model="showSelectedCustomerTagDialog"
+      title="添加标签"
+      width="400px"
+      class="wk-dialog--flush"
+    >
+      <el-input
+        v-model="newSelectedCustomerTagName"
+        placeholder="请输入标签名称"
+        maxlength="20"
+        show-word-limit
+        @keyup.enter="handleAddSelectedCustomerTag"
+      />
+      <template #footer>
+        <el-button @click="showSelectedCustomerTagDialog = false">取消</el-button>
+        <el-button type="primary" :loading="selectedCustomerTagSubmitting" @click="handleAddSelectedCustomerTag">添加</el-button>
+      </template>
+    </el-dialog>
+
     <ApiKeySetupModal
       :model-value="isApiKeyModalOpen"
       :loading="savingApiKey"
@@ -1024,6 +1204,7 @@ import { ref, computed, onBeforeUnmount, onMounted, nextTick, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { useEnterpriseStore } from '@/stores/enterprise'
+import { useEnumStore } from '@/stores/enums'
 import { useUserStore } from '@/stores/user'
 import { useRoute, useRouter } from 'vue-router'
 import { useResponsive } from '@/composables/useResponsive'
@@ -1031,12 +1212,13 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig, getAiConfigDetail, updateAiConfig } from '@/api/systemConfig'
-import { getCustomerDetail } from '@/api/customer'
+import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerStage } from '@/api/customer'
 import { getAddressBookDetail } from '@/api/addressBook'
 import { getRelationDetail } from '@/api/relation'
 import { getProductDetail } from '@/api/product'
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
+import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
 import CustomerChatInfoPanel from './components/CustomerChatInfoPanel.vue'
 import EmployeeChatInfoPanel from './components/EmployeeChatInfoPanel.vue'
 import MobileChatTopHeader from './components/MobileChatTopHeader.vue'
@@ -1070,6 +1252,7 @@ import type { AddressBookDetail } from '@/types/addressBook'
 import type { ProductVO } from '@/types/product'
 import type { RelationDetailVO } from '@/types/relation'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, ChatModelOption, Knowledge, Task } from '@/types/common'
+import type { Contact, CustomerDetailVO, CustomerTag } from '@/types/customer'
 import type { AiConfig, AiConfigUpdateBO, AiProvider, AiProviderPreset } from '@/types/systemConfig'
 import dashscopeBrandUrl from '@/assets/model-provider-brands/dashscope.svg?url'
 import openaiBrandUrl from '@/assets/model-provider-brands/openai.svg?url'
@@ -1088,6 +1271,7 @@ type ComposerAttachmentPreviewItem =
 const chatStore = useChatStore()
 const agentStore = useAgentStore()
 const enterpriseStore = useEnterpriseStore()
+const enumStore = useEnumStore()
 const userStore = useUserStore()
 const route = useRoute()
 const router = useRouter()
@@ -1136,10 +1320,18 @@ const resumeSendAfterApiKeySave = ref(false)
 const employeeDetail = ref<AddressBookDetail | null>(null)
 const relationDetail = ref<RelationDetailVO | null>(null)
 const productDetail = ref<ProductVO | null>(null)
+const selectedCustomer = ref<CustomerDetailVO | null>(null)
+const selectedCustomerLoading = ref(false)
+const showSelectedCustomerBasicInfoDrawer = ref(false)
+const showSelectedCustomerTagDialog = ref(false)
+const newSelectedCustomerTagName = ref('')
+const selectedCustomerTagSubmitting = ref(false)
 const objectPanelLoading = ref(false)
 const objectPanelError = ref('')
 const mobileObjectDetailOpen = ref(false)
 let objectDetailRequestId = 0
+let customerDetailRequestId = 0
+let offSelectedCustomerDetailRefresh: (() => void) | null = null
 let mediaRecorder: MediaRecorder | null = null
 let mediaStream: MediaStream | null = null
 let recordedChunks: Blob[] = []
@@ -1166,6 +1358,14 @@ const DEFAULT_CHAT_AI_CONFIG: AiConfigUpdateBO = {
 const SCROLL_TO_BOTTOM_THRESHOLD_PX = 100
 const MOBILE_KEYBOARD_INSET_GAP_PX = 8
 const MOBILE_KEYBOARD_VISIBLE_THRESHOLD_PX = 24
+const CUSTOMER_STAGE_FALLBACK_OPTIONS = [
+  { value: 'lead', label: '线索' },
+  { value: 'qualified', label: '资格审查' },
+  { value: 'proposal', label: '方案报价' },
+  { value: 'negotiation', label: '谈判中' },
+  { value: 'closed', label: '已成交' },
+  { value: 'lost', label: '已流失' }
+]
 
 // Notifications mock data
 // const notifications = ref([
@@ -1310,6 +1510,9 @@ const currentObjectId = computed(() => {
   if (chatObjectKind.value === 'product') return String(session.productId || '')
   return ''
 })
+const showDesktopCustomerHeader = computed(() =>
+  !isMobile.value && currentView.value === 'chat' && chatObjectKind.value === 'customer' && Boolean(currentObjectId.value)
+)
 const showDesktopObjectPanel = computed(() =>
   !isMobile.value && currentView.value === 'chat' && Boolean(chatObjectKind.value && currentObjectId.value)
 )
@@ -1383,6 +1586,31 @@ const mobileChatHeaderAvatarUrl = computed(() => {
 const mobileObjectPanelLoading = computed(() =>
   chatObjectKind.value !== 'customer' && objectPanelLoading.value
 )
+const customerHeaderTitle = computed(() =>
+  selectedCustomer.value?.companyName || currentChatSession.value?.customerName || currentChatSession.value?.title || '客户对话'
+)
+const customerHeaderLogoUrl = computed(() =>
+  selectedCustomer.value?.logoUrl || currentChatSession.value?.customerLogoUrl || ''
+)
+const customerStageOptions = computed(() =>
+  enumStore.customerStage.length
+    ? enumStore.customerStage.map(item => ({ value: item.value, label: item.label }))
+    : CUSTOMER_STAGE_FALLBACK_OPTIONS
+)
+const selectedCustomerStageText = computed(() => {
+  const customer = selectedCustomer.value
+  if (!customer) return '-'
+  const stage = customer.stage || ''
+  const stageOption = customerStageOptions.value.find(item => item.value === stage)
+  if (stageOption?.label) return stageOption.label
+  if (customer.stageName && customer.stageName !== stage) return customer.stageName
+  return enumStore.stageLabel(stage) || stage || '-'
+})
+const selectedCustomerStageButtonClass = computed(() => getCustomerStageButtonClass(selectedCustomer.value?.stage))
+const canChangeSelectedCustomerStage = computed(() => userStore.hasPermission('customer:change_stage'))
+const canEditSelectedCustomerTags = computed(() => userStore.hasPermission('customer:edit'))
+const selectedCustomerVisibleTags = computed(() => selectedCustomer.value?.tags?.slice(0, 3) || [])
+const selectedCustomerHiddenTags = computed(() => selectedCustomer.value?.tags?.slice(3) || [])
 const mobileObjectDetailTitle = computed(() => {
   if (chatObjectKind.value === 'customer') return '客户详情'
   if (chatObjectKind.value === 'employee') return '通讯录详情'
@@ -1393,12 +1621,17 @@ const mobileObjectDetailTitle = computed(() => {
 
 onMounted(async () => {
   registerMobileKeyboardInsetListeners()
+  offSelectedCustomerDetailRefresh = appEvents.on<{ customerId?: string | number }>(
+    APP_EVENT.CUSTOMER_DETAIL_REFRESH,
+    handleSelectedCustomerDetailRefresh
+  )
   await Promise.all([
     chatStore.fetchAppOptions(),
     chatStore.fetchModelOptions(),
     chatStore.fetchSessions(),
     agentStore.fetchEnabledAgents(),
     enterpriseStore.loadConfig(),
+    enumStore.ensureCustomerStage(),
     loadAiConfig()
   ])
   await applyChatRouteQuery()
@@ -1406,6 +1639,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   unregisterMobileKeyboardInsetListeners()
+  offSelectedCustomerDetailRefresh?.()
+  offSelectedCustomerDetailRefresh = null
   revokeAllSelectedFilePreviewUrls()
   abortVoiceRecording()
   if (scrollTimer) {
@@ -1521,6 +1756,21 @@ watch(
 )
 
 watch(
+  () => [chatObjectKind.value, currentObjectId.value] as const,
+  ([kind, id]) => {
+    if (kind === 'customer' && id) {
+      void loadSelectedCustomerDetail(id, { silent: Boolean(selectedCustomer.value) })
+      return
+    }
+    selectedCustomer.value = null
+    selectedCustomerLoading.value = false
+    showSelectedCustomerBasicInfoDrawer.value = false
+    showSelectedCustomerTagDialog.value = false
+  },
+  { immediate: true }
+)
+
+watch(
   () => [isMobile.value, chatObjectKind.value, currentObjectId.value] as const,
   ([mobile, kind, id]) => {
     if (!mobile || !kind || !id) {
@@ -1579,6 +1829,135 @@ async function loadObjectPanelDetail() {
       objectPanelLoading.value = false
     }
   }
+}
+
+async function loadSelectedCustomerDetail(customerId: string, options: { silent?: boolean } = {}) {
+  const requestId = ++customerDetailRequestId
+  if (!options.silent) {
+    selectedCustomerLoading.value = true
+  }
+
+  try {
+    const detail = await getCustomerDetail(customerId)
+    if (requestId === customerDetailRequestId && currentObjectId.value === customerId) {
+      selectedCustomer.value = detail
+    }
+  } catch (error) {
+    console.error('Load selected customer detail failed:', error)
+    if (requestId === customerDetailRequestId) {
+      selectedCustomer.value = null
+    }
+  } finally {
+    if (requestId === customerDetailRequestId) {
+      selectedCustomerLoading.value = false
+    }
+  }
+}
+
+function emitSelectedCustomerRefresh(customerId: string) {
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat' })
+  appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, { customerId, source: 'chatHeader' })
+}
+
+function handleSelectedCustomerDetailRefresh(payload?: { customerId?: string | number; source?: string }) {
+  if (payload?.source === 'chatHeader') return
+  const targetCustomerId = payload?.customerId ? String(payload.customerId) : ''
+  const activeCustomerId = currentObjectId.value
+  if (!activeCustomerId || (targetCustomerId && targetCustomerId !== activeCustomerId)) return
+  void loadSelectedCustomerDetail(activeCustomerId, { silent: Boolean(selectedCustomer.value) })
+}
+
+async function handleSelectedCustomerStageCommand(value: string | number | object) {
+  if (!selectedCustomer.value) return
+  const stage = String(value)
+  if (!stage || selectedCustomer.value.stage === stage) return
+
+  const customerId = String(selectedCustomer.value.customerId)
+  try {
+    await updateCustomerStage(customerId, stage)
+    await loadSelectedCustomerDetail(customerId, { silent: true })
+    emitSelectedCustomerRefresh(customerId)
+    ElMessage.success('客户阶段已更新')
+  } catch (error) {
+    console.error('Update customer stage failed:', error)
+    if (!isRequestErrorHandled(error)) ElMessage.error('客户阶段更新失败')
+  }
+}
+
+async function handleAddSelectedCustomerTag() {
+  if (!canEditSelectedCustomerTags.value || !selectedCustomer.value) return
+  const tagName = newSelectedCustomerTagName.value.trim()
+  if (!tagName) {
+    ElMessage.warning('请输入标签名称')
+    return
+  }
+
+  const customerId = String(selectedCustomer.value.customerId)
+  selectedCustomerTagSubmitting.value = true
+  try {
+    await addCustomerTag(customerId, tagName)
+    await loadSelectedCustomerDetail(customerId, { silent: true })
+    emitSelectedCustomerRefresh(customerId)
+    showSelectedCustomerTagDialog.value = false
+    newSelectedCustomerTagName.value = ''
+    ElMessage.success('标签添加成功')
+  } catch (error) {
+    console.error('Add customer tag failed:', error)
+    if (!isRequestErrorHandled(error)) ElMessage.error('标签添加失败')
+  } finally {
+    selectedCustomerTagSubmitting.value = false
+  }
+}
+
+async function handleRemoveSelectedCustomerTag(tag: CustomerTag) {
+  if (!canEditSelectedCustomerTags.value || !selectedCustomer.value) return
+
+  const customerId = String(selectedCustomer.value.customerId)
+  try {
+    await removeCustomerTag(customerId, tag.tagId)
+    await loadSelectedCustomerDetail(customerId, { silent: true })
+    emitSelectedCustomerRefresh(customerId)
+    ElMessage.success('标签已删除')
+  } catch (error) {
+    console.error('Remove customer tag failed:', error)
+    if (!isRequestErrorHandled(error)) ElMessage.error('标签删除失败')
+  }
+}
+
+function handleSelectedCustomerContactsUpdated(contacts: Contact[]) {
+  if (!selectedCustomer.value) return
+  selectedCustomer.value = {
+    ...selectedCustomer.value,
+    contacts
+  }
+  emitSelectedCustomerRefresh(String(selectedCustomer.value.customerId))
+}
+
+function getCustomerStageButtonClass(stage?: string) {
+  switch (stage) {
+    case 'closed':
+      return 'bg-emerald-50 text-emerald-700'
+    case 'lost':
+      return 'bg-rose-50 text-rose-700'
+    case 'negotiation':
+      return 'bg-orange-50 text-orange-700'
+    case 'proposal':
+      return 'bg-indigo-50 text-indigo-700'
+    default:
+      return 'bg-primary/10 text-primary'
+  }
+}
+
+function getCustomerStageIcon(stage?: string) {
+  const map: Record<string, string> = {
+    lead: 'radio_button_unchecked',
+    qualified: 'task_alt',
+    proposal: 'description',
+    negotiation: 'forum',
+    closed: 'handshake',
+    lost: 'block'
+  }
+  return map[stage || ''] || 'lens'
 }
 
 function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO> | null): AiConfig {
