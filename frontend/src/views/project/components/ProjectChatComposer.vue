@@ -380,6 +380,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
 import WkIcon from '@/components/common/WkIcon.vue'
@@ -449,6 +450,7 @@ type ComposerAttachmentPreviewItem =
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const { isMobile } = useResponsive()
+const router = useRouter()
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploadMenuVisible = ref(false)
@@ -695,7 +697,7 @@ function handleModelChange(modelKey: string) {
 
 function handleOpenMoreModels() {
   modelPopoverVisible.value = false
-  window.location.hash = '#/settings/system/api'
+  void router.push('/settings/system/api')
 }
 
 function handleSelectedAppChipClick() {
