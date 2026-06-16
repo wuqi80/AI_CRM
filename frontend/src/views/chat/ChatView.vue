@@ -788,7 +788,10 @@
               <!-- Input Box -->
               <div class="relative group">
                 <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl group-focus-within:bg-primary/10 transition-all opacity-0 group-focus-within:opacity-100"></div>
-                <div class="relative flex items-center bg-white border border-slate-200 rounded-2xl p-2 shadow-xl shadow-slate-200/40 focus-within:border-primary transition-all">
+                <div
+                  v-if="!isMobile"
+                  class="relative flex items-center bg-white border border-slate-200 rounded-2xl p-2 shadow-xl shadow-slate-200/40 focus-within:border-primary transition-all"
+                >
                   <input
                     ref="fileInputRef"
                     type="file"
@@ -1032,6 +1035,212 @@
                       <span v-else class="material-symbols-outlined text-xl">send</span>
                     </button>
                   </div>
+                </div>
+                <div v-else class="wk-mobile-composer-row flex w-full items-end gap-2">
+                  <el-popover
+                    v-model:visible="chatUploadMenuVisible"
+                    placement="top-start"
+                    trigger="click"
+                    width="calc(100vw - 32px)"
+                    :show-arrow="false"
+                    :teleported="true"
+                    :disabled="isUploading"
+                    transition="wk-chat-mobile-sheet"
+                    popper-class="wk-chat-upload-menu-popper wk-chat-upload-menu-popper--mobile"
+                  >
+                    <template #reference>
+                      <button
+                        type="button"
+                        class="wk-mobile-composer-icon-button"
+                        :disabled="isUploading"
+                        aria-label="添加附件"
+                        title="添加附件"
+                      >
+                        <span class="material-symbols-outlined text-[22px] leading-none">add</span>
+                      </button>
+                    </template>
+                    <div class="wk-chat-upload-menu wk-chat-upload-menu--mobile">
+                      <span class="wk-chat-upload-menu__mobile-handle" aria-hidden="true"></span>
+                      <button
+                        type="button"
+                        class="wk-chat-upload-menu__item"
+                        :disabled="selectedFiles.length + selectedKnowledgeItems.length >= MAX_FILE_COUNT"
+                        @click="handleUploadMenuAddFile"
+                      >
+                        <span class="wk-chat-upload-menu__icon">
+                          <span class="material-symbols-outlined text-[22px] leading-none">attach_file</span>
+                        </span>
+                        <span class="wk-chat-upload-menu__label">上传图片和文件</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="wk-chat-upload-menu__item"
+                        :disabled="selectedFiles.length + selectedKnowledgeItems.length >= MAX_FILE_COUNT"
+                        @click="handleUploadMenuChooseKnowledge"
+                      >
+                        <span class="wk-chat-upload-menu__icon">
+                          <span class="material-symbols-outlined text-[22px] leading-none">menu_book</span>
+                        </span>
+                        <span class="wk-chat-upload-menu__label">选择知识库文件</span>
+                      </button>
+                      <button
+                        v-for="app in chatUploadAppOptions"
+                        :key="app.code"
+                        type="button"
+                        class="wk-chat-upload-menu__item"
+                        :disabled="isUploading"
+                        @click="handleUploadMenuSelectApp(app.code)"
+                      >
+                        <span class="wk-chat-upload-menu__icon">
+                          <span
+                            class="material-symbols-outlined text-[22px] leading-none"
+                            :class="chatStore.selectedAppCode === app.code ? 'text-primary' : ''"
+                          >
+                            {{ resolveChatAppIcon(app.code) }}
+                          </span>
+                        </span>
+                        <span class="wk-chat-upload-menu__label wk-chat-upload-menu__label--grow">{{ app.label }}</span>
+                        <span
+                          v-if="chatStore.selectedAppCode === app.code"
+                          class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                        >
+                          check
+                        </span>
+                      </button>
+                    </div>
+                  </el-popover>
+
+                  <textarea
+                    ref="chatInputRef"
+                    v-model="inputText"
+                    rows="1"
+                    class="wk-mobile-composer-textarea min-w-0 flex-1 resize-none overflow-x-hidden overflow-y-auto border-none bg-transparent px-1 py-2 text-[16px] leading-[24px] text-[#0d0d0d] placeholder:text-[16px] placeholder:text-[#909090] focus:outline-none focus:ring-0"
+                    placeholder="输入指令..."
+                    :disabled="chatStore.currentSessionIsStreaming || isUploading"
+                    @input="resizeChatTextarea"
+                    @keydown.enter.exact.prevent="handleSend"
+                    @paste="handlePaste"
+                  ></textarea>
+
+                  <el-popover
+                    v-model:visible="chatModelPopoverVisible"
+                    placement="top-start"
+                    trigger="click"
+                    :width="300"
+                    :show-arrow="false"
+                    :teleported="true"
+                    :disabled="chatStore.modelOptionsLoading"
+                    popper-class="wk-chat-model-popper wk-chat-model-popper--mobile"
+                  >
+                    <template #reference>
+                      <button
+                        type="button"
+                        class="wk-mobile-composer-icon-button wk-mobile-model-trigger--icon"
+                        :disabled="chatStore.modelOptionsLoading"
+                        :title="`当前模型：${composerModelLabel}`"
+                        aria-label="切换模型"
+                      >
+                        <span class="wk-chat-model-trigger__icon" aria-hidden="true">
+                          <template v-if="chatStore.selectedModel">
+                            <img
+                              v-if="modelShowImage(chatStore.selectedModel)"
+                              :src="modelIconSrc(chatStore.selectedModel)"
+                              alt=""
+                              class="size-full object-fill"
+                              @error="onModelImageError($event)"
+                            />
+                            <span v-else>{{ selectedModelInitial }}</span>
+                          </template>
+                          <span v-else>{{ selectedModelInitial }}</span>
+                        </span>
+                      </button>
+                    </template>
+
+                    <div class="wk-chat-model-menu">
+                      <template v-if="modelOptionGroups.length > 0">
+                        <template v-for="group in modelOptionGroups" :key="group.source">
+                          <div v-if="modelOptionGroups.length > 1" class="wk-chat-model-menu__group-label">
+                            {{ group.label }}
+                          </div>
+                          <button
+                            v-for="option in group.options"
+                            :key="chatStore.toModelKey(option)"
+                            type="button"
+                            class="wk-chat-model-menu__item"
+                            @click="handleModelChange(chatStore.toModelKey(option))"
+                          >
+                            <span class="wk-chat-model-menu__logo" aria-hidden="true">
+                              <img
+                                v-if="modelShowImage(option)"
+                                :src="modelIconSrc(option)"
+                                alt=""
+                                class="size-5 object-fill"
+                                @error="onModelImageError($event)"
+                              />
+                              <span v-else>{{ modelOptionLabel(option).slice(0, 1) }}</span>
+                            </span>
+                            <span class="min-w-0 flex-1 truncate text-[14px] text-[#0d0d0d]">
+                              {{ modelOptionLabel(option) }}
+                            </span>
+                            <span
+                              class="material-symbols-outlined flex size-5 shrink-0 items-center justify-center text-[20px] leading-none"
+                              :class="chatStore.selectedModelKey === chatStore.toModelKey(option) ? 'text-primary' : 'invisible'"
+                              aria-hidden="true"
+                            >
+                              check
+                            </span>
+                          </button>
+                        </template>
+                      </template>
+                      <button
+                        v-if="canManageAiConfig"
+                        type="button"
+                        class="wk-chat-model-menu__more"
+                        @click="handleOpenMoreModels"
+                      >
+                        <span class="material-symbols-outlined text-[18px] leading-none" aria-hidden="true">
+                          add_circle
+                        </span>
+                        <span class="min-w-0 flex-1 truncate">
+                          {{ modelOptionGroups.length > 0 ? '管理模型配置' : '配置自建模型' }}
+                        </span>
+                        <span class="material-symbols-outlined text-[18px] leading-none text-[#8f8f8f]" aria-hidden="true">
+                          chevron_right
+                        </span>
+                      </button>
+                      <p v-else-if="modelOptionGroups.length === 0" class="wk-chat-model-menu__empty">
+                        暂无可用模型，请联系管理员配置。
+                      </p>
+                    </div>
+                  </el-popover>
+
+                  <button
+                    type="button"
+                    class="group/chat-send wk-mobile-composer-icon-button wk-mobile-send-button shadow-lg shadow-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    :class="sendActionButtonClass"
+                    :disabled="sendActionDisabled"
+                    :aria-label="sendActionTitle"
+                    :title="sendActionTitle"
+                    @click="handleSendAction"
+                  >
+                    <span v-if="chatStore.currentSessionIsStreaming || isUploading || isTranscribing" class="material-symbols-outlined animate-spin text-[20px] leading-none">progress_activity</span>
+                    <span v-else-if="isRecording" class="wk-recording-indicator" aria-hidden="true">
+                      <span class="material-symbols-outlined wk-recording-indicator__stop">stop</span>
+                      <span class="wk-recording-indicator__bars">
+                        <span />
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    </span>
+                    <WkIcon
+                      v-else-if="!hasComposerSendPayload"
+                      name="voice"
+                      :box-size="20"
+                      class="text-[20px] leading-none"
+                    />
+                    <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
+                  </button>
                 </div>
               </div>
               <p class="text-center text-xs text-slate-300 uppercase tracking-[0.4em]">内容由AI生成，请核查重要信息</p>
@@ -4194,6 +4403,106 @@ function resolveChatAppIcon(code: string): string {
   line-height: 1;
 }
 
+.wk-mobile-composer-row {
+  min-height: 40px;
+}
+
+.wk-mobile-composer-icon-button {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #0d0d0d;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-composer-icon-button:hover {
+  background: var(--wk-bg-surface-hover);
+}
+
+.wk-mobile-composer-icon-button:active {
+  transform: scale(0.94);
+}
+
+.wk-mobile-composer-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.wk-mobile-model-trigger--icon {
+  border: 1px solid var(--wk-border-subtle);
+  background: #fff;
+  padding: 0;
+}
+
+.wk-mobile-send-button {
+  background: var(--wk-primary);
+  color: #fff;
+}
+
+.wk-mobile-send-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wk-primary) 90%, #000);
+}
+
+.wk-mobile-composer-textarea {
+  box-sizing: border-box;
+  max-height: 120px;
+  min-height: 40px;
+  overscroll-behavior: contain;
+}
+
+.wk-mobile-composer-textarea::placeholder {
+  line-height: 24px;
+}
+
+.wk-chat-upload-menu--mobile {
+  padding: 12px 8px max(12px, var(--safe-area-inset-bottom));
+}
+
+.wk-chat-upload-menu__mobile-handle {
+  display: block;
+  width: 44px;
+  height: 5px;
+  margin: 0 auto 10px;
+  border-radius: 9999px;
+  background: #d1d5db;
+}
+
+.wk-chat-upload-menu--mobile .wk-chat-upload-menu__item {
+  height: 52px;
+  gap: 14px;
+  border-radius: 14px;
+  padding: 8px 12px;
+}
+
+.wk-chat-upload-menu--mobile .wk-chat-upload-menu__icon {
+  font-size: 22px;
+}
+
+.wk-chat-upload-menu__label {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.wk-chat-upload-menu--mobile .wk-chat-upload-menu__label {
+  font-weight: 600;
+}
+
+.wk-chat-upload-menu__label--grow {
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.wk-chat-upload-menu__check {
+  margin-left: auto;
+  font-size: 18px;
+  line-height: 1;
+}
+
 .wk-recording-indicator {
   position: relative;
   display: inline-flex;
@@ -4363,5 +4672,38 @@ function resolveChatAppIcon(code: string): string {
 .wk-chat-upload-menu-popper .el-popper__arrow,
 .wk-chat-upload-menu-popper .el-popper__arrow::before {
   display: none !important;
+}
+
+.wk-chat-upload-menu-popper--mobile.el-popper {
+  position: fixed !important;
+  top: auto !important;
+  right: 16px !important;
+  bottom: max(16px, var(--safe-area-inset-bottom)) !important;
+  left: 16px !important;
+  width: auto !important;
+  max-width: none !important;
+  border-radius: 24px !important;
+  transform: none !important;
+  box-shadow: 0 18px 48px rgb(var(--wk-shadow-color) / 0.32) !important;
+}
+
+.wk-chat-mobile-sheet-enter-active,
+.wk-chat-mobile-sheet-leave-active {
+  transform-origin: center bottom;
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease;
+}
+
+.wk-chat-mobile-sheet-enter-from,
+.wk-chat-mobile-sheet-leave-to {
+  opacity: 0;
+  transform: translateY(calc(100% + 24px)) !important;
+}
+
+.wk-chat-mobile-sheet-enter-to,
+.wk-chat-mobile-sheet-leave-from {
+  opacity: 1;
+  transform: translateY(0) !important;
 }
 </style>
