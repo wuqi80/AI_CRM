@@ -66,8 +66,37 @@ public class ChatController {
     @Operation(summary = "List chat model options")
     public Result<List<Map<String, Object>>> listChatModelOptions() {
         AiConfigVO config = systemConfigService.getAiConfig();
+        List<Map<String, Object>> options = new java.util.ArrayList<>();
+        if (config != null && config.getAvailableProviders() != null) {
+            for (AiConfigVO.ProviderOptionVO provider : config.getAvailableProviders()) {
+                String modelName = provider.getSavedModel();
+                if (!Boolean.TRUE.equals(provider.getConfigured())
+                        || !Boolean.TRUE.equals(provider.getApiKeyConfigured())
+                        || modelName == null
+                        || modelName.isBlank()) {
+                    continue;
+                }
+                Map<String, Object> option = new LinkedHashMap<>();
+                option.put("provider", provider.getValue());
+                option.put("providerLabel", provider.getLabel());
+                option.put("modelName", modelName);
+                option.put("displayName", provider.getLabel() == null || provider.getLabel().isBlank()
+                        ? modelName
+                        : provider.getLabel() + " / " + modelName);
+                option.put("modelSource", "custom");
+                Map<String, Object> capabilities = new LinkedHashMap<>();
+                capabilities.put("supportsStream", provider.getSupportsStream());
+                capabilities.put("supportsToolCall", provider.getSupportsToolCall());
+                capabilities.put("supportsVision", provider.getSupportsVision());
+                option.put("capabilities", capabilities);
+                options.add(option);
+            }
+        }
+        if (!options.isEmpty()) {
+            return Result.ok(options);
+        }
         if (config == null || !Boolean.TRUE.equals(config.getReady()) || config.getModel() == null || config.getModel().isBlank()) {
-            return Result.ok(List.of());
+            return Result.ok(options);
         }
         Map<String, Object> option = new LinkedHashMap<>();
         option.put("provider", config.getProvider());
@@ -78,7 +107,8 @@ public class ChatController {
                 : config.getProviderLabel() + " / " + config.getModel());
         option.put("modelSource", "custom");
         option.put("capabilities", config.getCapabilities());
-        return Result.ok(List.of(option));
+        options.add(option);
+        return Result.ok(options);
     }
 
     @PostMapping("/session/delete/{id}")

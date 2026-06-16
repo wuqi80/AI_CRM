@@ -40,6 +40,15 @@ public class ChatSendBO {
     @Schema(description = "Bound project task ID")
     private Long projectTaskId;
 
+    @Schema(description = "本次对话选择的 AI 服务商编码")
+    private String modelProvider;
+
+    @Schema(description = "本次对话选择的模型名称")
+    private String modelName;
+
+    @Schema(description = "模型来源：custom/system，单机版仅使用 custom")
+    private String modelSource;
+
     @Schema(description = "Knowledge file IDs used to limit RAG answers")
     private List<Long> knowledgeIds;
 

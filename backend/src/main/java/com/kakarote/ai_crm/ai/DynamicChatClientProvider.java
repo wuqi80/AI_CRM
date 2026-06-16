@@ -132,6 +132,14 @@ public class DynamicChatClientProvider {
         return client;
     }
 
+    public ChatClient getChatClient(String providerCode, String modelName) {
+        if (StrUtil.isBlank(providerCode) && StrUtil.isBlank(modelName)) {
+            return getChatClient();
+        }
+        AiRuntimeConfig runtimeConfig = resolveRuntimeConfigForSelection(loadAiConfigsFromDB(), providerCode, modelName);
+        return createChatClient(runtimeConfig);
+    }
+
     public void refreshChatClient() {
         synchronized (lock) {
             AiRuntimeConfig runtimeConfig = resolveRuntimeConfig(loadAiConfigsFromDB());
@@ -161,6 +169,17 @@ public class DynamicChatClientProvider {
 
     public AiRuntimeConfigSnapshot getCurrentRuntimeConfigSnapshot() {
         AiRuntimeConfig runtimeConfig = resolveRuntimeConfig(loadAiConfigsFromDB());
+        return toSnapshot(runtimeConfig);
+    }
+
+    public AiRuntimeConfigSnapshot getRuntimeConfigSnapshot(String providerCode, String modelName) {
+        AiRuntimeConfig runtimeConfig = StrUtil.isBlank(providerCode) && StrUtil.isBlank(modelName)
+                ? resolveRuntimeConfig(loadAiConfigsFromDB())
+                : resolveRuntimeConfigForSelection(loadAiConfigsFromDB(), providerCode, modelName);
+        return toSnapshot(runtimeConfig);
+    }
+
+    private AiRuntimeConfigSnapshot toSnapshot(AiRuntimeConfig runtimeConfig) {
         return new AiRuntimeConfigSnapshot(
                 runtimeConfig.providerCode(),
                 runtimeConfig.apiUrl(),
@@ -462,21 +481,7 @@ public class DynamicChatClientProvider {
         Map<String, SavedProviderConfigSnapshot> savedProviderConfigs = loadSavedProviderConfigs(configs);
         SavedProviderConfigSnapshot selectedSavedProvider = resolveSelectedSavedProvider(configs, savedProviderConfigs);
         if (selectedSavedProvider != null) {
-            AiProviderDescriptor descriptor = AiProviderRegistry.resolve(
-                    selectedSavedProvider.providerCode(),
-                    selectedSavedProvider.apiUrl()
-            );
-            return new AiRuntimeConfig(
-                    selectedSavedProvider.providerCode(),
-                    selectedSavedProvider.apiUrl(),
-                    selectedSavedProvider.apiKey(),
-                    selectedSavedProvider.model(),
-                    selectedSavedProvider.temperature(),
-                    selectedSavedProvider.maxTokens(),
-                    selectedSavedProvider.extraHeadersJson(),
-                    descriptor.resolveCapabilities(selectedSavedProvider.model()),
-                    AiMode.CUSTOM
-            );
+            return toRuntimeConfig(selectedSavedProvider, null);
         }
 
         String resolvedApiUrl = normalizeCompatibleBaseUrl(
@@ -493,6 +498,52 @@ public class DynamicChatClientProvider {
                 defaultMaxTokens,
                 null,
                 descriptor.resolveCapabilities(resolvedModel),
+                AiMode.CUSTOM
+        );
+    }
+
+    private AiRuntimeConfig resolveRuntimeConfigForSelection(Map<String, String> configs,
+                                                            String providerCode,
+                                                            String modelName) {
+        Map<String, SavedProviderConfigSnapshot> savedProviderConfigs = loadSavedProviderConfigs(configs);
+        if (savedProviderConfigs.isEmpty()) {
+            return resolveRuntimeConfig(configs);
+        }
+
+        String normalizedProvider = StrUtil.nullToEmpty(providerCode).trim().toLowerCase();
+        String requestedModel = StrUtil.nullToEmpty(modelName).trim();
+        SavedProviderConfigSnapshot snapshot = null;
+
+        if (StrUtil.isNotBlank(normalizedProvider)) {
+            snapshot = savedProviderConfigs.get(normalizedProvider);
+        }
+        if (snapshot == null && StrUtil.isNotBlank(requestedModel)) {
+            snapshot = savedProviderConfigs.values().stream()
+                    .filter(item -> requestedModel.equalsIgnoreCase(item.model()))
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (snapshot == null) {
+            snapshot = resolveSelectedSavedProvider(configs, savedProviderConfigs);
+        }
+        return snapshot != null ? toRuntimeConfig(snapshot, requestedModel) : resolveRuntimeConfig(configs);
+    }
+
+    private AiRuntimeConfig toRuntimeConfig(SavedProviderConfigSnapshot snapshot, String requestedModel) {
+        String model = StrUtil.blankToDefault(StrUtil.nullToEmpty(requestedModel).trim(), snapshot.model());
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(
+                snapshot.providerCode(),
+                snapshot.apiUrl()
+        );
+        return new AiRuntimeConfig(
+                snapshot.providerCode(),
+                snapshot.apiUrl(),
+                snapshot.apiKey(),
+                model,
+                snapshot.temperature(),
+                snapshot.maxTokens(),
+                snapshot.extraHeadersJson(),
+                descriptor.resolveCapabilities(model),
                 AiMode.CUSTOM
         );
     }

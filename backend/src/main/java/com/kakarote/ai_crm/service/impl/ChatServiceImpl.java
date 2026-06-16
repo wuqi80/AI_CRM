@@ -518,7 +518,8 @@ public class ChatServiceImpl implements IChatService {
             enhancedContent = enhancedContent + "\n\n" + knowledgeSelectionContext;
         }
 
-        AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
+        DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig = resolveChatRuntimeConfig(sendBO);
+        AiModelCapabilities capabilities = runtimeConfig.capabilities();
         if (containsImageAttachment(attachments) && !capabilities.isSupportsVision()) {
             enhancedContent = enhancedContent + "\n\n[系统提示] 当前配置的模型不支持图片直传，请仅基于可提取文本回答；如需图片理解，请切换到支持视觉的模型。";
         }
@@ -531,7 +532,7 @@ public class ChatServiceImpl implements IChatService {
         AtomicReference<String> modelNameRef = new AtomicReference<>(null);
         AtomicReference<AiToolExecutionRecorder.ToolExecution> toolFailureRef = new AtomicReference<>(null);
 
-        String unavailableTip = resolveAiUnavailableTip();
+        String unavailableTip = resolveAiUnavailableTip(runtimeConfig);
         if (unavailableTip != null) {
             saveMessage(sessionId, "assistant", unavailableTip);
             AiContextHolder.clear();
@@ -540,14 +541,7 @@ public class ChatServiceImpl implements IChatService {
 
         log.debug("开始 AI 对话，启用工具调用...");
 
-        if (!chatClientProvider.isApiKeyConfigured()) {
-            String tip = "请先在系统设置-系统参数设置-AI/API设置中配置AI大模型相关信息";
-            saveMessage(sessionId, "assistant", tip);
-            AiContextHolder.clear();
-            return Flux.just(tip);
-        }
-
-        ChatClient chatClient = chatClientProvider.getChatClient();
+        ChatClient chatClient = resolveChatClient(sendBO);
         aiToolExecutionRecorder.begin(sessionId);
 
         final String finalSystemPrompt = enhancedSystemPrompt;
@@ -695,14 +689,15 @@ public class ChatServiceImpl implements IChatService {
             enhancedContent = enhancedContent + "\n\n" + knowledgeSelectionContext;
         }
 
-        AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
+        DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig = resolveChatRuntimeConfig(sendBO);
+        AiModelCapabilities capabilities = runtimeConfig.capabilities();
         if (containsImageAttachment(attachments) && !capabilities.isSupportsVision()) {
             enhancedContent = enhancedContent + "\n\n[系统提示] 当前配置的模型不支持图片直传，请仅基于可提取文本回答；如需图片理解，请切换到支持视觉的模型。";
         }
 
         List<Media> mediaList = buildMediaList(attachments, capabilities);
 
-        String unavailableTip = resolveAiUnavailableTip();
+        String unavailableTip = resolveAiUnavailableTip(runtimeConfig);
         if (unavailableTip != null) {
             saveMessage(sessionId, "assistant", unavailableTip);
             AiContextHolder.clear();
@@ -710,7 +705,7 @@ public class ChatServiceImpl implements IChatService {
         }
 
         try {
-            ChatClient chatClient = chatClientProvider.getChatClient();
+            ChatClient chatClient = resolveChatClient(sendBO);
             aiToolExecutionRecorder.begin(sessionId);
 
             final String finalSystemPrompt = enhancedSystemPrompt;
@@ -1162,8 +1157,16 @@ public class ChatServiceImpl implements IChatService {
                 && !response.contains("功能未启用");
     }
 
-    private String resolveAiUnavailableTip() {
-        if (!chatClientProvider.isApiKeyConfigured()) {
+    private DynamicChatClientProvider.AiRuntimeConfigSnapshot resolveChatRuntimeConfig(ChatSendBO sendBO) {
+        return chatClientProvider.getRuntimeConfigSnapshot(sendBO.getModelProvider(), sendBO.getModelName());
+    }
+
+    private ChatClient resolveChatClient(ChatSendBO sendBO) {
+        return chatClientProvider.getChatClient(sendBO.getModelProvider(), sendBO.getModelName());
+    }
+
+    private String resolveAiUnavailableTip(DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig) {
+        if (runtimeConfig == null || StrUtil.isBlank(runtimeConfig.apiKey())) {
             return "请先在系统设置中配置 AI 服务。";
         }
         return null;
