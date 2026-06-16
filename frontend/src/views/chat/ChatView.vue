@@ -789,8 +789,44 @@
                           <span class="block truncate text-xs text-slate-400">引用已上传资料</span>
                         </span>
                       </button>
+                      <div v-if="chatUploadAppOptions.length > 0" class="mt-1 border-t border-slate-100 pt-1">
+                        <button
+                          v-for="app in chatUploadAppOptions"
+                          :key="app.code"
+                          type="button"
+                          class="wk-chat-upload-menu__item"
+                          @click="handleUploadMenuSelectApp(app.code)"
+                        >
+                          <span class="wk-chat-upload-menu__icon">
+                            <span class="material-symbols-outlined text-[19px] leading-none">
+                              {{ resolveChatAppIcon(app.code) }}
+                            </span>
+                          </span>
+                          <span class="min-w-0 flex-1">
+                            <span class="block truncate text-sm font-semibold text-[#0d0d0d]">{{ app.label }}</span>
+                            <span class="block truncate text-xs text-slate-400">{{ app.description || '切换聊天应用' }}</span>
+                          </span>
+                          <span
+                            v-if="chatStore.selectedAppCode === app.code"
+                            class="material-symbols-outlined fill-1 text-[18px] leading-none text-primary"
+                          >
+                            check
+                          </span>
+                        </button>
+                      </div>
                     </div>
                   </el-popover>
+                  <button
+                    v-if="selectedChatAppLabel"
+                    type="button"
+                    class="group/crm-toolbar hidden h-10 shrink-0 items-center gap-1.5 rounded-full bg-slate-50 pl-2 pr-3 text-sm font-semibold text-[var(--wk-text-primary)] transition-colors hover:bg-slate-100 sm:inline-flex"
+                    :title="`已启用 ${selectedChatAppLabel}，点击关闭`"
+                    @click="chatStore.setSelectedAppCode('general')"
+                  >
+                    <span class="material-symbols-outlined text-[18px] leading-none">{{ selectedChatAppIcon }}</span>
+                    <span class="max-w-[96px] truncate">{{ selectedChatAppLabel }}</span>
+                    <span class="material-symbols-outlined text-[16px] leading-none text-slate-400 transition-colors group-hover/crm-toolbar:text-slate-700">close</span>
+                  </button>
                   <textarea
                     ref="chatInputRef"
                     v-model="inputText"
@@ -1488,6 +1524,14 @@ const hasComposerSendPayload = computed(() =>
   || selectedFiles.value.length > 0
   || selectedKnowledgeItems.value.length > 0
 )
+const chatUploadAppOptions = computed(() =>
+  chatStore.appOptions.filter(app => app.code !== 'general')
+)
+const selectedChatAppLabel = computed(() => {
+  if (chatStore.selectedAppCode === 'general') return ''
+  return chatStore.selectedApp?.label || chatStore.selectedAppCode
+})
+const selectedChatAppIcon = computed(() => resolveChatAppIcon(chatStore.selectedAppCode))
 const sendActionButtonClass = computed(() => {
   if (isRecording.value) return '!bg-red-500 hover:!bg-red-600'
   if (isTranscribing.value || isUploading.value) return '!bg-slate-200 !text-slate-500 hover:!bg-slate-200'
@@ -2754,6 +2798,11 @@ function handleUploadMenuAddFile() {
 function handleUploadMenuChooseKnowledge() {
   closeChatUploadMenu()
   openKnowledgePicker()
+}
+
+function handleUploadMenuSelectApp(appCode: string) {
+  closeChatUploadMenu()
+  chatStore.setSelectedAppCode(chatStore.selectedAppCode === appCode ? 'general' : appCode)
 }
 
 function handleKnowledgePickerConfirm(items: Knowledge[]) {
