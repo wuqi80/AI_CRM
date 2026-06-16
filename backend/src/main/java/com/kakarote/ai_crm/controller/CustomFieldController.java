@@ -21,7 +21,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/custom-field")
-@Tag(name = "Custom Field APIs")
+@Tag(name = "自定义字段")
 public class CustomFieldController {
 
     @Autowired
@@ -31,14 +31,14 @@ public class CustomFieldController {
     private ICustomFieldSortService customFieldSortService;
 
     @PostMapping("/add")
-    @Operation(summary = "Add custom field")
+    @Operation(summary = "新增自定义字段")
     @RequirePermission("customField:create")
     public Result<Long> add(@Valid @RequestBody CustomFieldAddBO bo) {
         return Result.ok(customFieldService.addField(bo));
     }
 
     @PostMapping("/update")
-    @Operation(summary = "Update custom field")
+    @Operation(summary = "更新自定义字段")
     @RequirePermission("customField:edit")
     public Result<String> update(@Valid @RequestBody CustomFieldUpdateBO bo) {
         customFieldService.updateField(bo);
@@ -46,49 +46,49 @@ public class CustomFieldController {
     }
 
     @PostMapping("/disable/{id}")
-    @Operation(summary = "Disable custom field")
+    @Operation(summary = "停用自定义字段")
     @RequirePermission("customField:edit")
     public Result<String> disable(
-            @Parameter(description = "Field ID") @PathVariable("id") Long id) {
+            @Parameter(description = "字段ID") @PathVariable("id") Long id) {
         customFieldService.disableField(id);
         return Result.ok();
     }
 
     @PostMapping("/enable/{id}")
-    @Operation(summary = "Enable custom field")
+    @Operation(summary = "启用自定义字段")
     @RequirePermission("customField:edit")
     public Result<String> enable(
-            @Parameter(description = "Field ID") @PathVariable("id") Long id) {
+            @Parameter(description = "字段ID") @PathVariable("id") Long id) {
         customFieldService.enableField(id);
         return Result.ok();
     }
 
     @PostMapping("/delete/{id}")
-    @Operation(summary = "Delete custom field")
+    @Operation(summary = "删除自定义字段")
     @RequirePermission("customField:delete")
     public Result<String> delete(
-            @Parameter(description = "Field ID") @PathVariable("id") Long id) {
+            @Parameter(description = "字段ID") @PathVariable("id") Long id) {
         customFieldService.deleteField(id);
         return Result.ok();
     }
 
     @GetMapping("/list/{entityType}")
-    @Operation(summary = "List fields by entity")
+    @Operation(summary = "按实体获取字段列表")
     @RequirePermission("customField")
     public Result<List<CustomFieldVO>> list(
-            @Parameter(description = "Entity type, such as customer or contact") @PathVariable("entityType") String entityType) {
+            @Parameter(description = "实体类型，如 customer 或 contact") @PathVariable("entityType") String entityType) {
         return Result.ok(customFieldService.getFieldsByEntity(entityType));
     }
 
     @GetMapping("/enabled/{entityType}")
-    @Operation(summary = "List enabled fields by entity")
+    @Operation(summary = "按实体获取启用字段列表")
     public Result<List<CustomFieldVO>> enabled(
-            @Parameter(description = "Entity type, such as customer or contact") @PathVariable("entityType") String entityType) {
+            @Parameter(description = "实体类型，如 customer 或 contact") @PathVariable("entityType") String entityType) {
         return Result.ok(customFieldService.getEnabledFieldsByEntity(entityType));
     }
 
     @PostMapping("/sort")
-    @Operation(summary = "Sort custom fields")
+    @Operation(summary = "调整自定义字段排序")
     @RequirePermission("customField:edit")
     public Result<String> sort(@RequestBody List<FieldSortBO> sortList) {
         customFieldService.updateSortOrder(sortList);
@@ -96,7 +96,7 @@ public class CustomFieldController {
     }
 
     @PostMapping("/unique/check")
-    @Operation(summary = "Check unique custom field value")
+    @Operation(summary = "校验自定义字段唯一值")
     public Result<Boolean> checkUnique(@Valid @RequestBody CustomFieldUniqueCheckBO bo) {
         customFieldService.validateUniqueFieldValue(bo.getEntityType(), bo.getEntityId(), bo.getFieldName(), bo.getValue());
         return Result.ok(Boolean.TRUE);

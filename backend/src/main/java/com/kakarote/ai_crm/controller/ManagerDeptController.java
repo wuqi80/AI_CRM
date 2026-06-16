@@ -16,21 +16,21 @@ import java.util.List;
 
 @RequestMapping("/managerDept")
 @RestController
-@Tag(name = "Department APIs")
+@Tag(name = "部门管理")
 public class ManagerDeptController {
 
     @Autowired
     private IManagerDeptService managerDeptService;
 
     @PostMapping("/queryDeptTree")
-    @Operation(summary = "Query department tree")
+    @Operation(summary = "查询部门树")
     @RequirePermission("dept")
     public Result<List<DeptVO>> queryDeptTree() {
         return Result.ok(managerDeptService.queryDeptTree());
     }
 
     @PostMapping("/add")
-    @Operation(summary = "Add department")
+    @Operation(summary = "新增部门")
     @RequirePermission("dept:create")
     public Result<String> add(@RequestBody DeptAddBO deptAddBO) {
         managerDeptService.addDept(deptAddBO);
@@ -38,7 +38,7 @@ public class ManagerDeptController {
     }
 
     @PostMapping("/update")
-    @Operation(summary = "Update department")
+    @Operation(summary = "更新部门")
     @RequirePermission("dept:edit")
     public Result<String> update(@RequestBody DeptUpdateBO deptUpdateBO) {
         managerDeptService.updateDept(deptUpdateBO);
@@ -46,9 +46,9 @@ public class ManagerDeptController {
     }
 
     @PostMapping("/delete")
-    @Operation(summary = "Delete department")
+    @Operation(summary = "删除部门")
     @RequirePermission("dept:delete")
-    public Result<String> delete(@Parameter(description = "Department ID") @RequestParam("deptId") Long deptId) {
+    public Result<String> delete(@Parameter(description = "部门ID") @RequestParam("deptId") Long deptId) {
         managerDeptService.deleteDept(deptId);
         return Result.ok();
     }

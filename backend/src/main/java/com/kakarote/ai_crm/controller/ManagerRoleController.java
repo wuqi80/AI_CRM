@@ -25,22 +25,22 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/managerRole")
-@Tag(name = "Role APIs")
+@Tag(name = "角色管理")
 public class ManagerRoleController {
 
     @Autowired
     private IManagerRoleService managerRoleService;
 
     @PostMapping("/queryById/{id}")
-    @Operation(summary = "Query role by id")
+    @Operation(summary = "按ID查询角色")
     @RequirePermission("role")
-    public Result<ManagerRole> queryById(@PathVariable("id") @Parameter(name = "id", description = "Role ID") Serializable id) {
+    public Result<ManagerRole> queryById(@PathVariable("id") @Parameter(name = "id", description = "角色ID") Serializable id) {
         ManagerRole entity = managerRoleService.queryById(id);
         return Result.ok(entity);
     }
 
     @PostMapping("/add")
-    @Operation(summary = "Create role")
+    @Operation(summary = "新增角色")
     @RequirePermission("role:create")
     public Result add(@RequestBody SetRoleBO setRoleBO) {
         managerRoleService.addOrUpdate(setRoleBO);
@@ -48,7 +48,7 @@ public class ManagerRoleController {
     }
 
     @PostMapping("/update")
-    @Operation(summary = "Update role")
+    @Operation(summary = "更新角色")
     @RequirePermission("role:edit")
     public Result update(@RequestBody SetRoleBO setRoleBO) {
         managerRoleService.addOrUpdate(setRoleBO);
@@ -56,14 +56,14 @@ public class ManagerRoleController {
     }
 
     @PostMapping("/queryPageList")
-    @Operation(summary = "Query role page")
+    @Operation(summary = "分页查询角色")
     @RequirePermission("role")
     public Result<BasePage<ManagerRole>> queryPageList(@RequestBody RoleQueryBO roleQueryBO) {
         return Result.ok(managerRoleService.queryPageList(roleQueryBO));
     }
 
     @PostMapping("/relatedUser")
-    @Operation(summary = "Bind users to role")
+    @Operation(summary = "绑定用户到角色")
     @RequirePermission("role:user")
     public Result relatedUser(@RequestBody RoleBO idsRoleBO) {
         managerRoleService.relatedUser(idsRoleBO.getUserIds(), idsRoleBO.getRoleIds());
@@ -71,7 +71,7 @@ public class ManagerRoleController {
     }
 
     @PostMapping("/unbindingUser")
-    @Operation(summary = "Unbind user from role")
+    @Operation(summary = "从角色解绑用户")
     @RequirePermission("role:user")
     public Result unbindingUser(@RequestParam("userId") Long userId, @RequestParam("roleId") Long roleId) {
         managerRoleService.unbindingUser(userId, roleId);
@@ -79,7 +79,7 @@ public class ManagerRoleController {
     }
 
     @PostMapping("/getAllRoleList")
-    @Operation(summary = "Query all roles")
+    @Operation(summary = "查询全部角色")
     @RequirePermission("role")
     public Result<List<ManagerRole>> getAllRoleList() {
         List<ManagerRole> allRoleList = managerRoleService.getAllRoleList();
@@ -87,14 +87,14 @@ public class ManagerRoleController {
     }
 
     @PostMapping("/auth")
-    @Operation(summary = "Query current user role auth tree")
+    @Operation(summary = "查询当前用户角色权限树")
     public Result<JSONObject> auth() {
         JSONObject object = managerRoleService.auth(UserUtil.getUserId());
         return Result.ok(object);
     }
 
     @PostMapping("/relatedMenu")
-    @Operation(summary = "Bind menus to role")
+    @Operation(summary = "绑定菜单到角色")
     @RequirePermission("role:permission")
     public Result relatedMenu(@RequestBody RelatedMenuBO relatedMenuBO) {
         managerRoleService.relatedMenu(relatedMenuBO.getRoleId(), relatedMenuBO.getMenuIds());
@@ -102,14 +102,14 @@ public class ManagerRoleController {
     }
 
     @PostMapping("/queryMenuIdList/{id}")
-    @Operation(summary = "Query role menu ids")
+    @Operation(summary = "查询角色菜单ID")
     @RequirePermission("role:permission")
-    public Result<List<Long>> queryMenuIdList(@PathVariable("id") @Parameter(name = "id", description = "Role ID") Long id) {
+    public Result<List<Long>> queryMenuIdList(@PathVariable("id") @Parameter(name = "id", description = "角色ID") Long id) {
         return Result.ok(managerRoleService.queryMenuIdList(id));
     }
 
     @PostMapping("/delete")
-    @Operation(summary = "Delete role")
+    @Operation(summary = "删除角色")
     @RequirePermission("role:delete")
     public Result delete(@RequestBody List<Long> ids) {
         managerRoleService.deleteByIds(ids.stream().map(id -> (Serializable) id).collect(java.util.stream.Collectors.toList()));
@@ -117,7 +117,7 @@ public class ManagerRoleController {
     }
 
     @PostMapping("/queryRoleListWithUserCount")
-    @Operation(summary = "Query role list with user count")
+    @Operation(summary = "查询带用户数量的角色列表")
     @RequirePermission("role")
     public Result<List<RoleVO>> queryRoleListWithUserCount(@RequestBody(required = false) RoleQueryBO query) {
         String search = query != null ? query.getSearch() : null;
@@ -125,14 +125,14 @@ public class ManagerRoleController {
     }
 
     @PostMapping("/queryPermissions/{roleId}")
-    @Operation(summary = "Query role permissions")
+    @Operation(summary = "查询角色权限")
     @RequirePermission("role:permission")
     public Result<List<RolePermissionVO>> queryPermissions(@PathVariable("roleId") Long roleId) {
         return Result.ok(managerRoleService.queryRolePermissions(roleId));
     }
 
     @PostMapping("/savePermissions")
-    @Operation(summary = "Save role permissions")
+    @Operation(summary = "保存角色权限")
     @RequirePermission("role:permission")
     public Result savePermissions(@RequestBody RolePermissionSaveBO bo) {
         managerRoleService.saveRolePermissions(bo);
