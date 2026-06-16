@@ -3794,20 +3794,19 @@ function resolveChatAppIcon(code: string): string {
 }
 
 .wk-chat-model-menu {
-  display: flex;
-  max-height: min(420px, 60vh);
-  flex-direction: column;
-  gap: 4px;
-  overflow-y: auto;
   padding: 6px;
+  max-height: min(52vh, 360px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .wk-chat-model-menu__group-label {
-  padding: 8px 8px 4px;
-  color: #94a3b8;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  padding: 8px 10px 4px;
+  color: var(--wk-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
 }
 
 .wk-chat-model-menu__item,
@@ -3816,18 +3815,16 @@ function resolveChatAppIcon(code: string): string {
   width: 100%;
   min-width: 0;
   align-items: center;
-  gap: 10px;
-  border-radius: 12px;
-  padding: 9px 10px;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 8px 10px;
   text-align: left;
-  transition:
-    background-color 160ms ease,
-    color 160ms ease;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
 .wk-chat-model-menu__item:hover,
 .wk-chat-model-menu__more:hover {
-  background: #f5f5f5;
+  background: var(--wk-bg-surface-hover);
 }
 
 .wk-chat-model-menu__logo {
@@ -3846,11 +3843,18 @@ function resolveChatAppIcon(code: string): string {
 }
 
 .wk-chat-model-menu__more {
-  margin-top: 4px;
-  border-top: 1px solid #f1f5f9;
-  color: #475569;
+  width: calc(100% - 4px);
+  margin: 4px 2px 6px;
+  border: 0 solid var(--wk-border-subtle);
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-primary);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
+}
+
+.wk-chat-model-menu__more:hover {
+  border-color: color-mix(in srgb, var(--wk-primary) 24%, var(--wk-border-subtle));
+  background: color-mix(in srgb, var(--wk-primary) 8%, var(--wk-bg-surface));
 }
 
 .wk-chat-model-menu__empty {
@@ -3862,45 +3866,42 @@ function resolveChatAppIcon(code: string): string {
 }
 
 .wk-chat-upload-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px;
+  padding: 10px;
 }
 
 .wk-chat-upload-menu__item {
   display: flex;
   width: 100%;
+  height: 36px;
   min-width: 0;
   align-items: center;
   gap: 10px;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 10px;
+  color: var(--wk-text-primary);
   text-align: left;
-  transition:
-    background-color 160ms ease,
-    opacity 160ms ease;
+  transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease;
 }
 
-.wk-chat-upload-menu__item:hover:not(:disabled) {
-  background: #f5f5f5;
+.wk-chat-upload-menu__item:hover {
+  background: var(--wk-bg-surface-hover);
 }
 
 .wk-chat-upload-menu__item:disabled {
   cursor: not-allowed;
-  opacity: 0.48;
+  opacity: 0.5;
 }
 
 .wk-chat-upload-menu__icon {
   display: inline-flex;
-  width: 34px;
-  height: 34px;
+  width: 22px;
+  height: 22px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border-radius: 11px;
-  background: #f1f5f9;
-  color: #475569;
+  color: var(--wk-text-primary);
+  font-size: 18px;
+  line-height: 1;
 }
 
 .wk-recording-indicator {
@@ -4045,22 +4046,32 @@ function resolveChatAppIcon(code: string): string {
 
 <style>
 .wk-chat-model-popper.el-popper {
-  border: 1px solid #e5e7eb !important;
-  border-radius: 16px !important;
-  box-shadow: 0 18px 60px rgb(15 23 42 / 0.16) !important;
+  z-index: 3000 !important;
+  overflow: hidden;
+  border: 1px solid var(--wk-border-subtle) !important;
+  border-radius: 8px !important;
+  background: var(--wk-bg-surface) !important;
+  padding: 0 !important;
+  box-shadow: 0 12px 36px rgb(var(--wk-shadow-color) / 0.28) !important;
 }
 
+.wk-chat-model-popper .el-popper__arrow,
 .wk-chat-model-popper .el-popper__arrow::before {
-  border-color: #e5e7eb !important;
+  display: none !important;
 }
 
 .wk-chat-upload-menu-popper.el-popper {
-  border: 1px solid #e5e7eb !important;
+  z-index: 3000 !important;
+  overflow: visible !important;
+  border: 1px solid var(--wk-border-subtle) !important;
   border-radius: 16px !important;
-  box-shadow: 0 18px 60px rgb(15 23 42 / 0.16) !important;
+  background: var(--wk-bg-surface) !important;
+  padding: 0 !important;
+  box-shadow: 0 12px 36px rgb(var(--wk-shadow-color) / 0.28) !important;
 }
 
+.wk-chat-upload-menu-popper .el-popper__arrow,
 .wk-chat-upload-menu-popper .el-popper__arrow::before {
-  border-color: #e5e7eb !important;
+  display: none !important;
 }
 </style>
