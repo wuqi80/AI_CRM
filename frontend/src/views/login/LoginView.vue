@@ -7,7 +7,7 @@
 
     <div class="auth-shell relative z-10">
       <div class="auth-card">
-        <section class="auth-brand-panel">
+        <div class="relative hidden flex-col justify-between overflow-hidden bg-slate-900 p-12 text-white lg:flex lg:w-[46%]">
           <div class="pointer-events-none absolute inset-0 opacity-20">
             <div class="absolute left-1/4 top-1/4 h-64 w-64 rounded-full bg-primary blur-[100px]" />
             <div class="absolute bottom-1/4 right-1/4 h-64 w-64 rounded-full bg-indigo-500 blur-[100px]" />
@@ -15,7 +15,7 @@
 
           <div class="relative z-10">
             <div class="mb-12 flex items-center gap-3">
-              <div class="auth-logo-shell">
+              <div class="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-black/20 ring-1 ring-white/20">
                 <img
                   :src="logoImg"
                   alt="悟空AI CRM"
@@ -41,7 +41,7 @@
 
           <div class="relative z-10 space-y-8">
             <div class="flex items-center gap-4">
-              <div class="auth-feature-icon">
+              <div class="flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
                 <el-icon class="text-white" :size="24"><CircleCheck /></el-icon>
               </div>
               <div>
@@ -50,7 +50,7 @@
               </div>
             </div>
             <div class="flex items-center gap-4">
-              <div class="auth-feature-icon">
+              <div class="flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
                 <el-icon class="text-white" :size="24"><MagicStick /></el-icon>
               </div>
               <div>
@@ -59,9 +59,9 @@
               </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        <section class="auth-form-panel">
+        <div class="auth-form-panel lg:w-[54%]">
           <div ref="formScrollRef" class="auth-form-scroll">
             <div class="auth-form-content auth-form-content--with-fixed-consent">
               <div class="mb-8 flex items-center justify-center gap-3 lg:hidden">
@@ -226,7 +226,7 @@
               </div>
             </div>
           </div>
-        </section>
+        </div>
       </div>
     </div>
 
@@ -743,41 +743,6 @@ async function completeLoginRedirect(redirectValue: unknown) {
   box-shadow: 0 28px 80px rgba(148, 163, 184, 0.22);
 }
 
-.auth-brand-panel {
-  position: relative;
-  display: none;
-  width: 46%;
-  flex-direction: column;
-  justify-content: space-between;
-  overflow: hidden;
-  background: #0f172a;
-  padding: 3rem;
-  color: #fff;
-}
-
-.auth-logo-shell {
-  display: flex;
-  width: 2.5rem;
-  height: 2.5rem;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 0.75rem;
-  background: #fff;
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.2);
-}
-
-.auth-feature-icon {
-  display: flex;
-  width: 3rem;
-  height: 3rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-}
-
 .auth-form-panel {
   position: relative;
   display: flex;
@@ -822,6 +787,7 @@ async function completeLoginRedirect(redirectValue: unknown) {
   width: min(100%, 456px);
   margin: 0 auto;
   padding: 2rem 1.5rem;
+  --el-input-border-radius: 16px;
 }
 
 .auth-form-stage {
@@ -1270,10 +1236,6 @@ async function completeLoginRedirect(redirectValue: unknown) {
 }
 
 @media (min-width: 1024px) {
-  .auth-brand-panel {
-    display: flex;
-  }
-
   .auth-card {
     min-height: 620px;
   }
