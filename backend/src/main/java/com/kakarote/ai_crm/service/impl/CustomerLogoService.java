@@ -422,7 +422,7 @@ public class CustomerLogoService {
         while ((read = inputStream.read(buffer)) != -1) {
             total += read;
             if (total > maxBytes) {
-                throw new IllegalStateException("response body too large");
+                throw new IllegalStateException("响应内容过大");
             }
             outputStream.write(buffer, 0, read);
         }
@@ -452,30 +452,30 @@ public class CustomerLogoService {
      */
     private void validateFetchUri(URI uri) throws UnknownHostException {
         if (uri == null) {
-            throw new IllegalArgumentException("uri is null");
+            throw new IllegalArgumentException("URI 不能为空");
         }
         String scheme = StrUtil.blankToDefault(uri.getScheme(), "").toLowerCase(Locale.ROOT);
         if (!"http".equals(scheme) && !"https".equals(scheme)) {
-            throw new IllegalArgumentException("unsupported scheme");
+            throw new IllegalArgumentException("不支持的 URI 协议");
         }
         if (StrUtil.isNotBlank(uri.getUserInfo())) {
-            throw new IllegalArgumentException("userinfo is not allowed");
+            throw new IllegalArgumentException("URI 不允许包含 userinfo");
         }
         String host = StrUtil.trimToNull(uri.getHost());
         if (host == null) {
-            throw new IllegalArgumentException("host is missing");
+            throw new IllegalArgumentException("host 缺失");
         }
         String asciiHost = IDN.toASCII(host, IDN.ALLOW_UNASSIGNED);
         if ("localhost".equalsIgnoreCase(asciiHost) || asciiHost.endsWith(".local")) {
-            throw new IllegalArgumentException("private host is not allowed");
+            throw new IllegalArgumentException("不允许访问内网域名");
         }
         InetAddress[] addresses = InetAddress.getAllByName(asciiHost);
         if (addresses.length == 0) {
-            throw new IllegalArgumentException("host can not be resolved");
+            throw new IllegalArgumentException("域名无法解析");
         }
         for (InetAddress address : addresses) {
             if (!isPublicAddress(address)) {
-                throw new IllegalArgumentException("private address is not allowed");
+                throw new IllegalArgumentException("不允许访问内网地址");
             }
         }
     }

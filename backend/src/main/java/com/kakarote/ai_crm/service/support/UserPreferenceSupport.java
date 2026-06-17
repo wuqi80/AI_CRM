@@ -93,7 +93,7 @@ public final class UserPreferenceSupport {
         try {
             return OBJECT_MAPPER.writeValueAsString(Map.of("sidebarModuleOrder", sidebarModuleOrder));
         } catch (Exception e) {
-            throw new IllegalStateException("Serialize user preferences failed", e);
+            throw new IllegalStateException("用户偏好序列化失败", e);
         }
     }
 
