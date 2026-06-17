@@ -797,9 +797,11 @@
                     v-model:visible="chatUploadMenuVisible"
                     placement="top-start"
                     trigger="click"
-                    :width="224"
+                    width="200"
+                    :show-arrow="false"
                     :teleported="true"
                     :disabled="isUploading"
+                    transition="el-zoom-in-bottom"
                     popper-class="wk-chat-upload-menu-popper"
                   >
                     <template #reference>
@@ -819,20 +821,19 @@
                         </span>
                       </button>
                     </template>
-                    <div class="wk-chat-upload-menu">
+                    <div
+                      class="wk-chat-upload-menu"
+                      @mouseenter="clearChatUploadMenuLeaveTimer"
+                      @mouseleave="handleChatUploadMenuMouseLeave"
+                    >
                       <button
                         type="button"
                         class="wk-chat-upload-menu__item"
                         :disabled="selectedFiles.length + selectedKnowledgeItems.length >= MAX_FILE_COUNT"
                         @click="handleUploadMenuAddFile"
                       >
-                        <span class="wk-chat-upload-menu__icon">
-                          <span class="material-symbols-outlined text-[19px] leading-none">attach_file</span>
-                        </span>
-                        <span class="min-w-0 flex-1">
-                          <span class="block truncate text-sm font-semibold text-[#0d0d0d]">上传本地文件</span>
-                          <span class="block truncate text-xs text-slate-400">图片、文档或音视频</span>
-                        </span>
+                        <WkIcon name="file" :box-size="18" class="shrink-0" />
+                        <span class="wk-chat-upload-menu__label">上传图片和文件</span>
                       </button>
                       <button
                         type="button"
@@ -840,39 +841,60 @@
                         :disabled="selectedFiles.length + selectedKnowledgeItems.length >= MAX_FILE_COUNT"
                         @click="handleUploadMenuChooseKnowledge"
                       >
-                        <span class="wk-chat-upload-menu__icon">
-                          <span class="material-symbols-outlined text-[19px] leading-none">menu_book</span>
-                        </span>
-                        <span class="min-w-0 flex-1">
-                          <span class="block truncate text-sm font-semibold text-[#0d0d0d]">选择知识库文件</span>
-                          <span class="block truncate text-xs text-slate-400">引用已上传资料</span>
-                        </span>
+                        <WkIcon name="knowledge-1" :size="18" class="shrink-0" />
+                        <span class="wk-chat-upload-menu__label">选择知识库文件</span>
                       </button>
-                      <div v-if="chatUploadAppOptions.length > 0" class="mt-1 border-t border-slate-100 pt-1">
-                        <button
-                          v-for="app in chatUploadAppOptions"
-                          :key="app.code"
-                          type="button"
-                          class="wk-chat-upload-menu__item"
-                          @click="handleUploadMenuSelectApp(app.code)"
+                      <el-popover
+                        v-if="chatUploadAppOptions.length > 0"
+                        v-model:visible="chatUploadSubmenuVisible"
+                        trigger="hover"
+                        placement="right-end"
+                        :show-arrow="false"
+                        :disabled="isUploading"
+                        :teleported="false"
+                        :offset="8"
+                        :hide-after="220"
+                        width="200"
+                        popper-class="wk-chat-upload-menu-popper wk-chat-upload-submenu-popper"
+                      >
+                        <template #reference>
+                          <div
+                            class="wk-chat-upload-menu__apps-ref"
+                            role="button"
+                            tabindex="0"
+                          >
+                            <WkIcon name="application" :size="18" class="shrink-0" />
+                            <span class="wk-chat-upload-menu__label">悟空技能</span>
+                            <span class="wk-chat-upload-menu__chevron material-symbols-outlined">chevron_right</span>
+                          </div>
+                        </template>
+                        <div
+                          class="wk-chat-upload-submenu"
+                          @mouseenter="clearChatUploadMenuLeaveTimer"
+                          @mouseleave="handleChatUploadMenuMouseLeave"
                         >
-                          <span class="wk-chat-upload-menu__icon">
+                          <button
+                            v-for="app in chatUploadAppOptions"
+                            :key="app.code"
+                            type="button"
+                            class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                            @click="handleUploadMenuSelectApp(app.code)"
+                          >
                             <span class="material-symbols-outlined text-[19px] leading-none">
                               {{ resolveChatAppIcon(app.code) }}
                             </span>
-                          </span>
-                          <span class="min-w-0 flex-1">
-                            <span class="block truncate text-sm font-semibold text-[#0d0d0d]">{{ app.label }}</span>
-                            <span class="block truncate text-xs text-slate-400">{{ app.description || '切换聊天应用' }}</span>
-                          </span>
-                          <span
-                            v-if="chatStore.selectedAppCode === app.code"
-                            class="material-symbols-outlined fill-1 text-[18px] leading-none text-primary"
-                          >
-                            check
-                          </span>
-                        </button>
-                      </div>
+                            <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">
+                              {{ resolveChatUploadAppLabel(app) }}
+                            </span>
+                            <span
+                              v-if="chatStore.selectedAppCode === app.code"
+                              class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                            >
+                              check
+                            </span>
+                          </button>
+                        </div>
+                      </el-popover>
                     </div>
                   </el-popover>
                   <button
@@ -1683,6 +1705,7 @@ const composerAttachmentCanScrollLeft = ref(false)
 const composerAttachmentCanScrollRight = ref(false)
 const chatModelPopoverVisible = ref(false)
 const chatUploadMenuVisible = ref(false)
+const chatUploadSubmenuVisible = ref(false)
 const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
 const isRecording = ref(false)
 const isTranscribing = ref(false)
@@ -1743,6 +1766,7 @@ let transcriptionToken = 0
 let speechInputBase = ''
 let applyingChatRouteQuery = false
 let composerAttachmentScrollResizeObserver: ResizeObserver | null = null
+let chatUploadMenuLeaveTimer: ReturnType<typeof setTimeout> | null = null
 let customerPanelResizeObserver: ResizeObserver | null = null
 let chatMainAreaResizeObserver: ResizeObserver | null = null
 let chatMessagesResizeObserver: ResizeObserver | null = null
@@ -3388,8 +3412,35 @@ function openKnowledgePicker() {
   chatKnowledgePickerVisible.value = true
 }
 
+function clearChatUploadMenuLeaveTimer() {
+  if (chatUploadMenuLeaveTimer) {
+    clearTimeout(chatUploadMenuLeaveTimer)
+    chatUploadMenuLeaveTimer = null
+  }
+}
+
+function isInsideChatUploadMenuPopover(target: EventTarget | null): boolean {
+  if (!(target instanceof Node)) return false
+  const el = target instanceof Element ? target : target.parentElement
+  return Boolean(el?.closest('.wk-chat-upload-menu-popper'))
+}
+
 function closeChatUploadMenu() {
+  clearChatUploadMenuLeaveTimer()
   chatUploadMenuVisible.value = false
+  chatUploadSubmenuVisible.value = false
+}
+
+function handleChatUploadMenuMouseLeave(event: MouseEvent) {
+  if (isInsideChatUploadMenuPopover(event.relatedTarget)) {
+    clearChatUploadMenuLeaveTimer()
+    return
+  }
+  clearChatUploadMenuLeaveTimer()
+  chatUploadMenuLeaveTimer = setTimeout(() => {
+    chatUploadMenuLeaveTimer = null
+    closeChatUploadMenu()
+  }, 120)
 }
 
 function handleUploadMenuAddFile() {
@@ -3405,6 +3456,12 @@ function handleUploadMenuChooseKnowledge() {
 function handleUploadMenuSelectApp(appCode: string) {
   closeChatUploadMenu()
   chatStore.setSelectedAppCode(chatStore.selectedAppCode === appCode ? 'general' : appCode)
+}
+
+function resolveChatUploadAppLabel(app: { code: string; label: string }) {
+  if (app.code === 'crm') return 'CRM管理'
+  if (app.code === 'knowledge') return '知识库检索'
+  return app.label
 }
 
 function handleKnowledgePickerConfirm(items: Knowledge[]) {
@@ -4595,6 +4652,56 @@ function resolveChatAppIcon(code: string): string {
   line-height: 1;
 }
 
+.wk-chat-upload-menu__label {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--wk-text-primary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.wk-chat-upload-menu__apps-ref {
+  display: flex;
+  width: 100%;
+  height: 36px;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--wk-text-primary);
+  cursor: default;
+  outline: none;
+  transition: background-color 150ms ease;
+}
+
+.wk-chat-upload-menu__apps-ref:hover,
+.wk-chat-upload-menu__apps-ref:focus-visible {
+  background: var(--wk-bg-surface-hover);
+}
+
+.wk-chat-upload-menu__chevron {
+  margin-left: auto;
+  color: var(--wk-text-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.wk-chat-upload-submenu {
+  padding: 10px;
+}
+
+.wk-chat-upload-submenu__btn {
+  justify-content: flex-start;
+}
+
+.wk-chat-upload-submenu__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+
 .wk-mobile-composer-row {
   min-height: 40px;
   align-items: center;
@@ -4676,11 +4783,6 @@ function resolveChatAppIcon(code: string): string {
 
 .wk-chat-upload-menu--mobile .wk-chat-upload-menu__icon {
   font-size: 22px;
-}
-
-.wk-chat-upload-menu__label {
-  font-size: 14px;
-  line-height: 1.2;
 }
 
 .wk-chat-upload-menu--mobile .wk-chat-upload-menu__label {
@@ -4863,6 +4965,10 @@ function resolveChatAppIcon(code: string): string {
   background: var(--wk-bg-surface) !important;
   padding: 0 !important;
   box-shadow: 0 12px 36px rgb(var(--wk-shadow-color) / 0.28) !important;
+}
+
+.wk-chat-upload-submenu-popper.el-popper {
+  z-index: 3100 !important;
 }
 
 .wk-chat-upload-menu-popper .el-popper__arrow,
