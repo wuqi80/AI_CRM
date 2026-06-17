@@ -140,6 +140,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private static final List<String> DEFAULT_IMAP_FOLDERS = List.of("INBOX", "Sent");
     private static final List<String> DEFAULT_GMAIL_FOLDERS = List.of("INBOX", "SENT");
     private static final List<String> DEFAULT_GRAPH_FOLDERS = List.of("inbox", "sentitems");
+    private static final int IMAP_FETCH_BATCH_SIZE = 20;
     private static final Map<String, String> IMAP_CLIENT_ID = Map.of(
             "name", "AICRM",
             "version", "1.0.0",
@@ -464,12 +465,13 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
             return;
         }
         Date threshold = Date.from(Instant.now().minus(10, ChronoUnit.MINUTES));
+        int maxConcurrentSync = resolveMaxConcurrentSync();
         List<MailAccount> accounts = baseMapper.selectList(new LambdaQueryWrapper<MailAccount>()
                 .eq(MailAccount::getEnabled, true)
                 .and(wrapper -> wrapper.isNull(MailAccount::getLastSyncTime)
                         .or()
                         .lt(MailAccount::getLastSyncTime, threshold))
-                .last("LIMIT 20"));
+                .last("LIMIT " + maxConcurrentSync));
         for (MailAccount account : accounts) {
             try {
                 MailSyncLog syncLog = startSyncLog(account, "scheduled");
@@ -480,6 +482,14 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                 log.warn("自动同步邮箱失败: accountId={}, error={}", account.getAccountId(), e.getMessage());
             }
         }
+    }
+
+    private int resolveMaxConcurrentSync() {
+        int configured = properties.getMaxConcurrentSync();
+        if (configured <= 0) {
+            return 1;
+        }
+        return Math.min(configured, 50);
     }
 
     @Override
@@ -1175,25 +1185,16 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         MailSyncLog syncLog = existingSyncLog == null ? startSyncLog(account, "mailbox") : existingSyncLog;
         result.setLogId(syncLog.getLogId());
         try {
-            List<SyncedMail> messages = switch (account.getProvider()) {
-                case PROVIDER_IMAP -> fetchImapMessages(account, decryptCredentials(account));
-                case PROVIDER_GMAIL -> fetchGmailMessages(account, decryptCredentials(account));
-                case PROVIDER_OUTLOOK -> fetchGraphMessages(account, decryptCredentials(account));
-                default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的邮箱服务商");
-            };
-            result.setFetchedCount(messages.size());
-            for (SyncedMail syncedMail : messages) {
-                try {
-                    if (saveSyncedMail(account, syncedMail)) {
-                        result.setSavedCount(result.getSavedCount() + 1);
-                    } else {
-                        result.setSkippedCount(result.getSkippedCount() + 1);
-                    }
-                } catch (Exception e) {
-                    result.setFailedCount(result.getFailedCount() + 1);
-                    log.warn("保存同步邮件失败: accountId={}, providerMessageId={}, error={}",
-                            account.getAccountId(), syncedMail.providerMessageId(), e.getMessage());
-                }
+            Map<String, Object> credentials = decryptCredentials(account);
+            if (PROVIDER_IMAP.equals(account.getProvider())) {
+                syncImapMessages(account, credentials, syncLog, result);
+            } else {
+                List<SyncedMail> messages = switch (account.getProvider()) {
+                    case PROVIDER_GMAIL -> fetchGmailMessages(account, credentials);
+                    case PROVIDER_OUTLOOK -> fetchGraphMessages(account, credentials);
+                    default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的邮箱服务商");
+                };
+                processFetchedMessages(account, syncLog, result, messages);
             }
             account.setLastSyncTime(new Date());
             account.setLastSyncStatus(result.getFailedCount() > 0 ? "partial" : "success");
@@ -1304,6 +1305,53 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         return true;
     }
 
+    private void processFetchedMessages(MailAccount account, MailSyncLog syncLog, MailSyncResultVO result,
+                                        List<SyncedMail> messages) {
+        result.setFetchedCount(messages.size());
+        int processedCount = 0;
+        for (SyncedMail syncedMail : messages) {
+            processedCount++;
+            processSyncedMail(account, syncLog, result, syncedMail, processedCount, messages.size());
+        }
+    }
+
+    private boolean processSyncedMail(MailAccount account, MailSyncLog syncLog, MailSyncResultVO result,
+                                      SyncedMail syncedMail, int processedCount, int totalCount) {
+        boolean processed = true;
+        String messageRef = buildMessageLogRef(syncedMail, processedCount, totalCount);
+        try {
+            logSyncStage(syncLog, account, "save.start", messageRef);
+            if (saveSyncedMail(account, syncedMail)) {
+                result.setSavedCount(result.getSavedCount() + 1);
+                logSyncStage(syncLog, account, "save.inserted", messageRef);
+            } else {
+                result.setSkippedCount(result.getSkippedCount() + 1);
+                logSyncStage(syncLog, account, "save.skipped", messageRef);
+            }
+        } catch (Exception e) {
+            result.setFailedCount(result.getFailedCount() + 1);
+            log.warn("保存同步邮件失败: accountId={}, providerMessageId={}, error={}",
+                    account.getAccountId(), syncedMail.providerMessageId(), e.getMessage());
+            logSyncStage(syncLog, account, "save.failed", messageRef + ", error=" + e.getMessage());
+            processed = false;
+        }
+        if (processedCount == 1 || processedCount % IMAP_FETCH_BATCH_SIZE == 0 || processedCount == totalCount) {
+            logSyncStage(syncLog, account, "save.progress",
+                    "Processed messages=" + processedCount + "/" + totalCount
+                            + ", fetched=" + result.getFetchedCount()
+                            + ", saved=" + result.getSavedCount()
+                            + ", skipped=" + result.getSkippedCount()
+                            + ", failed=" + result.getFailedCount());
+        }
+        return processed;
+    }
+
+    private String buildMessageLogRef(SyncedMail syncedMail, int processedCount, int totalCount) {
+        return "index=" + processedCount + "/" + totalCount
+                + ", providerMessageId=" + syncedMail.providerMessageId()
+                + ", subject=" + StrUtil.maxLength(StrUtil.blankToDefault(syncedMail.subject(), ""), 120);
+    }
+
     private void saveAttachments(MailAccount account, MailMessage message, List<SyncedAttachment> attachments) {
         String syncMode = resolveAttachmentSyncMode(account.getAttachmentSyncMode());
         long maxAutoSize = resolveMaxAutoAttachmentSize(account.getMaxAutoAttachmentSize());
@@ -1329,6 +1377,110 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
             entity.setScanStatus(path == null ? "not_scanned" : "pending");
             mailAttachmentMapper.insert(entity);
         }
+    }
+
+    private void syncImapMessages(MailAccount account, Map<String, Object> credentials,
+                                  MailSyncLog syncLog, MailSyncResultVO result) throws Exception {
+        String password = asString(credentials.get("password"));
+        List<String> folders = normalizeFolders(splitFolders(account.getFolders()), DEFAULT_IMAP_FOLDERS);
+        Properties props = new Properties();
+        props.put("mail.store.protocol", "imap");
+        props.put("mail.imap.ssl.enable", String.valueOf(Boolean.TRUE.equals(account.getImapSsl())));
+        props.put("mail.imap.connectiontimeout", "15000");
+        props.put("mail.imap.timeout", "30000");
+        Session session = Session.getInstance(props);
+        logSyncStage(syncLog, account, "imap.connect",
+                "Connecting host=" + account.getImapHost() + ", port=" + account.getImapPort()
+                        + ", ssl=" + Boolean.TRUE.equals(account.getImapSsl()) + ", folders=" + folders);
+        try (Store store = session.getStore("imap")) {
+            store.connect(account.getImapHost(), account.getImapPort(), account.getUsername(), password);
+            sendImapClientId(store);
+            logSyncStage(syncLog, account, "imap.connected", "IMAP store connected");
+            for (String folderName : folders) {
+                logSyncStage(syncLog, account, "imap.folder.lookup", "Looking up folder=" + folderName);
+                Folder folder = store.getFolder(folderName);
+                if (folder == null || !folder.exists()) {
+                    logSyncStage(syncLog, account, "imap.folder.missing", "Folder not found=" + folderName);
+                    continue;
+                }
+                logSyncStage(syncLog, account, "imap.folder.open", "Opening folder=" + folderName);
+                folder.open(Folder.READ_ONLY);
+                try {
+                    logSyncStage(syncLog, account, "imap.folder.candidates", "Resolving candidates for folder=" + folderName);
+                    Message[] messages = resolveImapCandidates(account, folder, folderName);
+                    logSyncStage(syncLog, account, "imap.folder.candidates.done",
+                            "Folder=" + folderName + ", candidates=" + messages.length);
+
+                    FetchProfile profile = new FetchProfile();
+                    profile.add(FetchProfile.Item.ENVELOPE);
+                    profile.add(FetchProfile.Item.CONTENT_INFO);
+                    long maxUid = 0L;
+                    UIDFolder uidFolder = folder instanceof UIDFolder value ? value : null;
+                    int parsedCount = 0;
+                    boolean folderHadFailure = false;
+                    int totalBatches = (messages.length + IMAP_FETCH_BATCH_SIZE - 1) / IMAP_FETCH_BATCH_SIZE;
+                    for (int start = 0; start < messages.length; start += IMAP_FETCH_BATCH_SIZE) {
+                        int end = Math.min(start + IMAP_FETCH_BATCH_SIZE, messages.length);
+                        Message[] batch = new Message[end - start];
+                        System.arraycopy(messages, start, batch, 0, batch.length);
+                        int batchNumber = start / IMAP_FETCH_BATCH_SIZE + 1;
+                        logSyncStage(syncLog, account, "imap.batch.fetch_profile",
+                                "Fetching envelope/profile folder=" + folderName
+                                        + ", batch=" + batchNumber + "/" + totalBatches
+                                        + ", range=" + (start + 1) + "-" + end + "/" + messages.length
+                                        + ", batchSize=" + batch.length);
+                        folder.fetch(batch, profile);
+                        logSyncStage(syncLog, account, "imap.batch.fetch_profile.done",
+                                "Fetched envelope/profile folder=" + folderName
+                                        + ", batch=" + batchNumber + "/" + totalBatches);
+                        for (Message message : batch) {
+                            if (!(message instanceof MimeMessage mimeMessage)) {
+                                continue;
+                            }
+                            long uid = uidFolder == null ? message.getMessageNumber() : uidFolder.getUID(message);
+                            maxUid = Math.max(maxUid, uid);
+                            parsedCount++;
+                            if (parsedCount == 1 || parsedCount % IMAP_FETCH_BATCH_SIZE == 0
+                                    || parsedCount == messages.length) {
+                                logSyncStage(syncLog, account, "imap.message.parse",
+                                        "Parsing folder=" + folderName + ", index=" + parsedCount + "/" + messages.length
+                                                + ", uid=" + uid);
+                            }
+                            try {
+                                SyncedMail syncedMail = toSyncedMail(folderName, uid, mimeMessage);
+                                result.setFetchedCount(result.getFetchedCount() + 1);
+                                if (!processSyncedMail(account, syncLog, result, syncedMail, parsedCount, messages.length)) {
+                                    folderHadFailure = true;
+                                }
+                            } catch (Exception e) {
+                                folderHadFailure = true;
+                                result.setFailedCount(result.getFailedCount() + 1);
+                                log.warn("解析同步邮件失败: accountId={}, folder={}, uid={}, error={}",
+                                        account.getAccountId(), folderName, uid, e.getMessage());
+                                logSyncStage(syncLog, account, "imap.message.parse.failed",
+                                        "Parse failed folder=" + folderName + ", uid=" + uid + ", error=" + e.getMessage());
+                            }
+                        }
+                    }
+                    if (maxUid > 0 && !folderHadFailure) {
+                        logSyncStage(syncLog, account, "imap.cursor.update",
+                                "Updating cursor folder=" + folderName + ", maxUid=" + maxUid);
+                        upsertCursor(account, folderName, "imap_uid", String.valueOf(maxUid), maxUid, null, null);
+                    } else if (folderHadFailure) {
+                        logSyncStage(syncLog, account, "imap.cursor.skip",
+                                "Skip cursor update because folder had failed messages, folder=" + folderName
+                                        + ", maxUid=" + maxUid);
+                    }
+                    logSyncStage(syncLog, account, "imap.folder.done",
+                            "Folder=" + folderName + " done, parsed=" + parsedCount
+                                    + ", totalFetched=" + result.getFetchedCount());
+                } finally {
+                    logSyncStage(syncLog, account, "imap.folder.close", "Closing folder=" + folderName);
+                    folder.close(false);
+                }
+            }
+        }
+        logSyncStage(syncLog, account, "imap.done", "IMAP fetch done, messages=" + result.getFetchedCount());
     }
 
     private List<SyncedMail> fetchImapMessages(MailAccount account, Map<String, Object> credentials) throws Exception {
