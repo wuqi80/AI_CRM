@@ -484,17 +484,23 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
                 .collect(Collectors.toSet()));
 
         for (TaskVO task : tasks) {
+            if (hasPersistedValuePriority(task)) {
+                continue;
+            }
             TaskValuePriorityResult result = evaluateValuePriority(toTaskPriorityInput(task), customerMap.get(task.getCustomerId()));
-            boolean needsPersist = !Objects.equals(task.getValuePriorityScore(), result.score())
-                    || !Objects.equals(task.getValuePriorityTier(), result.tier())
-                    || !Objects.equals(task.getValuePriorityReason(), result.reason())
-                    || !Objects.equals(task.getHighValue(), result.highValue());
             applyValuePriority(task, result);
 
-            if (persistMissing && needsPersist && task.getTaskId() != null) {
+            if (persistMissing && task.getTaskId() != null) {
                 baseMapper.updateValuePriorityById(task.getTaskId(), result.score(), result.tier(), result.reason(), result.highValue());
             }
         }
+    }
+
+    private boolean hasPersistedValuePriority(TaskVO task) {
+        return task.getValuePriorityScore() != null
+                && StrUtil.isNotBlank(task.getValuePriorityTier())
+                && StrUtil.isNotBlank(task.getValuePriorityReason())
+                && task.getHighValue() != null;
     }
 
     private void persistValuePriority(Task task, Customer customer) {
