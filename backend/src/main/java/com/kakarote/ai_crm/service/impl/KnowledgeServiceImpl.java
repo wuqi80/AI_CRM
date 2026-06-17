@@ -448,7 +448,10 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             if (!isUnavailableRagAnswer(ragResult.getAnswer())) {
                 answer = KnowledgeAnswerLocalizationUtil.localizeToChinese(ragResult.getAnswer());
             }
-            references = buildReferencesFromChunks(ragResult.getReferences(), type, limit);
+            references = buildReferencesFromChunks(
+                    weKnoraClient.filterRelevantChunks(ragResult.getReferences(), keyword),
+                    type,
+                    limit);
         }
 
         if (references.isEmpty()) {

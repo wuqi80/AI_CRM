@@ -30,7 +30,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -54,6 +56,10 @@ public class WeKnoraClient {
     private final WeKnoraConfig config;
     private final ObjectMapper objectMapper;
     private final ConcurrentHashMap<String, String> conversationSessionCache = new ConcurrentHashMap<>();
+    private static final Set<String> REFERENCE_QUERY_STOP_TERMS = Set.of(
+            "什么", "怎么", "怎样", "如何", "是否", "能否", "可以", "需要", "有关", "关于",
+            "问题", "搜索", "检索", "文档", "资料", "内容", "这个", "那个", "哪些", "哪个"
+    );
 
     @Autowired
     public WeKnoraClient(WeKnoraConfig config) {
@@ -223,12 +229,15 @@ public class WeKnoraClient {
                             new TypeReference<List<WeKnoraChunk>>() {
                             }
                     );
-                    double threshold = config.getSearch().getVectorThreshold();
                     int maxCount = config.getSearch().getMatchCount();
-                    return chunks.stream()
-                            .filter(c -> c.getScore() == null || c.getScore() >= threshold)
+                    List<WeKnoraChunk> filteredChunks = filterRelevantChunks(chunks, query).stream()
                             .limit(maxCount)
                             .toList();
+                    if (filteredChunks.isEmpty() && !chunks.isEmpty()) {
+                        log.info("WeKnora 搜索结果被相关性过滤清空: rawCount={}, query={}",
+                                chunks.size(), abbreviateForLog(query));
+                    }
+                    return filteredChunks;
                 }
             }
             log.warn("WeKnora 搜索返回空结果: {}", response.getBody());
@@ -237,6 +246,86 @@ public class WeKnoraClient {
             log.error("WeKnora 搜索异常: {}", e.getMessage(), e);
             return Collections.emptyList();
         }
+    }
+
+    public List<WeKnoraChunk> filterRelevantChunks(List<WeKnoraChunk> chunks, String query) {
+        if (chunks == null || chunks.isEmpty()) {
+            return Collections.emptyList();
+        }
+        double threshold = config.getSearch().getVectorThreshold();
+        return chunks.stream()
+                .filter(chunk -> isRelevantChunk(chunk, query, threshold))
+                .toList();
+    }
+
+    private boolean isRelevantChunk(WeKnoraChunk chunk, String query, double threshold) {
+        if (chunk == null) {
+            return false;
+        }
+        Double score = chunk.getScore();
+        if (score != null && score >= threshold) {
+            return true;
+        }
+        if (score == null && threshold <= 0) {
+            return true;
+        }
+        return matchesQueryText(chunk, query);
+    }
+
+    private boolean matchesQueryText(WeKnoraChunk chunk, String query) {
+        List<String> terms = extractQueryTerms(query);
+        if (terms.isEmpty()) {
+            return false;
+        }
+
+        String searchableText = normalizeReferenceText(String.join(" ",
+                StrUtil.blankToDefault(chunk.getKnowledgeTitle(), ""),
+                StrUtil.blankToDefault(chunk.getKnowledgeFilename(), ""),
+                StrUtil.blankToDefault(chunk.getContent(), "")
+        ));
+        if (StrUtil.isBlank(searchableText)) {
+            return false;
+        }
+
+        long hits = terms.stream()
+                .filter(searchableText::contains)
+                .count();
+        return hits >= Math.min(2, terms.size());
+    }
+
+    private List<String> extractQueryTerms(String query) {
+        String normalized = normalizeReferenceText(query);
+        if (StrUtil.isBlank(normalized)) {
+            return Collections.emptyList();
+        }
+
+        LinkedHashSet<String> terms = new LinkedHashSet<>();
+        for (String token : normalized.split("\\s+")) {
+            if (token.length() >= 2 && !REFERENCE_QUERY_STOP_TERMS.contains(token)) {
+                terms.add(token);
+            }
+        }
+
+        String compact = normalized.replace(" ", "");
+        if (compact.length() >= 2) {
+            for (int i = 0; i <= compact.length() - 2; i++) {
+                String gram = compact.substring(i, i + 2);
+                if (!REFERENCE_QUERY_STOP_TERMS.contains(gram)) {
+                    terms.add(gram);
+                }
+            }
+        }
+        return new ArrayList<>(terms);
+    }
+
+    private String normalizeReferenceText(String text) {
+        if (StrUtil.isBlank(text)) {
+            return "";
+        }
+        return text.toLowerCase(Locale.ROOT)
+                .replaceAll("[\\p{P}\\p{Punct}]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     public List<WeKnoraChunk> hybridSearch(String query) {
