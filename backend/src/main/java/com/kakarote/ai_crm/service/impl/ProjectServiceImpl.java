@@ -43,6 +43,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -550,18 +551,273 @@ public class ProjectServiceImpl implements IProjectService {
         getProjectEntity(projectId);
         String content = requireName(commandBO.getContent());
         appendProjectChat(projectId, "user", content);
-        appendProjectChat(projectId, "assistant", "已记录项目指令。请继续在项目任务中跟进处理。");
+        String reply = "我已经记录到当前项目上下文。你也可以继续让我创建任务、总结进展或查询项目任务。";
+        ProjectAiCommandParser.ParsedCommand command = ProjectAiCommandParser.parse(content);
+
+        switch (command.action()) {
+            case CREATE_TASK -> {
+                ProjectBO.TaskSave taskBO = parseProjectAiTask(projectId, content, command.title());
+                ProjectTask task = insertAiTask(projectId, taskBO);
+                String scheduleReply = "";
+                if (command.createTaskSchedule()) {
+                    appendTaskSchedule(projectId, task.getTaskId(), task.getTitle() + "相关日程", task.getDueDate());
+                    scheduleReply = " 同时已为该任务创建相关日程。";
+                }
+                reply = "已为当前项目创建任务「" + task.getTitle() + "」，并默认放入「未开始」泳道。"
+                        + (task.getDueDate() == null ? "" : " 截止时间：" + task.getDueDate())
+                        + scheduleReply;
+            }
+            case CREATE_LANE -> {
+                ProjectBO.LaneSave laneBO = new ProjectBO.LaneSave();
+                laneBO.setName(command.title());
+                addLane(projectId, laneBO);
+                reply = "已为当前项目创建泳道「" + command.title() + "」。";
+            }
+            case CREATE_PROJECT_SCHEDULE -> {
+                ProjectBO.ProjectScheduleSave scheduleBO = new ProjectBO.ProjectScheduleSave();
+                scheduleBO.setTitle(command.title());
+                scheduleBO.setScheduleTime(parseRelativeDateTime(content));
+                addProjectSchedule(projectId, scheduleBO);
+                reply = "已为当前项目创建日程「" + command.title() + "」。";
+            }
+            case CREATE_PROJECT_ATTACHMENT -> {
+                ProjectBO.ProjectAttachmentSave attachmentBO = new ProjectBO.ProjectAttachmentSave();
+                attachmentBO.setName(command.title());
+                addProjectAttachment(projectId, attachmentBO);
+                reply = "已将「" + command.title() + "」记录为项目附件。";
+            }
+            case UPDATE_PROJECT_STATUS -> {
+                updateProjectStatus(projectId, command.targetStatus());
+                reply = "已将项目状态更新为「" + projectStatusName(command.targetStatus()) + "」。";
+            }
+            case ARCHIVE_PROJECT -> {
+                updateProjectStatus(projectId, STATUS_ARCHIVED);
+                reply = "已将项目状态更新为「已归档」。";
+            }
+            case SUMMARIZE_PROJECT -> reply = summarizeProject(projectId);
+            case QUERY_TASKS -> reply = summarizeProjectTasks(projectId);
+            case UNSAFE_DELETE -> reply = "删除类操作风险较高，请通过项目、任务或泳道的手动删除入口确认执行。";
+            case UNKNOWN -> {
+                // Keep the default context reply.
+            }
+        }
+
+        appendProjectChat(projectId, "assistant", reply);
+        touchProject(projectId);
         return getProject(projectId);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO handleTaskAiCommand(Long projectId, Long taskId, ProjectBO.AiCommand commandBO) {
-        getProjectTask(projectId, taskId);
+        ProjectTask task = getProjectTask(projectId, taskId);
         String content = requireName(commandBO.getContent());
         appendTaskChat(projectId, taskId, "user", content);
-        appendTaskChat(projectId, taskId, "assistant", "已记录任务指令。请继续在任务中跟进处理。");
+        String reply = "当前对话对象是任务「" + task.getTitle() + "」，我已经收到你的指令。";
+        if (containsAny(content, "改到", "改成", "调整到", "延期到")
+                && containsAny(content, "今天", "明天", "后天", "上午", "下午", "晚上", "点")) {
+            Date dueDate = parseRelativeDateTime(content);
+            if (dueDate != null) {
+                task.setDueDate(dueDate);
+                task.setUpdateUserId(UserUtil.getUserId());
+                projectTaskMapper.updateById(task);
+                reply = "已将任务「" + task.getTitle() + "」的截止时间更新为 " + dueDate + "。";
+            }
+        } else if (containsAny(content, "优先级")) {
+            String priority = parsePriority(content);
+            task.setPriority(priority);
+            task.setUpdateUserId(UserUtil.getUserId());
+            projectTaskMapper.updateById(task);
+            reply = "已将任务优先级更新为「" + priority + "」。";
+        } else if (containsAny(content, "日程", "安排", "提醒")) {
+            Date scheduleTime = parseRelativeDateTime(content);
+            String title = extractScheduleTitle(content, task.getTitle());
+            appendTaskSchedule(projectId, taskId, title, scheduleTime);
+            reply = "已为任务创建相关日程「" + title + "」。";
+        } else if (containsAny(content, "备注", "补充说明", "追加说明")) {
+            appendTaskNote(projectId, taskId, extractNote(content));
+            reply = "已为任务追加备注。";
+        } else if (containsAny(content, "大纲", "执行方案", "方案")) {
+            reply = buildTaskExecutionPlan(task);
+            appendTaskNote(projectId, taskId, reply);
+        }
+        appendTaskChat(projectId, taskId, "assistant", reply);
+        touchProject(projectId);
         return getProject(projectId);
+    }
+
+    private ProjectTask insertAiTask(Long projectId, ProjectBO.TaskSave taskBO) {
+        ProjectLane lane = taskBO.getLaneId() == null ? firstLane(projectId) : getProjectLane(projectId, taskBO.getLaneId());
+        ProjectTask task = new ProjectTask();
+        copyTaskFields(task, taskBO);
+        task.setProjectId(projectId);
+        task.setLaneId(lane.getLaneId());
+        task.setStatus(TASK_STATUS_TODO);
+        task.setPriority(normalizePriority(taskBO.getPriority()));
+        task.setGeneratedByAi(true);
+        task.setSource("ai");
+        task.setAiSourceText(normalizeOptional(taskBO.getAiSourceText()));
+        Long currentUserId = UserUtil.getUserId();
+        task.setCreateUserId(currentUserId);
+        task.setUpdateUserId(currentUserId);
+        projectTaskMapper.insert(task);
+        saveTaskAttachments(projectId, task.getTaskId(), taskBO.getAttachments());
+        return task;
+    }
+
+    private ProjectBO.TaskSave parseProjectAiTask(Long projectId, String content, String parsedTitle) {
+        Project project = getProjectEntity(projectId);
+        ProjectBO.TaskSave task = new ProjectBO.TaskSave();
+        task.setTitle(StrUtil.blankToDefault(normalizeOptional(parsedTitle), "项目任务"));
+        task.setDescription("由 AI 指令创建：" + content);
+        task.setDueDate(parseRelativeDateTime(content));
+        task.setPriority(parsePriority(content));
+        task.setCustomerId(project.getCustomerId());
+        task.setCustomerName(project.getCustomerName());
+        task.setGeneratedByAi(true);
+        task.setAiSourceText(content);
+        return task;
+    }
+
+    private void appendTaskSchedule(Long projectId, Long taskId, String title, Date scheduleTime) {
+        jdbcTemplate.update("""
+                INSERT INTO crm_project_task_schedule(schedule_id, project_id, task_id, title, schedule_time, create_user_id, create_user_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, IdWorker.getId(), projectId, taskId, requireName(title), scheduleTime,
+                UserUtil.getUserId(), currentUserDisplayName());
+    }
+
+    private void appendTaskNote(Long projectId, Long taskId, String content) {
+        jdbcTemplate.update("""
+                INSERT INTO crm_project_task_note(note_id, project_id, task_id, content, create_user_id, create_user_name)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, IdWorker.getId(), projectId, taskId, requireName(content),
+                UserUtil.getUserId(), currentUserDisplayName());
+    }
+
+    private void updateProjectStatus(Long projectId, String status) {
+        Project project = new Project();
+        project.setProjectId(projectId);
+        project.setStatus(normalizeProjectStatus(status));
+        project.setUpdateUserId(UserUtil.getUserId());
+        projectMapper.updateById(project);
+    }
+
+    private void touchProject(Long projectId) {
+        Project project = new Project();
+        project.setProjectId(projectId);
+        project.setUpdateUserId(UserUtil.getUserId());
+        projectMapper.updateById(project);
+    }
+
+    private String summarizeProject(Long projectId) {
+        ProjectVO project = getProject(projectId);
+        long completed = project.getTasks().stream()
+                .filter(task -> TASK_STATUS_COMPLETED.equalsIgnoreCase(task.getStatus()))
+                .count();
+        return "项目「" + project.getName() + "」当前状态为「" + projectStatusName(project.getStatus()) + "」，共有 "
+                + project.getTasks().size() + " 个任务，已完成 " + completed + " 个，未完成 "
+                + Math.max(project.getTasks().size() - completed, 0) + " 个。";
+    }
+
+    private String summarizeProjectTasks(Long projectId) {
+        List<ProjectVO.ProjectTaskVO> tasks = getProject(projectId).getTasks();
+        if (tasks.isEmpty()) {
+            return "当前项目暂无任务。";
+        }
+        StringBuilder builder = new StringBuilder("当前项目任务：");
+        for (int i = 0; i < Math.min(tasks.size(), 8); i++) {
+            ProjectVO.ProjectTaskVO task = tasks.get(i);
+            builder.append("\n- ").append(task.getTitle())
+                    .append("（").append(StrUtil.blankToDefault(task.getStatus(), "未设置")).append("）");
+            if (task.getDueDate() != null) {
+                builder.append("，截止 ").append(task.getDueDate());
+            }
+        }
+        if (tasks.size() > 8) {
+            builder.append("\n还有 ").append(tasks.size() - 8).append(" 个任务未列出。");
+        }
+        return builder.toString();
+    }
+
+    private Date parseRelativeDateTime(String content) {
+        if (StrUtil.isBlank(content)) {
+            return null;
+        }
+        if (!containsAny(content, "今天", "明天", "后天", "上午", "下午", "晚上", "点")) {
+            return null;
+        }
+        Calendar calendar = Calendar.getInstance();
+        if (content.contains("后天")) {
+            calendar.add(Calendar.DAY_OF_MONTH, 2);
+        } else if (content.contains("明天")) {
+            calendar.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        int hour = content.contains("晚上") ? 19 : content.contains("下午") ? 14 : content.contains("上午") ? 10 : 18;
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d{1,2})\\s*点").matcher(content);
+        if (matcher.find()) {
+            int parsedHour = Integer.parseInt(matcher.group(1));
+            hour = content.contains("下午") && parsedHour < 12 ? parsedHour + 12 : parsedHour;
+        }
+        calendar.set(Calendar.HOUR_OF_DAY, Math.min(Math.max(hour, 0), 23));
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar.getTime();
+    }
+
+    private String parsePriority(String content) {
+        if (containsAny(content, "紧急", "urgent")) {
+            return "URGENT";
+        }
+        if (containsAny(content, "高", "重要", "high")) {
+            return "HIGH";
+        }
+        if (containsAny(content, "低", "low")) {
+            return "LOW";
+        }
+        return PRIORITY_MEDIUM;
+    }
+
+    private String extractScheduleTitle(String content, String fallback) {
+        String title = StrUtil.blankToDefault(content, fallback);
+        title = title.replaceAll("请|帮我|创建|新增|添加|安排|日程|会议|提醒", "").trim();
+        return StrUtil.blankToDefault(title, fallback + "相关日程");
+    }
+
+    private String extractNote(String content) {
+        String note = StrUtil.blankToDefault(content, "").replaceAll("备注|补充说明|追加说明", "").trim();
+        return StrUtil.blankToDefault(note, content);
+    }
+
+    private String buildTaskExecutionPlan(ProjectTask task) {
+        return "任务「" + task.getTitle() + "」建议按以下步骤推进：\n"
+                + "1. 明确交付目标和验收标准。\n"
+                + "2. 拆分关键事项并确认负责人。\n"
+                + "3. 跟踪阻塞点并及时更新进度。";
+    }
+
+    private String projectStatusName(String status) {
+        return switch (StrUtil.blankToDefault(status, "").toUpperCase(Locale.ROOT)) {
+            case STATUS_NOT_STARTED -> "未开始";
+            case STATUS_IN_PROGRESS -> "进行中";
+            case STATUS_COMPLETED -> "已完成";
+            case "PAUSED" -> "已暂停";
+            case STATUS_ARCHIVED -> "已归档";
+            default -> StrUtil.blankToDefault(status, "未设置");
+        };
+    }
+
+    private boolean containsAny(String content, String... keywords) {
+        if (StrUtil.isBlank(content)) {
+            return false;
+        }
+        for (String keyword : keywords) {
+            if (content.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void copyTaskFields(ProjectTask task, ProjectBO.TaskSave taskBO) {
