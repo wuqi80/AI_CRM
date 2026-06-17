@@ -1,22 +1,97 @@
 package com.kakarote.ai_crm.service.impl;
 
+import com.kakarote.ai_crm.entity.BO.CustomerFieldUpdateBO;
 import com.kakarote.ai_crm.entity.BO.CustomerFieldFilterBO;
 import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
 import com.kakarote.ai_crm.entity.BO.CustomerResolvedFieldFilterBO;
+import com.kakarote.ai_crm.entity.PO.Contact;
+import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.CustomFieldVO;
 import com.kakarote.ai_crm.entity.VO.CustomerAiSearchParseVO;
+import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
+import com.kakarote.ai_crm.mapper.ContactMapper;
+import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.CustomerTagMapper;
+import com.kakarote.ai_crm.mapper.TaskMapper;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.IDynamicSchemaService;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class CustomerServiceImplTest {
+
+    @Test
+    void updateCustomerFieldUpdatesPrimaryContactPhone() {
+        CustomerServiceImpl service = spy(new CustomerServiceImpl());
+        CustomerMapper customerMapper = mock(CustomerMapper.class);
+        ContactMapper contactMapper = mock(ContactMapper.class);
+        CustomerTagMapper customerTagMapper = mock(CustomerTagMapper.class);
+        TaskMapper taskMapper = mock(TaskMapper.class);
+        ICustomFieldService customFieldService = mock(ICustomFieldService.class);
+        IGlobalSearchIndexService globalSearchIndexService = mock(IGlobalSearchIndexService.class);
+
+        ReflectionTestUtils.setField(service, "baseMapper", customerMapper);
+        ReflectionTestUtils.setField(service, "contactMapper", contactMapper);
+        ReflectionTestUtils.setField(service, "customerTagMapper", customerTagMapper);
+        ReflectionTestUtils.setField(service, "taskMapper", taskMapper);
+        ReflectionTestUtils.setField(service, "customFieldService", customFieldService);
+        ReflectionTestUtils.setField(service, "globalSearchIndexService", globalSearchIndexService);
+
+        Long customerId = 100L;
+        Long contactId = 200L;
+        Customer customer = new Customer();
+        customer.setCustomerId(customerId);
+        customer.setCompanyName("Acme");
+        customer.setPrimaryContactName("Alice");
+
+        Contact primary = new Contact();
+        primary.setContactId(contactId);
+        primary.setCustomerId(customerId);
+        primary.setIsPrimary(1);
+        primary.setStatus(1);
+        primary.setName("Alice");
+        primary.setPhone("old");
+
+        CustomerDetailVO detail = new CustomerDetailVO();
+        detail.setCustomerId(customerId);
+        detail.setCompanyName("Acme");
+
+        when(customerMapper.selectById(customerId)).thenReturn(customer);
+        when(customerMapper.getCustomerById(customerId)).thenReturn(detail);
+        when(contactMapper.selectList(any())).thenReturn(List.of(primary));
+        when(customerTagMapper.selectList(any())).thenReturn(List.of());
+        when(taskMapper.selectList(any())).thenReturn(List.of());
+        when(customFieldService.getCustomFieldValues("customer", customerId)).thenReturn(Map.of());
+        doNothing().when(service).syncContactCache(customerId);
+
+        CustomerFieldUpdateBO updateBO = new CustomerFieldUpdateBO();
+        updateBO.setCustomerId(customerId);
+        updateBO.setFieldName("primaryContactPhone");
+        updateBO.setFieldSource("contact");
+        updateBO.setValue("13800000000");
+
+        CustomerDetailVO result = assertDoesNotThrow(() -> service.updateCustomerField(updateBO));
+
+        assertSame(detail, result);
+        ArgumentCaptor<Contact> contactCaptor = ArgumentCaptor.forClass(Contact.class);
+        verify(contactMapper).updateById(contactCaptor.capture());
+        assertEquals("13800000000", contactCaptor.getValue().getPhone());
+        verify(service).syncContactCache(customerId);
+        verify(globalSearchIndexService).refreshContactIndex(contactId);
+    }
 
     @Test
     void parseFollowedCustomerSearchUsesNotEmptyFilter() {

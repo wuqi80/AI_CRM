@@ -112,6 +112,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private static final Set<String> BLANK_EMPTY_FIELD_TYPES = Set.of("text", "textarea", "select");
     private static final String FIELD_SOURCE_SYSTEM = "system";
     private static final String FIELD_SOURCE_CUSTOM = "custom";
+    private static final String FIELD_SOURCE_CONTACT = "contact";
     private static final String FILTER_OPERATOR_IS_EMPTY = "isEmpty";
     private static final String FILTER_OPERATOR_IS_NOT_EMPTY = "isNotEmpty";
     private static final String EMPTY_MODE_NULL_ONLY = "nullOnly";
@@ -123,6 +124,16 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private static final String AI_ANALYSIS_STATUS_RUNNING = "running";
     private static final String AI_ANALYSIS_STATUS_SUCCESS = "success";
     private static final String AI_ANALYSIS_STATUS_FAILED = "failed";
+    private static final Set<String> INLINE_EDITABLE_CONTACT_FIELDS = Set.of(
+            "primaryContactName",
+            "primaryContactPhone",
+            "primaryContactEmail",
+            "primaryContactPosition",
+            "contactName",
+            "contactPhone",
+            "contactEmail",
+            "contactPosition"
+    );
 
     private record CustomerFilterFieldDefinition(
             String fieldName,
@@ -342,6 +353,13 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         String fieldName = StrUtil.trim(fieldUpdateBO.getFieldName());
         String fieldSource = normalizeFieldSource(fieldUpdateBO.getFieldSource());
         Object value = fieldUpdateBO.getValue();
+        if (StrUtil.isBlank(fieldName)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "瀛楁鍚嶇О涓嶈兘涓虹┖");
+        }
+        if (FIELD_SOURCE_CONTACT.equals(fieldSource) || INLINE_EDITABLE_CONTACT_FIELDS.contains(fieldName)) {
+            updatePrimaryContactField(customer, fieldName, value);
+            return getCustomerDetail(fieldUpdateBO.getCustomerId());
+        }
         if (FIELD_SOURCE_CUSTOM.equals(fieldSource) || !CUSTOMER_SYSTEM_FILTER_FIELDS.containsKey(fieldName)) {
             customFieldService.updateCustomFieldValue("customer", fieldUpdateBO.getCustomerId(), fieldName, value);
             refreshCustomerActivity(fieldUpdateBO.getCustomerId());
@@ -611,7 +629,91 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (FIELD_SOURCE_CUSTOM.equalsIgnoreCase(normalized)) {
             return FIELD_SOURCE_CUSTOM;
         }
+        if (FIELD_SOURCE_CONTACT.equalsIgnoreCase(normalized)) {
+            return FIELD_SOURCE_CONTACT;
+        }
         return FIELD_SOURCE_SYSTEM;
+    }
+
+    private void updatePrimaryContactField(Customer customer, String fieldName, Object value) {
+        String normalizedFieldName = normalizePrimaryContactFieldName(fieldName);
+        String textValue = normalizeStringValue(value);
+        Contact contact = findPrimaryContactEntity(customer.getCustomerId());
+
+        if (contact == null) {
+            if (StrUtil.isBlank(textValue)) {
+                return;
+            }
+            contact = new Contact();
+            contact.setCustomerId(customer.getCustomerId());
+            contact.setName("name".equals(normalizedFieldName)
+                    ? textValue
+                    : StrUtil.blankToDefault(customer.getPrimaryContactName(),
+                    StrUtil.blankToDefault(customer.getCompanyName(), "Primary Contact")));
+            contact.setIsPrimary(1);
+            contact.setStatus(1);
+            applyPrimaryContactValue(contact, normalizedFieldName, textValue);
+            Map<String, Object> uniqueValues = new HashMap<>();
+            uniqueValues.put(normalizedFieldName, textValue);
+            customFieldService.validateUniqueCustomFieldValues("contact", null, uniqueValues);
+            contactMapper.insert(contact);
+        } else {
+            applyPrimaryContactValue(contact, normalizedFieldName, textValue);
+            contact.setUpdateTime(new Date());
+            Long updateUserId = getCurrentUserIdOrNull();
+            if (updateUserId != null) {
+                contact.setUpdateUserId(updateUserId);
+            }
+            Map<String, Object> uniqueValues = new HashMap<>();
+            uniqueValues.put(normalizedFieldName, textValue);
+            customFieldService.validateUniqueCustomFieldValues("contact", contact.getContactId(), uniqueValues);
+            contactMapper.updateById(contact);
+        }
+
+        syncContactCache(customer.getCustomerId());
+        if (contact.getContactId() != null) {
+            globalSearchIndexService.refreshContactIndex(contact.getContactId());
+        }
+    }
+
+    private String normalizePrimaryContactFieldName(String fieldName) {
+        return switch (fieldName) {
+            case "primaryContactName", "contactName" -> "name";
+            case "primaryContactPhone", "contactPhone" -> "phone";
+            case "primaryContactEmail", "contactEmail" -> "email";
+            case "primaryContactPosition", "contactPosition" -> "position";
+            default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "鑱旂郴浜哄瓧娈典笉鍏佽缂栬緫");
+        };
+    }
+
+    private void applyPrimaryContactValue(Contact contact, String normalizedFieldName, String value) {
+        switch (normalizedFieldName) {
+            case "name" -> contact.setName(value);
+            case "phone" -> contact.setPhone(value);
+            case "email" -> contact.setEmail(value);
+            case "position" -> contact.setPosition(value);
+            default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "鑱旂郴浜哄瓧娈典笉鍏佽缂栬緫");
+        }
+    }
+
+    private Contact findPrimaryContactEntity(Long customerId) {
+        List<Contact> contacts = contactMapper.selectList(
+                new LambdaQueryWrapper<Contact>()
+                        .eq(Contact::getCustomerId, customerId)
+                        .eq(Contact::getStatus, 1)
+                        .orderByDesc(Contact::getIsPrimary)
+                        .orderByAsc(Contact::getCreateTime)
+                        .orderByAsc(Contact::getContactId)
+                        .last("LIMIT 1")
+        );
+        return contacts == null || contacts.isEmpty() ? null : contacts.getFirst();
+    }
+
+    private String normalizeStringValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return value.toString().trim();
     }
 
     private String normalizeEmptyFilterOperator(String operator) {
