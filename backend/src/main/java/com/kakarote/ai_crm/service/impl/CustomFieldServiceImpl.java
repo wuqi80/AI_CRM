@@ -56,6 +56,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
     private static final long OPTIONS_CACHE_TTL_MS = 60_000L;
     private static final String FIELD_SOURCE_SYSTEM = "system";
     private static final String FIELD_SOURCE_CUSTOM = "custom";
+    private static final Set<String> HIDDEN_RELATION_SYSTEM_FIELDS = Set.of("avatar", "company");
 
     private final Map<String, OptionsCacheEntry> optionsCache = new ConcurrentHashMap<>();
 
@@ -236,7 +237,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                 .eq(CustomField::getEntityType, entityType)
                 .orderByAsc(CustomField::getSortOrder)
                 .orderByAsc(CustomField::getCreateTime));
-        return convertToVO(fields);
+        return convertToVO(filterHiddenSystemFields(fields));
     }
 
     @Override
@@ -246,7 +247,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                 .eq(CustomField::getStatus, 1)
                 .orderByAsc(CustomField::getSortOrder)
                 .orderByAsc(CustomField::getCreateTime));
-        return convertToVO(fields);
+        return convertToVO(filterHiddenSystemFields(fields));
     }
 
     @Override
@@ -457,7 +458,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         if (StrUtil.isBlank(entityType) || StrUtil.isBlank(fieldName)) {
             return Collections.emptyList();
         }
-        String key = optionKey(entityType, fieldName);
+        String key = optionsCacheKey(entityType, fieldName);
         OptionsCacheEntry cached = optionsCache.get(key);
         if (cached != null && cached.expireAt() >= System.currentTimeMillis()) {
             return cached.options();
@@ -647,6 +648,31 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         return field != null && FIELD_SOURCE_SYSTEM.equalsIgnoreCase(field.getFieldSource());
     }
 
+    private boolean isCustomField(CustomField field) {
+        return !isSystemField(field);
+    }
+
+    private boolean isHiddenSystemField(CustomField field) {
+        return isSystemField(field)
+                && "relation".equals(field.getEntityType())
+                && HIDDEN_RELATION_SYSTEM_FIELDS.contains(field.getFieldName());
+    }
+
+    private List<CustomField> filterHiddenSystemFields(List<CustomField> fields) {
+        if (fields == null || fields.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return fields.stream()
+                .filter(field -> !isHiddenSystemField(field))
+                .toList();
+    }
+
+    private List<CustomFieldVO> getEnabledCustomFieldVOs(String entityType) {
+        return getEnabledFieldsByEntity(entityType).stream()
+                .filter(field -> !FIELD_SOURCE_SYSTEM.equalsIgnoreCase(field.getFieldSource()))
+                .collect(Collectors.toList());
+    }
+
     private List<String> optionFieldNames(String entityType, String fieldName) {
         if ("relation".equals(entityType)) {
             if ("relationType".equals(fieldName)) {
@@ -718,6 +744,10 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
 
     private static String optionKey(String entityType, String fieldName) {
         return StrUtil.blankToDefault(entityType, "") + ":" + StrUtil.blankToDefault(fieldName, "");
+    }
+
+    private String optionsCacheKey(String entityType, String fieldName) {
+        return optionKey(entityType, fieldName);
     }
 
     private static FieldOption option(String value, String label) {
