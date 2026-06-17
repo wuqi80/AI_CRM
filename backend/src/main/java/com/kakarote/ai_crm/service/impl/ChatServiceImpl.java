@@ -285,6 +285,8 @@ public class ChatServiceImpl implements IChatService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createSession(SessionCreateBO sessionCreateBO) {
+        validateSessionBinding(sessionCreateBO);
+
         ChatSession session = new ChatSession();
         session.setTitle(sessionCreateBO.getTitle());
         session.setAgentId(sessionCreateBO.getAgentId());
@@ -301,6 +303,97 @@ public class ChatServiceImpl implements IChatService {
         session.setUpdateTime(new Date());
         chatSessionMapper.insert(session);
         return session.getSessionId();
+    }
+
+    private void validateSessionBinding(SessionCreateBO sessionCreateBO) {
+        if (sessionCreateBO == null) {
+            return;
+        }
+        int boundObjectCount = 0;
+        if (sessionCreateBO.getCustomerId() != null) {
+            boundObjectCount++;
+        }
+        if (sessionCreateBO.getEmployeeId() != null) {
+            boundObjectCount++;
+        }
+        if (sessionCreateBO.getRelationId() != null) {
+            boundObjectCount++;
+        }
+        if (sessionCreateBO.getProductId() != null) {
+            boundObjectCount++;
+        }
+        if (sessionCreateBO.getProjectId() != null || sessionCreateBO.getProjectTaskId() != null) {
+            boundObjectCount++;
+        }
+        if (boundObjectCount > 1) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "一个会话只能绑定一个业务对象");
+        }
+
+        validateBoundCustomer(sessionCreateBO.getCustomerId());
+        validateBoundEmployee(sessionCreateBO.getEmployeeId());
+        validateBoundRelation(sessionCreateBO.getRelationId());
+        validateBoundProduct(sessionCreateBO.getProductId());
+        validateBoundProject(sessionCreateBO.getProjectId(), sessionCreateBO.getProjectTaskId());
+    }
+
+    private void validateBoundCustomer(Long customerId) {
+        if (customerId == null) {
+            return;
+        }
+        Customer customer = customerMapper.selectById(customerId);
+        if (customer == null || Integer.valueOf(0).equals(customer.getStatus())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
+        }
+    }
+
+    private void validateBoundEmployee(Long employeeId) {
+        if (employeeId == null) {
+            return;
+        }
+        ManagerUser employee = manageUserMapper.selectById(employeeId);
+        if (employee == null || Integer.valueOf(0).equals(employee.getStatus())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "员工不存在或无权限访问");
+        }
+    }
+
+    private void validateBoundRelation(Long relationId) {
+        if (relationId == null) {
+            return;
+        }
+        Relation relation = relationMapper.selectById(relationId);
+        if (relation == null || Integer.valueOf(0).equals(relation.getStatus())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在或无权限访问");
+        }
+    }
+
+    private void validateBoundProduct(Long productId) {
+        if (productId == null) {
+            return;
+        }
+        Product product = productMapper.selectById(productId);
+        if (product == null || Integer.valueOf(1).equals(product.getDelFlag())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品不存在或无权限访问");
+        }
+    }
+
+    private void validateBoundProject(Long projectId, Long projectTaskId) {
+        if (projectId == null && projectTaskId == null) {
+            return;
+        }
+        Project project = projectId == null ? null : projectMapper.selectById(projectId);
+        if (projectId != null && project == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "项目不存在或无权限访问");
+        }
+        if (projectTaskId == null) {
+            return;
+        }
+        ProjectTask task = projectTaskMapper.selectById(projectTaskId);
+        if (task == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "项目任务不存在或无权限访问");
+        }
+        if (projectId != null && !Objects.equals(projectId, task.getProjectId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "项目任务不存在或无权限访问");
+        }
     }
 
     @Override
