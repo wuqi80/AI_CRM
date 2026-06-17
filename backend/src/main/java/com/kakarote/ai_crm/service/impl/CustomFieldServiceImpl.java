@@ -63,6 +63,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
     private static final String FIELD_SOURCE_SYSTEM = "system";
     private static final String FIELD_SOURCE_CUSTOM = "custom";
     private static final Set<String> HIDDEN_RELATION_SYSTEM_FIELDS = Set.of("avatar", "company");
+    private static final Object SYSTEM_FIELD_INIT_LOCK = new Object();
 
     private final Map<String, OptionsCacheEntry> optionsCache = new ConcurrentHashMap<>();
 
@@ -101,6 +102,92 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                     option("manual", "手动创建"),
                     option("customer_contact", "客户联系人"),
                     option("other", "其他")
+            )
+    );
+
+    private static final Map<String, List<SystemFieldDefinition>> SYSTEM_FIELD_DEFINITIONS = Map.of(
+            "customer", List.of(
+                    systemField("companyName", "公司名称", "text", "company_name", "VARCHAR(255)", null, "请输入公司名称", true, true, true, null, 10),
+                    systemField("industry", "所属行业", "text", "industry", "VARCHAR(100)", null, "请输入所属行业", false, true, true, null, 20),
+                    systemField("stage", "商机阶段", "select", "stage", "VARCHAR(50)", "lead", null, false, false, true, List.of(
+                            option("lead", "线索"),
+                            option("qualified", "资格审核"),
+                            option("proposal", "方案报价"),
+                            option("negotiation", "谈判中"),
+                            option("closed", "已成交"),
+                            option("lost", "已流失")
+                    ), 30),
+                    systemField("level", "客户级别", "select", "level", "VARCHAR(10)", null, null, false, false, true, List.of(
+                            option("A", "A级客户"),
+                            option("B", "B级客户"),
+                            option("C", "C级客户")
+                    ), 40),
+                    systemField("source", "来源", "text", "source", "VARCHAR(100)", null, "请输入客户来源", false, true, true, null, 50),
+                    systemField("website", "网站", "text", "website", "VARCHAR(255)", null, "请输入网站地址", false, false, true, null, 60),
+                    systemField("quotation", "预计成交金额", "number", "quotation", "DECIMAL(15,2)", null, "请输入预计成交金额", false, false, true, null, 70),
+                    systemField("address", "地址", "textarea", "address", "VARCHAR(500)", null, "请输入客户地址", false, false, false, null, 100),
+                    systemField("nextFollowTime", "下次跟进时间", "datetime", "next_follow_time", "TIMESTAMP", null, "请选择下次跟进时间", false, false, true, null, 110),
+                    systemField("remark", "备注", "textarea", "remark", "TEXT", null, "请输入备注", false, false, false, null, 120)
+            ),
+            "contact", List.of(
+                    systemField("name", "姓名", "text", "name", "VARCHAR(100)", null, "请输入姓名", true, true, true, null, 10),
+                    systemField("position", "职位", "text", "position", "VARCHAR(100)", null, "请输入职位", false, true, true, null, 20),
+                    systemField("phone", "电话", "text", "phone", "VARCHAR(50)", null, "请输入电话", false, true, true, null, 30),
+                    systemField("email", "邮箱", "text", "email", "VARCHAR(100)", null, "请输入邮箱", false, true, true, null, 40),
+                    systemField("wechat", "微信", "text", "wechat", "VARCHAR(100)", null, "请输入微信号", false, true, false, null, 50),
+                    systemField("isPrimary", "主联系人", "checkbox", "is_primary", "SMALLINT", "0", null, false, false, true, null, 60),
+                    systemField("notes", "备注", "textarea", "notes", "TEXT", null, "请输入备注", false, false, false, null, 70)
+            ),
+            "relation", List.of(
+                    systemField("name", "姓名", "text", "name", "VARCHAR(100)", null, "请输入姓名", true, true, true, null, 10),
+                    systemField("avatar", "头像", "text", "avatar", "VARCHAR(500)", null, "请输入头像地址", false, false, false, null, 20),
+                    systemField("phone", "手机号", "text", "phone", "VARCHAR(50)", null, "请输入手机号", false, true, true, null, 30),
+                    systemField("wechat", "微信号", "text", "wechat", "VARCHAR(100)", null, "请输入微信号", false, true, true, null, 40),
+                    systemField("email", "邮箱", "text", "email", "VARCHAR(100)", null, "请输入邮箱", false, true, true, null, 50),
+                    systemField("relationType", "关系类型", "select", "relation_type", "VARCHAR(50)", "other", null, false, true, true, List.of(
+                            option("friend", "朋友"),
+                            option("family", "家人"),
+                            option("relative", "亲戚"),
+                            option("partner", "合作伙伴"),
+                            option("customer_contact", "客户联系人"),
+                            option("supplier", "供应商"),
+                            option("investor", "投资人"),
+                            option("other", "其他")
+                    ), 60),
+                    systemField("company", "所属公司", "text", "company", "VARCHAR(255)", null, "请输入所属公司", false, true, true, null, 70),
+                    systemField("remark", "备注", "textarea", "remark", "TEXT", null, "请输入备注", false, false, false, null, 80),
+                    systemField("source", "来源", "select", "source", "VARCHAR(50)", "manual", null, false, false, true, List.of(
+                            option("manual", "手动创建"),
+                            option("customer_contact", "客户联系人")
+                    ), 90)
+            ),
+            "product", List.of(
+                    systemField("productName", "产品名称", "text", "product_name", "VARCHAR(255)", null, "请输入产品名称", true, true, true, null, 10),
+                    systemField("productCode", "产品编码", "text", "product_code", "VARCHAR(100)", null, "请输入产品编码", false, true, true, null, 20),
+                    systemField("categoryId", "产品类目", "number", "category_id", "BIGINT", null, null, false, false, true, null, 30),
+                    systemField("productType", "产品类型", "select", "product_type", "VARCHAR(50)", "goods", null, false, true, true, List.of(
+                            option("goods", "实物"),
+                            option("service", "服务"),
+                            option("subscription", "订阅"),
+                            option("other", "其他")
+                    ), 40),
+                    systemField("unit", "单位", "select", "unit", "VARCHAR(50)", null, "请选择单位", false, true, true, List.of(
+                            option("个", "个"),
+                            option("套", "套"),
+                            option("台", "台"),
+                            option("件", "件"),
+                            option("年", "年"),
+                            option("月", "月"),
+                            option("次", "次")
+                    ), 50),
+                    systemField("standardPrice", "标准价", "number", "standard_price", "DECIMAL(18,2)", null, null, false, false, true, null, 60),
+                    systemField("costPrice", "成本价", "number", "cost_price", "DECIMAL(18,2)", null, null, false, false, false, null, 70),
+                    systemField("ownerId", "负责人", "number", "owner_id", "BIGINT", null, null, true, false, true, null, 80),
+                    systemField("status", "状态", "select", "status", "VARCHAR(20)", "active", null, false, true, true, List.of(
+                            option("active", "启用"),
+                            option("inactive", "停用")
+                    ), 90),
+                    systemField("description", "描述", "textarea", "description", "TEXT", null, "请输入描述", false, true, false, null, 100)
             )
     );
 
@@ -283,27 +370,31 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
     @Transactional(rollbackFor = Exception.class)
     public void initializeSystemFields(String entityType) {
         String normalizedEntity = StrUtil.trimToEmpty(entityType).toLowerCase(Locale.ROOT);
-        if (!"product".equals(normalizedEntity)) {
+        List<SystemFieldDefinition> definitions = SYSTEM_FIELD_DEFINITIONS.get(normalizedEntity);
+        if (definitions == null || definitions.isEmpty()) {
             return;
         }
-        List<CustomField> fields = list(new LambdaQueryWrapper<CustomField>()
-                .eq(CustomField::getEntityType, normalizedEntity)
-                .eq(CustomField::getFieldName, "unit"));
-        if (fields.isEmpty()) {
-            return;
-        }
-        String unitOptions = JSON.toJSONString(List.of(
-                option("piece", "Piece"),
-                option("set", "Set"),
-                option("box", "Box")
-        ));
-        for (CustomField field : fields) {
-            field.setFieldType("select");
-            field.setFieldSource("system");
-            field.setColumnType("VARCHAR(50)");
-            field.setPlaceholder("Select unit");
-            field.setOptions(unitOptions);
-            updateById(field);
+
+        synchronized (SYSTEM_FIELD_INIT_LOCK) {
+            List<CustomField> existingFields = list(new LambdaQueryWrapper<CustomField>()
+                    .eq(CustomField::getEntityType, normalizedEntity));
+            Map<String, CustomField> existingFieldMap = existingFields.stream()
+                    .filter(field -> StrUtil.isNotBlank(field.getFieldName()))
+                    .collect(Collectors.toMap(CustomField::getFieldName, field -> field, (left, right) -> left));
+
+            for (SystemFieldDefinition definition : definitions) {
+                CustomField existing = existingFieldMap.get(definition.fieldName());
+                if (existing != null) {
+                    syncSystemFieldMetadata(existing, definition);
+                    continue;
+                }
+                try {
+                    save(buildSystemField(normalizedEntity, definition));
+                } catch (Exception exception) {
+                    log.warn("初始化系统字段失败: entityType={}, fieldName={}, error={}",
+                            normalizedEntity, definition.fieldName(), exception.getMessage());
+                }
+            }
         }
         evictOptionsCache();
     }
@@ -710,6 +801,15 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
     }
 
     private List<FieldOption> builtinOptions(String entityType, String fieldName) {
+        List<SystemFieldDefinition> definitions = SYSTEM_FIELD_DEFINITIONS.get(entityType);
+        String normalizedFieldName = builtinFieldName(entityType, fieldName);
+        if (definitions != null) {
+            for (SystemFieldDefinition definition : definitions) {
+                if (definition.fieldName().equals(normalizedFieldName) && definition.options() != null) {
+                    return definition.options();
+                }
+            }
+        }
         return BUILTIN_FIELD_OPTIONS.getOrDefault(optionKey(entityType, fieldName), Collections.emptyList());
     }
 
@@ -782,6 +882,92 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         optionsCache.clear();
     }
 
+    private void syncSystemFieldMetadata(CustomField field, SystemFieldDefinition definition) {
+        boolean changed = false;
+        boolean fieldTypeChanged = false;
+
+        if (!FIELD_SOURCE_SYSTEM.equalsIgnoreCase(field.getFieldSource())) {
+            field.setFieldSource(FIELD_SOURCE_SYSTEM);
+            changed = true;
+        }
+        if (!StrUtil.equals(field.getFieldType(), definition.fieldType())) {
+            field.setFieldType(definition.fieldType());
+            changed = true;
+            fieldTypeChanged = true;
+        }
+        if (!StrUtil.equals(field.getColumnName(), definition.columnName())) {
+            field.setColumnName(definition.columnName());
+            changed = true;
+        }
+        if (!StrUtil.equals(field.getColumnType(), definition.columnType())) {
+            field.setColumnType(definition.columnType());
+            changed = true;
+        }
+        if ((fieldTypeChanged || StrUtil.isBlank(field.getPlaceholder()))
+                && StrUtil.isNotBlank(definition.placeholder())
+                && !StrUtil.equals(field.getPlaceholder(), definition.placeholder())) {
+            field.setPlaceholder(definition.placeholder());
+            changed = true;
+        }
+        if (definition.options() != null && (fieldTypeChanged || StrUtil.isBlank(field.getOptions()))) {
+            field.setOptions(JSON.toJSONString(definition.options()));
+            changed = true;
+        }
+        if (changed) {
+            updateById(field);
+        }
+    }
+
+    private CustomField buildSystemField(String entityType, SystemFieldDefinition definition) {
+        CustomField field = new CustomField();
+        field.setEntityType(entityType);
+        field.setFieldName(definition.fieldName());
+        field.setFieldLabel(definition.fieldLabel());
+        field.setFieldType(definition.fieldType());
+        field.setFieldSource(FIELD_SOURCE_SYSTEM);
+        field.setColumnName(definition.columnName());
+        field.setColumnType(definition.columnType());
+        field.setDefaultValue(definition.defaultValue());
+        field.setPlaceholder(definition.placeholder());
+        field.setIsRequired(definition.required() ? 1 : 0);
+        field.setIsSearchable(definition.searchable() ? 1 : 0);
+        field.setIsShowInList(definition.showInList() ? 1 : 0);
+        field.setIsUnique(0);
+        field.setOptions(definition.options() == null ? null : JSON.toJSONString(definition.options()));
+        field.setValidationRules(null);
+        field.setSortOrder(definition.sortOrder());
+        field.setStatus(1);
+        return field;
+    }
+
+    private static SystemFieldDefinition systemField(String fieldName,
+                                                     String fieldLabel,
+                                                     String fieldType,
+                                                     String columnName,
+                                                     String columnType,
+                                                     String defaultValue,
+                                                     String placeholder,
+                                                     boolean required,
+                                                     boolean searchable,
+                                                     boolean showInList,
+                                                     List<FieldOption> options,
+                                                     int sortOrder) {
+        return new SystemFieldDefinition(
+                fieldName,
+                fieldLabel,
+                fieldType,
+                columnName,
+                columnType,
+                defaultValue,
+                placeholder,
+                required,
+                searchable,
+                showInList,
+                options,
+                sortOrder
+        );
+    }
+
     private static String optionKey(String entityType, String fieldName) {
         return StrUtil.blankToDefault(entityType, "") + ":" + StrUtil.blankToDefault(fieldName, "");
     }
@@ -795,6 +981,20 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         option.setValue(value);
         option.setLabel(label);
         return option;
+    }
+
+    private record SystemFieldDefinition(String fieldName,
+                                         String fieldLabel,
+                                         String fieldType,
+                                         String columnName,
+                                         String columnType,
+                                         String defaultValue,
+                                         String placeholder,
+                                         boolean required,
+                                         boolean searchable,
+                                         boolean showInList,
+                                         List<FieldOption> options,
+                                         int sortOrder) {
     }
 
     /**

@@ -221,9 +221,14 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private static final Pattern RECENT_NEW_CUSTOMERS_PATTERN = Pattern.compile("(?:最近|近)(\\d{1,3})\\s*天新增");
     private static final Pattern LEVEL_PATTERN = Pattern.compile("([ABC])\\s*(?:类|级)?客户", Pattern.CASE_INSENSITIVE);
     private static final Pattern WEBSITE_URL_PATTERN = Pattern.compile("(?i)\\b(?:https?://|www\\.)[^\\s，。；;、)）\\]】>]+");
+    private static final String SEARCH_AMOUNT_PATTERN = "(\\d+(?:\\.\\d+)?)\\s*(万|w|W|千|k|K|亿)?";
     private static final Pattern QUOTATION_COMPARE_PATTERN = Pattern.compile(
             "(?:预计成交金额|成交金额|金额|报价)\\s*(大于等于|不低于|至少|超过|大于|高于|小于等于|不超过|至多|低于|小于|少于|等于|>=|<=|>|<|=)?\\s*(\\d+(?:\\.\\d+)?)\\s*(万|w|W|千|k|K|亿)?"
     );
+    private static final Pattern QUOTATION_RANGE_PATTERN = Pattern.compile(
+            "(?:预计成交金额|成交金额|金额|报价)\\s*(?:在|介于|从)?\\s*" + SEARCH_AMOUNT_PATTERN + "\\s*(?:到|至|~|-|—|之间)\\s*" + SEARCH_AMOUNT_PATTERN
+    );
+    private static final Pattern EXPLICIT_ZERO_PATTERN = Pattern.compile("(?<!\\d)0+(?:\\.0+)?(?!\\d)|零");
     private static final List<String> COMMON_INDUSTRIES = List.of(
         "制造业", "互联网", "金融", "教育", "医疗", "零售", "物流", "房地产", "SaaS", "政府", "能源"
     );
@@ -2896,7 +2901,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             }
         }
 
-        applyQuotationComparisonFromQuery(query, normalizedQuery);
+        if (!applyQuotationRangeFromQuery(query, normalizedQuery)) {
+            applyQuotationComparisonFromQuery(query, normalizedQuery);
+        }
+        clearImplicitZeroSearchRanges(query, normalizedQuery);
 
         if (query.getQuotationMin() == null && normalizedQuery.contains("高价值")) {
             query.setQuotationMin(BigDecimal.valueOf(500_000));
@@ -2954,6 +2962,31 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
     }
 
+    private boolean applyQuotationRangeFromQuery(CustomerAiSearchQueryVO query, String normalizedQuery) {
+        if (query == null || StrUtil.isBlank(normalizedQuery)) {
+            return false;
+        }
+        Matcher matcher = QUOTATION_RANGE_PATTERN.matcher(normalizedQuery);
+        if (!matcher.find()) {
+            return false;
+        }
+
+        String minUnit = StrUtil.blankToDefault(matcher.group(2), matcher.group(4));
+        BigDecimal min = parseSearchAmount(matcher.group(1), minUnit);
+        BigDecimal max = parseSearchAmount(matcher.group(3), matcher.group(4));
+        if (min == null || max == null) {
+            return false;
+        }
+        if (min.compareTo(max) > 0) {
+            BigDecimal temp = min;
+            min = max;
+            max = temp;
+        }
+        query.setQuotationMin(min);
+        query.setQuotationMax(max);
+        return true;
+    }
+
     private void applyQuotationComparisonFromQuery(CustomerAiSearchQueryVO query, String normalizedQuery) {
         if (query == null || StrUtil.isBlank(normalizedQuery)) {
             return;
@@ -3009,6 +3042,32 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         } catch (NumberFormatException exception) {
             return null;
         }
+    }
+
+    private void clearImplicitZeroSearchRanges(CustomerAiSearchQueryVO query, String normalizedQuery) {
+        if (query == null || mentionsExplicitZero(normalizedQuery)) {
+            return;
+        }
+        if (isZero(query.getQuotationMin())) {
+            query.setQuotationMin(null);
+        }
+        if (isZero(query.getQuotationMax())) {
+            query.setQuotationMax(null);
+        }
+        if (Integer.valueOf(0).equals(query.getContactCountMin())) {
+            query.setContactCountMin(null);
+        }
+        if (Integer.valueOf(0).equals(query.getContactCountMax())) {
+            query.setContactCountMax(null);
+        }
+    }
+
+    private boolean mentionsExplicitZero(String normalizedQuery) {
+        return StrUtil.isNotBlank(normalizedQuery) && EXPLICIT_ZERO_PATTERN.matcher(normalizedQuery).find();
+    }
+
+    private boolean isZero(BigDecimal value) {
+        return value != null && value.compareTo(BigDecimal.ZERO) == 0;
     }
 
     private boolean isSearchQueryEmpty(CustomerAiSearchQueryVO query) {

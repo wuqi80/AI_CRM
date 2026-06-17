@@ -20,9 +20,23 @@ class CustomFieldServiceImplTest {
         CustomField unitField = service.field("unit");
         assertThat(unitField.getFieldType()).isEqualTo("select");
         assertThat(unitField.getFieldSource()).isEqualTo("system");
-        assertThat(unitField.getPlaceholder()).isEqualTo("Select unit");
-        assertThat(unitField.getOptions()).contains("\"value\":\"piece\"");
+        assertThat(unitField.getPlaceholder()).isEqualTo("请选择单位");
+        assertThat(unitField.getOptions()).contains("\"value\":\"个\"");
         assertThat(service.updateCount).isEqualTo(1);
+    }
+
+    @Test
+    void initializeSystemFieldsCreatesCustomerSystemFields() {
+        InMemoryCustomFieldService service = new InMemoryCustomFieldService();
+
+        service.initializeSystemFields("customer");
+
+        CustomField companyName = service.field("companyName");
+        assertThat(companyName.getFieldSource()).isEqualTo("system");
+        assertThat(companyName.getFieldType()).isEqualTo("text");
+        assertThat(companyName.getColumnName()).isEqualTo("company_name");
+        assertThat(companyName.getIsRequired()).isEqualTo(1);
+        assertThat(companyName.getIsSearchable()).isEqualTo(1);
     }
 
     private static CustomField existingProductUnitTextField() {

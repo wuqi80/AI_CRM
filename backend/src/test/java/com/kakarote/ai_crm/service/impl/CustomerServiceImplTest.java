@@ -195,6 +195,46 @@ class CustomerServiceImplTest {
     }
 
     @Test
+    void heuristicSearchParsesChineseAmountRange() {
+        CustomerServiceImpl service = new CustomerServiceImpl();
+
+        CustomerAiSearchQueryVO query = ReflectionTestUtils.invokeMethod(
+                service,
+                "buildHeuristicSearchQuery",
+                "预计成交金额50到100万的客户"
+        );
+
+        assertNotNull(query);
+        assertEquals(new BigDecimal("500000"), query.getQuotationMin());
+        assertEquals(new BigDecimal("1000000"), query.getQuotationMax());
+    }
+
+    @Test
+    void parseSearchDropsImplicitZeroAmountBeforeHeuristics() {
+        CustomerServiceImpl service = new CustomerServiceImpl();
+        String response = """
+                {
+                  "parsedQuery": {
+                    "quotationMin": 0
+                  },
+                  "explanation": "高价值客户",
+                  "confidence": 0.8
+                }
+                """;
+
+        CustomerAiSearchParseVO result = ReflectionTestUtils.invokeMethod(
+                service,
+                "parseCustomerAiSearchResponse",
+                response,
+                "高价值客户"
+        );
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("500000"), result.getParsedQuery().getQuotationMin());
+        assertNull(result.getParsedQuery().getQuotationMax());
+    }
+
+    @Test
     void resolveSystemFieldEmptyFilters() {
         CustomerServiceImpl service = new CustomerServiceImpl();
         IDynamicSchemaService dynamicSchemaService = mock(IDynamicSchemaService.class);

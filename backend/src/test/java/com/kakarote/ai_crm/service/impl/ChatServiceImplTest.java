@@ -1,17 +1,29 @@
 package com.kakarote.ai_crm.service.impl;
 
 import com.kakarote.ai_crm.ai.context.AiContextHolder;
+import com.kakarote.ai_crm.ai.AiMode;
+import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.ai.app.ChatApplicationRegistry;
+import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.common.exception.BusinessException;
+import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
 import com.kakarote.ai_crm.entity.BO.SessionPinBO;
 import com.kakarote.ai_crm.entity.PO.ChatSession;
+import com.kakarote.ai_crm.entity.PO.Product;
+import com.kakarote.ai_crm.entity.PO.Project;
+import com.kakarote.ai_crm.entity.PO.ProjectTask;
+import com.kakarote.ai_crm.mapper.ChatMessageMapper;
 import com.kakarote.ai_crm.mapper.ProductMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
+import com.kakarote.ai_crm.mapper.ProjectMapper;
+import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -91,5 +103,100 @@ class ChatServiceImplTest {
         assertThat(updated.getPinned()).isTrue();
         assertThat(updated.getPinnedTime()).isNotNull();
         assertThat(updated.getUpdateTime()).isNull();
+    }
+
+    @Test
+    void chatBindsProductContextFromSendRequest() {
+        ChatServiceImpl service = new ChatServiceImpl();
+        ChatSessionMapper chatSessionMapper = mock(ChatSessionMapper.class);
+        ChatMessageMapper chatMessageMapper = mock(ChatMessageMapper.class);
+        ProductMapper productMapper = mock(ProductMapper.class);
+        DynamicChatClientProvider chatClientProvider = mock(DynamicChatClientProvider.class);
+
+        ReflectionTestUtils.setField(service, "chatApplicationRegistry", new ChatApplicationRegistry());
+        ReflectionTestUtils.setField(service, "chatSessionMapper", chatSessionMapper);
+        ReflectionTestUtils.setField(service, "chatMessageMapper", chatMessageMapper);
+        ReflectionTestUtils.setField(service, "productMapper", productMapper);
+        ReflectionTestUtils.setField(service, "chatClientProvider", chatClientProvider);
+
+        ChatSession session = new ChatSession();
+        session.setSessionId(3001L);
+        session.setTitle("Existing session");
+        when(chatSessionMapper.selectById(3001L)).thenReturn(session);
+
+        Product product = new Product();
+        product.setProductId(501L);
+        product.setProductName("CRM Suite");
+        product.setStatus("enabled");
+        when(productMapper.selectById(501L)).thenReturn(product);
+        when(chatMessageMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(chatClientProvider.getRuntimeConfigSnapshot(null, null))
+                .thenReturn(new DynamicChatClientProvider.AiRuntimeConfigSnapshot(
+                        null, null, null, null, null, AiModelCapabilities.builder().build(), AiMode.CUSTOM));
+
+        ChatSendBO sendBO = new ChatSendBO();
+        sendBO.setSessionId(3001L);
+        sendBO.setContent("介绍一下这个产品");
+        sendBO.setProductId(501L);
+
+        service.chat(sendBO);
+
+        ArgumentCaptor<ChatSession> sessionCaptor = ArgumentCaptor.forClass(ChatSession.class);
+        verify(chatSessionMapper).updateById(sessionCaptor.capture());
+        ChatSession updated = sessionCaptor.getValue();
+        assertThat(updated.getProductId()).isEqualTo(501L);
+        assertThat(updated.getAppCode()).isEqualTo("product");
+    }
+
+    @Test
+    void chatBindsProjectContextFromSendRequest() {
+        ChatServiceImpl service = new ChatServiceImpl();
+        ChatSessionMapper chatSessionMapper = mock(ChatSessionMapper.class);
+        ChatMessageMapper chatMessageMapper = mock(ChatMessageMapper.class);
+        ProjectMapper projectMapper = mock(ProjectMapper.class);
+        ProjectTaskMapper projectTaskMapper = mock(ProjectTaskMapper.class);
+        DynamicChatClientProvider chatClientProvider = mock(DynamicChatClientProvider.class);
+
+        ReflectionTestUtils.setField(service, "chatApplicationRegistry", new ChatApplicationRegistry());
+        ReflectionTestUtils.setField(service, "chatSessionMapper", chatSessionMapper);
+        ReflectionTestUtils.setField(service, "chatMessageMapper", chatMessageMapper);
+        ReflectionTestUtils.setField(service, "projectMapper", projectMapper);
+        ReflectionTestUtils.setField(service, "projectTaskMapper", projectTaskMapper);
+        ReflectionTestUtils.setField(service, "chatClientProvider", chatClientProvider);
+
+        ChatSession session = new ChatSession();
+        session.setSessionId(3002L);
+        session.setTitle("Existing session");
+        when(chatSessionMapper.selectById(3002L)).thenReturn(session);
+
+        Project project = new Project();
+        project.setProjectId(701L);
+        project.setName("Implementation");
+        when(projectMapper.selectById(701L)).thenReturn(project);
+
+        ProjectTask task = new ProjectTask();
+        task.setTaskId(801L);
+        task.setProjectId(701L);
+        task.setTitle("Prepare launch");
+        when(projectTaskMapper.selectById(801L)).thenReturn(task);
+        when(chatMessageMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(chatClientProvider.getRuntimeConfigSnapshot(null, null))
+                .thenReturn(new DynamicChatClientProvider.AiRuntimeConfigSnapshot(
+                        null, null, null, null, null, AiModelCapabilities.builder().build(), AiMode.CUSTOM));
+
+        ChatSendBO sendBO = new ChatSendBO();
+        sendBO.setSessionId(3002L);
+        sendBO.setContent("总结一下这个任务");
+        sendBO.setProjectId(701L);
+        sendBO.setProjectTaskId(801L);
+
+        service.chat(sendBO);
+
+        ArgumentCaptor<ChatSession> sessionCaptor = ArgumentCaptor.forClass(ChatSession.class);
+        verify(chatSessionMapper).updateById(sessionCaptor.capture());
+        ChatSession updated = sessionCaptor.getValue();
+        assertThat(updated.getProjectId()).isEqualTo(701L);
+        assertThat(updated.getProjectTaskId()).isEqualTo(801L);
+        assertThat(updated.getAppCode()).isEqualTo("project");
     }
 }

@@ -582,6 +582,7 @@ public class ChatServiceImpl implements IChatService {
         Long currentUserId = UserUtil.getUserIdOrNull();
         ChatSession session = chatSessionMapper.selectById(sessionId);
         ChatApplicationDefinition application = resolveChatApplication(sendBO, session);
+        session = bindBusinessContextFromSendIfNeeded(sendBO, session, application);
         persistSessionAppCodeIfNeeded(session, application.code());
         if (currentUserId != null) {
             setAiContext(session, sessionId, currentUserId);
@@ -770,6 +771,7 @@ public class ChatServiceImpl implements IChatService {
         Long currentUserId = UserUtil.getUserIdOrNull();
         ChatSession session = chatSessionMapper.selectById(sessionId);
         ChatApplicationDefinition application = resolveChatApplication(sendBO, session);
+        session = bindBusinessContextFromSendIfNeeded(sendBO, session, application);
         persistSessionAppCodeIfNeeded(session, application.code());
         if (currentUserId != null) {
             setAiContext(session, sessionId, currentUserId);
@@ -1341,6 +1343,82 @@ public class ChatServiceImpl implements IChatService {
             appCode = ChatApplicationCodes.PROJECT;
         }
         return chatApplicationRegistry.resolve(appCode);
+    }
+
+    private ChatSession bindBusinessContextFromSendIfNeeded(ChatSendBO sendBO, ChatSession session,
+                                                            ChatApplicationDefinition application) {
+        if (sendBO == null || session == null || application == null) {
+            return session;
+        }
+        if (ChatApplicationCodes.PRODUCT.equals(application.code())) {
+            return bindProductContextFromSendIfNeeded(sendBO, session);
+        }
+        if (ChatApplicationCodes.PROJECT.equals(application.code())) {
+            return bindProjectContextFromSendIfNeeded(sendBO, session);
+        }
+        return session;
+    }
+
+    private ChatSession bindProductContextFromSendIfNeeded(ChatSendBO sendBO, ChatSession session) {
+        Long productId = sendBO.getProductId();
+        if (productId == null) {
+            return session;
+        }
+        if (hasOtherBusinessBinding(session, ChatApplicationCodes.PRODUCT)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前会话已绑定其他业务对象");
+        }
+        validateBoundProduct(productId);
+        if (Objects.equals(session.getProductId(), productId)
+                && ChatApplicationCodes.PRODUCT.equals(chatApplicationRegistry.normalize(session.getAppCode()))) {
+            return session;
+        }
+        session.setProductId(productId);
+        session.setAppCode(ChatApplicationCodes.PRODUCT);
+        chatSessionMapper.updateById(session);
+        return session;
+    }
+
+    private ChatSession bindProjectContextFromSendIfNeeded(ChatSendBO sendBO, ChatSession session) {
+        Long projectId = sendBO.getProjectId();
+        Long projectTaskId = sendBO.getProjectTaskId();
+        if (projectId == null && projectTaskId == null) {
+            return session;
+        }
+        if (hasOtherBusinessBinding(session, ChatApplicationCodes.PROJECT)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前会话已绑定其他业务对象");
+        }
+        validateBoundProject(projectId, projectTaskId);
+        Long resolvedProjectId = resolveProjectId(projectId, projectTaskId);
+        if (Objects.equals(session.getProjectId(), resolvedProjectId)
+                && Objects.equals(session.getProjectTaskId(), projectTaskId)
+                && ChatApplicationCodes.PROJECT.equals(chatApplicationRegistry.normalize(session.getAppCode()))) {
+            return session;
+        }
+        session.setProjectId(resolvedProjectId);
+        session.setProjectTaskId(projectTaskId);
+        session.setAppCode(ChatApplicationCodes.PROJECT);
+        chatSessionMapper.updateById(session);
+        return session;
+    }
+
+    private boolean hasOtherBusinessBinding(ChatSession session, String targetAppCode) {
+        if (ChatApplicationCodes.PRODUCT.equals(targetAppCode)) {
+            return session.getCustomerId() != null || session.getEmployeeId() != null || session.getRelationId() != null
+                    || session.getProjectId() != null || session.getProjectTaskId() != null;
+        }
+        if (ChatApplicationCodes.PROJECT.equals(targetAppCode)) {
+            return session.getCustomerId() != null || session.getEmployeeId() != null || session.getRelationId() != null
+                    || session.getProductId() != null;
+        }
+        return false;
+    }
+
+    private Long resolveProjectId(Long projectId, Long projectTaskId) {
+        if (projectId != null || projectTaskId == null) {
+            return projectId;
+        }
+        ProjectTask task = projectTaskMapper.selectById(projectTaskId);
+        return task == null ? null : task.getProjectId();
     }
 
     private void persistSessionAppCodeIfNeeded(ChatSession session, String appCode) {
