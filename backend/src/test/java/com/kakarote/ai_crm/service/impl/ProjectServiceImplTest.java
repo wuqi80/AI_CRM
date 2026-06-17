@@ -1,6 +1,10 @@
 package com.kakarote.ai_crm.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.ai.AiMode;
+import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
+import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
+import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.BO.ProjectBO;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
@@ -20,6 +24,7 @@ import com.kakarote.ai_crm.mapper.ProjectMapper;
 import com.kakarote.ai_crm.mapper.ProjectScheduleMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskAttachmentMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
+import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.ISystemConfigService;
 import org.junit.jupiter.api.AfterEach;
@@ -76,6 +81,12 @@ class ProjectServiceImplTest {
     private ISystemConfigService systemConfigService;
 
     @Mock
+    private DynamicChatClientProvider chatClientProvider;
+
+    @Mock
+    private FileStorageService fileStorageService;
+
+    @Mock
     private JdbcTemplate jdbcTemplate;
 
     private ProjectServiceImpl projectService;
@@ -93,6 +104,8 @@ class ProjectServiceImplTest {
             customerMapper,
             knowledgeService,
             systemConfigService,
+            chatClientProvider,
+            fileStorageService,
             jdbcTemplate,
             new ObjectMapper()
         );
@@ -230,6 +243,47 @@ class ProjectServiceImplTest {
         assertThat(saved.getFileUrl()).isEqualTo("project/2001/charter.docx");
         assertThat(saved.getCreateUserId()).isEqualTo(1001L);
         assertThat(result.getProjectId()).isEqualTo(2001L);
+    }
+
+    @Test
+    void taskAiCommandWithAttachmentsUsesProjectAiRuntime() {
+        Project project = new Project();
+        project.setProjectId(2001L);
+        project.setName("Implementation");
+        ProjectTask task = new ProjectTask();
+        task.setTaskId(3001L);
+        task.setProjectId(2001L);
+        task.setTitle("Prepare proposal");
+        task.setPriority("MEDIUM");
+        task.setStatus("TODO");
+        when(projectTaskMapper.selectById(3001L)).thenReturn(task);
+        when(projectMapper.selectById(2001L)).thenReturn(project);
+        when(projectMapper.getProjectById(2001L)).thenReturn(projectDetail(2001L));
+        when(projectLaneMapper.selectList(any())).thenReturn(List.of());
+        when(projectTaskMapper.selectProjectTasks(2001L, null)).thenReturn(List.of(taskVO(3001L)));
+        when(projectTaskAttachmentMapper.selectList(any())).thenReturn(List.of());
+        when(chatClientProvider.getRuntimeConfigSnapshot(null, null)).thenReturn(new DynamicChatClientProvider.AiRuntimeConfigSnapshot(
+                "dashscope",
+                "https://example.invalid",
+                "",
+                "qwen-plus",
+                null,
+                AiModelCapabilities.builder().supportsVision(false).build(),
+                AiMode.CUSTOM
+        ));
+
+        ProjectBO.AiCommand command = new ProjectBO.AiCommand();
+        command.setContent("请分析这个附件");
+        ChatSendBO.AttachmentDTO attachment = new ChatSendBO.AttachmentDTO();
+        attachment.setFileName("proposal.txt");
+        attachment.setFilePath("project/2001/proposal.txt");
+        attachment.setMimeType("text/plain");
+        command.setAttachments(List.of(attachment));
+
+        ProjectVO result = projectService.handleTaskAiCommand(2001L, 3001L, command);
+
+        assertThat(result.getProjectId()).isEqualTo(2001L);
+        verify(chatClientProvider).getRuntimeConfigSnapshot(null, null);
     }
 
     private ManagerUser activeUser(Long userId) {
