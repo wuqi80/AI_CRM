@@ -62,6 +62,9 @@ public class AiConfigVO implements Serializable {
     @Schema(description = "当前模式下 AI 是否可立即使用")
     private Boolean ready;
 
+    @Schema(description = "悟空云 AI 是否已完成手机号补全")
+    private Boolean wukongExternalMobileCompleted;
+
     @Schema(description = "最后更新时间")
     private Date updateTime;
 
@@ -125,6 +128,9 @@ public class AiConfigVO implements Serializable {
 
         @Schema(description = "是否已保存该服务商的 API Key")
         private Boolean apiKeyConfigured;
+
+        @Schema(description = "是否已完成手机号补全，仅悟空云 AI 有效")
+        private Boolean mobileCompleted;
 
         @Schema(description = "已保存的 API URL")
         private String savedApiUrl;

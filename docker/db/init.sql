@@ -758,11 +758,6 @@ COMMENT ON TABLE "public"."manager_user" IS '用户表';
 -- Records of manager_user
 -- ----------------------------
 INSERT INTO "public"."manager_user" VALUES (1, 'admin', '$2a$10$Kgbyz2XIQQ8xxF8fzcG1uO3lMaJ3x/.qwJNezZ909Ov/Vj8SVXEKO', 'aa1bb1b0f5fa40c5b83e22f1de0500c9', NULL, '2025-11-08 14:54:01', 'admin', 'A021', '18888888888', NULL, 0, NULL, NULL, 1, 0);
-INSERT INTO "public"."manager_user" VALUES (1988224371763707906, '123', '$2a$10$k6OGyDK6U8/jla4VI7z1JejxRDfCtjvarXoyulaXJhlm7zZx6fO.q', '142a2b2f780345b19dd5c8242be970dc', NULL, '2025-11-11 20:36:44', '123', NULL, '123', '3213', 0, NULL, NULL, 1, NULL);
-INSERT INTO "public"."manager_user" VALUES (1988854418885259264, 'wwww', '$2a$10$7NDB3Ml7ZGKJtDO6NqSF4e30RxthyA3os.940/H3BDo2qE..GZCDS', '96b90870534e40e383f1ef106a8166a6', NULL, '2025-11-13 14:20:19', '1111', NULL, '1111', '', 0, NULL, NULL, 1, NULL);
-INSERT INTO "public"."manager_user" VALUES (1988863766139215872, '权限账号', '$2a$10$9Qj0qkSZWgp6cNLx5h2YO.d1Ar/m3QJayrnyDffw15PvFJBapZ8N6', '84bd4777d7cc48598b7c8ca3fd9512bf', NULL, '2025-11-13 14:57:28', '权', NULL, '', '', 0, NULL, NULL, 1, NULL);
-INSERT INTO "public"."manager_user" VALUES (1991112035846250496, 'test', '$2a$10$ywH9VXmPXdoNSLadaBs5.u.riGw75Dj3D.yKGZc7wmoGGRj4lARWW', '6f1941a61e0148598aed060a3f170697', NULL, '2025-11-19 19:51:17', 'est', NULL, '', '', 0, NULL, NULL, 1, NULL);
-INSERT INTO "public"."manager_user" VALUES (1993867768534880256, 'y', '$2a$10$YVJfQTzKxWQcZXrwcIuIze35hnQrP5gY0Sazka9Z9IiF08j.DO6Zi', '5850b8c036f94df28f5e3438a8515172', NULL, '2025-11-27 10:21:35', 'y', NULL, '', '', 0, NULL, NULL, 1, NULL);
 
 -- ----------------------------
 -- Table structure for manager_user_role
@@ -790,12 +785,7 @@ COMMENT ON TABLE "public"."manager_user_role" IS '用户与角色对应表';
 -- ----------------------------
 -- Records of manager_user_role
 -- ----------------------------
-INSERT INTO "public"."manager_user_role" VALUES (1988854418858078209, 1988854418885259264, 1988211126550142978, 1, NULL, '2025-11-13 14:20:19', NULL);
-INSERT INTO "public"."manager_user_role" VALUES (1988854876620218369, 1988224371763707906, 1988211126550142978, NULL, 1, NULL, '2025-11-13 14:22:08');
 INSERT INTO "public"."manager_user_role" VALUES (1988854920857542658, 1, 1988211126550142978, NULL, 1, NULL, '2025-11-13 14:22:19');
-INSERT INTO "public"."manager_user_role" VALUES (1988863766112002050, 1988863766139215872, 1988211126550142978, 1, NULL, '2025-11-13 14:57:28', NULL);
-INSERT INTO "public"."manager_user_role" VALUES (1991112035814875138, 1991112035846250496, 1988211126550142978, 1, NULL, '2025-11-19 19:51:17', NULL);
-INSERT INTO "public"."manager_user_role" VALUES (1993867933473869825, 1993867768534880256, 1993867842096762882, NULL, 1, NULL, '2025-11-27 10:22:14');
 
 -- ----------------------------
 -- Indexes structure for table crm_ai_agent
@@ -962,10 +952,6 @@ ALTER TABLE "public"."crm_follow_up" ADD CONSTRAINT "crm_follow_up_pkey" PRIMARY
 -- ----------------------------
 -- Indexes structure for table crm_knowledge
 -- ----------------------------
-CREATE INDEX "ft_content" ON "public"."crm_knowledge" USING btree (
-  "name" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST,
-  "content_text" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST
-);
 CREATE INDEX "idx_type" ON "public"."crm_knowledge" USING btree (
   "type" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST
 );

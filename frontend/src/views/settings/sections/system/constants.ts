@@ -107,6 +107,19 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     supportsAudioTranscription: false
   },
   {
+    label: '悟空云 AI',
+    value: 'wukong_external',
+    description: '通过远端外部 API 注册获取系统级 Key，并以 OpenAI 兼容协议接入。',
+    baseUrl: 'https://www.72crm.com/crmapi/',
+    models: ['qwen-plus', 'qwen3-max', 'qwen3.6-plus'],
+    modelHint: '填写远端开放模型名称，例如 qwen3.6-plus。',
+    extraHeadersHint: '',
+    supportsStream: true,
+    supportsToolCall: true,
+    supportsVision: false,
+    supportsAudioTranscription: false
+  },
+  {
     label: '自定义 OpenAI 兼容服务',
     value: 'custom',
     description: '适用于自建或第三方兼容 OpenAI Chat Completions 的服务。',

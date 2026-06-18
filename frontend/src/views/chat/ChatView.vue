@@ -1585,6 +1585,7 @@
       :provider-options="apiKeySetupProviderOptions"
       :initial-config="apiKeySetupInitialConfig"
       @update:model-value="handleApiKeyModalVisibleChange"
+      @manage-quota="handleOpenExternalAiQuotaSettings"
       @save="handleSaveApiKey"
     />
     <ChatKnowledgePickerModal
@@ -1803,13 +1804,16 @@ const CHAT_CONTEXT_QUERY_KEYS = ['sessionId', 'customerId', 'employeeId', 'relat
 type ChatContextQueryKey = (typeof CHAT_CONTEXT_QUERY_KEYS)[number]
 
 const MAX_FILE_COUNT = MAX_CHAT_ATTACHMENT_COUNT
+const WUKONG_EXTERNAL_PROVIDER: AiProvider = 'wukong_external'
+const WUKONG_EXTERNAL_DEFAULT_API_URL = 'https://www.72crm.com/crmapi/'
+const WUKONG_EXTERNAL_DEFAULT_MODEL = 'qwen3.6-plus'
 const DEFAULT_CHAT_AI_CONFIG: AiConfigUpdateBO = {
-  provider: 'dashscope',
-  apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode',
+  provider: WUKONG_EXTERNAL_PROVIDER,
+  apiUrl: WUKONG_EXTERNAL_DEFAULT_API_URL,
   apiKey: '',
-  model: 'qwen3.5-plus',
+  model: WUKONG_EXTERNAL_DEFAULT_MODEL,
   temperature: 0.7,
-  maxTokens: 4096
+  maxTokens: 2048
 }
 const SCROLL_TO_BOTTOM_THRESHOLD_PX = 100
 const MOBILE_KEYBOARD_INSET_GAP_PX = 4
@@ -2797,14 +2801,34 @@ async function prepareApiKeySetupModal() {
 
   try {
     const detailConfig = await getAiConfigDetail()
-    apiKeySetupProviderOptions.value = detailConfig.availableProviders?.length
-      ? detailConfig.availableProviders
-      : []
+    const wukongProviderOptions = detailConfig.availableProviders?.filter((item) => item.value === WUKONG_EXTERNAL_PROVIDER) || []
+    apiKeySetupProviderOptions.value = wukongProviderOptions.length
+      ? wukongProviderOptions
+      : [{
+          label: '悟空云 AI',
+          value: WUKONG_EXTERNAL_PROVIDER,
+          description: '系统自动注册并维护悟空云 AI。',
+          baseUrl: WUKONG_EXTERNAL_DEFAULT_API_URL,
+          models: [WUKONG_EXTERNAL_DEFAULT_MODEL],
+          supportsStream: true,
+          supportsToolCall: true,
+          supportsVision: false,
+          supportsAudioTranscription: false,
+          configured: detailConfig.provider === WUKONG_EXTERNAL_PROVIDER && detailConfig.ready,
+          active: detailConfig.provider === WUKONG_EXTERNAL_PROVIDER,
+          apiKeyConfigured: detailConfig.provider === WUKONG_EXTERNAL_PROVIDER && detailConfig.ready,
+          savedApiUrl: detailConfig.provider === WUKONG_EXTERNAL_PROVIDER ? detailConfig.apiUrl : WUKONG_EXTERNAL_DEFAULT_API_URL,
+          savedModel: detailConfig.provider === WUKONG_EXTERNAL_PROVIDER ? detailConfig.model : WUKONG_EXTERNAL_DEFAULT_MODEL
+        }]
     apiKeySetupInitialConfig.value = {
-      provider: (detailConfig.provider || DEFAULT_CHAT_AI_CONFIG.provider) as AiProvider,
-      apiUrl: detailConfig.apiUrl || DEFAULT_CHAT_AI_CONFIG.apiUrl,
+      provider: WUKONG_EXTERNAL_PROVIDER,
+      apiUrl: detailConfig.provider === WUKONG_EXTERNAL_PROVIDER
+        ? detailConfig.apiUrl || WUKONG_EXTERNAL_DEFAULT_API_URL
+        : WUKONG_EXTERNAL_DEFAULT_API_URL,
       apiKey: '',
-      model: detailConfig.model || DEFAULT_CHAT_AI_CONFIG.model,
+      model: detailConfig.provider === WUKONG_EXTERNAL_PROVIDER
+        ? detailConfig.model || WUKONG_EXTERNAL_DEFAULT_MODEL
+        : WUKONG_EXTERNAL_DEFAULT_MODEL,
       temperature: detailConfig.temperature ?? DEFAULT_CHAT_AI_CONFIG.temperature,
       maxTokens: detailConfig.maxTokens ?? DEFAULT_CHAT_AI_CONFIG.maxTokens,
       extraHeadersJson: detailConfig.extraHeadersJson ?? ''
@@ -2815,12 +2839,21 @@ async function prepareApiKeySetupModal() {
   }
 }
 
+function handleOpenExternalAiQuotaSettings() {
+  void router.push({ path: '/settings/system/api' })
+}
+
 function resolveProviderLabel(provider?: AiProvider): string {
   return apiKeySetupProviderOptions.value.find((item) => item.value === provider)?.label || 'AI 服务商'
 }
 
 async function handleSaveApiKey(payload: AiConfigUpdateBO) {
   const resolvedProvider = (payload.provider || DEFAULT_CHAT_AI_CONFIG.provider) as AiProvider
+  if (resolvedProvider === WUKONG_EXTERNAL_PROVIDER) {
+    ElMessage.info('悟空云 AI 由系统自动维护密钥，请完善手机号获取更多额度。')
+    handleOpenExternalAiQuotaSettings()
+    return
+  }
   const trimmedApiKey = payload.apiKey.trim()
   const trimmedApiUrl = payload.apiUrl.trim()
   const trimmedModel = payload.model.trim()
@@ -2899,7 +2932,8 @@ const MODEL_PROVIDER_BRAND_URL: Record<string, string> = {
   arkl: arkBrandUrl,
   hunyuan: hunyuanBrandUrl,
   minimax: minimaxBrandUrl,
-  zhipu: zhipuBrandUrl
+  zhipu: zhipuBrandUrl,
+  wukong_external: '/logo.png'
 }
 
 function providerBrandAssetUrl(provider: string): string | undefined {

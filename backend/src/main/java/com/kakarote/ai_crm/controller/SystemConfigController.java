@@ -6,12 +6,18 @@ import com.kakarote.ai_crm.config.OidcConfig;
 import com.kakarote.ai_crm.entity.BO.AiProviderActivateBO;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
+import com.kakarote.ai_crm.entity.BO.ExternalAiCaptchaProxyBO;
+import com.kakarote.ai_crm.entity.BO.ExternalAiCompleteMobileBO;
+import com.kakarote.ai_crm.entity.BO.ExternalAiRegisterAndSaveBO;
+import com.kakarote.ai_crm.entity.BO.ExternalAiSmsCodeBO;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
+import com.kakarote.ai_crm.entity.VO.ExternalAiRegisterAndSaveVO;
 import com.kakarote.ai_crm.service.ISystemConfigService;
 import com.kakarote.ai_crm.service.OidcService;
+import com.kakarote.ai_crm.service.impl.ExternalAiProviderRegistrationService;
 import com.kakarote.ai_crm.utils.RequestContextUtil;
 import com.kakarote.ai_crm.utils.UserUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,6 +44,9 @@ public class SystemConfigController {
 
     @Autowired
     private OidcConfig oidcConfig;
+
+    @Autowired
+    private ExternalAiProviderRegistrationService externalAiProviderRegistrationService;
 
     @Value("${minio.enabled:false}")
     private boolean minioEnabled;
@@ -84,6 +93,43 @@ public class SystemConfigController {
     @RequirePermission("config:ai")
     public Result<AiConnectionTestVO> testAiConnection(@Valid @RequestBody AiConfigUpdateBO configBO) {
         return Result.ok(systemConfigService.testAiConnection(configBO));
+    }
+
+    @PostMapping("/ai/external-api/getCaptcha")
+    @Operation(summary = "代理获取外部 AI 图形验证码")
+    @RequirePermission("config:ai")
+    public Result<Object> externalAiGetCaptcha(@Valid @RequestBody ExternalAiCaptchaProxyBO request) {
+        return Result.ok(externalAiProviderRegistrationService.getCaptcha(request));
+    }
+
+    @PostMapping("/ai/external-api/checkCaptcha")
+    @Operation(summary = "代理校验外部 AI 图形验证码")
+    @RequirePermission("config:ai")
+    public Result<Object> externalAiCheckCaptcha(@Valid @RequestBody ExternalAiCaptchaProxyBO request) {
+        return Result.ok(externalAiProviderRegistrationService.checkCaptcha(request));
+    }
+
+    @PostMapping("/ai/external-api/sms-code")
+    @Operation(summary = "代理发送外部 AI 手机验证码")
+    @RequirePermission("config:ai")
+    public Result<Object> externalAiSmsCode(@Valid @RequestBody ExternalAiSmsCodeBO request) {
+        return Result.ok(externalAiProviderRegistrationService.sendSmsCode(request));
+    }
+
+    @PostMapping("/ai/external-api/register-and-save")
+    @Operation(summary = "注册外部 AI 并保存为系统模型")
+    @RequirePermission("config:ai")
+    public Result<ExternalAiRegisterAndSaveVO> externalAiRegisterAndSave(
+            @Valid @RequestBody ExternalAiRegisterAndSaveBO request) {
+        return Result.ok(externalAiProviderRegistrationService.registerAndSave(request));
+    }
+
+    @PostMapping("/ai/external-api/complete-mobile")
+    @Operation(summary = "完善外部 AI 手机号")
+    @RequirePermission("config:ai")
+    public Result<ExternalAiRegisterAndSaveVO> externalAiCompleteMobile(
+            @Valid @RequestBody ExternalAiCompleteMobileBO request) {
+        return Result.ok(externalAiProviderRegistrationService.completeMobile(request));
     }
 
     @GetMapping("/byType/{type}")

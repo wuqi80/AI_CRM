@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: wuknogcrm-registry.cn-beijing.cr.aliyuncs.com/wukongcrm/weknora-ui:v0.2.14
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/wechatopenai/weknora-ui:v0.3.6
     container_name: WeKnora-frontend
     volumes:
       - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template
@@ -13,12 +13,14 @@ services:
     depends_on:
       app:
         condition: service_healthy
+      crm:
+        condition: service_healthy
     networks:
       - crm-network
     restart: unless-stopped
 
   app:
-    image: wuknogcrm-registry.cn-beijing.cr.aliyuncs.com/wukongcrm/weknora-app:v0.2.14
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/wechatopenai/weknora-app:v0.3.6
     container_name: WeKnora-app
     ports:
       - "${APP_PORT:-8080}:8080"
@@ -100,7 +102,7 @@ services:
       - "host.docker.internal:host-gateway"
 
   docreader:
-    image: wuknogcrm-registry.cn-beijing.cr.aliyuncs.com/wukongcrm/weknora-docreader:v0.2.14
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/wechatopenai/weknora-docreader:v0.3.6
     build:
       context: .
       dockerfile: docker/Dockerfile.docreader
@@ -194,10 +196,12 @@ services:
     depends_on:
       crm:
         condition: service_healthy
+      frontend:
+        condition: service_started
     networks:
       - crm-network
   crm:
-    image: wuknogcrm-registry.cn-beijing.cr.aliyuncs.com/wukongcrm/wk_ai_crm:20260227
+    image: wuknogcrm-registry.cn-beijing.cr.aliyuncs.com/wukongcrm/wk_ai_crm:20260618
     container_name: crm
     platform: linux/amd64
     ports:

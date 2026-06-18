@@ -199,6 +199,27 @@ public final class AiProviderRegistry {
                 .build());
 
         register(AiProviderDescriptor.builder()
+                .code("wukong_external")
+                .displayName("悟空云 AI")
+                .description("通过悟空云外部 API 注册获取系统级 Key，并以 OpenAI 兼容协议接入单机版。")
+                .baseUrl("https://www.72crm.com/crmapi/")
+                .completionsPath(null)
+                .embeddingsPath(null)
+                .recommendedModels(List.of(
+                        "qwen-plus",
+                        "qwen3-max",
+                        "qwen3.6-plus"
+                ))
+                .modelHint("填写远端外部 API 开放的模型名称，例如 qwen3.6-plus。")
+                .extraHeadersHint("")
+                .defaultCapabilities(defaultCapabilities())
+                .apiUrlKeywords(List.of("/external-api", "external-api"))
+                .toolCallEnabledKeywords(List.of())
+                .toolCallDisabledKeywords(List.of())
+                .visionEnabledKeywords(List.of("qwen3.6-plus", "vl", "vision", "qvq", "omni"))
+                .build());
+
+        register(AiProviderDescriptor.builder()
                 .code("custom")
                 .displayName("自定义 OpenAI 兼容服务")
                 .description("适用于兼容 OpenAI Chat Completions 的自建或第三方服务。")

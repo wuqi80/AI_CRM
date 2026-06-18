@@ -59,6 +59,8 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     private static final String AI_MAX_TOKENS_KEY = "ai_max_tokens";
     private static final String AI_EXTRA_HEADERS_KEY = "ai_extra_headers";
     private static final String AI_PROVIDER_CONFIGS_KEY = "ai_provider_configs";
+    private static final String WUKONG_EXTERNAL_PROVIDER = "wukong_external";
+    private static final String WUKONG_EXTERNAL_MOBILE_COMPLETED_KEY = "ai_wukong_external_mobile_completed";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -168,8 +170,22 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateAiConfig(AiConfigUpdateBO updateBO) {
+        updateAiConfig(updateBO, false);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateManagedWukongExternalAiConfig(AiConfigUpdateBO updateBO) {
+        updateAiConfig(updateBO, true);
+    }
+
+    private void updateAiConfig(AiConfigUpdateBO updateBO, boolean allowManagedWukongExternal) {
         String normalizedApiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(updateBO.getApiUrl());
         AiProviderDescriptor descriptor = AiProviderRegistry.resolve(updateBO.getProvider(), normalizedApiUrl);
+        if (WUKONG_EXTERNAL_PROVIDER.equals(descriptor.getCode()) && !allowManagedWukongExternal) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                    "悟空云 AI 的密钥由系统自动注册维护，不能手动设置");
+        }
         Map<String, String> existingConfigs = getConfigsByType(AI_CONFIG_TYPE);
         Map<String, StoredProviderConfig> providerConfigs = loadWritableProviderConfigs(existingConfigs);
         String normalizedApiKey = resolveApiKeyForSave(descriptor.getCode(), updateBO.getApiKey(), providerConfigs);
@@ -380,6 +396,9 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         AiModelCapabilities capabilities = descriptor.resolveCapabilities(displaySnapshot.model());
 
         AiConfigVO vo = new AiConfigVO();
+        boolean wukongExternalMobileCompleted = Boolean.parseBoolean(
+                configs.getOrDefault(WUKONG_EXTERNAL_MOBILE_COMPLETED_KEY, "false")
+        );
         vo.setProvider(descriptor.getCode());
         vo.setProviderLabel(descriptor.getDisplayName());
         vo.setApiUrl(displaySnapshot.apiUrl());
@@ -395,11 +414,13 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         vo.setAvailableProviders(buildProviderOptions(
                 savedProviderConfigs,
                 detailView && includeSensitiveExtraHeaders,
-                selectedSavedProvider != null ? selectedSavedProvider.providerCode() : null
+                selectedSavedProvider != null ? selectedSavedProvider.providerCode() : null,
+                wukongExternalMobileCompleted
         ));
         vo.setMode(effectiveSnapshot.mode().getCode());
         vo.setCustomConfigSaved(customConfigSaved);
         vo.setReady(isAiReady(effectiveSnapshot.apiKey()));
+        vo.setWukongExternalMobileCompleted(wukongExternalMobileCompleted);
         vo.setUpdateTime(getLatestAiConfigUpdateTime());
         return vo;
     }
@@ -458,7 +479,8 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     private List<AiConfigVO.ProviderOptionVO> buildProviderOptions(Map<String, SavedProviderConfigSnapshot> savedProviderConfigs,
                                                                   boolean includeSensitiveExtraHeaders,
-                                                                  String activeProviderCode) {
+                                                                  String activeProviderCode,
+                                                                  boolean wukongExternalMobileCompleted) {
         return AiProviderRegistry.list().stream()
                 .map(descriptor -> {
                     AiConfigVO.ProviderOptionVO option = new AiConfigVO.ProviderOptionVO();
@@ -481,6 +503,8 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
                             && StrUtil.isNotBlank(activeProviderCode)
                             && descriptor.getCode().equalsIgnoreCase(activeProviderCode));
                     option.setApiKeyConfigured(savedConfig != null && StrUtil.isNotBlank(savedConfig.apiKey()));
+                    option.setMobileCompleted(WUKONG_EXTERNAL_PROVIDER.equalsIgnoreCase(descriptor.getCode())
+                            && wukongExternalMobileCompleted);
                     option.setSavedApiUrl(savedConfig != null ? savedConfig.apiUrl() : null);
                     option.setSavedModel(savedConfig != null ? savedConfig.model() : null);
                     option.setSavedTemperature(savedConfig != null ? savedConfig.temperature() : null);

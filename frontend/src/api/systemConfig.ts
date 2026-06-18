@@ -3,9 +3,14 @@ import type {
   AiConfig,
   AiProviderActivateBO,
   AiConfigUpdateBO,
+  ExternalAiCompleteMobileParams,
   AiConnectionTestResult,
   EnterpriseConfig,
   EnterpriseConfigUpdateBO,
+  ExternalAiCaptchaProxyParams,
+  ExternalAiRegisterAndSaveParams,
+  ExternalAiRegisterAndSaveResult,
+  ExternalAiSmsCodeParams,
   MinioConsoleConfig
 } from '@/types/systemConfig'
 
@@ -31,6 +36,30 @@ export function useCustomAiConfig(): Promise<void> {
 
 export function testAiConnection(data: AiConfigUpdateBO): Promise<AiConnectionTestResult> {
   return post('/systemConfig/ai/test', data)
+}
+
+export function externalAiGetCaptcha(data: ExternalAiCaptchaProxyParams): Promise<Record<string, unknown>> {
+  return post('/systemConfig/ai/external-api/getCaptcha', data)
+}
+
+export function externalAiCheckCaptcha(data: ExternalAiCaptchaProxyParams): Promise<Record<string, unknown>> {
+  return post('/systemConfig/ai/external-api/checkCaptcha', data)
+}
+
+export function externalAiSendSmsCode(data: ExternalAiSmsCodeParams): Promise<void> {
+  return post('/systemConfig/ai/external-api/sms-code', data)
+}
+
+export function externalAiRegisterAndSave(
+  data: ExternalAiRegisterAndSaveParams
+): Promise<ExternalAiRegisterAndSaveResult> {
+  return post('/systemConfig/ai/external-api/register-and-save', data)
+}
+
+export function externalAiCompleteMobile(
+  data: ExternalAiCompleteMobileParams
+): Promise<ExternalAiRegisterAndSaveResult> {
+  return post('/systemConfig/ai/external-api/complete-mobile', data)
 }
 
 export function getConfigsByType(type: string): Promise<Record<string, string>> {

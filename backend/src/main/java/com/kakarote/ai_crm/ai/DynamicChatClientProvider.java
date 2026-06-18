@@ -33,6 +33,8 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -295,6 +297,11 @@ public class DynamicChatClientProvider {
                 .maxCompletionTokens(maxTokens)
                 .streamUsage(true);
 
+        Map<String, String> httpHeaders = buildChatHttpHeaders(providerCode, baseUrl);
+        if (!httpHeaders.isEmpty()) {
+            builder.httpHeaders(httpHeaders);
+        }
+
         Map<String, Object> extraBody = new LinkedHashMap<>();
         applyThinkingDisabledOptions(extraBody, providerCode, baseUrl, resolvedModel);
         if (!extraBody.isEmpty()) {
@@ -302,6 +309,18 @@ public class DynamicChatClientProvider {
         }
 
         return builder.build();
+    }
+
+    private Map<String, String> buildChatHttpHeaders(String providerCode, String baseUrl) {
+        if (shouldRequestEventStream(providerCode, baseUrl)) {
+            return Map.of(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM_VALUE);
+        }
+        return Map.of();
+    }
+
+    private boolean shouldRequestEventStream(String providerCode, String baseUrl) {
+        String resolvedProviderCode = AiProviderRegistry.resolve(providerCode, normalizeCompatibleBaseUrl(baseUrl)).getCode();
+        return "wukong_external".equals(resolvedProviderCode);
     }
 
     private Object[] resolveDefaultTools() {
@@ -367,7 +386,9 @@ public class DynamicChatClientProvider {
     private boolean supportsParallelToolCalls(String providerCode, String baseUrl) {
         String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
         String resolvedProviderCode = AiProviderRegistry.resolve(providerCode, normalizedBaseUrl).getCode();
-        return "openai".equals(resolvedProviderCode) || "dashscope".equals(resolvedProviderCode);
+        return "openai".equals(resolvedProviderCode)
+                || "dashscope".equals(resolvedProviderCode)
+                || "wukong_external".equals(resolvedProviderCode);
     }
 
     private Double resolveRequestTemperature(String providerCode, String model, Double temperature) {

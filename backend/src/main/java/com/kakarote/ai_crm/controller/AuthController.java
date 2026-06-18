@@ -16,6 +16,7 @@ import com.kakarote.ai_crm.entity.VO.ManageUserVO;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.service.OidcService;
 import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.impl.ExternalAiProviderRegistrationService;
 import com.kakarote.ai_crm.service.support.UserPreferenceSupport;
 import com.kakarote.ai_crm.utils.UserUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,6 +35,7 @@ import org.springframework.security.authentication.InternalAuthenticationService
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -41,6 +43,7 @@ import java.util.Map;
 /**
  * 认证控制器
  */
+@Slf4j
 @RestController
 @RequestMapping("/auth")
 @Tag(name = "认证接口")
@@ -69,6 +72,9 @@ public class AuthController {
 
     @Autowired
     private AjCaptchaProperties captchaProperties;
+
+    @Autowired
+    private ExternalAiProviderRegistrationService externalAiProviderRegistrationService;
 
     @PostMapping("/login")
     @Operation(summary = "用户登录")
@@ -104,6 +110,8 @@ public class AuthController {
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, sessionCookie.toString());
 
+        ensureWukongExternalAiProvider();
+
         // Build response
         Map<String, Object> result = new HashMap<>();
         result.put("token", token);
@@ -122,6 +130,14 @@ public class AuthController {
         result.put("userInfo", userVO);
 
         return Result.ok(result);
+    }
+
+    private void ensureWukongExternalAiProvider() {
+        try {
+            externalAiProviderRegistrationService.ensureWukongExternalProvider();
+        } catch (Exception e) {
+            log.warn("自动初始化悟空云 AI 配置失败，登录流程继续: {}", e.getMessage());
+        }
     }
 
     private void verifyCaptchaIfNecessary(LoginUserBO loginUserBO) {

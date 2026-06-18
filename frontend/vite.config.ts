@@ -4,7 +4,7 @@ import legacy from '@vitejs/plugin-legacy'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
-const devProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:8088'
+const devProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:8152'
 const syncProxyTarget = process.env.VITE_SYNC_DEV_PROXY_TARGET || 'http://127.0.0.1:10456'
 const androidLegacyTargets = ['Android >= 8', 'Chrome >= 61']
 const packageJson = JSON.parse(readFileSync(resolve(__dirname, './package.json'), 'utf-8')) as { version?: string }

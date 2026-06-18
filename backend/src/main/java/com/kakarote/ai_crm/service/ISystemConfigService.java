@@ -33,6 +33,8 @@ public interface ISystemConfigService extends IService<SystemConfig> {
 
     void updateAiConfig(AiConfigUpdateBO updateBO);
 
+    void updateManagedWukongExternalAiConfig(AiConfigUpdateBO updateBO);
+
     void activateAiProvider(String provider);
 
     void useCustomAiConfig();

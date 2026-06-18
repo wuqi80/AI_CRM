@@ -1,10 +1,16 @@
 package com.kakarote.ai_crm.config;
 
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
+import com.kakarote.ai_crm.common.auth.DataPermissionHolder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.TaskDecorator;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.concurrent.Executor;
 
@@ -28,6 +34,7 @@ public class AsyncConfig {
         executor.setQueueCapacity(100);
         executor.setKeepAliveSeconds(60);
         executor.setThreadNamePrefix("customer-ai-analysis-");
+        executor.setTaskDecorator(contextPropagatingTaskDecorator());
         executor.setWaitForTasksToCompleteOnShutdown(false);
         executor.initialize();
         return executor;
@@ -44,6 +51,28 @@ public class AsyncConfig {
         executor.setWaitForTasksToCompleteOnShutdown(false);
         executor.initialize();
         return executor;
+    }
+
+    private TaskDecorator contextPropagatingTaskDecorator() {
+        return task -> {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            Long aiSessionId = AiContextHolder.getCurrentSessionId();
+            return () -> {
+                try {
+                    SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+                    securityContext.setAuthentication(authentication);
+                    SecurityContextHolder.setContext(securityContext);
+                    if (aiSessionId != null) {
+                        AiContextHolder.setSessionId(aiSessionId);
+                    }
+                    task.run();
+                } finally {
+                    SecurityContextHolder.clearContext();
+                    DataPermissionHolder.clear();
+                    AiContextHolder.clearThreadContext();
+                }
+            };
+        };
     }
 
 }

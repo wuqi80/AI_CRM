@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue';
 import legacy from '@vitejs/plugin-legacy';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-var devProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:8088';
+var devProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:8152';
 var syncProxyTarget = process.env.VITE_SYNC_DEV_PROXY_TARGET || 'http://127.0.0.1:10456';
 var androidLegacyTargets = ['Android >= 8', 'Chrome >= 61'];
 var packageJson = JSON.parse(readFileSync(resolve(__dirname, './package.json'), 'utf-8'));

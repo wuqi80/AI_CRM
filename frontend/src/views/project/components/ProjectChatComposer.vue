@@ -606,6 +606,7 @@ const MODEL_PROVIDER_BRAND_URL: Record<string, string> = {
   hunyuan: hunyuanBrandUrl,
   minimax: minimaxBrandUrl,
   zhipu: zhipuBrandUrl,
+  wukong_external: '/logo.png',
 }
 
 function providerBrandAssetUrl(provider: string): string | undefined {

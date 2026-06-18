@@ -7,6 +7,7 @@ export type AiProvider =
   | 'hunyuan'
   | 'minimax'
   | 'zhipu'
+  | 'wukong_external'
   | 'custom'
 
 export type AiMode = 'custom'
@@ -33,6 +34,7 @@ export interface AiProviderPreset {
   configured?: boolean
   active?: boolean
   apiKeyConfigured?: boolean
+  mobileCompleted?: boolean
   savedApiUrl?: string | null
   savedModel?: string | null
   savedTemperature?: number | null
@@ -58,6 +60,7 @@ export interface AiConfig {
   mode?: AiMode
   customConfigSaved?: boolean
   ready?: boolean
+  wukongExternalMobileCompleted?: boolean
   updateTime?: string
 }
 
@@ -81,6 +84,42 @@ export interface AiConnectionTestResult {
   message: string
   model?: string
   provider?: AiProvider
+}
+
+export interface ExternalAiCaptchaProxyParams {
+  apiUrl: string
+  payload?: Record<string, unknown>
+}
+
+export interface ExternalAiSmsCodeParams {
+  apiUrl: string
+  mobile: string
+  captchaVerification: string
+}
+
+export interface ExternalAiRegisterAndSaveParams {
+  apiUrl: string
+  mobile?: string
+  verificationCode?: string
+  accountName?: string
+  model?: string
+  temperature?: number
+  maxTokens?: number
+  extraHeadersJson?: string
+}
+
+export interface ExternalAiCompleteMobileParams {
+  apiUrl?: string
+  mobile: string
+  verificationCode: string
+}
+
+export interface ExternalAiRegisterAndSaveResult {
+  provider: AiProvider
+  apiUrl: string
+  model: string
+  keyPrefix?: string
+  apiKeyConfigured: boolean
 }
 
 export interface MinioConsoleConfig {
